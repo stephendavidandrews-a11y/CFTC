@@ -1,0 +1,28 @@
+# environment
+.env
+.env.save
+.env.*
+
+# databases and data
+/data/
+*.db
+*.sql
+*.dump
+
+# node
+node_modules/
+
+# python
+__pycache__/
+*.pyc
+venv/
+*.egg-info/
+
+# pdf storage
+cftc-comment-system/pdf_storage/
+
+# docker
+*.log
+
+# backups
+*.bak

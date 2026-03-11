@@ -1,0 +1,132 @@
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL (for comment analysis system)
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: cftc-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: cftc_comments
+      POSTGRES_USER: ${DB_USER:-cftc_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-cftc_user} -d cftc_comments"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Comment Analysis Backend (FastAPI + PostgreSQL)
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./cftc-comment-system
+      dockerfile: Dockerfile
+    container_name: cftc-backend
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql+asyncpg://${DB_USER:-cftc_user}:${DB_PASSWORD}@postgres:5432/cftc_comments"
+      DATABASE_URL_SYNC: "postgresql+psycopg2://${DB_USER:-cftc_user}:${DB_PASSWORD}@postgres:5432/cftc_comments"
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?Set ANTHROPIC_API_KEY in .env}
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env}
+      CORS_ORIGINS: '["https://${DOMAIN:-localhost}"]'
+      APP_ENV: production
+      LOG_LEVEL: INFO
+    volumes:
+      - pdf_storage:/app/pdf_storage
+
+  # ---------------------------------------------------------------------------
+  # Pipeline Manager Backend (FastAPI + SQLite)
+  # ---------------------------------------------------------------------------
+  pipeline-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.pipeline
+    container_name: cftc-pipeline-backend
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql+asyncpg://${DB_USER:-cftc_user}:${DB_PASSWORD}@postgres:5432/cftc_comments"
+      DATABASE_URL_SYNC: "postgresql+psycopg2://${DB_USER:-cftc_user}:${DB_PASSWORD}@postgres:5432/cftc_comments"
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env}
+      CORS_ORIGINS: '["https://${DOMAIN:-localhost}"]'
+      APP_ENV: production
+      LOG_LEVEL: INFO
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      FROM_EMAIL: ${FROM_EMAIL:-}
+      MANAGER_EMAIL: ${MANAGER_EMAIL:-}
+      CFTC_REGULATORY_DB_PATH: /data/cftc_regulatory.db
+      EO_TRACKER_DB_PATH: /data/eo_tracker.db
+    volumes:
+      - pipeline_data:/app/app/pipeline/data
+      - work_data:/app/app/work/data
+      - pdf_storage:/app/pdf_storage
+      - ./data/cftc_regulatory.db:/data/cftc_regulatory.db:ro
+      - ./data/eo_tracker.db:/data/eo_tracker.db:ro
+
+  # ---------------------------------------------------------------------------
+  # Comment Analyzer Frontend (React + Nginx)
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./cftc-frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: /api/v1
+    container_name: cftc-frontend
+    restart: always
+    depends_on:
+      - backend
+
+  # ---------------------------------------------------------------------------
+  # Command Center Frontend (React + Nginx)
+  # ---------------------------------------------------------------------------
+  command-center:
+    build:
+      context: ./Command Center
+      dockerfile: Dockerfile
+    container_name: cftc-command-center
+    restart: always
+    depends_on:
+      - pipeline-backend
+      - backend
+
+  # ---------------------------------------------------------------------------
+  # Caddy (reverse proxy — Cloudflare Tunnel handles SSL)
+  # ---------------------------------------------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    container_name: cftc-caddy
+    restart: always
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+      - ../personal-site:/srv/personal-site:ro
+    depends_on:
+      - frontend
+      - command-center
+
+volumes:
+  pgdata:
+  pdf_storage:
+  pipeline_data:
+  work_data:
+  caddy_data:
+  caddy_config:

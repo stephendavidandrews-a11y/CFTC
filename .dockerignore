@@ -1,0 +1,19 @@
+__pycache__
+*.pyc
+.env
+.git
+*.egg-info
+.pytest_cache
+node_modules
+cftc-comment-system
+cftc-frontend
+cftc-comments
+Command Center
+stage1
+output
+deploy
+Executive Order Tracker
+Authorities Scrapper
+*.db
+*.zip
+.dockerignore.pipeline

@@ -1,0 +1,140 @@
+{
+  "generated": "2026-02-17",
+  "overview": "This checklist synthesizes compliance obligations arising from thirty-five high-relevance presidential documents spanning two administrations. The CFTC is operating in an unusually dense compliance environment shaped by three converging agendas of the current administration: Aggressive deregulation driven by DOGE and broad regulatory review mandates; A crypto-forward policy agenda led by the Presidential Working Group on Digital Asset Markets; and A significant expansion of presidential oversight over independent agencies. The most pressing immediate obligations stem from several key executive orders: Executive Order 14178 establishes the digital-asset regulatory framework and imposes a 180-day deadline for the Working Group, which fell on July 21, 2025. Executive Order 14219 requires a sixty-day deregulatory review, with an approximate deadline of April 20, 2025. Executive Order 14215 mandates submission of significant regulations to OIRA and the establishment of a White House Liaison position. Executive Order 14192 imposes a ten-for-one deregulation ratio. Because many deadlines in early-2025 executive orders have already passed, the agency faces compliance gaps that require immediate remediation. Although the CFTC’s status as an independent agency provides legal arguments against mandatory compliance with some directives, the administration has articulated an expansive theory of executive authority over independent agencies—most forcefully in Executive Order 14215—and the current political environment strongly favors voluntary compliance in most areas. Against this backdrop, the Deputy General Counsel’s office must simultaneously manage backward-looking remediation of missed deadlines, implement current operational mandates, and navigate forward-looking rulemaking constraints, all while preserving the CFTC’s statutory independence and advancing Chairman Selig’s ten priorities.",
+  "mandatory": [
+    {
+      "id": 1,
+      "source": "EO 14267, Section 3",
+      "eo_number": 14267,
+      "directive": "Within 70 days, all agency heads shall provide a list of regulations with anti-competitive effects, including those creating barriers to entry or limiting market competition, with recommendations for rescission or modification.",
+      "cftc_obligation": "CFTC must review all regulations for anti-competitive effects and submit a list with recommendations for rescission or modification. This includes DCM registration requirements, SEF rules, clearing mandates, margin rules, and registration barriers that may favor incumbents over new market entrants (including crypto-native platforms).",
+      "deadline": "June 18, 2025 (70 days from April 9, 2025)",
+      "status": "overdue"
+    },
+    {
+      "id": 2,
+      "source": "EO 14178, Section 3(a)",
+      "eo_number": 14178,
+      "directive": "Within 30 days, each agency head shall identify all regulations, guidance documents, orders, and other items affecting the digital asset sector.",
+      "cftc_obligation": "CFTC must compile a comprehensive inventory of all regulations (17 CFR), guidance documents, no-action letters, staff advisories, interpretive letters, orders, and enforcement precedents that affect or could affect the digital asset sector.",
+      "deadline": "February 22, 2025 (PASSED)",
+      "status": "overdue"
+    },
+    {
+      "id": 3,
+      "source": "EO 14178, Section 3(b)",
+      "eo_number": 14178,
+      "directive": "Within 60 days, agencies shall submit recommendations on whether identified regulations should be rescinded, modified, or adopted as regulation through notice-and-comment rulemaking.",
+      "cftc_obligation": "CFTC must submit written recommendations to PWG on disposition of each item identified in the 30-day inventory: rescind, modify, maintain, or codify through formal rulemaking. \nRecommendations must align with EO 14178's policy of promoting innovation, technology-neutral regulation, and well-defined jurisdictional boundaries.",
+      "deadline": "March 24, 2025 (PASSED)",
+      "status": "overdue"
+    },
+    {
+      "id": 4,
+      "source": "EO 14219, Section 2(a)-(b)",
+      "eo_number": 14219,
+      "directive": "All agency heads shall review all existing regulations under sole or joint jurisdiction and identify those that are: \nunconstitutional, \nbased on unlawful delegations, \nnot based on best reading of statute,\naddress major questions without clear authorization,  \nimpose costs exceeding benefits, \nimpede innovation, or \nburden small business. \nSubmit classified list to OIRA within 60 days.",
+      "cftc_obligation": "CFTC must conduct a comprehensive regulation-by-regulation review of all of 17 CFR Chapter I (Parts 1-190), all staff guidance documents, all no-action letters, and all advisory letters against the seven deregulatory criteria. Results must be classified by category and submitted to OIRA. The scope includes joint SEC-CFTC rules under Title VII.",
+      "deadline": "April 20, 2025 (60 days from February 19, 2025) — LIKELY PASSED OR IMMINENT",
+      "status": "overdue"
+    },
+    {
+      "id": 5,
+      "source": "EO 14192, Sections 2-4",
+      "eo_number": 14192,
+      "directive": "Agencies must repeal 10 existing regulations for every 1 new regulation issued. Total incremental cost of all new regulations in FY 2025 must be significantly less than zero. OMB must approve additions/removals from Unified Regulatory Agenda.",
+      "cftc_obligation": "For every new CFTC regulation promulgated (including for Selig priorities like perpetual derivatives, tokenized collateral, DeFi safe harbors, etc.), the CFTC must identify and repeal 10 existing regulations. The CFTC must achieve net negative regulatory costs for FY 2025. All rulemaking plans must be submitted to OMB for Unified Regulatory Agenda approval.",
+      "deadline": "Immediate upon any new rulemaking; FY 2025 net negative cost target by September 30, 2025; FY 2026 Regulatory Plan submission per OMB schedule",
+      "status": "active"
+    },
+    {
+      "id": 6,
+      "source": "EO 14215, Sections 2-4",
+      "eo_number": 14215,
+      "directive": "Independent regulatory agencies must submit all significant regulatory actions to OIRA for review before Federal Register publication.\nAgency chairmen must regularly consult with OMB Director, DPC Director, and NEC Director. \nAgencies must establish White House Liaison positions.",
+      "cftc_obligation": "CFTC must: (1) establish process for submitting all significant regulatory actions to OIRA before publication; \n(2) Chairman Selig must establish regular consultation schedule with OMB, DPC, and NEC directors; \n(3) create and fill a GS-15 White House Liaison position in Schedule C excepted service; \n(4) submit strategic plans to OMB for clearance before finalization; \n(5) comply with OMB performance standards and management objectives.",
+      "deadline": "60 days from February 18, 2025 (approximately April 19, 2025) or completion of OMB guidance, whichever is later. White House Liaison position: immediate/ongoing.",
+      "status": "active"
+    },
+    {
+      "id": 7,
+      "source": "EO 14178, Section 6",
+      "eo_number": 14178,
+      "directive": "Agencies are prohibited from undertaking actions to establish, issue, or promote CBDCs.",
+      "cftc_obligation": "CFTC must not engage in any rulemaking, guidance, or other action that would facilitate or promote a Central Bank Digital Currency. Any pending or planned work related to CBDCs must be terminated.",
+      "deadline": "Immediate and ongoing (effective January 23, 2025)",
+      "status": "active"
+    },
+    {
+      "id": 8,
+      "source": "EO 14222, Sections 3(a)-(g)",
+      "eo_number": 14222,
+      "directive": "Agencies must build centralized payment tracking systems, conduct 30-day reviews of all contracts and grants, review contracting policies/personnel, freeze credit cards for 30 days, implement travel justification systems, update real property inventories, and identify lease termination rights.",
+      "cftc_obligation": "CFTC must: (1) build centralized technology system to track and justify every payment under covered contracts/grants; (2) complete review of all existing contracts and grants with authority to terminate/modify; (3) complete review of all contracting policies, procedures, and personnel; (4) implement credit card freeze (with Chairman exceptions for critical services); (5) build travel justification and approval system; (6) update Federal Real Property Profile; (7) identify all lease termination rights; (8) provide monthly reports to DOGE Administrator on contracting and travel.",
+      "deadline": "Multiple deadlines, most already PASSED: 7 days (real property update — March 5, 2025); 30 days (contract review, contracting policy review, credit card freeze, lease termination identification — all March 28, 2025). Monthly reporting is ongoing.",
+      "status": "overdue"
+    },
+    {
+      "id": 9,
+      "source": "EO 14233, Section 3",
+      "eo_number": 14233,
+      "directive": "All agencies must provide full accounting of digital asset holdings to Secretary of Treasury and PWG within 30 days, and review legal authority to transfer digital assets to Treasury.",
+      "cftc_obligation": "CFTC must report all digital assets in its possession or control (from enforcement forfeitures, settlements, or any other source) to Treasury Secretary and the Presidential Working Group. CFTC must also review its legal authority to transfer these assets to Treasury's Strategic Bitcoin Reserve or Digital Asset Stockpile.",
+      "deadline": "April 5, 2025 (30 days from March 6, 2025) — PASSED",
+      "status": "overdue"
+    },
+    {
+      "id": 10,
+      "source": "EO 14210, Sections 2-4",
+      "eo_number": 14210,
+      "directive": "Agencies must implement 1:4 hiring ratio (hire 1 for every 4 departures), prepare for large-scale reductions in force, eliminate non-statutorily mandated functions, consult with DOGE Team Lead on new career appointments, and submit reorganization reports to OMB within 30 days.",
+      "cftc_obligation": "CFTC must: (1) implement 1:4 hiring restriction; (2) prepare RIF plans targeting non-statutorily mandated functions; (3) consult DOGE Team Lead before making new career appointments; (4) submit reorganization report to OMB; (5) provide monthly hiring reports to USDS.",
+      "deadline": "30 days for reorganization report (approximately March 13, 2025 — PASSED). Hiring ratio is ongoing. Monthly reporting ongoing.",
+      "status": "overdue"
+    },
+    {
+      "id": 11,
+      "source": "EO 14219, Section 3(a)-(b)",
+      "eo_number": 14219,
+      "directive": "Agencies shall de-prioritize enforcement of regulations not based on best reading of statute and terminate ongoing enforcement proceedings inconsistent with Constitution, laws, or Administration policy on case-by-case basis.",
+      "cftc_obligation": "Division of Enforcement must review all pending enforcement actions and investigations to determine whether the underlying regulations reflect the 'best reading' of the CEA. Cases premised on expansive interpretations of CFTC authority — particularly in novel areas like DeFi protocol enforcement, broad manipulation theories, and extraterritorial assertions — must be evaluated. Cases identified as inconsistent must be considered for termination or modification.",
+      "deadline": "Ongoing; immediate review required. Should be completed concurrent with Section 2 regulatory review (April 20, 2025 target).",
+      "status": "active"
+    },
+    {
+      "id": 12,
+      "source": "EO 14178, Sections 3 and 5",
+      "eo_number": 14178,
+      "directive": "CFTC Chairman must participate as a member of the President's Working Group on Digital Asset Markets; \nWorking Group must deliver report within 180 days proposing federal regulatory framework for digital assets including legislative proposals.",
+      "cftc_obligation": "Chairman Selig must actively participate in all PWG meetings and deliberations.\nCFTC must contribute substantive regulatory and legislative proposals for the 180-day report, including recommendations on jurisdictional boundaries between CFTC and SEC, treatment of digital commodities, DeFi protocols, stablecoins, and derivatives. \nCFTC staff must prepare position papers, draft regulatory text, and legislative language for Chairman's use in PWG proceedings.",
+      "deadline": "July 21, 2025 (180 days from January 23, 2025) for final Working Group report. Interim participation is ongoing.",
+      "status": "active"
+    }
+  ],
+  "encouraged": [
+    {
+      "source": "EO 14215, Section 3(c)",
+      "eo_number": 14215,
+      "directive": "OMB Director reviews agency obligations for consistency with presidential policies and can adjust budget apportionments accordingly.",
+      "rationale": "While the constitutionality of OMB apportionment control over independent agencies is debatable, proactive alignment with presidential policies on crypto regulation and deregulation protects the CFTC's budget and demonstrates cooperative posture. Chairman Selig's priorities already align with administration policy, making voluntary compliance strategically advantageous.",
+      "risk": "OMB could restrict CFTC spending on activities deemed inconsistent with presidential policies. Budget retaliation could impair the CFTC's ability to hire staff, procure technology, or conduct enforcement — directly undermining Selig's agenda. Congressional allies may be limited given bipartisan deregulatory trends.",
+      "deadline": "Ongoing"
+    },
+    {
+      "source": "EO 13892, Sections 3-5",
+      "eo_number": 13892,
+      "directive": "Agencies must publish all enforcement-relevant guidance, provide advance notice of legal standards, establish pre-enforcement ruling procedures, and give parties opportunity to be heard before adverse actions.",
+      "rationale": "Even though this is a Trump 1 era EO that was revoked and then effectively reinstated by Trump 2 administration policy, compliance strengthens CFTC enforcement actions against legal challenge. Post-Loper Bright, parties will aggressively challenge enforcement based on unpublished guidance. Compliance also supports Selig Priority 4 (DeFi safe harbors) by establishing formal pre-enforcement ruling mechanisms that could provide regulatory clarity to DeFi developers.",
+      "risk": "Enforcement actions could be challenged on due process grounds. Courts may dismiss cases where defendants argue they were not given fair notice of applicable legal standards. The current judicial environment is highly receptive to such arguments.",
+      "deadline": "Various (120-270 days from original issuance, but ongoing compliance obligation)"
+    },
+    {
+      "source": "EO 13891, Sections 3-4",
+      "eo_number": 13891,
+      "directive": "Agencies must establish searchable public databases of all guidance documents, treat guidance as non-binding, implement public comment periods for significant guidance, and review/rescind outdated guidance.",
+      "rationale": "The CFTC's extensive body of staff letters and no-action relief provides critical market certainty. Establishing a comprehensive searchable database strengthens the CFTC's regulatory transparency and could advance the Future-Proof Initiative. However, treating all guidance as truly non-binding could reduce regulatory certainty that market participants depend on, requiring careful communication.",
+      "risk": "Regulated entities may challenge CFTC enforcement actions premised on guidance documents. Courts post-Loper Bright are less likely to defer to agency interpretations expressed through guidance rather than notice-and-comment rulemaking.",
+      "deadline": "120-300 days from OMB implementing memorandum (original dates passed, but principle remains operative under current administration policy)"
+    }
+  ]
+}
