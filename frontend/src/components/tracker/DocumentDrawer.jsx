@@ -1,0 +1,151 @@
+import React from "react";
+import DrawerShell from "./DrawerShell";
+import { fetchJSON } from "../../api/client";
+
+const INPUT_STYLE = {
+  width: "100%",
+  padding: "8px 12px",
+  borderRadius: 6,
+  border: "1px solid #1f2937",
+  background: "#0f172a",
+  color: "#f1f5f9",
+  fontSize: 13,
+  boxSizing: "border-box",
+};
+const LABEL_STYLE = { display: "block", fontSize: 12, fontWeight: 600, color: "#94a3b8", marginBottom: 4 };
+const SAVE_BTN = { background: "#1e40af", color: "#fff", padding: "8px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" };
+const CANCEL_BTN = { background: "transparent", color: "#64748b", padding: "8px 20px", borderRadius: 8, fontSize: 13, border: "1px solid #1f2937", cursor: "pointer" };
+
+const EMPTY = {
+  title: "",
+  document_type: "",
+  matter_id: "",
+  status: "",
+  assigned_to_person_id: "",
+  version_label: "",
+  due_date: "",
+  summary: "",
+  notes: "",
+};
+
+export default function DocumentDrawer({ isOpen, onClose, document: doc, matterId, onSaved }) {
+  const [form, setForm] = React.useState({ ...EMPTY });
+  const [enums, setEnums] = React.useState({});
+  const [people, setPeople] = React.useState([]);
+  const [matters, setMatters] = React.useState([]);
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState(null);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    Promise.all([
+      fetchJSON("/tracker/lookups/enums/document_type").catch(() => []),
+      fetchJSON("/tracker/lookups/enums/document_status").catch(() => []),
+      fetchJSON("/tracker/people?limit=100").catch(() => ({ items: [] })),
+      fetchJSON("/tracker/matters?limit=200").catch(() => ({ items: [] })),
+    ]).then(([docType, docStatus, ppl, matterList]) => {
+      setEnums({ document_type: docType, document_status: docStatus });
+      setPeople(ppl.items || ppl || []);
+      setMatters(matterList.items || matterList || []);
+    });
+  }, [isOpen]);
+
+  React.useEffect(() => {
+    if (doc) {
+      setForm({
+        title: doc.title || "",
+        document_type: doc.document_type || "",
+        matter_id: doc.matter_id || "",
+        status: doc.status || "",
+        assigned_to_person_id: doc.assigned_to_person_id || "",
+        version_label: doc.version_label || "",
+        due_date: doc.due_date || "",
+        summary: doc.summary || "",
+        notes: doc.notes || "",
+      });
+    } else {
+      setForm({ ...EMPTY, matter_id: matterId || "" });
+    }
+    setError(null);
+  }, [doc, matterId, isOpen]);
+
+  const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+
+  const handleSave = async () => {
+    setError(null);
+    setSaving(true);
+    try {
+      const payload = { ...form };
+      Object.keys(payload).forEach((k) => { if (payload[k] === "") payload[k] = null; });
+      if (!payload.title) { setError("Title is required"); setSaving(false); return; }
+      if (!payload.document_type) { setError("Document type is required"); setSaving(false); return; }
+
+      if (doc?.id) {
+        await fetchJSON(`/tracker/documents/${doc.id}`, { method: "PUT", body: JSON.stringify(payload) });
+      } else {
+        await fetchJSON("/tracker/documents", { method: "POST", body: JSON.stringify(payload) });
+      }
+      if (onSaved) onSaved();
+      onClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const renderSelect = (label, field, options) => (
+    <div style={{ marginBottom: 14 }}>
+      <label style={LABEL_STYLE}>{label}</label>
+      <select style={INPUT_STYLE} value={form[field]} onChange={set(field)}>
+        <option value="">--</option>
+        {(Array.isArray(options) ? options : []).map((v) => (
+          <option key={typeof v === "object" ? v.value : v} value={typeof v === "object" ? v.value : v}>
+            {typeof v === "object" ? v.label || v.value : v}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+
+  const renderInput = (label, field, type = "text", extra = {}) => (
+    <div style={{ marginBottom: 14 }}>
+      <label style={LABEL_STYLE}>{label}</label>
+      <input style={INPUT_STYLE} type={type} value={form[field]} onChange={set(field)} {...extra} />
+    </div>
+  );
+
+  const personOpts = people.map((p) => ({ value: p.id, label: `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.full_name || `Person #${p.id}` }));
+  const matterOpts = matters.map((m) => ({ value: m.id, label: m.title || `Matter #${m.id}` }));
+
+  const isEdit = !!doc?.id;
+
+  return (
+    <DrawerShell isOpen={isOpen} onClose={onClose} title={isEdit ? "Edit Document" : "New Document"}>
+      {renderInput("Title", "title", "text", { required: true })}
+      {renderSelect("Document Type", "document_type", enums.document_type)}
+      {renderSelect("Matter", "matter_id", matterOpts)}
+      {renderSelect("Status", "status", enums.document_status)}
+      {renderSelect("Assigned To", "assigned_to_person_id", personOpts)}
+      {renderInput("Version Label", "version_label")}
+      {renderInput("Due Date", "due_date", "date")}
+      <div style={{ marginBottom: 14 }}>
+        <label style={LABEL_STYLE}>Summary</label>
+        <textarea style={{ ...INPUT_STYLE, minHeight: 60, resize: "vertical" }} value={form.summary} onChange={set("summary")} />
+      </div>
+      <div style={{ marginBottom: 14 }}>
+        <label style={LABEL_STYLE}>Notes</label>
+        <textarea style={{ ...INPUT_STYLE, minHeight: 60, resize: "vertical" }} value={form.notes} onChange={set("notes")} />
+      </div>
+
+      {error && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 10 }}>{error}</div>}
+
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", paddingTop: 16, borderTop: "1px solid #1f2937", marginTop: 10 }}>
+        <button style={CANCEL_BTN} onClick={onClose}>Cancel</button>
+        <button style={{ ...SAVE_BTN, opacity: saving ? 0.6 : 1 }} onClick={handleSave} disabled={saving}>
+          {saving ? "Saving..." : "Save"}
+        </button>
+      </div>
+    </DrawerShell>
+  );
+}

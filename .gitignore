@@ -26,3 +26,4 @@ cftc-comment-system/pdf_storage/
 
 # backups
 *.bak
+.gitnexus

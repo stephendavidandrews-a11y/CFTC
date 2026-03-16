@@ -1,39 +1,8 @@
 {
-    auto_https off
+	auto_https off
 }
 
 http://stephenandrews.org, http://www.stephenandrews.org {
-    root * /srv/personal-site
-    file_server
-}
-
-http://cftc.stephenandrews.org {
-    basicauth {
-        Stephen $2a$14$a4Az8Bd3E7WcQ21wpohzLO0ofSR3Hv0En79l2vgU4ss.pnJvy2LHq
-    }
-
-    # Pipeline API
-    handle /pipeline/* {
-        reverse_proxy pipeline-backend:8000
-    }
-
-    # Legacy pipeline API path
-    handle /api/v1/pipeline/* {
-        reverse_proxy pipeline-backend:8000
-    }
-
-    # Comment system API
-    handle /api/* {
-        reverse_proxy backend:8000
-    }
-
-    # Health check
-    handle /health {
-        reverse_proxy pipeline-backend:8000
-    }
-
-    # Default: Command Center is the main site
-    handle {
-        reverse_proxy command-center:80
-    }
+	root * /srv/personal-site
+	file_server
 }
