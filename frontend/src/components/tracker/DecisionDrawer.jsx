@@ -27,6 +27,7 @@ const EMPTY = {
   recommended_option: "",
   decision_result: "",
   notes: "",
+  made_at: "",
 };
 
 export default function DecisionDrawer({ isOpen, onClose, decision, matterId, onSaved }) {
@@ -64,6 +65,7 @@ export default function DecisionDrawer({ isOpen, onClose, decision, matterId, on
         recommended_option: decision.recommended_option || "",
         decision_result: decision.decision_result || "",
         notes: decision.notes || "",
+        made_at: decision.made_at ? decision.made_at.slice(0, 16) : "",
       });
     } else {
       setForm({ ...EMPTY, matter_id: matterId || "" });
@@ -149,6 +151,8 @@ export default function DecisionDrawer({ isOpen, onClose, decision, matterId, on
         <label style={LABEL_STYLE}>Notes</label>
         <textarea style={{ ...INPUT_STYLE, minHeight: 60, resize: "vertical" }} value={form.notes} onChange={set("notes")} />
       </div>
+
+      {form.status === "made" && renderInput("Decision Made At", "made_at", "datetime-local")}
 
       {error && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 10 }}>{error}</div>}
 

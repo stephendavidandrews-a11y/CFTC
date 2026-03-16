@@ -30,6 +30,9 @@ const EMPTY = {
   waiting_on_person_id: "",
   waiting_on_org_id: "",
   expected_output: "",
+  completion_notes: "",
+  next_follow_up_date: "",
+  delegated_by_person_id: "",
 };
 
 export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved }) {
@@ -47,7 +50,7 @@ export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved })
       fetchJSON("/tracker/lookups/enums/task_status").catch(() => []),
       fetchJSON("/tracker/lookups/enums/task_mode").catch(() => []),
       fetchJSON("/tracker/lookups/enums/task_type").catch(() => []),
-      fetchJSON("/tracker/lookups/enums/priority").catch(() => []),
+      fetchJSON("/tracker/lookups/enums/task_priority").catch(() => []),
       fetchJSON("/tracker/lookups/enums/deadline_type").catch(() => []),
       fetchJSON("/tracker/people?limit=100").catch(() => ({ items: [] })),
       fetchJSON("/tracker/organizations?limit=100").catch(() => ({ items: [] })),
@@ -76,6 +79,9 @@ export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved })
         waiting_on_person_id: task.waiting_on_person_id || "",
         waiting_on_org_id: task.waiting_on_org_id || "",
         expected_output: task.expected_output || "",
+        completion_notes: task.completion_notes || "",
+        next_follow_up_date: task.next_follow_up_date || "",
+        delegated_by_person_id: task.delegated_by_person_id || "",
       });
     } else {
       setForm({ ...EMPTY, matter_id: matterId || "" });
@@ -143,16 +149,24 @@ export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved })
         <label style={LABEL_STYLE}>Expected Output</label>
         <textarea style={{ ...INPUT_STYLE, minHeight: 60, resize: "vertical" }} value={form.expected_output} onChange={set("expected_output")} placeholder="What deliverable or result is expected?" />
       </div>
+      {form.status === "done" && (
+        <div style={{ marginBottom: 14 }}>
+          <label style={LABEL_STYLE}>Completion Notes</label>
+          <textarea style={{ ...INPUT_STYLE, minHeight: 60, resize: "vertical" }} value={form.completion_notes} onChange={set("completion_notes")} />
+        </div>
+      )}
       {renderSelect("Status", "status", enums.status)}
       {renderSelect("Task Mode", "task_mode", enums.task_mode)}
       {renderSelect("Task Type", "task_type", enums.task_type)}
       {renderSelect("Priority", "priority", enums.priority)}
       {renderSelect("Assigned To", "assigned_to_person_id", personOpts)}
       {renderInput("Due Date", "due_date", "date")}
+      {renderInput("Next Follow-Up Date", "next_follow_up_date", "date")}
       {renderSelect("Deadline Type", "deadline_type", enums.deadline_type)}
       {renderSelect("Matter", "matter_id", matterOpts)}
       {renderSelect("Waiting On Person", "waiting_on_person_id", personOpts)}
       {renderSelect("Waiting On Org", "waiting_on_org_id", orgOpts)}
+      {renderSelect("Delegated By", "delegated_by_person_id", personOpts)}
 
       {error && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 10 }}>{error}</div>}
 
