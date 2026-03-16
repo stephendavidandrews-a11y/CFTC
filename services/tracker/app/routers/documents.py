@@ -6,6 +6,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from app.db import get_db
 from app.config import UPLOAD_DIR, MAX_UPLOAD_SIZE
 from app.validators import CreateDocument, UpdateDocument
+import json
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from app.deps import get_write_source
+from app.audit import log_event
+from app.concurrency import get_etag, check_etag
+from app.idempotency import claim_idempotency_key, finalize_idempotency_key
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -50,9 +57,19 @@ async def list_documents(
 
 
 @router.post("")
-async def create_document(body: CreateDocument, db=Depends(get_db)):
+async def create_document(body: CreateDocument, request: Request, db=Depends(get_db),
+                      write_source: str = Depends(get_write_source)):
+    idem_key = request.headers.get("idempotency-key")
+    cached = claim_idempotency_key(db, idem_key, body.model_dump(), "/tracker/documents")
+    if cached == "conflict":
+        raise HTTPException(409, detail="Idempotency key reused with different payload")
+    if cached == "pending":
+        raise HTTPException(409, detail="Request with this idempotency key is still in progress")
+    if isinstance(cached, dict):
+        return JSONResponse(status_code=cached["status_code"], content=json.loads(cached["body"]))
     did = str(uuid.uuid4())
     now = datetime.now().isoformat()
+    source_val = write_source if body.source == "manual" else body.source
     db.execute("""
         INSERT INTO documents (id, matter_id, title, document_type, status,
             assigned_to_person_id, version_label, due_date, final_location,
@@ -63,10 +80,16 @@ async def create_document(body: CreateDocument, db=Depends(get_db)):
           body.status, body.assigned_to_person_id,
           body.version_label, body.due_date, body.final_location,
           body.is_finalized, body.is_sent, body.sent_at,
-          body.summary, body.notes, body.source, body.source_id,
+          body.summary, body.notes, source_val, body.source_id,
           body.external_refs, now, now))
+    new_data = body.model_dump()
+    new_data.update({"id": did, "source": source_val, "created_at": now, "updated_at": now})
+    log_event(db, table_name="documents", record_id=did, action="create",
+              source=write_source, new_data=new_data)
+    result = {"id": did}
+    finalize_idempotency_key(db, idem_key, 200, result)
     db.commit()
-    return {"id": did}
+    return result
 
 
 
@@ -87,15 +110,17 @@ async def get_document(doc_id: str, db=Depends(get_db)):
         SELECT id, original_filename, mime_type, file_size_bytes, is_current, uploaded_at
         FROM document_files WHERE document_id = ? ORDER BY uploaded_at DESC
     """, (doc_id,))]
-    return result
+    return JSONResponse(content=result, headers={"ETag": get_etag(row)})
 
 
 @router.put("/{doc_id}")
-async def update_document(doc_id: str, body: UpdateDocument, db=Depends(get_db)):
+async def update_document(doc_id: str, body: UpdateDocument, request: Request, db=Depends(get_db),
+                      write_source: str = Depends(get_write_source)):
     """Update document metadata."""
-    existing = db.execute("SELECT id FROM documents WHERE id = ?", (doc_id,)).fetchone()
-    if not existing:
+    old = db.execute("SELECT * FROM documents WHERE id = ?", (doc_id,)).fetchone()
+    if not old:
         raise HTTPException(status_code=404, detail="Document not found")
+    check_etag(request, old)
     data = body.model_dump(exclude_unset=True)
     if not data:
         raise HTTPException(status_code=400, detail="No fields to update")
@@ -105,6 +130,8 @@ async def update_document(doc_id: str, body: UpdateDocument, db=Depends(get_db))
     sets.append("updated_at = ?")
     params.extend([now, doc_id])
     db.execute(f"UPDATE documents SET {', '.join(sets)} WHERE id = ?", params)
+    log_event(db, table_name="documents", record_id=doc_id, action="update",
+              source=write_source, old_record=old, new_data=data)
     db.commit()
     return {"id": doc_id, "updated": True}
 
@@ -144,13 +171,17 @@ async def upload_file(doc_id: str, file: UploadFile = File(...), db=Depends(get_
 
 
 @router.delete("/{doc_id}")
-async def delete_document(doc_id: str, db=Depends(get_db)):
+async def delete_document(doc_id: str, request: Request, db=Depends(get_db),
+                      write_source: str = Depends(get_write_source)):
     """Delete a document and its file records and reviewers."""
-    existing = db.execute("SELECT id FROM documents WHERE id = ?", (doc_id,)).fetchone()
-    if not existing:
+    old = db.execute("SELECT * FROM documents WHERE id = ?", (doc_id,)).fetchone()
+    if not old:
         raise HTTPException(status_code=404, detail="Document not found")
+    check_etag(request, old)
     db.execute("DELETE FROM document_reviewers WHERE document_id = ?", (doc_id,))
     db.execute("DELETE FROM document_files WHERE document_id = ?", (doc_id,))
     db.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+    log_event(db, table_name="documents", record_id=doc_id, action="delete",
+              source=write_source, old_record=old)
     db.commit()
     return {"id": doc_id, "deleted": True}

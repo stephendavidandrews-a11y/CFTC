@@ -424,6 +424,17 @@ TABLES = [
         created_at TEXT DEFAULT (datetime('now'))
     )"""),
 
+
+    ("idempotency_keys", """CREATE TABLE IF NOT EXISTS idempotency_keys (
+        key TEXT PRIMARY KEY,
+        method TEXT NOT NULL,
+        path TEXT NOT NULL,
+        request_hash TEXT NOT NULL,
+        status_code INTEGER,
+        response_body TEXT,
+        created_at TEXT DEFAULT (datetime('now'))
+    )"""),
+
     ("sync_state", """CREATE TABLE IF NOT EXISTS sync_state (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         sync_type TEXT NOT NULL UNIQUE,
@@ -523,6 +534,7 @@ INDEXES = [
     # -- system_events --
     "CREATE INDEX IF NOT EXISTS idx_sysevents_table_created ON system_events(table_name, created_at);",
     "CREATE INDEX IF NOT EXISTS idx_sysevents_source_created ON system_events(source, created_at);",
+    "CREATE INDEX IF NOT EXISTS idx_idempotency_created ON idempotency_keys(created_at);",
     "CREATE INDEX IF NOT EXISTS idx_sysevents_record ON system_events(record_id);",
 
     # -- sync_state --

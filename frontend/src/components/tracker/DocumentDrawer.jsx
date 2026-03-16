@@ -1,7 +1,15 @@
 import React from "react";
 import DrawerShell from "./DrawerShell";
-import { fetchJSON } from "../../api/client";
-import { uploadDocumentFile } from "../../api/tracker";
+import {
+  createDocument,
+  updateDocument,
+  uploadDocumentFile,
+  getEnum,
+  listPeople,
+  listMatters,
+  getDocument,
+} from "../../api/tracker";
+import { validate } from "../../utils/validation";
 
 const INPUT_STYLE = {
   width: "100%",
@@ -56,16 +64,18 @@ export default function DocumentDrawer({ isOpen, onClose, document: doc, matterI
   const [matters, setMatters] = React.useState([]);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState(null);
+  const [fieldErrors, setFieldErrors] = React.useState({});
+  const [etag, setEtag] = React.useState(null);
   const [file, setFile] = React.useState(null);
   const fileInputRef = React.useRef(null);
 
   React.useEffect(() => {
     if (!isOpen) return;
     Promise.all([
-      fetchJSON("/tracker/lookups/enums/document_type").catch(() => []),
-      fetchJSON("/tracker/lookups/enums/document_status").catch(() => []),
-      fetchJSON("/tracker/people?limit=100").catch(() => ({ items: [] })),
-      fetchJSON("/tracker/matters?limit=200").catch(() => ({ items: [] })),
+      getEnum("document_type").catch(() => []),
+      getEnum("document_status").catch(() => []),
+      listPeople({ limit: 100 }).catch(() => ({ items: [] })),
+      listMatters({ limit: 200 }).catch(() => ({ items: [] })),
     ]).then(([docType, docStatus, ppl, matterList]) => {
       setEnums({ document_type: docType, document_status: docStatus });
       setPeople(ppl.items || ppl || []);
@@ -91,11 +101,20 @@ export default function DocumentDrawer({ isOpen, onClose, document: doc, matterI
         sent_at: doc.sent_at ? doc.sent_at.slice(0, 16) : "",
       });
     } else {
+      setEtag(null);
       setForm({ ...EMPTY, matter_id: matterId || "" });
     }
     setFile(null);
     setError(null);
+    setFieldErrors({});
   }, [doc, matterId, isOpen]);
+
+  // Fetch detail on edit to capture ETag for concurrency control
+  React.useEffect(() => {
+    if (doc && doc.id) {
+      getDocument(doc.id).then(d => setEtag(d._etag || null)).catch(() => {});
+    }
+  }, [doc, isOpen]);
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
   const setCheck = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.checked ? 1 : 0 }));
@@ -107,6 +126,7 @@ export default function DocumentDrawer({ isOpen, onClose, document: doc, matterI
 
   const handleSave = async () => {
     setError(null);
+    setFieldErrors({});
     setSaving(true);
     try {
       const payload = { ...form };
@@ -115,17 +135,15 @@ export default function DocumentDrawer({ isOpen, onClose, document: doc, matterI
       payload.is_sent = form.is_sent ? 1 : 0;
       if (!doc?.id) { Object.keys(payload).forEach((k) => { if (payload[k] === null || payload[k] === undefined) delete payload[k]; }); }
 
-      const missing = [];
-      if (!payload.title) missing.push("Title");
-      if (!payload.document_type) missing.push("Document Type");
-      if (missing.length > 0) { setError("Required fields missing: " + missing.join(", ")); setSaving(false); return; }
+      const v = validate("document", payload);
+      if (!v.valid) { setFieldErrors(v.errors); setError(Object.values(v.errors).join(", ")); setSaving(false); return; }
 
       let docId;
       if (doc?.id) {
-        await fetchJSON("/tracker/documents/" + doc.id, { method: "PUT", body: JSON.stringify(payload) });
+        await updateDocument(doc.id, payload, etag);
         docId = doc.id;
       } else {
-        const created = await fetchJSON("/tracker/documents", { method: "POST", body: JSON.stringify(payload) });
+        const created = await createDocument(payload);
         docId = created.id;
       }
 
@@ -139,7 +157,18 @@ export default function DocumentDrawer({ isOpen, onClose, document: doc, matterI
       if (onSaved) onSaved();
       onClose();
     } catch (err) {
-      setError(err.message);
+      if (err.status === 409 && !err.fieldErrors) {
+        setError("This record was modified by someone else. Please close, reopen to load the latest version, and review before saving again.");
+        setSaving(false);
+        return;
+      }
+      if (err.fieldErrors && Object.keys(err.fieldErrors).length) {
+        setFieldErrors(err.fieldErrors);
+        setError(Object.entries(err.fieldErrors).map(([k, v]) => `${k}: ${v}`).join("; "));
+      } else {
+        setFieldErrors({});
+        setError(err.message);
+      }
     } finally {
       setSaving(false);
     }

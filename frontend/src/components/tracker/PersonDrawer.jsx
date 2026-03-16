@@ -1,6 +1,14 @@
 import React from "react";
 import DrawerShell from "./DrawerShell";
-import { fetchJSON } from "../../api/client";
+import {
+  createPerson,
+  updatePerson,
+  getEnum,
+  listPeople,
+  listOrganizations,
+  getPerson,
+} from "../../api/tracker";
+import { validate } from "../../utils/validation";
 
 const INPUT_STYLE = {
   width: "100%",
@@ -45,15 +53,17 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
   const [people, setPeople] = React.useState([]);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState(null);
+  const [fieldErrors, setFieldErrors] = React.useState({});
+  const [etag, setEtag] = React.useState(null);
 
   React.useEffect(() => {
     if (!isOpen) return;
     Promise.all([
-      fetchJSON("/tracker/lookups/enums/relationship_category").catch(() => []),
-      fetchJSON("/tracker/lookups/enums/relationship_lane").catch(() => []),
-      fetchJSON("/tracker/lookups/enums/next_interaction_type").catch(() => []),
-      fetchJSON("/tracker/organizations?limit=100").catch(() => ({ items: [] })),
-      fetchJSON("/tracker/people?limit=100").catch(() => ({ items: [] })),
+      getEnum("relationship_category").catch(() => []),
+      getEnum("relationship_lane").catch(() => []),
+      getEnum("next_interaction_type").catch(() => []),
+      listOrganizations({ limit: 100 }).catch(() => ({ items: [] })),
+      listPeople({ limit: 100 }).catch(() => ({ items: [] })),
     ]).then(([relCat, relLane, nextIntType, orgList, ppl]) => {
       setEnums({ relationship_category: relCat, relationship_lane: relLane, next_interaction_type: nextIntType });
       setOrgs(orgList.items || orgList || []);
@@ -85,9 +95,18 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
         next_interaction_purpose: person.next_interaction_purpose || "",
       });
     } else {
+      setEtag(null);
       setForm({ ...EMPTY });
     }
     setError(null);
+    setFieldErrors({});
+  }, [person, isOpen]);
+
+  // Fetch detail on edit to capture ETag for concurrency control
+  React.useEffect(() => {
+    if (person && person.id) {
+      getPerson(person.id).then(d => setEtag(d._etag || null)).catch(() => {});
+    }
   }, [person, isOpen]);
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
@@ -95,6 +114,7 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
 
   const handleSave = async () => {
     setError(null);
+    setFieldErrors({});
     setSaving(true);
     try {
       const payload = { ...form };
@@ -110,20 +130,29 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
 
       if (!person?.id) { Object.keys(payload).forEach((k) => { if (payload[k] === null || payload[k] === undefined) delete payload[k]; }); }
 
-      const missing = [];
-      if (!form.first_name || !form.first_name.trim()) missing.push("First Name");
-      if (!form.last_name || !form.last_name.trim()) missing.push("Last Name");
-      if (missing.length > 0) { setError("Required fields missing: " + missing.join(", ")); setSaving(false); return; }
+      const v = validate("person", form);
+      if (!v.valid) { setFieldErrors(v.errors); setError(Object.values(v.errors).join(", ")); setSaving(false); return; }
 
       if (person?.id) {
-        await fetchJSON(`/tracker/people/${person.id}`, { method: "PUT", body: JSON.stringify(payload) });
+        await updatePerson(person.id, payload, etag);
       } else {
-        await fetchJSON("/tracker/people", { method: "POST", body: JSON.stringify(payload) });
+        await createPerson(payload);
       }
       if (onSaved) onSaved();
       onClose();
     } catch (err) {
-      setError(err.message);
+      if (err.status === 409 && !err.fieldErrors) {
+        setError("This record was modified by someone else. Please close, reopen to load the latest version, and review before saving again.");
+        setSaving(false);
+        return;
+      }
+      if (err.fieldErrors && Object.keys(err.fieldErrors).length) {
+        setFieldErrors(err.fieldErrors);
+        setError(Object.entries(err.fieldErrors).map(([k, v]) => `${k}: ${v}`).join("; "));
+      } else {
+        setFieldErrors({});
+        setError(err.message);
+      }
     } finally {
       setSaving(false);
     }

@@ -1,6 +1,14 @@
 import React from "react";
 import DrawerShell from "./DrawerShell";
-import { fetchJSON } from "../../api/client";
+import {
+  createDecision,
+  updateDecision,
+  getEnum,
+  listPeople,
+  listMatters,
+  getDecision,
+} from "../../api/tracker";
+import { validate } from "../../utils/validation";
 
 const INPUT_STYLE = {
   width: "100%",
@@ -37,14 +45,16 @@ export default function DecisionDrawer({ isOpen, onClose, decision, matterId, on
   const [matters, setMatters] = React.useState([]);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState(null);
+  const [fieldErrors, setFieldErrors] = React.useState({});
+  const [etag, setEtag] = React.useState(null);
 
   React.useEffect(() => {
     if (!isOpen) return;
     Promise.all([
-      fetchJSON("/tracker/lookups/enums/decision_type").catch(() => []),
-      fetchJSON("/tracker/lookups/enums/decision_status").catch(() => []),
-      fetchJSON("/tracker/people?limit=100").catch(() => ({ items: [] })),
-      fetchJSON("/tracker/matters?limit=200").catch(() => ({ items: [] })),
+      getEnum("decision_type").catch(() => []),
+      getEnum("decision_status").catch(() => []),
+      listPeople({ limit: 100 }).catch(() => ({ items: [] })),
+      listMatters({ limit: 200 }).catch(() => ({ items: [] })),
     ]).then(([decisionType, decisionStatus, ppl, matterList]) => {
       setEnums({ decision_type: decisionType, decision_status: decisionStatus });
       setPeople(ppl.items || ppl || []);
@@ -68,36 +78,55 @@ export default function DecisionDrawer({ isOpen, onClose, decision, matterId, on
         made_at: decision.made_at ? decision.made_at.slice(0, 16) : "",
       });
     } else {
+      setEtag(null);
       setForm({ ...EMPTY, matter_id: matterId || "" });
     }
     setError(null);
+    setFieldErrors({});
   }, [decision, matterId, isOpen]);
+
+  // Fetch detail on edit to capture ETag for concurrency control
+  React.useEffect(() => {
+    if (decision && decision.id) {
+      getDecision(decision.id).then(d => setEtag(d._etag || null)).catch(() => {});
+    }
+  }, [decision, isOpen]);
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
   const handleSave = async () => {
     setError(null);
+    setFieldErrors({});
     setSaving(true);
     try {
       const payload = { ...form };
       Object.keys(payload).forEach((k) => { if (payload[k] === "") payload[k] = null; });
       if (!decision?.id) { Object.keys(payload).forEach((k) => { if (payload[k] === null || payload[k] === undefined) delete payload[k]; }); }
 
-      const missing = [];
-      if (!payload.title) missing.push("Title");
-      if (!payload.matter_id) missing.push("Matter");
-      if (missing.length > 0) { setError("Required fields missing: " + missing.join(", ")); setSaving(false); return; }
+      const v = validate("decision", payload);
+      if (!v.valid) { setFieldErrors(v.errors); setError(Object.values(v.errors).join(", ")); setSaving(false); return; }
 
       if (decision?.id) {
         const { matter_id, ...updatePayload } = payload;
-        await fetchJSON(`/tracker/decisions/${decision.id}`, { method: "PUT", body: JSON.stringify(updatePayload) });
+        await updateDecision(decision.id, updatePayload, etag);
       } else {
-        await fetchJSON("/tracker/decisions", { method: "POST", body: JSON.stringify(payload) });
+        await createDecision(payload);
       }
       if (onSaved) onSaved();
       onClose();
     } catch (err) {
-      setError(err.message);
+      if (err.status === 409 && !err.fieldErrors) {
+        setError("This record was modified by someone else. Please close, reopen to load the latest version, and review before saving again.");
+        setSaving(false);
+        return;
+      }
+      if (err.fieldErrors && Object.keys(err.fieldErrors).length) {
+        setFieldErrors(err.fieldErrors);
+        setError(Object.entries(err.fieldErrors).map(([k, v]) => `${k}: ${v}`).join("; "));
+      } else {
+        setFieldErrors({});
+        setError(err.message);
+      }
     } finally {
       setSaving(false);
     }

@@ -1,6 +1,15 @@
 import React from "react";
 import DrawerShell from "./DrawerShell";
-import { fetchJSON } from "../../api/client";
+import {
+  createTask,
+  updateTask,
+  getEnum,
+  listPeople,
+  listOrganizations,
+  listMatters,
+  getTask,
+} from "../../api/tracker";
+import { validate } from "../../utils/validation";
 
 const INPUT_STYLE = {
   width: "100%",
@@ -43,18 +52,20 @@ export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved })
   const [matters, setMatters] = React.useState([]);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState(null);
+  const [fieldErrors, setFieldErrors] = React.useState({});
+  const [etag, setEtag] = React.useState(null);
 
   React.useEffect(() => {
     if (!isOpen) return;
     Promise.all([
-      fetchJSON("/tracker/lookups/enums/task_status").catch(() => []),
-      fetchJSON("/tracker/lookups/enums/task_mode").catch(() => []),
-      fetchJSON("/tracker/lookups/enums/task_type").catch(() => []),
-      fetchJSON("/tracker/lookups/enums/task_priority").catch(() => []),
-      fetchJSON("/tracker/lookups/enums/deadline_type").catch(() => []),
-      fetchJSON("/tracker/people?limit=100").catch(() => ({ items: [] })),
-      fetchJSON("/tracker/organizations?limit=100").catch(() => ({ items: [] })),
-      fetchJSON("/tracker/matters?limit=200").catch(() => ({ items: [] })),
+      getEnum("task_status").catch(() => []),
+      getEnum("task_mode").catch(() => []),
+      getEnum("task_type").catch(() => []),
+      getEnum("task_priority").catch(() => []),
+      getEnum("deadline_type").catch(() => []),
+      listPeople({ limit: 100 }).catch(() => ({ items: [] })),
+      listOrganizations({ limit: 100 }).catch(() => ({ items: [] })),
+      listMatters({ limit: 200 }).catch(() => ({ items: [] })),
     ]).then(([status, mode, type, priority, deadlineType, ppl, orgList, matterList]) => {
       setEnums({ status, task_mode: mode, task_type: type, priority, deadline_type: deadlineType });
       setPeople(ppl.items || ppl || []);
@@ -84,34 +95,54 @@ export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved })
         delegated_by_person_id: task.delegated_by_person_id || "",
       });
     } else {
+      setEtag(null);
       setForm({ ...EMPTY, matter_id: matterId || "" });
     }
     setError(null);
+    setFieldErrors({});
   }, [task, matterId, isOpen]);
+
+  // Fetch detail on edit to capture ETag for concurrency control
+  React.useEffect(() => {
+    if (task && task.id) {
+      getTask(task.id).then(d => setEtag(d._etag || null)).catch(() => {});
+    }
+  }, [task, isOpen]);
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
   const handleSave = async () => {
     setError(null);
+    setFieldErrors({});
     setSaving(true);
     try {
       const payload = { ...form };
       Object.keys(payload).forEach((k) => { if (payload[k] === "") payload[k] = null; });
       if (!task?.id) { Object.keys(payload).forEach((k) => { if (payload[k] === null || payload[k] === undefined) delete payload[k]; }); }
 
-      const missing = [];
-      if (!payload.title) missing.push("Title");
-      if (missing.length > 0) { setError("Required fields missing: " + missing.join(", ")); setSaving(false); return; }
+      const v = validate("task", payload);
+      if (!v.valid) { setFieldErrors(v.errors); setError(Object.values(v.errors).join(", ")); setSaving(false); return; }
 
       if (task?.id) {
-        await fetchJSON(`/tracker/tasks/${task.id}`, { method: "PUT", body: JSON.stringify(payload) });
+        await updateTask(task.id, payload, etag);
       } else {
-        await fetchJSON("/tracker/tasks", { method: "POST", body: JSON.stringify(payload) });
+        await createTask(payload);
       }
       if (onSaved) onSaved();
       onClose();
     } catch (err) {
-      setError(err.message);
+      if (err.status === 409 && !err.fieldErrors) {
+        setError("This record was modified by someone else. Please close, reopen to load the latest version, and review before saving again.");
+        setSaving(false);
+        return;
+      }
+      if (err.fieldErrors && Object.keys(err.fieldErrors).length) {
+        setFieldErrors(err.fieldErrors);
+        setError(Object.entries(err.fieldErrors).map(([k, v]) => `${k}: ${v}`).join("; "));
+      } else {
+        setFieldErrors({});
+        setError(err.message);
+      }
     } finally {
       setSaving(false);
     }

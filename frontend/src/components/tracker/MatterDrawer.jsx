@@ -1,6 +1,14 @@
 import React from "react";
 import DrawerShell from "./DrawerShell";
-import { fetchJSON } from "../../api/client";
+import {
+  createMatter,
+  updateMatter,
+  getEnum,
+  listPeople,
+  listOrganizations,
+  getMatter,
+} from "../../api/tracker";
+import { validate } from "../../utils/validation";
 
 const INPUT_STYLE = {
   width: "100%",
@@ -56,21 +64,23 @@ export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
   const [orgs, setOrgs] = React.useState([]);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState(null);
+  const [fieldErrors, setFieldErrors] = React.useState({});
+  const [etag, setEtag] = React.useState(null);
 
   // Load lookups
   React.useEffect(() => {
     if (!isOpen) return;
     Promise.all([
-      fetchJSON("/tracker/lookups/enums/matter_type").catch(() => []),
-      fetchJSON("/tracker/lookups/enums/matter_status").catch(() => []),
-      fetchJSON("/tracker/lookups/enums/matter_priority").catch(() => []),
-      fetchJSON("/tracker/lookups/enums/matter_sensitivity").catch(() => []),
-      fetchJSON("/tracker/lookups/enums/boss_involvement_level").catch(() => []),
-      fetchJSON("/tracker/lookups/enums/regulatory_stage").catch(() => []),
-      fetchJSON("/tracker/lookups/enums/risk_level").catch(() => []),
-      fetchJSON("/tracker/lookups/enums/unified_agenda_priority").catch(() => []),
-      fetchJSON("/tracker/people?limit=100").catch(() => ({ items: [] })),
-      fetchJSON("/tracker/organizations?limit=100").catch(() => ({ items: [] })),
+      getEnum("matter_type").catch(() => []),
+      getEnum("matter_status").catch(() => []),
+      getEnum("matter_priority").catch(() => []),
+      getEnum("matter_sensitivity").catch(() => []),
+      getEnum("boss_involvement_level").catch(() => []),
+      getEnum("regulatory_stage").catch(() => []),
+      getEnum("risk_level").catch(() => []),
+      getEnum("unified_agenda_priority").catch(() => []),
+      listPeople({ limit: 100 }).catch(() => ({ items: [] })),
+      listOrganizations({ limit: 100 }).catch(() => ({ items: [] })),
     ]).then(([matterType, status, priority, sensitivity, boss, regStage, riskLevel, uaPriority, ppl, orgList]) => {
       setEnums({
         matter_type: matterType,
@@ -123,15 +133,25 @@ export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
         docket_number: matter.docket_number || "",
       });
     } else {
+      setEtag(null);
       setForm({ ...EMPTY });
     }
     setError(null);
+    setFieldErrors({});
+  }, [matter, isOpen]);
+
+  // Fetch detail on edit to capture ETag for concurrency control
+  React.useEffect(() => {
+    if (matter && matter.id) {
+      getMatter(matter.id).then(d => setEtag(d._etag || null)).catch(() => {});
+    }
   }, [matter, isOpen]);
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
   const handleSave = async () => {
     setError(null);
+    setFieldErrors({});
     setSaving(true);
     try {
       const payload = { ...form };
@@ -141,21 +161,29 @@ export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
       });
       if (!matter?.id) { Object.keys(payload).forEach((k) => { if (payload[k] === null || payload[k] === undefined) delete payload[k]; }); }
 
-      const missing = [];
-      if (!payload.title) missing.push("Title");
-      if (!payload.matter_type) missing.push("Matter Type");
-      if (payload.status === "closed" && !payload.outcome_summary) missing.push("Outcome Summary (required when closing)");
-      if (missing.length > 0) { setError("Required fields missing: " + missing.join(", ")); setSaving(false); return; }
+      const v = validate("matter", payload);
+      if (!v.valid) { setFieldErrors(v.errors); setError(Object.values(v.errors).join(", ")); setSaving(false); return; }
 
       if (matter?.id) {
-        await fetchJSON(`/tracker/matters/${matter.id}`, { method: "PUT", body: JSON.stringify(payload) });
+        await updateMatter(matter.id, payload, etag);
       } else {
-        await fetchJSON("/tracker/matters", { method: "POST", body: JSON.stringify(payload) });
+        await createMatter(payload);
       }
       if (onSaved) onSaved();
       onClose();
     } catch (err) {
-      setError(err.message);
+      if (err.status === 409 && !err.fieldErrors) {
+        setError("This record was modified by someone else. Please close, reopen to load the latest version, and review before saving again.");
+        setSaving(false);
+        return;
+      }
+      if (err.fieldErrors && Object.keys(err.fieldErrors).length) {
+        setFieldErrors(err.fieldErrors);
+        setError(Object.entries(err.fieldErrors).map(([k, v]) => `${k}: ${v}`).join("; "));
+      } else {
+        setFieldErrors({});
+        setError(err.message);
+      }
     } finally {
       setSaving(false);
     }

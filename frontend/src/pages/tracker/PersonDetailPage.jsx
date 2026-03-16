@@ -48,10 +48,14 @@ export default function PersonDetailPage() {
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      await deletePerson(id);
+      await deletePerson(id, person?._etag);
       navigate("/people");
     } catch (err) {
-      alert("Failed to delete: " + (err.message || String(err)));
+      if (err.status === 409) {
+        alert("This person was modified by someone else. Please refresh and review before deleting.");
+      } else {
+        alert("Failed to delete: " + (err.message || String(err)));
+      }
       setDeleting(false);
       setShowDeleteConfirm(false);
     }

@@ -110,7 +110,7 @@ export default function TasksPage() {
         return <Badge bg={s.bg} text={s.text} label={s.label || val || "\u2014"} />;
       },
     },
-    { key: "mode", label: "Mode", width: 90 },
+    { key: "task_mode", label: "Mode", width: 90 },
     { key: "owner_name", label: "Assignee", width: 130 },
     { key: "due_date", label: "Due Date", width: 120, render: (v) => formatDate(v) },
     {
