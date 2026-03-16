@@ -44,8 +44,8 @@ function qs(params) {
   return str ? `?${str}` : "";
 }
 
-export function listMatters({ status, priority, matter_type, assigned_to, search, sort, order, limit, offset } = {}) {
-  return fetchJSON(`${P}/matters${qs({ status, priority, matter_type, assigned_to, search, sort, order, limit, offset })}`);
+export function listMatters({ status, priority, matter_type, assigned_to, search, source, source_id, sort, order, limit, offset } = {}) {
+  return fetchJSON(`${P}/matters${qs({ status, priority, matter_type, assigned_to, search, source, source_id, sort, order, limit, offset })}`);
 }
 
 export function createMatter(data) {
@@ -287,4 +287,10 @@ export function addMatterDependency(matterId, data) {
 
 export function removeMatterDependency(matterId, depId) {
   return fetchJSON(P + "/matters/" + matterId + "/dependencies/" + depId, { method: "DELETE" });
+}
+
+// ── Pipeline Integration ────────────────────────────────────────────────────
+
+export function findMatterByPipelineItem(pipelineItemId) {
+  return listMatters({ source: "pipeline", source_id: String(pipelineItemId), limit: 1 });
 }

@@ -108,7 +108,12 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
       const last = payload.last_name || "";
       payload.full_name = `${first} ${last}`.trim() || null;
 
-      if (!payload.full_name) { setError("Name is required"); setSaving(false); return; }
+      if (!person?.id) { Object.keys(payload).forEach((k) => { if (payload[k] === null || payload[k] === undefined) delete payload[k]; }); }
+
+      const missing = [];
+      if (!form.first_name || !form.first_name.trim()) missing.push("First Name");
+      if (!form.last_name || !form.last_name.trim()) missing.push("Last Name");
+      if (missing.length > 0) { setError("Required fields missing: " + missing.join(", ")); setSaving(false); return; }
 
       if (person?.id) {
         await fetchJSON(`/tracker/people/${person.id}`, { method: "PUT", body: JSON.stringify(payload) });
@@ -150,8 +155,8 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
 
   return (
     <DrawerShell isOpen={isOpen} onClose={onClose} title={person ? "Edit Person" : "New Person"}>
-      {renderInput("First Name", "first_name")}
-      {renderInput("Last Name", "last_name")}
+      {renderInput("First Name *", "first_name")}
+      {renderInput("Last Name *", "last_name")}
       {renderInput("Title", "title")}
       {renderSelect("Organization", "organization_id", orgOpts)}
       {renderInput("Email", "email", "email")}

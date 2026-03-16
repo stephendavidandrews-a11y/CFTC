@@ -71,7 +71,11 @@ export default function OrganizationDrawer({ isOpen, onClose, organization, onSa
       const payload = { ...form };
       Object.keys(payload).forEach((k) => { if (payload[k] === "") payload[k] = null; });
       payload.is_active = form.is_active ? 1 : 0;
-      if (!payload.name) { setError("Name is required"); setSaving(false); return; }
+      if (!organization?.id) { Object.keys(payload).forEach((k) => { if (payload[k] === null || payload[k] === undefined) delete payload[k]; }); }
+
+      const missing = [];
+      if (!payload.name) missing.push("Name");
+      if (missing.length > 0) { setError("Required fields missing: " + missing.join(", ")); setSaving(false); return; }
 
       if (organization?.id) {
         await fetchJSON(`/tracker/organizations/${organization.id}`, { method: "PUT", body: JSON.stringify(payload) });
@@ -114,7 +118,7 @@ export default function OrganizationDrawer({ isOpen, onClose, organization, onSa
 
   return (
     <DrawerShell isOpen={isOpen} onClose={onClose} title={organization ? "Edit Organization" : "New Organization"}>
-      {renderInput("Name", "name", "text", { required: true })}
+      {renderInput("Name *", "name", "text", { required: true })}
       {renderInput("Short Name", "short_name")}
       {renderSelect("Organization Type", "organization_type", enums.organization_type)}
       {renderSelect("Parent Organization", "parent_organization_id", orgOpts)}

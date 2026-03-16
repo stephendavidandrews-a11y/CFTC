@@ -98,8 +98,8 @@ export default function MeetingDrawer({ isOpen, onClose, meeting, onSaved }) {
       fetchJSON("/tracker/lookups/enums/meeting_role").catch(() => MEETING_ROLES_FALLBACK),
       fetchJSON("/tracker/people?limit=100").catch(() => ({ items: [] })),
       fetchJSON("/tracker/matters?limit=200").catch(() => ({ items: [] })),
-    ]).then(([meetingType, ppl, matterList]) => {
-      setEnums({ meeting_type: meetingType, meeting_role: Array.isArray(meetingRoles) ? meetingRoles : (meetingRoles?.meeting_role || MEETING_ROLES_FALLBACK) });
+    ]).then(([meetingType, meetingRoles, ppl, matterList]) => {
+      setEnums({ meeting_type: meetingType, meeting_role: Array.isArray(meetingRoles) ? meetingRoles : MEETING_ROLES_FALLBACK });
       setPeople(ppl.items || ppl || []);
       setMatters(matterList.items || matterList || []);
     });
@@ -220,8 +220,12 @@ export default function MeetingDrawer({ isOpen, onClose, meeting, onSaved }) {
         payload.date_time_end = end.toISOString().slice(0, 16);
       }
 
-      if (!payload.title) { setError("Title is required"); setSaving(false); return; }
-      if (!payload.date_time_start) { setError("Start time is required"); setSaving(false); return; }
+      if (!isEdit) { Object.keys(payload).forEach((k) => { if (payload[k] === null || payload[k] === undefined) delete payload[k]; }); }
+
+      const missing = [];
+      if (!payload.title) missing.push("Title");
+      if (!payload.date_time_start) missing.push("Start Time");
+      if (missing.length > 0) { setError("Required fields missing: " + missing.join(", ")); setSaving(false); return; }
 
       if (isEdit) {
         await updateMeeting(meeting.id, payload);
@@ -284,9 +288,9 @@ export default function MeetingDrawer({ isOpen, onClose, meeting, onSaved }) {
 
   return (
     <DrawerShell isOpen={isOpen} onClose={onClose} title={isEdit ? "Edit Meeting" : "New Meeting"}>
-      {renderInput("Title", "title", "text", { required: true })}
+      {renderInput("Title *", "title", "text", { required: true })}
       {renderSelect("Meeting Type", "meeting_type", enums.meeting_type)}
-      {renderInput("Start Time", "date_time_start", "datetime-local")}
+      {renderInput("Start Time *", "date_time_start", "datetime-local")}
       {renderInput("Duration (minutes)", "duration_minutes", "number", { min: 0 })}
       {renderInput("Location / Link", "location_or_link")}
       <div style={{ marginBottom: 14 }}>

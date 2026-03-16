@@ -27,6 +27,8 @@ async def list_matters(
     priority: str = Query(None),
     matter_type: str = Query(None),
     assigned_to: str = Query(None),
+    source: str = Query(None),
+    source_id: str = Query(None),
     sort_by: str = Query("updated_at"),
     sort_dir: str = Query("desc"),
     limit: int = Query(100, le=500),
@@ -51,6 +53,12 @@ async def list_matters(
     if assigned_to:
         conditions.append("m.assigned_to_person_id = ?")
         params.append(assigned_to)
+    if source:
+        conditions.append("m.source = ?")
+        params.append(source)
+    if source_id:
+        conditions.append("m.source_id = ?")
+        params.append(source_id)
 
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
 

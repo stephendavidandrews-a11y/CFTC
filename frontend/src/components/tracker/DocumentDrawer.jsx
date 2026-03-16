@@ -113,8 +113,12 @@ export default function DocumentDrawer({ isOpen, onClose, document: doc, matterI
       Object.keys(payload).forEach((k) => { if (payload[k] === "") payload[k] = null; });
       payload.is_finalized = form.is_finalized ? 1 : 0;
       payload.is_sent = form.is_sent ? 1 : 0;
-      if (!payload.title) { setError("Title is required"); setSaving(false); return; }
-      if (!payload.document_type) { setError("Document type is required"); setSaving(false); return; }
+      if (!doc?.id) { Object.keys(payload).forEach((k) => { if (payload[k] === null || payload[k] === undefined) delete payload[k]; }); }
+
+      const missing = [];
+      if (!payload.title) missing.push("Title");
+      if (!payload.document_type) missing.push("Document Type");
+      if (missing.length > 0) { setError("Required fields missing: " + missing.join(", ")); setSaving(false); return; }
 
       let docId;
       if (doc?.id) {
@@ -170,8 +174,8 @@ export default function DocumentDrawer({ isOpen, onClose, document: doc, matterI
 
   return (
     <DrawerShell isOpen={isOpen} onClose={onClose} title={isEdit ? "Edit Document" : "New Document"}>
-      {renderInput("Title", "title", "text", { required: true })}
-      {renderSelect("Document Type", "document_type", enums.document_type)}
+      {renderInput("Title *", "title", "text", { required: true })}
+      {renderSelect("Document Type *", "document_type", enums.document_type)}
       {renderSelect("Matter", "matter_id", matterOpts)}
       {renderSelect("Status", "status", enums.document_status)}
       {renderSelect("Assigned To", "assigned_to_person_id", personOpts)}
