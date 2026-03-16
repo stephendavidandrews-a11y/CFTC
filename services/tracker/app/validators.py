@@ -31,10 +31,15 @@ class CreatePerson(BaseModel):
     next_interaction_purpose: Optional[str] = None
     manager_person_id: Optional[str] = None
     include_in_team_workload: int = 0
+    include_in_team: Optional[bool] = None  # alias accepted from frontend
     relationship_assigned_to_person_id: Optional[str] = None
     source: str = "manual"
     source_id: Optional[str] = None
     external_refs: Optional[str] = None
+
+    def model_post_init(self, __context):
+        if self.include_in_team is not None:
+            self.include_in_team_workload = 1 if self.include_in_team else 0
 
 
 class UpdatePerson(BaseModel):
@@ -148,6 +153,7 @@ class CreateTask(BaseModel):
     supervising_person_id: Optional[str] = None
     waiting_on_person_id: Optional[str] = None
     waiting_on_org_id: Optional[str] = None
+    waiting_on_description: Optional[str] = None
     expected_output: Optional[str] = None
     due_date: Optional[str] = None
     deadline_type: Optional[str] = None
@@ -172,6 +178,7 @@ class UpdateTask(BaseModel):
     supervising_person_id: Optional[str] = None
     waiting_on_person_id: Optional[str] = None
     waiting_on_org_id: Optional[str] = None
+    waiting_on_description: Optional[str] = None
     expected_output: Optional[str] = None
     due_date: Optional[str] = None
     deadline_type: Optional[str] = None
@@ -179,6 +186,7 @@ class UpdateTask(BaseModel):
     completed_at: Optional[str] = None
     next_follow_up_date: Optional[str] = None
     completion_notes: Optional[str] = None
+    waiting_on_description: Optional[str] = None
     sort_order: Optional[int] = None
 
 

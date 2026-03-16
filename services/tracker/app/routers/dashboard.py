@@ -28,19 +28,21 @@ async def get_dashboard(db=Depends(get_db)):
         "SELECT COUNT(*) as c FROM tasks WHERE status NOT IN ('done', 'deferred') AND due_date < date('now') AND due_date IS NOT NULL"
     ).fetchone()["c"]
 
-    # Upcoming deadlines (next 7 days) across matters
+    # Upcoming deadlines (past 7 days through next 30 days) across matters
     upcoming_deadlines = [dict(row) for row in db.execute("""
-        SELECT id, title, matter_type, work_deadline, decision_deadline, external_deadline,
-               assigned_to_person_id, priority, status
-        FROM matters
-        WHERE status != 'closed'
+        SELECT m.id, m.title, m.matter_type, m.work_deadline, m.decision_deadline,
+               m.external_deadline, m.assigned_to_person_id, m.priority, m.status,
+               p.full_name as owner_name
+        FROM matters m
+        LEFT JOIN people p ON m.assigned_to_person_id = p.id
+        WHERE m.status != 'closed'
         AND (
-            (work_deadline BETWEEN date('now') AND date('now', '+7 days'))
-            OR (decision_deadline BETWEEN date('now') AND date('now', '+7 days'))
-            OR (external_deadline BETWEEN date('now') AND date('now', '+7 days'))
+            (m.work_deadline BETWEEN date('now', '-7 days') AND date('now', '+30 days'))
+            OR (m.decision_deadline BETWEEN date('now', '-7 days') AND date('now', '+30 days'))
+            OR (m.external_deadline BETWEEN date('now', '-7 days') AND date('now', '+30 days'))
         )
-        ORDER BY COALESCE(external_deadline, decision_deadline, work_deadline)
-        LIMIT 10
+        ORDER BY COALESCE(m.external_deadline, m.decision_deadline, m.work_deadline)
+        LIMIT 15
     """)]
 
     # Recent matters (last 5 updated)
@@ -79,7 +81,7 @@ async def get_dashboard(db=Depends(get_db)):
         LIMIT 10
     """)]
 
-    # Pending decisions
+    # Pending decisions — from decisions table + matters with pending_decision text
     pending_decisions = [dict(row) for row in db.execute("""
         SELECT d.id, d.title, d.status, d.decision_due_date, d.decision_type,
                m.title as matter_title, m.id as matter_id,
@@ -88,8 +90,18 @@ async def get_dashboard(db=Depends(get_db)):
         JOIN matters m ON d.matter_id = m.id
         LEFT JOIN people p ON d.decision_assigned_to_person_id = p.id
         WHERE d.status IN ('pending', 'under consideration')
-        ORDER BY d.decision_due_date
-        LIMIT 10
+        UNION ALL
+        SELECT m.id, m.pending_decision as title, 'pending' as status,
+               COALESCE(m.decision_deadline, m.external_deadline) as decision_due_date,
+               'matter' as decision_type,
+               m.title as matter_title, m.id as matter_id,
+               p.full_name as owner_name
+        FROM matters m
+        LEFT JOIN people p ON m.assigned_to_person_id = p.id
+        WHERE m.status != 'closed'
+          AND m.pending_decision IS NOT NULL AND m.pending_decision != ''
+        ORDER BY decision_due_date
+        LIMIT 15
     """)]
 
     return {

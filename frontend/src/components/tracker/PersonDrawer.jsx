@@ -27,6 +27,8 @@ const EMPTY = {
   relationship_lane: "",
   include_in_team_workload: false,
   manager_person_id: "",
+  last_interaction_date: "",
+  next_interaction_needed_date: "",
 };
 
 export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
@@ -64,6 +66,8 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
         relationship_lane: person.relationship_lane || "",
         include_in_team_workload: !!person.include_in_team_workload,
         manager_person_id: person.manager_person_id || "",
+        last_interaction_date: person.last_interaction_date || "",
+        next_interaction_needed_date: person.next_interaction_needed_date || "",
       });
     } else {
       setForm({ ...EMPTY });
@@ -154,6 +158,8 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
       </div>
 
       {renderSelect("Manager", "manager_person_id", personOpts)}
+      {renderInput("Last Interaction", "last_interaction_date", "date")}
+      {renderInput("Next Interaction Needed", "next_interaction_needed_date", "date")}
 
       {error && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 10 }}>{error}</div>}
 

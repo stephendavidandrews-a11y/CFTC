@@ -29,6 +29,7 @@ from app.routers import (
     updates,
     lookups,
     dashboard,
+    tags,
 )
 
 logger = logging.getLogger(__name__)
@@ -93,6 +94,7 @@ app.include_router(documents.router, prefix=router_prefix, dependencies=[Depends
 app.include_router(decisions.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 app.include_router(updates.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 app.include_router(lookups.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
+app.include_router(tags.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 
 
 @app.get("/tracker/health")

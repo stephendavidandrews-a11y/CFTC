@@ -114,8 +114,8 @@ export function deleteTask(id) {
 
 // ── People ──────────────────────────────────────────────────────────────────
 
-export function listPeople({ organization_id, is_active, search, limit, offset } = {}) {
-  return fetchJSON(`${P}/people${qs({ organization_id, is_active, search, limit, offset })}`);
+export function listPeople({ organization_id, is_active, search, relationship_category, relationship_lane, limit, offset } = {}) {
+  return fetchJSON(`${P}/people${qs({ organization_id, is_active, search, relationship_category, relationship_lane, limit, offset })}`);
 }
 
 export function createPerson(data) {
@@ -230,4 +230,61 @@ export function deleteDecision(id) {
 
 export function getRecentUpdates({ limit } = {}) {
   return fetchJSON(`${P}/updates/recent${qs({ limit })}`);
+}
+
+
+// ── Tags ────────────────────────────────────────────────────────────────────
+
+export function listTags(tagType) {
+  let url = P + "/tags";
+  if (tagType) url += "?tag_type=" + encodeURIComponent(tagType);
+  return fetchJSON(url);
+}
+
+export function createTag(data) {
+  return fetchJSON(P + "/tags", { method: "POST", body: JSON.stringify(data) });
+}
+
+export function deleteTag(tagId) {
+  return fetchJSON(P + "/tags/" + tagId, { method: "DELETE" });
+}
+
+export function getMatterTags(matterId) {
+  return fetchJSON(P + "/matters/" + matterId + "/tags");
+}
+
+export function addMatterTag(matterId, tagId) {
+  return fetchJSON(P + "/matters/" + matterId + "/tags", { method: "POST", body: JSON.stringify({ tag_id: tagId }) });
+}
+
+export function removeMatterTag(matterId, tagId) {
+  return fetchJSON(P + "/matters/" + matterId + "/tags/" + tagId, { method: "DELETE" });
+}
+
+// ── Meeting Participants (post-creation) ────────────────────────────────────
+
+export function addMeetingParticipant(meetingId, data) {
+  return fetchJSON(P + "/meetings/" + meetingId + "/participants", { method: "POST", body: JSON.stringify(data) });
+}
+
+export function updateMeetingParticipant(meetingId, participantId, data) {
+  return fetchJSON(P + "/meetings/" + meetingId + "/participants/" + participantId, { method: "PUT", body: JSON.stringify(data) });
+}
+
+export function removeMeetingParticipant(meetingId, participantId) {
+  return fetchJSON(P + "/meetings/" + meetingId + "/participants/" + participantId, { method: "DELETE" });
+}
+
+export function updateMeetingMatters(meetingId, matterIds) {
+  return fetchJSON(P + "/meetings/" + meetingId + "/matters", { method: "PUT", body: JSON.stringify({ matter_ids: matterIds }) });
+}
+
+// ── Matter Dependencies ─────────────────────────────────────────────────────
+
+export function addMatterDependency(matterId, data) {
+  return fetchJSON(P + "/matters/" + matterId + "/dependencies", { method: "POST", body: JSON.stringify(data) });
+}
+
+export function removeMatterDependency(matterId, depId) {
+  return fetchJSON(P + "/matters/" + matterId + "/dependencies/" + depId, { method: "DELETE" });
 }

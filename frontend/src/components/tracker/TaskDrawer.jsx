@@ -29,6 +29,7 @@ const EMPTY = {
   matter_id: "",
   waiting_on_person_id: "",
   waiting_on_org_id: "",
+  expected_output: "",
 };
 
 export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved }) {
@@ -74,6 +75,7 @@ export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved })
         matter_id: task.matter_id || "",
         waiting_on_person_id: task.waiting_on_person_id || "",
         waiting_on_org_id: task.waiting_on_org_id || "",
+        expected_output: task.expected_output || "",
       });
     } else {
       setForm({ ...EMPTY, matter_id: matterId || "" });
@@ -136,6 +138,10 @@ export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved })
       <div style={{ marginBottom: 14 }}>
         <label style={LABEL_STYLE}>Description</label>
         <textarea style={{ ...INPUT_STYLE, minHeight: 80, resize: "vertical" }} value={form.description} onChange={set("description")} />
+      </div>
+      <div style={{ marginBottom: 14 }}>
+        <label style={LABEL_STYLE}>Expected Output</label>
+        <textarea style={{ ...INPUT_STYLE, minHeight: 60, resize: "vertical" }} value={form.expected_output} onChange={set("expected_output")} placeholder="What deliverable or result is expected?" />
       </div>
       {renderSelect("Status", "status", enums.status)}
       {renderSelect("Task Mode", "task_mode", enums.task_mode)}

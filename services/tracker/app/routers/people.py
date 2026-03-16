@@ -13,6 +13,7 @@ async def list_people(
     search: str = Query(None),
     organization_id: str = Query(None),
     relationship_category: str = Query(None),
+    relationship_lane: str = Query(None),
     include_in_team: bool = Query(None),
     is_active: bool = Query(True),
     sort_by: str = Query("full_name"),
@@ -31,6 +32,9 @@ async def list_people(
     if relationship_category:
         conditions.append("p.relationship_category = ?")
         params.append(relationship_category)
+    if relationship_lane:
+        conditions.append("p.relationship_lane = ?")
+        params.append(relationship_lane)
     if include_in_team is not None:
         conditions.append("p.include_in_team_workload = ?")
         params.append(1 if include_in_team else 0)

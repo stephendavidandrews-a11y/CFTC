@@ -1,0 +1,7320 @@
+{
+  "generated_at": "2026-03-16T14:12:09.206328+00:00",
+  "services": {
+    "tracker": {
+      "tables": 24,
+      "port": 8004,
+      "db": "tracker.db",
+      "tech": "FastAPI + SQLite (WAL)"
+    },
+    "pipeline": {
+      "tables": 24,
+      "port": 8002,
+      "db": "pipeline.db",
+      "tech": "FastAPI + SQLite (WAL)"
+    },
+    "comments": {
+      "tables": 5,
+      "port": 8001,
+      "db": "comments.db",
+      "tech": "FastAPI + SQLite"
+    },
+    "work": {
+      "tables": 8,
+      "port": 8005,
+      "db": "work.db",
+      "tech": "FastAPI + SQLite (WAL)"
+    }
+  },
+  "tables": [
+    {
+      "name": "organizations",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "short_name",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "organization_type",
+          "type": "TEXT",
+          "tags": [
+            "ENUM",
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "parent_organization_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES organizations.id"
+        },
+        {
+          "name": "jurisdiction",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "is_active",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 1",
+          "default": "1"
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 'manual'",
+          "default": "'manual'"
+        },
+        {
+          "name": "source_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "external_refs",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "people",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "full_name",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "first_name",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "last_name",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "organization_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES organizations.id"
+        },
+        {
+          "name": "email",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "phone",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "assistant_name",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "assistant_contact",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "working_style_notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "substantive_areas",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "relationship_category",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "relationship_lane",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "personality",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "last_interaction_date",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "next_interaction_needed_date",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "next_interaction_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "next_interaction_purpose",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "manager_person_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES people.id"
+        },
+        {
+          "name": "include_in_team_workload",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "relationship_assigned_to_person_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES people.id"
+        },
+        {
+          "name": "is_active",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 1",
+          "default": "1"
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 'manual'",
+          "default": "'manual'"
+        },
+        {
+          "name": "source_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "external_refs",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "matters",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "matter_number",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false,
+          "note": "UNIQUE"
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "matter_type",
+          "type": "TEXT",
+          "tags": [
+            "ENUM",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "problem_statement",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "why_it_matters",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "priority",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "sensitivity",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "risk_level",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "boss_involvement_level",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "assigned_to_person_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES people.id"
+        },
+        {
+          "name": "supervisor_person_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES people.id"
+        },
+        {
+          "name": "requesting_organization_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES organizations.id"
+        },
+        {
+          "name": "client_organization_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES organizations.id"
+        },
+        {
+          "name": "reviewing_organization_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES organizations.id"
+        },
+        {
+          "name": "lead_external_org_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES organizations.id"
+        },
+        {
+          "name": "opened_date",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "work_deadline",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "decision_deadline",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "external_deadline",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "revisit_date",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "next_step",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "next_step_assigned_to_person_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES people.id"
+        },
+        {
+          "name": "pending_decision",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "outcome_summary",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "last_material_update_at",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "closed_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "is_stale_override",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "created_by_person_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES people.id"
+        },
+        {
+          "name": "rin",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "regulatory_stage",
+          "type": "TEXT",
+          "tags": [
+            "ENUM",
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "federal_register_citation",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "unified_agenda_priority",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "cfr_citation",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "docket_number",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "fr_doc_number",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "tags": [
+            "ENUM",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 'manual'",
+          "default": "'manual'"
+        },
+        {
+          "name": "source_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "ai_confidence",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "automation_hold",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "external_refs",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "tasks",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "matter_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES matters.id"
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "task_type",
+          "type": "TEXT",
+          "tags": [
+            "ENUM",
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "task_mode",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "priority",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "assigned_to_person_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES people.id"
+        },
+        {
+          "name": "created_by_person_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES people.id"
+        },
+        {
+          "name": "delegated_by_person_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES people.id"
+        },
+        {
+          "name": "supervising_person_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES people.id"
+        },
+        {
+          "name": "waiting_on_person_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES people.id"
+        },
+        {
+          "name": "waiting_on_org_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES organizations.id"
+        },
+        {
+          "name": "expected_output",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "due_date",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "deadline_type",
+          "type": "TEXT",
+          "tags": [
+            "ENUM",
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "started_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "completed_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "next_follow_up_date",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "completion_notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "sort_order",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 'manual'",
+          "default": "'manual'"
+        },
+        {
+          "name": "source_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "ai_confidence",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "automation_hold",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "external_refs",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "meetings",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "meeting_type",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "date_time_start",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "date_time_end",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "location_or_link",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "purpose",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "prep_needed",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "decisions_made",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "readout_summary",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "boss_attends",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "external_parties_attend",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "created_followups",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "assigned_to_person_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES people.id"
+        },
+        {
+          "name": "transcript_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "recording_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_by_person_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES people.id"
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 'manual'",
+          "default": "'manual'"
+        },
+        {
+          "name": "source_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "external_refs",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "documents",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "matter_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES matters.id"
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "document_type",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "assigned_to_person_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES people.id"
+        },
+        {
+          "name": "version_label",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "due_date",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "final_location",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "current_file_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "is_finalized",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "is_sent",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "sent_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "summary",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 'manual'",
+          "default": "'manual'"
+        },
+        {
+          "name": "source_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "external_refs",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "decisions",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "matter_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES matters.id"
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "decision_type",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "decision_assigned_to_person_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES people.id"
+        },
+        {
+          "name": "decision_due_date",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "options_summary",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "recommended_option",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "decision_result",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "made_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 'manual'",
+          "default": "'manual'"
+        },
+        {
+          "name": "source_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "ai_confidence",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "automation_hold",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "external_refs",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "matter_people",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "matter_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES matters.id"
+        },
+        {
+          "name": "person_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES people.id"
+        },
+        {
+          "name": "matter_role",
+          "type": "TEXT",
+          "tags": [
+            "ENUM",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "engagement_level",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "last_contact_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "next_contact_needed_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "matter_organizations",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "matter_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES matters.id"
+        },
+        {
+          "name": "organization_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES organizations.id"
+        },
+        {
+          "name": "organization_role",
+          "type": "TEXT",
+          "tags": [
+            "ENUM",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "meeting_participants",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "meeting_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES meetings.id"
+        },
+        {
+          "name": "person_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES people.id"
+        },
+        {
+          "name": "organization_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES organizations.id"
+        },
+        {
+          "name": "meeting_role",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "attendance_status",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "attended",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "stance_summary",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "stance_confidence",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "position_strength",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "moved_position",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "movement_summary",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "key_contribution_summary",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "follow_up_expected",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "meeting_matters",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "meeting_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES meetings.id"
+        },
+        {
+          "name": "matter_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES matters.id"
+        },
+        {
+          "name": "relationship_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "status_before",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "status_after",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "decision_made",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "decision_summary",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "follow_up_required",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "document_reviewers",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "document_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES documents.id"
+        },
+        {
+          "name": "person_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES people.id"
+        },
+        {
+          "name": "review_role",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "review_status",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "requested_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "responded_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "task_dependencies",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "task_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES tasks.id"
+        },
+        {
+          "name": "depends_on_task_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES tasks.id"
+        },
+        {
+          "name": "dependency_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "matter_dependencies",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "matter_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES matters.id"
+        },
+        {
+          "name": "depends_on_matter_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES matters.id"
+        },
+        {
+          "name": "dependency_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "tags",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "tag_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "matter_tags",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "matter_id",
+          "type": "TEXT",
+          "tags": [
+            "PK",
+            "FK"
+          ],
+          "not_null": true,
+          "note": "REFERENCES matters.id; UUID"
+        },
+        {
+          "name": "tag_id",
+          "type": "TEXT",
+          "tags": [
+            "PK",
+            "FK"
+          ],
+          "not_null": true,
+          "note": "REFERENCES tags.id; UUID"
+        }
+      ]
+    },
+    {
+      "name": "matter_updates",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "matter_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES matters.id"
+        },
+        {
+          "name": "update_type",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "summary",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "created_by_person_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES people.id"
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "task_updates",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "task_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES tasks.id"
+        },
+        {
+          "name": "update_type",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "summary",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "old_status",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "new_status",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "old_assigned_to_person_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "new_assigned_to_person_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_by_person_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "document_files",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "document_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES documents.id"
+        },
+        {
+          "name": "storage_provider",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "storage_path",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "original_filename",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "mime_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "file_size_bytes",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "version_label",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "uploaded_at",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "uploaded_by_person_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "is_current",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 1",
+          "default": "1"
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "rulemaking_publication_status",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "matter_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; UNIQUE; REFERENCES matters.id"
+        },
+        {
+          "name": "ofr_submitted",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "ofr_accepted",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "ofr_publication_date",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "ofr_doc_number",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "pra_required",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "pra_icr_number",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "pra_submitted_oira",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "pra_approved",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "pra_burden_hours",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "oira_submitted",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "oira_review_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "oira_completed",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "oira_changes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "cra_submitted",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "cra_review_period_end",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "cra_is_major",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "cra_resolution_introduced",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "fr_volume",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "fr_start_page",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "fr_end_page",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "effective_date",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "rulemaking_comment_periods",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "matter_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES matters.id"
+        },
+        {
+          "name": "comment_period_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "opens_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "closes_at",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "fr_doc_number",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "comment_count",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "comment_docket",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "rulemaking_cba_tracking",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "matter_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; UNIQUE; REFERENCES matters.id"
+        },
+        {
+          "name": "cba_status",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "analyst_assigned_person_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES people.id"
+        },
+        {
+          "name": "estimated_costs",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "estimated_benefits",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "net_benefit",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "methodology",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "small_entity_impact",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "rfa_required",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "irfa_completed",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "frfa_completed",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "system_events",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "table_name",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "record_id",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "action",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "tags": [
+            "ENUM",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "changed_fields",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "old_values",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "new_values",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "actor_person_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "sync_state",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "sync_type",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; UNIQUE"
+        },
+        {
+          "name": "last_run_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "last_status",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "last_error",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "items_created",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "items_updated",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "next_run_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "config_json",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "team_members",
+      "service": "pipeline",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "email",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false,
+          "note": "UNIQUE"
+        },
+        {
+          "name": "role",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "gs_level",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "division",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 'Regulation'",
+          "default": "'Regulation'"
+        },
+        {
+          "name": "specializations",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false,
+          "note": "DEFAULT '[]'",
+          "default": "'[]'"
+        },
+        {
+          "name": "max_concurrent",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 5",
+          "default": "5"
+        },
+        {
+          "name": "is_active",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 1",
+          "default": "1"
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "background_summary",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "working_style",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 'balanced'",
+          "default": "'balanced'"
+        },
+        {
+          "name": "communication_preference",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 'email'",
+          "default": "'email'"
+        },
+        {
+          "name": "current_capacity",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 'available'",
+          "default": "'available'"
+        },
+        {
+          "name": "strengths",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false,
+          "note": "DEFAULT '[]'",
+          "default": "'[]'"
+        },
+        {
+          "name": "growth_areas",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false,
+          "note": "DEFAULT '[]'",
+          "default": "'[]'"
+        },
+        {
+          "name": "personal_context",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "recent_wins",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false,
+          "note": "DEFAULT '[]'",
+          "default": "'[]'"
+        }
+      ]
+    },
+    {
+      "name": "stage_templates",
+      "service": "pipeline",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "module",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "item_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "stage_order",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "stage_key",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "stage_label",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "stage_color",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "is_terminal",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "sla_days",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "pipeline_items",
+      "service": "pipeline",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "module",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "item_type",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "short_title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "docket_number",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "rin",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "fr_citation",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "fr_doc_number",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "current_stage",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "stage_entered_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "priority_composite",
+          "type": "REAL",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0.0",
+          "default": "0.0"
+        },
+        {
+          "name": "priority_override",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "priority_label",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 'medium'",
+          "default": "'medium'"
+        },
+        {
+          "name": "chairman_priority",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "lead_attorney_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES team_members.id"
+        },
+        {
+          "name": "backup_attorney_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES team_members.id"
+        },
+        {
+          "name": "action_subtype",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "requesting_party",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "related_rulemaking_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES pipeline_items.id"
+        },
+        {
+          "name": "enforcement_referral",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "foia_request_count",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "unified_agenda_rin",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "unified_agenda_stage",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "stage1_fr_citation",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "stage1_doc_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "eo_action_item_id",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "comment_docket",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 'active'",
+          "default": "'active'"
+        },
+        {
+          "name": "archived_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "archived_reason",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "pipeline_stages",
+      "service": "pipeline",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "item_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES pipeline_items.id"
+        },
+        {
+          "name": "stage_order",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "stage_key",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "stage_label",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "stage_color",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "is_terminal",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "sla_days",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "entered_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "completed_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "pipeline_item_assignments",
+      "service": "pipeline",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "item_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES pipeline_items.id"
+        },
+        {
+          "name": "team_member_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES team_members.id"
+        },
+        {
+          "name": "role",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 'contributor'",
+          "default": "'contributor'"
+        },
+        {
+          "name": "assigned_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "pipeline_deadlines",
+      "service": "pipeline",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "item_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES pipeline_items.id"
+        },
+        {
+          "name": "deadline_type",
+          "type": "TEXT",
+          "tags": [
+            "ENUM",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "due_date",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "source_detail",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "is_hard_deadline",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 1",
+          "default": "1"
+        },
+        {
+          "name": "days_warning",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 14",
+          "default": "14"
+        },
+        {
+          "name": "days_critical",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 3",
+          "default": "3"
+        },
+        {
+          "name": "predecessor_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES pipeline_deadlines.id"
+        },
+        {
+          "name": "offset_days",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 'pending'",
+          "default": "'pending'"
+        },
+        {
+          "name": "completed_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "extended_to",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "extension_reason",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "owner_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES team_members.id"
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "pipeline_documents",
+      "service": "pipeline",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "item_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES pipeline_items.id"
+        },
+        {
+          "name": "document_type",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 1",
+          "default": "1"
+        },
+        {
+          "name": "file_path",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "file_size",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "file_hash",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "mime_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "uploaded_by",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "change_summary",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "is_current",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 1",
+          "default": "1"
+        },
+        {
+          "name": "parent_version_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES pipeline_documents.id"
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "pipeline_decision_log",
+      "service": "pipeline",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "item_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES pipeline_items.id"
+        },
+        {
+          "name": "action_type",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "old_value",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "new_value",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "decided_by",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "rationale",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "pipeline_stakeholders",
+      "service": "pipeline",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "organization",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "stakeholder_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "email",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "phone",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "pipeline_stakeholder_links",
+      "service": "pipeline",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "item_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES pipeline_items.id"
+        },
+        {
+          "name": "stakeholder_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES pipeline_stakeholders.id"
+        },
+        {
+          "name": "interest_level",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 'medium'",
+          "default": "'medium'"
+        },
+        {
+          "name": "position",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "pipeline_meetings",
+      "service": "pipeline",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "item_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES pipeline_items.id"
+        },
+        {
+          "name": "meeting_type",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "date",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "attendees",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "summary",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "follow_up_items",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "is_ex_parte",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "ex_parte_filed",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "pipeline_dependencies",
+      "service": "pipeline",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "source_item_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES pipeline_items.id"
+        },
+        {
+          "name": "target_item_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES pipeline_items.id"
+        },
+        {
+          "name": "dependency_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "pipeline_notifications",
+      "service": "pipeline",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "recipient_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES team_members.id"
+        },
+        {
+          "name": "item_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES pipeline_items.id"
+        },
+        {
+          "name": "notification_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "message",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "severity",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 'info'",
+          "default": "'info'"
+        },
+        {
+          "name": "is_read",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "is_dismissed",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "pipeline_cba_tracking",
+      "service": "pipeline",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "item_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES pipeline_items.id"
+        },
+        {
+          "name": "cba_status",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 'not_started'",
+          "default": "'not_started'"
+        },
+        {
+          "name": "analyst_assigned",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "estimated_costs",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "estimated_benefits",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "net_benefit",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "methodology",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "oira_review_required",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "oira_submitted",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "oira_completed",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "small_entity_impact",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "rfa_required",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "irfa_completed",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "frfa_completed",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "pipeline_publication_status",
+      "service": "pipeline",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "item_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES pipeline_items.id"
+        },
+        {
+          "name": "ofr_submitted",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "ofr_accepted",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "ofr_publication_date",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "ofr_doc_number",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "pra_required",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "pra_icr_number",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "pra_submitted_oira",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "pra_approved",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "pra_burden_hours",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "oira_submitted",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "oira_review_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "oira_completed",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "oira_changes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "cra_submitted",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "cra_review_period_end",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "cra_is_major",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "cra_resolution_introduced",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "fr_volume",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "fr_start_page",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "fr_end_page",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "effective_date",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "pipeline_unified_agenda",
+      "service": "pipeline",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "item_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES pipeline_items.id"
+        },
+        {
+          "name": "rin",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "agenda_stage",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "priority_designation",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "abstract",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "timetable",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "legal_authority",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "last_unified_agenda_update",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "next_action",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "next_action_date",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "pipeline_foia",
+      "service": "pipeline",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "item_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES pipeline_items.id"
+        },
+        {
+          "name": "foia_number",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "requester",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "request_date",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "due_date",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 'pending'",
+          "default": "'pending'"
+        },
+        {
+          "name": "assigned_to",
+          "type": "INTEGER",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES team_members.id"
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "pipeline_enforcement_referrals",
+      "service": "pipeline",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "item_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES pipeline_items.id"
+        },
+        {
+          "name": "referral_date",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "referring_division",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "subject",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 'pending'",
+          "default": "'pending'"
+        },
+        {
+          "name": "enforcement_case_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "pipeline_priority_signals",
+      "service": "pipeline",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "item_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES pipeline_items.id"
+        },
+        {
+          "name": "signal_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "signal_value",
+          "type": "REAL",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "signal_source",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "signal_detail",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "computed_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "interagency_contacts",
+      "service": "pipeline",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "agency",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "email",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "phone",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "areas_of_focus",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false,
+          "note": "DEFAULT '[]'",
+          "default": "'[]'"
+        },
+        {
+          "name": "relationship_status",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 'acquaintance'",
+          "default": "'acquaintance'"
+        },
+        {
+          "name": "last_contact_date",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "interagency_rulemakings",
+      "service": "pipeline",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "agency",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "rulemaking_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "topics",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false,
+          "note": "DEFAULT '[]'",
+          "default": "'[]'"
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 'active'",
+          "default": "'active'"
+        },
+        {
+          "name": "key_dates",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false,
+          "note": "DEFAULT '{}'",
+          "default": "'{}'"
+        },
+        {
+          "name": "url",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "summary",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "cftc_position",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "impact_on_cftc_work",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "linked_pipeline_ids",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false,
+          "note": "DEFAULT '[]'",
+          "default": "'[]'"
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "email_log",
+      "service": "pipeline",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "email_type",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "recipients",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "subject",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "body_html",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "body_text",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 'sent'",
+          "default": "'sent'"
+        },
+        {
+          "name": "error_message",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "sent_at",
+          "type": "TEXT",
+          "tags": [
+            "TS",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "ai_processing_log",
+      "service": "pipeline",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "processing_type",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "source_id",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "source_table",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "prompt_summary",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "result_text",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "model_used",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "input_tokens",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "output_tokens",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "cost_estimate",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "scheduler_state",
+      "service": "pipeline",
+      "fields": [
+        {
+          "name": "task_key",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "last_run_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "last_status",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "next_run_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "proposed_rules",
+      "service": "comments",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "docket_number",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; UNIQUE"
+        },
+        {
+          "name": "rin",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "publication_date",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "comment_period_start",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "comment_period_end",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "federal_register_citation",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "federal_register_doc_number",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "priority_level",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 'STANDARD'",
+          "default": "'STANDARD'"
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 'OPEN'",
+          "default": "'OPEN'"
+        },
+        {
+          "name": "full_text_url",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "summary",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "regulations_gov_url",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "page_count",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "last_comment_pull",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "total_comments",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        }
+      ]
+    },
+    {
+      "name": "comments",
+      "service": "comments",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "docket_number",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES proposed_rules.docket_number"
+        },
+        {
+          "name": "document_id",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; UNIQUE"
+        },
+        {
+          "name": "commenter_name",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "commenter_organization",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "submission_date",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "comment_text",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "original_pdf_url",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "page_count",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "has_attachments",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "attachment_count",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "tier",
+          "type": "INTEGER",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "sentiment",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "is_form_letter",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "form_letter_group_id",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "ai_summary",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "ai_summary_structured",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "pdf_extraction_confidence",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "pdf_extraction_method",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "regulations_gov_url",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "comment_tags",
+      "service": "comments",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "comment_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES comments.id"
+        },
+        {
+          "name": "tag_type",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "tag_value",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        }
+      ]
+    },
+    {
+      "name": "tier1_organizations",
+      "service": "comments",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL; UNIQUE"
+        },
+        {
+          "name": "category",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "name_variations",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false,
+          "note": "DEFAULT '[]'",
+          "default": "'[]'"
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "weekly_reports",
+      "service": "comments",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "week_ending_date",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "generated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "pdf_file_url",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "html_content",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "project_types",
+      "service": "work",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "type_key",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL; UNIQUE"
+        },
+        {
+          "name": "label",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "sort_order",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        }
+      ]
+    },
+    {
+      "name": "projects",
+      "service": "work",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "short_title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "project_type",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 'active'",
+          "default": "'active'"
+        },
+        {
+          "name": "priority_label",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 'medium'",
+          "default": "'medium'"
+        },
+        {
+          "name": "lead_attorney_id",
+          "type": "INTEGER",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "linked_pipeline_id",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "linked_docket",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "linked_eo_doc_id",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "sort_order",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "why_me",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "completion_notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "due_date",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "work_items",
+      "service": "work",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "project_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES projects.id"
+        },
+        {
+          "name": "parent_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES work_items.id"
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 'not_started'",
+          "default": "'not_started'"
+        },
+        {
+          "name": "priority_label",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "due_date",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "blocked_reason",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "sort_order",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "completed_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "context",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "last_update_notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "last_update_date",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "completion_notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "work_item_assignments",
+      "service": "work",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "work_item_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES work_items.id"
+        },
+        {
+          "name": "team_member_id",
+          "type": "INTEGER",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "role",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 'assigned'",
+          "default": "'assigned'"
+        },
+        {
+          "name": "assigned_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "work_item_dependencies",
+      "service": "work",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "blocked_item_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES work_items.id"
+        },
+        {
+          "name": "blocking_item_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES work_items.id"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "resolved",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "resolved_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "tasks",
+      "service": "work",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 'todo'",
+          "default": "'todo'"
+        },
+        {
+          "name": "priority_label",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 'medium'",
+          "default": "'medium'"
+        },
+        {
+          "name": "due_date",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "project_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES projects.id"
+        },
+        {
+          "name": "work_item_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES work_items.id"
+        },
+        {
+          "name": "linked_member_id",
+          "type": "INTEGER",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "parent_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES tasks.id"
+        },
+        {
+          "name": "tags",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false,
+          "note": "DEFAULT '[]'",
+          "default": "'[]'"
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "source_system",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "source_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "completed_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "manager_notes",
+      "service": "work",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "content",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "project_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES projects.id"
+        },
+        {
+          "name": "work_item_id",
+          "type": "INTEGER",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES work_items.id"
+        },
+        {
+          "name": "linked_member_id",
+          "type": "INTEGER",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "note_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 'general'",
+          "default": "'general'"
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "context_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 'general'",
+          "default": "'general'"
+        },
+        {
+          "name": "processed",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "ai_insights",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "project_type_templates",
+      "service": "work",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "project_type",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "item_title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "item_description",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "item_sort_order",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "parent_ref",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "from": "organizations",
+      "fromField": "parent_organization_id",
+      "to": "organizations",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "people",
+      "fromField": "organization_id",
+      "to": "organizations",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "people",
+      "fromField": "manager_person_id",
+      "to": "people",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "people",
+      "fromField": "relationship_assigned_to_person_id",
+      "to": "people",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matters",
+      "fromField": "assigned_to_person_id",
+      "to": "people",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matters",
+      "fromField": "supervisor_person_id",
+      "to": "people",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matters",
+      "fromField": "requesting_organization_id",
+      "to": "organizations",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matters",
+      "fromField": "client_organization_id",
+      "to": "organizations",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matters",
+      "fromField": "reviewing_organization_id",
+      "to": "organizations",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matters",
+      "fromField": "lead_external_org_id",
+      "to": "organizations",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matters",
+      "fromField": "next_step_assigned_to_person_id",
+      "to": "people",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matters",
+      "fromField": "created_by_person_id",
+      "to": "people",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "tasks",
+      "fromField": "matter_id",
+      "to": "matters",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "tasks",
+      "fromField": "assigned_to_person_id",
+      "to": "people",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "tasks",
+      "fromField": "created_by_person_id",
+      "to": "people",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "tasks",
+      "fromField": "delegated_by_person_id",
+      "to": "people",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "tasks",
+      "fromField": "supervising_person_id",
+      "to": "people",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "tasks",
+      "fromField": "waiting_on_person_id",
+      "to": "people",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "tasks",
+      "fromField": "waiting_on_org_id",
+      "to": "organizations",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "meetings",
+      "fromField": "assigned_to_person_id",
+      "to": "people",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "meetings",
+      "fromField": "created_by_person_id",
+      "to": "people",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "documents",
+      "fromField": "matter_id",
+      "to": "matters",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "documents",
+      "fromField": "assigned_to_person_id",
+      "to": "people",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "decisions",
+      "fromField": "matter_id",
+      "to": "matters",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "decisions",
+      "fromField": "decision_assigned_to_person_id",
+      "to": "people",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matter_people",
+      "fromField": "matter_id",
+      "to": "matters",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matter_people",
+      "fromField": "person_id",
+      "to": "people",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matter_organizations",
+      "fromField": "matter_id",
+      "to": "matters",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matter_organizations",
+      "fromField": "organization_id",
+      "to": "organizations",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "meeting_participants",
+      "fromField": "meeting_id",
+      "to": "meetings",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "meeting_participants",
+      "fromField": "person_id",
+      "to": "people",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "meeting_participants",
+      "fromField": "organization_id",
+      "to": "organizations",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "meeting_matters",
+      "fromField": "meeting_id",
+      "to": "meetings",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "meeting_matters",
+      "fromField": "matter_id",
+      "to": "matters",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "document_reviewers",
+      "fromField": "document_id",
+      "to": "documents",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "document_reviewers",
+      "fromField": "person_id",
+      "to": "people",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "task_dependencies",
+      "fromField": "task_id",
+      "to": "tasks",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "task_dependencies",
+      "fromField": "depends_on_task_id",
+      "to": "tasks",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matter_dependencies",
+      "fromField": "matter_id",
+      "to": "matters",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matter_dependencies",
+      "fromField": "depends_on_matter_id",
+      "to": "matters",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matter_tags",
+      "fromField": "matter_id",
+      "to": "matters",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matter_tags",
+      "fromField": "tag_id",
+      "to": "tags",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matter_updates",
+      "fromField": "matter_id",
+      "to": "matters",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matter_updates",
+      "fromField": "created_by_person_id",
+      "to": "people",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "task_updates",
+      "fromField": "task_id",
+      "to": "tasks",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "document_files",
+      "fromField": "document_id",
+      "to": "documents",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "rulemaking_publication_status",
+      "fromField": "matter_id",
+      "to": "matters",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "rulemaking_comment_periods",
+      "fromField": "matter_id",
+      "to": "matters",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "rulemaking_cba_tracking",
+      "fromField": "matter_id",
+      "to": "matters",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "rulemaking_cba_tracking",
+      "fromField": "analyst_assigned_person_id",
+      "to": "people",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_items",
+      "fromField": "lead_attorney_id",
+      "to": "team_members",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_items",
+      "fromField": "backup_attorney_id",
+      "to": "team_members",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_items",
+      "fromField": "related_rulemaking_id",
+      "to": "pipeline_items",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_stages",
+      "fromField": "item_id",
+      "to": "pipeline_items",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_item_assignments",
+      "fromField": "item_id",
+      "to": "pipeline_items",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_item_assignments",
+      "fromField": "team_member_id",
+      "to": "team_members",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_deadlines",
+      "fromField": "item_id",
+      "to": "pipeline_items",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_deadlines",
+      "fromField": "predecessor_id",
+      "to": "pipeline_deadlines",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_deadlines",
+      "fromField": "owner_id",
+      "to": "team_members",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_documents",
+      "fromField": "item_id",
+      "to": "pipeline_items",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_documents",
+      "fromField": "parent_version_id",
+      "to": "pipeline_documents",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_decision_log",
+      "fromField": "item_id",
+      "to": "pipeline_items",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_stakeholder_links",
+      "fromField": "item_id",
+      "to": "pipeline_items",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_stakeholder_links",
+      "fromField": "stakeholder_id",
+      "to": "pipeline_stakeholders",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_meetings",
+      "fromField": "item_id",
+      "to": "pipeline_items",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_dependencies",
+      "fromField": "source_item_id",
+      "to": "pipeline_items",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_dependencies",
+      "fromField": "target_item_id",
+      "to": "pipeline_items",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_notifications",
+      "fromField": "recipient_id",
+      "to": "team_members",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_notifications",
+      "fromField": "item_id",
+      "to": "pipeline_items",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_cba_tracking",
+      "fromField": "item_id",
+      "to": "pipeline_items",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_publication_status",
+      "fromField": "item_id",
+      "to": "pipeline_items",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_unified_agenda",
+      "fromField": "item_id",
+      "to": "pipeline_items",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_foia",
+      "fromField": "item_id",
+      "to": "pipeline_items",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_foia",
+      "fromField": "assigned_to",
+      "to": "team_members",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_enforcement_referrals",
+      "fromField": "item_id",
+      "to": "pipeline_items",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "pipeline_priority_signals",
+      "fromField": "item_id",
+      "to": "pipeline_items",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "comments",
+      "fromField": "docket_number",
+      "to": "proposed_rules",
+      "toField": "docket_number",
+      "label": "FK"
+    },
+    {
+      "from": "comment_tags",
+      "fromField": "comment_id",
+      "to": "comments",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "work_items",
+      "fromField": "project_id",
+      "to": "projects",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "work_items",
+      "fromField": "parent_id",
+      "to": "work_items",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "work_item_assignments",
+      "fromField": "work_item_id",
+      "to": "work_items",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "work_item_dependencies",
+      "fromField": "blocked_item_id",
+      "to": "work_items",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "work_item_dependencies",
+      "fromField": "blocking_item_id",
+      "to": "work_items",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "tasks",
+      "fromField": "project_id",
+      "to": "projects",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "tasks",
+      "fromField": "work_item_id",
+      "to": "work_items",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "tasks",
+      "fromField": "parent_id",
+      "to": "tasks",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "manager_notes",
+      "fromField": "project_id",
+      "to": "projects",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "manager_notes",
+      "fromField": "work_item_id",
+      "to": "work_items",
+      "toField": "id",
+      "label": "FK"
+    }
+  ],
+  "enums": {
+    "matter_type": [
+      "rulemaking",
+      "interpretive guidance",
+      "no-action letter",
+      "exemptive letter",
+      "staff advisory",
+      "other letter",
+      "interagency coordination",
+      "enforcement support",
+      "congressional response",
+      "speech / testimony / briefing prep",
+      "litigation-sensitive issue",
+      "personnel / management",
+      "administrative / ethics / process",
+      "industry inquiry",
+      "international matter"
+    ],
+    "matter_status": [
+      "new intake",
+      "framing issue",
+      "research in progress",
+      "draft in progress",
+      "internal review",
+      "client review",
+      "leadership review",
+      "external coordination",
+      "awaiting decision",
+      "awaiting comments",
+      "parked / monitoring",
+      "closed"
+    ],
+    "matter_priority": [
+      "critical this week",
+      "important this month",
+      "strategic / slow burn",
+      "monitoring only"
+    ],
+    "matter_sensitivity": [
+      "routine",
+      "internal only",
+      "leadership-sensitive",
+      "deliberative / predecisional",
+      "enforcement-sensitive",
+      "congressional-sensitive"
+    ],
+    "risk_level": [
+      "low",
+      "medium",
+      "high",
+      "critical"
+    ],
+    "boss_involvement_level": [
+      "no boss involvement needed",
+      "keep boss informed",
+      "boss review required",
+      "boss decision required",
+      "boss will present / speak"
+    ],
+    "regulatory_stage": [
+      "concept",
+      "drafting",
+      "proposed",
+      "comment_period",
+      "final_review",
+      "published",
+      "effective",
+      "withdrawn",
+      "long_term"
+    ],
+    "unified_agenda_priority": [
+      "economically_significant",
+      "significant",
+      "substantive_nonsignificant",
+      "routine",
+      "info_only"
+    ],
+    "task_status": [
+      "not started",
+      "in progress",
+      "waiting on others",
+      "needs review",
+      "done",
+      "deferred"
+    ],
+    "task_mode": [
+      "action",
+      "waiting",
+      "decision",
+      "follow-up",
+      "reading",
+      "delegated"
+    ],
+    "task_type": [
+      "research issue",
+      "draft memo",
+      "review markup",
+      "prepare talking points",
+      "schedule meeting",
+      "get clearance",
+      "follow up with client",
+      "redline document",
+      "produce options memo",
+      "send readout",
+      "coordinate with agency partner",
+      "other"
+    ],
+    "task_priority": [
+      "critical",
+      "high",
+      "normal",
+      "low"
+    ],
+    "deadline_type": [
+      "hard",
+      "soft"
+    ],
+    "meeting_type": [
+      "internal working meeting",
+      "leadership meeting",
+      "client meeting",
+      "interagency meeting",
+      "industry meeting",
+      "Hill meeting",
+      "briefing",
+      "check-in",
+      "commissioner office",
+      "other"
+    ],
+    "document_type": [
+      "memo",
+      "briefing paper",
+      "talking points",
+      "redline",
+      "regulatory text",
+      "comment summary",
+      "clearance memo",
+      "email draft",
+      "hearing prep",
+      "FAQ / Q&A",
+      "interagency paper",
+      "other"
+    ],
+    "document_status": [
+      "not started",
+      "drafting",
+      "under review",
+      "awaiting comments",
+      "finalized",
+      "sent",
+      "superseded",
+      "archived"
+    ],
+    "decision_type": [
+      "boss decision",
+      "leadership decision",
+      "client decision",
+      "interagency decision",
+      "legal interpretation",
+      "process decision"
+    ],
+    "decision_status": [
+      "pending",
+      "under consideration",
+      "made",
+      "deferred",
+      "no longer needed"
+    ],
+    "organization_type": [
+      "CFTC office",
+      "CFTC division",
+      "Commissioner office",
+      "Federal agency",
+      "White House / OMB",
+      "Congressional office",
+      "Regulated entity",
+      "Exchange",
+      "Clearinghouse",
+      "Trade association",
+      "Outside counsel",
+      "Inspector General / auditor",
+      "Other"
+    ],
+    "relationship_category": [
+      "Boss",
+      "Leadership",
+      "Direct report",
+      "OGC peer",
+      "Internal client",
+      "Commissioner office",
+      "Partner agency",
+      "Hill",
+      "Outside party"
+    ],
+    "relationship_lane": [
+      "Decision-maker",
+      "Recommender",
+      "Drafter",
+      "Blocker",
+      "Influencer",
+      "FYI only"
+    ],
+    "matter_role": [
+      "lead attorney",
+      "supervisor",
+      "requesting stakeholder",
+      "substantive client",
+      "reviewing stakeholder",
+      "leadership stakeholder",
+      "external partner",
+      "Hill stakeholder",
+      "outside party",
+      "subject matter contributor",
+      "FYI only"
+    ],
+    "engagement_level": [
+      "lead",
+      "core",
+      "consulted",
+      "informed",
+      "escalation only"
+    ],
+    "organization_role": [
+      "requesting office",
+      "client office",
+      "reviewing office",
+      "lead office",
+      "partner agency",
+      "counterparty",
+      "Hill office",
+      "affected office",
+      "outside party",
+      "FYI"
+    ],
+    "update_type": [
+      "status update",
+      "meeting readout",
+      "document milestone",
+      "decision made",
+      "blocker identified",
+      "deadline changed",
+      "escalation",
+      "closure note"
+    ],
+    "source": [
+      "manual",
+      "sync",
+      "sauron",
+      "api",
+      "import"
+    ]
+  }
+}

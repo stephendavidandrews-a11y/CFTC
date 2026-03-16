@@ -84,17 +84,17 @@ async def create_task(body: CreateTask, db=Depends(get_db)):
         INSERT INTO tasks (id, matter_id, title, description, task_type, status, task_mode,
             priority, assigned_to_person_id, created_by_person_id, delegated_by_person_id,
             supervising_person_id, waiting_on_person_id, waiting_on_org_id,
-            expected_output, due_date, deadline_type, sort_order,
+            waiting_on_description, expected_output, due_date, deadline_type, sort_order,
             source, source_id, ai_confidence, automation_hold, external_refs,
             created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         task_id, body.matter_id, body.title, body.description,
         body.task_type, body.status, body.task_mode,
         body.priority, body.assigned_to_person_id,
         body.created_by_person_id, body.delegated_by_person_id,
         body.supervising_person_id, body.waiting_on_person_id,
-        body.waiting_on_org_id,
+        body.waiting_on_org_id, body.waiting_on_description,
         body.expected_output, body.due_date, body.deadline_type,
         body.sort_order,
         body.source, body.source_id,

@@ -74,8 +74,8 @@ services:
   # ---------------------------------------------------------------------------
   command-center:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/Dockerfile
     container_name: cftc-command-center
     restart: always
     ports:

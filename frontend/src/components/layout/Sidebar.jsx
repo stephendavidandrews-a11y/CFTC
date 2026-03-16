@@ -32,6 +32,10 @@ const SECTIONS = [
   // ── Personal ──
   { separator: true, label: "Personal" },
   { path: "/network/", label: "Network", icon: "\u{1F310}", external: true },
+
+  // Developer
+  { separator: true, label: "Developer" },
+  { path: "/developer", label: "Dev Console", icon: "⚙" },
 ];
 
 export default function Sidebar({ badgeCounts = {}, isMobile = false, onNavigate }) {

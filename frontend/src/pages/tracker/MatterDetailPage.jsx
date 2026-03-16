@@ -1,11 +1,13 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
 import useApi from "../../hooks/useApi";
 import {
   getMatter, addMatterUpdate, addMatterPerson, removeMatterPerson,
   addMatterOrg, removeMatterOrg, listTasks, listMeetings, listDocuments, listDecisions,
-  listPeople, listOrganizations,
+  listPeople, listOrganizations, listMatters,
+  addMatterDependency, removeMatterDependency,
+  getMatterTags, addMatterTag, removeMatterTag, listTags, createTag,
 } from "../../api/tracker";
 import { useDrawer } from "../../contexts/DrawerContext";
 import Badge from "../../components/shared/Badge";
@@ -52,7 +54,7 @@ function formatDate(d) {
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-const TABS = ["Updates", "Tasks", "Stakeholders", "Organizations", "Meetings", "Documents", "Decisions"];
+const TABS = ["Updates", "Tasks", "Stakeholders", "Organizations", "Meetings", "Documents", "Decisions", "Dependencies"];
 
 export default function MatterDetailPage() {
   const { id } = useParams();
@@ -64,7 +66,7 @@ export default function MatterDetailPage() {
 
   // Tab data
   const { data: tasksData, refetch: refetchTasks } = useApi(() => listTasks({ matter_id: id }), [id]);
-  const { data: meetingsData } = useApi(() => listMeetings({ matter_id: id }), [id]);
+  const { data: meetingsData, refetch: refetchMeetings } = useApi(() => listMeetings({ matter_id: id }), [id]);
   const { data: docsData, refetch: refetchDocs } = useApi(() => listDocuments({ matter_id: id }), [id]);
   const { data: decisionsData, refetch: refetchDecisions } = useApi(() => listDecisions({ matter_id: id }), [id]);
 
@@ -85,6 +87,18 @@ export default function MatterDetailPage() {
   // Org inline add
   const [showOrgAdd, setShowOrgAdd] = useState(false);
   const [orgForm, setOrgForm] = useState({ organization_id: "", organization_role: "" });
+
+  // Dependencies
+  const { data: allMatters } = useApi(() => listMatters({ limit: 1000 }), []);
+  const [depForm, setDepForm] = useState({ depends_on_matter_id: "", dependency_type: "" });
+  const [showDepAdd, setShowDepAdd] = useState(false);
+
+  // Tags
+  const [tags, setTags] = useState([]);
+  const [allTags, setAllTags] = useState([]);
+  const [selectedTagId, setSelectedTagId] = useState("");
+  const [showNewTag, setShowNewTag] = useState(false);
+  const [newTagName, setNewTagName] = useState("");
 
   const handleSaveUpdate = useCallback(async () => {
     if (!updateSummary.trim()) return;
@@ -137,6 +151,60 @@ export default function MatterDetailPage() {
     } catch (e) { console.error(e); }
   }, [id, orgForm, refetch]);
 
+  // Fetch tags
+  useEffect(() => {
+    if (!id) return;
+    getMatterTags(id).then(setTags).catch(() => {});
+    listTags("matter").then(setAllTags).catch(() => {});
+  }, [id]);
+
+  const handleAddTag = useCallback(async () => {
+    if (!selectedTagId) return;
+    try {
+      await addMatterTag(id, parseInt(selectedTagId));
+      const updated = await getMatterTags(id);
+      setTags(updated);
+      setSelectedTagId("");
+    } catch (e) { console.error(e); }
+  }, [id, selectedTagId]);
+
+  const handleRemoveTag = useCallback(async (tagId) => {
+    try {
+      await removeMatterTag(id, tagId);
+      const updated = await getMatterTags(id);
+      setTags(updated);
+    } catch (e) { console.error(e); }
+  }, [id]);
+
+  const handleCreateTag = useCallback(async () => {
+    if (!newTagName.trim()) return;
+    try {
+      const newTag = await createTag({ name: newTagName.trim(), tag_type: "matter" });
+      setAllTags((prev) => [...prev, newTag]);
+      setNewTagName("");
+      setShowNewTag(false);
+    } catch (e) { console.error(e); }
+  }, [newTagName]);
+
+  // Dependencies handlers
+  const handleAddDep = useCallback(async () => {
+    if (!depForm.depends_on_matter_id || !depForm.dependency_type) return;
+    try {
+      await addMatterDependency(id, depForm);
+      setDepForm({ depends_on_matter_id: "", dependency_type: "" });
+      setShowDepAdd(false);
+      refetch();
+    } catch (e) { console.error(e); }
+  }, [id, depForm, refetch]);
+
+  const handleRemoveDep = useCallback(async (depId) => {
+    if (!window.confirm("Remove this dependency?")) return;
+    try {
+      await removeMatterDependency(id, depId);
+      refetch();
+    } catch (e) { console.error(e); }
+  }, [id, refetch]);
+
   if (loading) {
     return <div style={{ padding: "60px 32px", textAlign: "center", color: theme.text.faint }}>Loading matter...</div>;
   }
@@ -161,6 +229,10 @@ export default function MatterDetailPage() {
   const updates = matter.updates || [];
   const peopleList = allPeople?.items || allPeople || [];
   const orgsList = allOrgs?.items || allOrgs || [];
+  const mattersList = (allMatters?.items || allMatters || []).filter((m) => m.id !== parseInt(id));
+  const dependencies = matter.dependencies || [];
+  const assignedTagIds = new Set((tags || []).map((t) => t.id || t.tag_id));
+  const availableTags = (allTags || []).filter((t) => !assignedTagIds.has(t.id));
 
   const infoLeft = [
     { label: "Type", value: matter.matter_type },
@@ -223,6 +295,59 @@ export default function MatterDetailPage() {
               <div style={valStyle}>{item.value || "\u2014"}</div>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Tags */}
+      <div style={{ ...cardStyle, marginBottom: 24, padding: "14px 24px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ ...labelStyle, marginBottom: 0 }}>Tags</div>
+          {(tags || []).map((t) => (
+            <span key={t.id || t.tag_id} style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              background: "rgba(59,130,246,0.12)", color: theme.accent.blue,
+              fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 12,
+            }}>
+              {t.name || t.tag_name}
+              <button
+                onClick={() => handleRemoveTag(t.id || t.tag_id)}
+                style={{
+                  background: "transparent", border: "none", cursor: "pointer",
+                  color: theme.accent.blue, fontSize: 13, padding: "0 2px", lineHeight: 1, opacity: 0.7,
+                }}
+                title="Remove tag"
+              >&times;</button>
+            </span>
+          ))}
+          {!showNewTag && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <select style={{ ...inputStyle, width: 160, padding: "4px 8px", fontSize: 12 }}
+                value={selectedTagId} onChange={(e) => setSelectedTagId(e.target.value)}>
+                <option value="">Add tag...</option>
+                {availableTags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+              {selectedTagId && (
+                <button style={{ ...btnPrimary, padding: "4px 10px", fontSize: 11 }} onClick={handleAddTag}>Add</button>
+              )}
+              <button
+                onClick={() => setShowNewTag(true)}
+                style={{ ...btnSecondary, padding: "4px 10px", fontSize: 11 }}
+              >New Tag</button>
+            </div>
+          )}
+          {showNewTag && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <input
+                style={{ ...inputStyle, width: 140, padding: "4px 8px", fontSize: 12 }}
+                placeholder="Tag name..."
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleCreateTag()}
+              />
+              <button style={{ ...btnPrimary, padding: "4px 10px", fontSize: 11 }} onClick={handleCreateTag}>Create</button>
+              <button style={{ ...btnSecondary, padding: "4px 10px", fontSize: 11 }} onClick={() => { setShowNewTag(false); setNewTagName(""); }}>Cancel</button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -478,7 +603,12 @@ export default function MatterDetailPage() {
         {/* MEETINGS TAB */}
         {activeTab === "Meetings" && (
           <div>
-            <div style={sectionTitle}>Meetings</div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <div style={sectionTitle}>Meetings</div>
+              <button style={btnPrimary} onClick={() => openDrawer("meeting", { matter_id: parseInt(id) }, refetchMeetings)}>
+                + Add Meeting
+              </button>
+            </div>
             {meetings.length === 0 ? (
               <EmptyState title="No meetings" message="No meetings linked to this matter yet." />
             ) : (
@@ -548,6 +678,77 @@ export default function MatterDetailPage() {
                 ]}
                 data={decisions}
                 onRowClick={(row) => openDrawer("decision", row, refetchDecisions)}
+              />
+            )}
+          </div>
+        )}
+
+        {/* DEPENDENCIES TAB */}
+        {activeTab === "Dependencies" && (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <div style={sectionTitle}>Dependencies</div>
+              <button style={btnPrimary} onClick={() => setShowDepAdd(!showDepAdd)}>
+                {showDepAdd ? "Cancel" : "+ Add Dependency"}
+              </button>
+            </div>
+            {showDepAdd && (
+              <div style={{
+                display: "flex", gap: 8, alignItems: "center", marginBottom: 14,
+                background: theme.bg.input, padding: 12, borderRadius: 8, border: `1px solid ${theme.border.default}`,
+              }}>
+                <select style={{ ...inputStyle, width: 280 }}
+                  value={depForm.depends_on_matter_id}
+                  onChange={(e) => setDepForm((p) => ({ ...p, depends_on_matter_id: e.target.value }))}
+                >
+                  <option value="">Select matter...</option>
+                  {mattersList.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.matter_number ? `#${m.matter_number} - ` : ""}{m.title}
+                    </option>
+                  ))}
+                </select>
+                <select style={{ ...inputStyle, width: 180 }}
+                  value={depForm.dependency_type}
+                  onChange={(e) => setDepForm((p) => ({ ...p, dependency_type: e.target.value }))}
+                >
+                  <option value="">Type...</option>
+                  {["legal dependency", "policy dependency", "sequencing dependency", "approval dependency", "external dependency", "shared deadline", "related risk"].map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+                <button style={btnPrimary} onClick={handleAddDep}>Add</button>
+              </div>
+            )}
+            {dependencies.length === 0 ? (
+              <EmptyState title="No dependencies" message="Add dependencies to track related matters." />
+            ) : (
+              <DataTable
+                columns={[
+                  {
+                    key: "depends_on_title", label: "Related Matter",
+                    render: (v, row) => row.depends_on_title || row.depends_on_matter_title || `Matter #${row.depends_on_matter_id}`,
+                  },
+                  { key: "dependency_type", label: "Type", width: 170 },
+                  { key: "notes", label: "Notes", width: 200, render: (v) => v || "\u2014" },
+                  {
+                    key: "_remove", label: "", width: 60, sortable: false,
+                    render: (_, row) => (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleRemoveDep(row.id); }}
+                        style={{
+                          background: "transparent", border: "none", cursor: "pointer",
+                          color: "#ef4444", fontSize: 11, fontWeight: 600, padding: "2px 8px",
+                          borderRadius: 4, opacity: 0.7,
+                        }}
+                        onMouseEnter={(e) => e.target.style.opacity = "1"}
+                        onMouseLeave={(e) => e.target.style.opacity = "0.7"}
+                        title="Remove dependency"
+                      >Remove</button>
+                    ),
+                  },
+                ]}
+                data={dependencies}
               />
             )}
           </div>

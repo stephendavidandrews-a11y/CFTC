@@ -1,6 +1,7 @@
 import React from "react";
 import DrawerShell from "./DrawerShell";
 import { fetchJSON } from "../../api/client";
+import { uploadDocumentFile } from "../../api/tracker";
 
 const INPUT_STYLE = {
   width: "100%",
@@ -16,6 +17,16 @@ const LABEL_STYLE = { display: "block", fontSize: 12, fontWeight: 600, color: "#
 const SAVE_BTN = { background: "#1e40af", color: "#fff", padding: "8px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" };
 const CANCEL_BTN = { background: "transparent", color: "#64748b", padding: "8px 20px", borderRadius: 8, fontSize: 13, border: "1px solid #1f2937", cursor: "pointer" };
 
+const FILE_AREA_STYLE = {
+  border: "1px dashed #334155",
+  borderRadius: 6,
+  background: "#0f172a",
+  padding: "12px 14px",
+  textAlign: "center",
+  cursor: "pointer",
+  marginBottom: 14,
+};
+
 const EMPTY = {
   title: "",
   document_type: "",
@@ -28,6 +39,12 @@ const EMPTY = {
   notes: "",
 };
 
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+}
+
 export default function DocumentDrawer({ isOpen, onClose, document: doc, matterId, onSaved }) {
   const [form, setForm] = React.useState({ ...EMPTY });
   const [enums, setEnums] = React.useState({});
@@ -35,6 +52,8 @@ export default function DocumentDrawer({ isOpen, onClose, document: doc, matterI
   const [matters, setMatters] = React.useState([]);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState(null);
+  const [file, setFile] = React.useState(null);
+  const fileInputRef = React.useRef(null);
 
   React.useEffect(() => {
     if (!isOpen) return;
@@ -66,10 +85,16 @@ export default function DocumentDrawer({ isOpen, onClose, document: doc, matterI
     } else {
       setForm({ ...EMPTY, matter_id: matterId || "" });
     }
+    setFile(null);
     setError(null);
   }, [doc, matterId, isOpen]);
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+
+  const handleFileChange = (e) => {
+    const selected = e.target.files[0];
+    setFile(selected || null);
+  };
 
   const handleSave = async () => {
     setError(null);
@@ -80,11 +105,22 @@ export default function DocumentDrawer({ isOpen, onClose, document: doc, matterI
       if (!payload.title) { setError("Title is required"); setSaving(false); return; }
       if (!payload.document_type) { setError("Document type is required"); setSaving(false); return; }
 
+      let docId;
       if (doc?.id) {
-        await fetchJSON(`/tracker/documents/${doc.id}`, { method: "PUT", body: JSON.stringify(payload) });
+        await fetchJSON("/tracker/documents/" + doc.id, { method: "PUT", body: JSON.stringify(payload) });
+        docId = doc.id;
       } else {
-        await fetchJSON("/tracker/documents", { method: "POST", body: JSON.stringify(payload) });
+        const created = await fetchJSON("/tracker/documents", { method: "POST", body: JSON.stringify(payload) });
+        docId = created.id;
       }
+
+      // Upload file if selected
+      if (file && docId) {
+        const formData = new FormData();
+        formData.append("file", file);
+        await uploadDocumentFile(docId, formData);
+      }
+
       if (onSaved) onSaved();
       onClose();
     } catch (err) {
@@ -115,10 +151,11 @@ export default function DocumentDrawer({ isOpen, onClose, document: doc, matterI
     </div>
   );
 
-  const personOpts = people.map((p) => ({ value: p.id, label: `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.full_name || `Person #${p.id}` }));
-  const matterOpts = matters.map((m) => ({ value: m.id, label: m.title || `Matter #${m.id}` }));
+  const personOpts = people.map((p) => ({ value: p.id, label: ((p.first_name || "") + " " + (p.last_name || "")).trim() || p.full_name || ("Person #" + p.id) }));
+  const matterOpts = matters.map((m) => ({ value: m.id, label: m.title || ("Matter #" + m.id) }));
 
   const isEdit = !!doc?.id;
+  const existingFiles = doc?.files || [];
 
   return (
     <DrawerShell isOpen={isOpen} onClose={onClose} title={isEdit ? "Edit Document" : "New Document"}>
@@ -136,6 +173,45 @@ export default function DocumentDrawer({ isOpen, onClose, document: doc, matterI
       <div style={{ marginBottom: 14 }}>
         <label style={LABEL_STYLE}>Notes</label>
         <textarea style={{ ...INPUT_STYLE, minHeight: 60, resize: "vertical" }} value={form.notes} onChange={set("notes")} />
+      </div>
+
+      {/* File Upload */}
+      <div style={{ marginBottom: 14 }}>
+        <label style={LABEL_STYLE}>File</label>
+        {existingFiles.length > 0 && !file && (
+          <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 6, padding: "6px 10px", background: "#1e293b", borderRadius: 6 }}>
+            Current: {existingFiles.map((f) => f.original_filename || f.filename || "file").join(", ")}
+          </div>
+        )}
+        <div
+          style={FILE_AREA_STYLE}
+          onClick={() => fileInputRef.current && fileInputRef.current.click()}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            onChange={handleFileChange}
+            style={{ display: "none" }}
+          />
+          {file ? (
+            <div style={{ color: "#e2e8f0", fontSize: 12 }}>
+              <div style={{ fontWeight: 600 }}>{file.name}</div>
+              <div style={{ color: "#64748b", marginTop: 2 }}>{formatFileSize(file.size)}</div>
+            </div>
+          ) : (
+            <div style={{ color: "#64748b", fontSize: 12 }}>
+              Click to choose a file{existingFiles.length > 0 ? " (replaces current)" : ""}
+            </div>
+          )}
+        </div>
+        {file && (
+          <button
+            onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+            style={{ background: "none", border: "none", color: "#ef4444", fontSize: 11, cursor: "pointer", padding: 0 }}
+          >
+            Remove selected file
+          </button>
+        )}
       </div>
 
       {error && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 10 }}>{error}</div>}
