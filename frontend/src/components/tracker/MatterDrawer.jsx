@@ -31,6 +31,11 @@ const EMPTY = {
   external_deadline: "",
   decision_deadline: "",
   next_step: "",
+  next_step_assigned_to_person_id: "",
+  pending_decision: "",
+  revisit_date: "",
+  outcome_summary: "",
+  closed_at: "",
   rin: "",
   regulatory_stage: "",
 };
@@ -87,6 +92,11 @@ export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
         external_deadline: matter.external_deadline || "",
         decision_deadline: matter.decision_deadline || "",
         next_step: matter.next_step || "",
+        next_step_assigned_to_person_id: matter.next_step_assigned_to_person_id || "",
+        pending_decision: matter.pending_decision || "",
+        revisit_date: matter.revisit_date || "",
+        outcome_summary: matter.outcome_summary || "",
+        closed_at: matter.closed_at || "",
         rin: matter.rin || "",
         regulatory_stage: matter.regulatory_stage || "",
       });
@@ -108,6 +118,7 @@ export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
         if (payload[k] === "") payload[k] = null;
       });
       if (!payload.title) { setError("Title is required"); setSaving(false); return; }
+      if (payload.status === "closed" && !payload.outcome_summary) { setError("Outcome summary is required when closing a matter"); setSaving(false); return; }
 
       if (matter?.id) {
         await fetchJSON(`/tracker/matters/${matter.id}`, { method: "PUT", body: JSON.stringify(payload) });
@@ -163,10 +174,32 @@ export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
       {renderSelect("Client Organization", "client_organization_id", orgs.map((o) => ({ value: o.id, label: o.name || `Org #${o.id}` })))}
       {renderInput("Work Deadline", "work_deadline", "date")}
       {renderInput("External Deadline", "external_deadline", "date")}
+      {renderInput("Revisit Date", "revisit_date", "date")}
       {renderInput("Decision Deadline", "decision_deadline", "date")}
       {renderInput("Next Step", "next_step")}
+      {renderSelect("Next Step Owner", "next_step_assigned_to_person_id", people.map((p) => ({ value: p.id, label: `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.full_name || `Person #${p.id}` })))}
+      {form.status && form.status !== "closed" && !form.next_step_assigned_to_person_id && (
+        <div style={{ color: "#f59e0b", fontSize: 11, marginTop: -10, marginBottom: 10 }}>Consider assigning a next step owner</div>
+      )}
+      <div style={{ marginBottom: 14 }}>
+        <label style={LABEL_STYLE}>Pending Decision</label>
+        <textarea style={{ ...INPUT_STYLE, minHeight: 60, resize: "vertical" }} value={form.pending_decision} onChange={set("pending_decision")} placeholder="What decision is pending?" />
+      </div>
       {isRulemaking && renderInput("RIN", "rin")}
       {isRulemaking && renderSelect("Regulatory Stage", "regulatory_stage", enums.regulatory_stage)}
+
+      {form.status === "parked / monitoring" && !form.revisit_date && (
+        <div style={{ color: "#f59e0b", fontSize: 12, marginBottom: 10, padding: "6px 10px", background: "#422006", borderRadius: 6, border: "1px solid #854d0e" }}>Revisit date is recommended for parked/monitoring matters</div>
+      )}
+      {form.status === "closed" && (
+        <>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ ...LABEL_STYLE, color: form.status === "closed" && !form.outcome_summary ? "#f59e0b" : "#94a3b8" }}>Outcome Summary *</label>
+            <textarea style={{ ...INPUT_STYLE, minHeight: 60, resize: "vertical", borderColor: form.status === "closed" && !form.outcome_summary ? "#854d0e" : "#1f2937" }} value={form.outcome_summary} onChange={set("outcome_summary")} placeholder="Summarize the outcome of this matter" />
+          </div>
+          {renderInput("Closed At", "closed_at", "date")}
+        </>
+      )}
 
       {error && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 10 }}>{error}</div>}
 

@@ -1,8 +1,8 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
 import useApi from "../../hooks/useApi";
-import { listPeople, listOrganizations } from "../../api/tracker";
+import { listPeople, listOrganizations, getEnum } from "../../api/tracker";
 import DataTable from "../../components/shared/DataTable";
 import EmptyState from "../../components/shared/EmptyState";
 import { useDrawer } from "../../contexts/DrawerContext";
@@ -42,12 +42,21 @@ const btnPrimary = {
 export default function PeoplePage() {
   const navigate = useNavigate();
   const { openDrawer } = useDrawer();
-  const [filters, setFilters] = useState({ organization_id: "", search: "" });
+  const [filters, setFilters] = useState({ organization_id: "", search: "", relationship_category: "", relationship_lane: "" });
 
   const { data: orgsData } = useApi(() => listOrganizations({ limit: 500 }), []);
+  const [enumData, setEnumData] = useState({ relationship_category: [], relationship_lane: [] });
+  useEffect(() => {
+    Promise.all([
+      getEnum("relationship_category").catch(() => []),
+      getEnum("relationship_lane").catch(() => []),
+    ]).then(([cats, lanes]) => {
+      setEnumData({ relationship_category: cats || [], relationship_lane: lanes || [] });
+    });
+  }, []);
   const { data, loading, error, refetch } = useApi(
     () => listPeople(filters),
-    [filters.organization_id, filters.search]
+    [filters.organization_id, filters.search, filters.relationship_category, filters.relationship_lane]
   );
 
   const handleFilter = useCallback((key, val) => {
@@ -99,6 +108,14 @@ export default function PeoplePage() {
           value={filters.search}
           onChange={(e) => handleFilter("search", e.target.value)}
         />
+        <select style={inputStyle} value={filters.relationship_category} onChange={(e) => handleFilter("relationship_category", e.target.value)}>
+          <option value="">All Categories</option>
+          {enumData.relationship_category.map((v) => <option key={v} value={v}>{v}</option>)}
+        </select>
+        <select style={inputStyle} value={filters.relationship_lane} onChange={(e) => handleFilter("relationship_lane", e.target.value)}>
+          <option value="">All Lanes</option>
+          {enumData.relationship_lane.map((v) => <option key={v} value={v}>{v}</option>)}
+        </select>
       </div>
 
       {/* Table */}

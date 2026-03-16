@@ -193,6 +193,15 @@ async def get_matter(matter_id: str, db=Depends(get_db)):
         WHERE md.matter_id = ?
     """, (matter_id,))]
 
+    # Tags
+    result["tags"] = [dict(row) for row in db.execute("""
+        SELECT t.id, t.name, t.tag_type
+        FROM tags t
+        JOIN matter_tags mt ON t.id = mt.tag_id
+        WHERE mt.matter_id = ?
+        ORDER BY t.name
+    """, (matter_id,))]
+
     return result
 
 
@@ -398,3 +407,70 @@ async def add_matter_update(matter_id: str, body: AddMatterUpdate, db=Depends(ge
                (now, now, matter_id))
     db.commit()
     return {"id": update_id}
+
+
+# --- Matter Tags ---
+
+@router.get("/{matter_id}/tags")
+async def get_matter_tags(matter_id: str, db=Depends(get_db)):
+    """Get tags for a matter."""
+    rows = db.execute("""
+        SELECT t.id, t.name, t.tag_type
+        FROM tags t JOIN matter_tags mt ON t.id = mt.tag_id
+        WHERE mt.matter_id = ?
+        ORDER BY t.name
+    """, (matter_id,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+@router.post("/{matter_id}/tags")
+async def add_matter_tag(matter_id: str, body: dict, db=Depends(get_db)):
+    """Add a tag to a matter."""
+    tag_id = body.get("tag_id")
+    if not tag_id:
+        raise HTTPException(status_code=400, detail="tag_id required")
+    existing = db.execute("SELECT 1 FROM matter_tags WHERE matter_id = ? AND tag_id = ?",
+                          (matter_id, tag_id)).fetchone()
+    if existing:
+        return {"exists": True}
+    db.execute("INSERT INTO matter_tags (matter_id, tag_id) VALUES (?, ?)",
+               (matter_id, tag_id))
+    db.commit()
+    return {"added": True}
+
+
+@router.delete("/{matter_id}/tags/{tag_id}")
+async def remove_matter_tag(matter_id: str, tag_id: str, db=Depends(get_db)):
+    """Remove a tag from a matter."""
+    db.execute("DELETE FROM matter_tags WHERE matter_id = ? AND tag_id = ?",
+               (matter_id, tag_id))
+    db.commit()
+    return {"deleted": True}
+
+
+# --- Matter Dependencies ---
+
+@router.post("/{matter_id}/dependencies")
+async def add_matter_dependency(matter_id: str, body: dict, db=Depends(get_db)):
+    """Add a dependency to a matter."""
+    depends_on = body.get("depends_on_matter_id")
+    if not depends_on:
+        raise HTTPException(status_code=400, detail="depends_on_matter_id required")
+    dep_id = str(uuid.uuid4())
+    db.execute("""
+        INSERT INTO matter_dependencies (id, matter_id, depends_on_matter_id, dependency_type, notes)
+        VALUES (?, ?, ?, ?, ?)
+    """, (dep_id, matter_id, depends_on,
+          body.get("dependency_type", "sequencing dependency"),
+          body.get("notes")))
+    db.commit()
+    return {"id": dep_id}
+
+
+@router.delete("/{matter_id}/dependencies/{dep_id}")
+async def remove_matter_dependency(matter_id: str, dep_id: str, db=Depends(get_db)):
+    """Remove a dependency from a matter."""
+    db.execute("DELETE FROM matter_dependencies WHERE id = ? AND matter_id = ?",
+               (dep_id, matter_id))
+    db.commit()
+    return {"deleted": True}

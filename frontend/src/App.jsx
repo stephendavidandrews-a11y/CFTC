@@ -44,6 +44,7 @@ import WorkPage from "./pages/WorkPage";
 import ProjectDetailPage from "./pages/ProjectDetailPage";
 import TasksPage from "./pages/TasksPage";
 import NotFoundPage from "./pages/NotFoundPage";
+import DeveloperPage from "./pages/developer/DeveloperPage";
 
 export default function App() {
   return (
@@ -92,6 +93,9 @@ export default function App() {
           <Route path="/work" element={<WorkPage />} />
           <Route path="/work/tasks" element={<TasksPage />} />
           <Route path="/work/:id" element={<ProjectDetailPage />} />
+
+          {/* ── Developer (Internal) ── */}
+          <Route path="/developer" element={<DeveloperPage />} />
 
           <Route path="*" element={<NotFoundPage />} />
         </Route>

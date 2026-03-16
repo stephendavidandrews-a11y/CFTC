@@ -52,7 +52,8 @@ async def get_meeting(meeting_id: str, db=Depends(get_db)):
         WHERE mp.meeting_id = ?
     """, (meeting_id,))]
     result["matters"] = [dict(r) for r in db.execute("""
-        SELECT mm.*, m.title as matter_title, m.matter_number
+        SELECT m.id, m.title as matter_title, m.matter_number, m.status, m.priority,
+               mm.relationship_type, mm.decision_made, mm.decision_summary, mm.notes
         FROM meeting_matters mm
         JOIN matters m ON mm.matter_id = m.id
         WHERE mm.meeting_id = ?
@@ -123,3 +124,69 @@ async def delete_meeting(meeting_id: str, db=Depends(get_db)):
     db.execute("DELETE FROM meetings WHERE id = ?", (meeting_id,))
     db.commit()
     return {"id": meeting_id, "deleted": True}
+
+
+# --- Meeting Participants (post-creation management) ---
+
+@router.post("/{meeting_id}/participants")
+async def add_participant(meeting_id: str, body: dict, db=Depends(get_db)):
+    """Add a participant to an existing meeting."""
+    person_id = body.get("person_id")
+    if not person_id:
+        raise HTTPException(status_code=400, detail="person_id required")
+    pid = str(uuid.uuid4())
+    db.execute("""
+        INSERT INTO meeting_participants (id, meeting_id, person_id, organization_id, meeting_role, attendance_status)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (pid, meeting_id, person_id,
+          body.get("organization_id"),
+          body.get("meeting_role", "attendee"),
+          body.get("attendance_status", "invited")))
+    db.commit()
+    return {"id": pid}
+
+
+@router.put("/{meeting_id}/participants/{participant_id}")
+async def update_participant(meeting_id: str, participant_id: str, body: dict, db=Depends(get_db)):
+    """Update a meeting participant."""
+    updates = []
+    params = []
+    for field in ["meeting_role", "attendance_status", "attended", "notes"]:
+        val = body.get(field)
+        if val is not None:
+            updates.append(f"{field} = ?")
+            params.append(val)
+    if not updates:
+        return {"id": participant_id, "updated": False}
+    params.extend([participant_id, meeting_id])
+    set_clause = ", ".join(updates)
+    db.execute(f"UPDATE meeting_participants SET {set_clause} WHERE id = ? AND meeting_id = ?", params)
+    db.commit()
+    return {"id": participant_id, "updated": True}
+
+
+@router.delete("/{meeting_id}/participants/{participant_id}")
+async def remove_participant(meeting_id: str, participant_id: str, db=Depends(get_db)):
+    """Remove a participant from a meeting."""
+    db.execute("DELETE FROM meeting_participants WHERE id = ? AND meeting_id = ?",
+               (participant_id, meeting_id))
+    db.commit()
+    return {"deleted": True}
+
+
+# --- Meeting Matters (post-creation management) ---
+
+@router.put("/{meeting_id}/matters")
+async def update_meeting_matters(meeting_id: str, body: dict, db=Depends(get_db)):
+    """Replace the set of matters linked to a meeting."""
+    matter_ids = body.get("matter_ids", [])
+    db.execute("DELETE FROM meeting_matters WHERE meeting_id = ?", (meeting_id,))
+    now = datetime.now().isoformat()
+    for mid in matter_ids:
+        mm_id = str(uuid.uuid4())
+        db.execute("""
+            INSERT INTO meeting_matters (id, meeting_id, matter_id, relationship_type, created_at, updated_at)
+            VALUES (?, ?, ?, 'primary topic', ?, ?)
+        """, (mm_id, meeting_id, mid, now, now))
+    db.commit()
+    return {"updated": True, "matter_count": len(matter_ids)}
