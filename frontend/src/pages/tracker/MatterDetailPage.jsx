@@ -90,7 +90,7 @@ export default function MatterDetailPage() {
   const [orgForm, setOrgForm] = useState({ organization_id: "", organization_role: "", notes: "" });
 
   // Dependencies
-  const { data: allMatters } = useApi(() => listMatters({ limit: 1000 }), []);
+  const { data: allMatters } = useApi(() => listMatters({ limit: 500 }), []);
   const [depForm, setDepForm] = useState({ depends_on_matter_id: "", dependency_type: "" });
   const [showDepAdd, setShowDepAdd] = useState(false);
 
@@ -155,8 +155,8 @@ export default function MatterDetailPage() {
   // Fetch tags
   useEffect(() => {
     if (!id) return;
-    getMatterTags(id).then(setTags).catch(() => {});
-    listTags("matter").then(setAllTags).catch(() => {});
+    getMatterTags(id).then((res) => setTags(Array.isArray(res) ? res : (res?.items || res || []))).catch(() => {});
+    listTags("matter").then((res) => setAllTags(res?.items || res || [])).catch(() => {});
   }, [id]);
 
   // Fetch enums for inline forms
@@ -170,7 +170,7 @@ export default function MatterDetailPage() {
     try {
       await addMatterTag(id, parseInt(selectedTagId));
       const updated = await getMatterTags(id);
-      setTags(updated);
+      setTags(Array.isArray(updated) ? updated : (updated?.items || updated || []));
       setSelectedTagId("");
     } catch (e) { console.error(e); }
   }, [id, selectedTagId]);
@@ -179,7 +179,7 @@ export default function MatterDetailPage() {
     try {
       await removeMatterTag(id, tagId);
       const updated = await getMatterTags(id);
-      setTags(updated);
+      setTags(Array.isArray(updated) ? updated : (updated?.items || updated || []));
     } catch (e) { console.error(e); }
   }, [id]);
 

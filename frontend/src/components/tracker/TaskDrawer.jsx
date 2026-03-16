@@ -97,7 +97,11 @@ export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved })
     try {
       const payload = { ...form };
       Object.keys(payload).forEach((k) => { if (payload[k] === "") payload[k] = null; });
-      if (!payload.title) { setError("Title is required"); setSaving(false); return; }
+      if (!task?.id) { Object.keys(payload).forEach((k) => { if (payload[k] === null || payload[k] === undefined) delete payload[k]; }); }
+
+      const missing = [];
+      if (!payload.title) missing.push("Title");
+      if (missing.length > 0) { setError("Required fields missing: " + missing.join(", ")); setSaving(false); return; }
 
       if (task?.id) {
         await fetchJSON(`/tracker/tasks/${task.id}`, { method: "PUT", body: JSON.stringify(payload) });
@@ -140,7 +144,7 @@ export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved })
 
   return (
     <DrawerShell isOpen={isOpen} onClose={onClose} title={task ? "Edit Task" : "New Task"}>
-      {renderInput("Title", "title", "text", { required: true })}
+      {renderInput("Title *", "title", "text", { required: true })}
       <div style={{ marginBottom: 14 }}>
         <label style={LABEL_STYLE}>Description</label>
         <textarea style={{ ...INPUT_STYLE, minHeight: 80, resize: "vertical" }} value={form.description} onChange={set("description")} />

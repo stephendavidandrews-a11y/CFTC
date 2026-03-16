@@ -139,8 +139,13 @@ export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
       Object.keys(payload).forEach((k) => {
         if (payload[k] === "") payload[k] = null;
       });
-      if (!payload.title) { setError("Title is required"); setSaving(false); return; }
-      if (payload.status === "closed" && !payload.outcome_summary) { setError("Outcome summary is required when closing a matter"); setSaving(false); return; }
+      if (!matter?.id) { Object.keys(payload).forEach((k) => { if (payload[k] === null || payload[k] === undefined) delete payload[k]; }); }
+
+      const missing = [];
+      if (!payload.title) missing.push("Title");
+      if (!payload.matter_type) missing.push("Matter Type");
+      if (payload.status === "closed" && !payload.outcome_summary) missing.push("Outcome Summary (required when closing)");
+      if (missing.length > 0) { setError("Required fields missing: " + missing.join(", ")); setSaving(false); return; }
 
       if (matter?.id) {
         await fetchJSON(`/tracker/matters/${matter.id}`, { method: "PUT", body: JSON.stringify(payload) });
@@ -183,8 +188,8 @@ export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
 
   return (
     <DrawerShell isOpen={isOpen} onClose={onClose} title={matter ? "Edit Matter" : "New Matter"}>
-      {renderInput("Title", "title", "text", { required: true })}
-      {renderSelect("Matter Type", "matter_type", enums.matter_type)}
+      {renderInput("Title *", "title", "text", { required: true })}
+      {renderSelect("Matter Type *", "matter_type", enums.matter_type)}
       <div style={{ marginBottom: 14 }}>
         <label style={LABEL_STYLE}>Description</label>
         <textarea style={{ ...INPUT_STYLE, minHeight: 80, resize: "vertical" }} value={form.description} onChange={set("description")} />

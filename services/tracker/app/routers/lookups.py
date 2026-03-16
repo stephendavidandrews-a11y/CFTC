@@ -143,4 +143,4 @@ async def get_enum(enum_name: str):
     resolved = ENUM_ALIASES.get(enum_name, enum_name)
     if resolved not in ENUMS:
         return {"error": f"Unknown enum: {enum_name}"}
-    return {enum_name: ENUMS[resolved]}
+    return ENUMS[resolved]

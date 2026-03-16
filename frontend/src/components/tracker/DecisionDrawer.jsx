@@ -81,8 +81,12 @@ export default function DecisionDrawer({ isOpen, onClose, decision, matterId, on
     try {
       const payload = { ...form };
       Object.keys(payload).forEach((k) => { if (payload[k] === "") payload[k] = null; });
-      if (!payload.title) { setError("Title is required"); setSaving(false); return; }
-      if (!payload.matter_id) { setError("Matter is required"); setSaving(false); return; }
+      if (!decision?.id) { Object.keys(payload).forEach((k) => { if (payload[k] === null || payload[k] === undefined) delete payload[k]; }); }
+
+      const missing = [];
+      if (!payload.title) missing.push("Title");
+      if (!payload.matter_id) missing.push("Matter");
+      if (missing.length > 0) { setError("Required fields missing: " + missing.join(", ")); setSaving(false); return; }
 
       if (decision?.id) {
         const { matter_id, ...updatePayload } = payload;
@@ -127,8 +131,8 @@ export default function DecisionDrawer({ isOpen, onClose, decision, matterId, on
 
   return (
     <DrawerShell isOpen={isOpen} onClose={onClose} title={isEdit ? "Edit Decision" : "New Decision"}>
-      {renderInput("Title", "title", "text", { required: true })}
-      {renderSelect("Matter", "matter_id", matterOpts)}
+      {renderInput("Title *", "title", "text", { required: true })}
+      {renderSelect("Matter *", "matter_id", matterOpts)}
       {renderSelect("Decision Type", "decision_type", enums.decision_type)}
       {renderSelect("Status", "status", enums.decision_status)}
       {renderSelect("Assigned To", "decision_assigned_to_person_id", personOpts)}

@@ -17,6 +17,7 @@ import {
   createProjectFromItem,
 } from "../api/pipeline";
 import { getProjectByPipelineItem } from "../api/work";
+import { createMatter, findMatterByPipelineItem } from "../api/tracker";
 
 const inputStyle = {
   width: "100%", padding: "9px 12px", borderRadius: 8, fontSize: 13,
@@ -54,6 +55,11 @@ export default function ItemDetailPage() {
   const [createProjectForm, setCreateProjectForm] = useState({ priority_label: "medium", apply_template: true });
   const [creatingProject, setCreatingProject] = useState(false);
 
+  // Linked tracker matter
+  const [linkedMatter, setLinkedMatter] = useState(null);
+  const [linkedMatterLoading, setLinkedMatterLoading] = useState(true);
+  const [creatingMatter, setCreatingMatter] = useState(false);
+
   // Data
   const { data: item, loading, refetch } = useApi(() => getItem(id), [id]);
   const { data: deadlineData, refetch: refetchDl } = useApi(() => listDeadlines({ item_id: id }), [id]);
@@ -89,6 +95,19 @@ export default function ItemDetailPage() {
       .then((p) => setLinkedProject(p))
       .catch(() => setLinkedProject(null))
       .finally(() => setLinkedProjectLoading(false));
+  }, [id]);
+
+  // Check for linked tracker matter
+  useEffect(() => {
+    if (!id) return;
+    setLinkedMatterLoading(true);
+    findMatterByPipelineItem(id)
+      .then((res) => {
+        const items = res?.items || [];
+        setLinkedMatter(items.length > 0 ? items[0] : null);
+      })
+      .catch(() => setLinkedMatter(null))
+      .finally(() => setLinkedMatterLoading(false));
   }, [id]);
 
   if (loading) return <div style={{ padding: 40, color: theme.text.dim }}>Loading...</div>;
@@ -226,6 +245,47 @@ export default function ItemDetailPage() {
     setCreatingProject(false);
   };
 
+  // Pipeline → Tracker field mapping
+  const STAGE_MAP = {
+    concept: "concept",
+    drafting: "drafting", cba_development: "drafting",
+    chairman_review: "proposed", commission_review: "proposed", ofr_submission: "proposed",
+    comment_period: "comment_period", comment_analysis: "comment_period",
+    final_drafting: "final_review", final_commission: "final_review",
+    published: "published",
+    effective: "effective",
+  };
+  const PRIORITY_MAP = { low: "low", medium: "normal", high: "high", critical: "critical" };
+
+  const handleCreateMatter = async () => {
+    setCreatingMatter(true);
+    try {
+      const result = await createMatter({
+        title: item.title,
+        description: item.description || "",
+        matter_type: "rulemaking",
+        status: "open",
+        priority: PRIORITY_MAP[item.priority_label] || "normal",
+        sensitivity: "normal",
+        boss_involvement_level: "none",
+        next_step: "Review pipeline item",
+        rin: item.rin || null,
+        docket_number: item.docket_number || null,
+        federal_register_citation: item.fr_citation || null,
+        fr_doc_number: item.fr_doc_number || null,
+        regulatory_stage: STAGE_MAP[item.current_stage] || "concept",
+        source: "pipeline",
+        source_id: String(item.id),
+        opened_date: new Date().toISOString().split("T")[0],
+      });
+      toast.success("Tracker matter created: " + result.matter_number);
+      setLinkedMatter({ id: result.id, matter_number: result.matter_number, title: item.title });
+    } catch (e) {
+      toast.error(e.message || "Failed to create matter");
+    }
+    setCreatingMatter(false);
+  };
+
   const severityColor = (sev) => ({ overdue: "#ef4444", critical: "#ef4444", warning: "#f59e0b", ok: "#22c55e" }[sev] || theme.text.dim);
 
   return (
@@ -245,6 +305,12 @@ export default function ItemDetailPage() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
+          {!linkedMatterLoading && !linkedMatter && (
+            <button onClick={handleCreateMatter} disabled={creatingMatter} style={{...actionBtn("#059669"), opacity: creatingMatter ? 0.5 : 1}}>{creatingMatter ? "Creating..." : "Create Matter"}</button>
+          )}
+          {linkedMatter && (
+            <button onClick={() => navigate(`/matters/${linkedMatter.id}`)} style={actionBtn("#059669")}>View Matter →</button>
+          )}
           {!linkedProjectLoading && !linkedProject && (
             <button onClick={() => setShowCreateProject(true)} style={actionBtn("#7c3aed")}>+ Create Project</button>
           )}
@@ -267,6 +333,15 @@ export default function ItemDetailPage() {
         <InfoBlock label="Lead Attorney" value={item.lead_attorney_name || "Unassigned"} small />
         {item.chairman_priority && <><Divider /><Badge bg="#422006" text="#fbbf24" label="CHAIRMAN PRIORITY" /></>}
         {item.next_deadline && <><Divider /><InfoBlock label="Next Deadline" value={item.next_deadline.title} small /><span style={{ fontSize: 11, color: severityColor(item.next_deadline.severity), fontWeight: 600 }}>{item.next_deadline.due_date}</span></>}
+        {linkedMatter && (
+          <>
+            <Divider />
+            <div style={{ cursor: "pointer" }} onClick={() => navigate(`/matters/${linkedMatter.id}`)}>
+              <div style={{ fontSize: 10, color: theme.text.faint, marginBottom: 2 }}>Tracker Matter</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#4ade80" }}>{linkedMatter.matter_number || linkedMatter.title}</div>
+            </div>
+          </>
+        )}
         {linkedProject && (
           <>
             <Divider />
