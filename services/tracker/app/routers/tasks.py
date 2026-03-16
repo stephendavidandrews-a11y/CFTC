@@ -85,9 +85,10 @@ async def create_task(body: CreateTask, db=Depends(get_db)):
             priority, assigned_to_person_id, created_by_person_id, delegated_by_person_id,
             supervising_person_id, waiting_on_person_id, waiting_on_org_id,
             waiting_on_description, expected_output, due_date, deadline_type, sort_order,
+            next_follow_up_date, completion_notes, started_at, completed_at,
             source, source_id, ai_confidence, automation_hold, external_refs,
             created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         task_id, body.matter_id, body.title, body.description,
         body.task_type, body.status, body.task_mode,
@@ -97,6 +98,8 @@ async def create_task(body: CreateTask, db=Depends(get_db)):
         body.waiting_on_org_id, body.waiting_on_description,
         body.expected_output, body.due_date, body.deadline_type,
         body.sort_order,
+        body.next_follow_up_date, body.completion_notes,
+        body.started_at, body.completed_at,
         body.source, body.source_id,
         body.ai_confidence, body.automation_hold, body.external_refs,
         now, now,

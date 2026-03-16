@@ -55,13 +55,15 @@ async def create_document(body: CreateDocument, db=Depends(get_db)):
     now = datetime.now().isoformat()
     db.execute("""
         INSERT INTO documents (id, matter_id, title, document_type, status,
-            assigned_to_person_id, version_label, due_date, summary, notes,
+            assigned_to_person_id, version_label, due_date, final_location,
+            is_finalized, is_sent, sent_at, summary, notes,
             source, source_id, external_refs, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (did, body.matter_id, body.title, body.document_type,
           body.status, body.assigned_to_person_id,
-          body.version_label, body.due_date, body.summary,
-          body.notes, body.source, body.source_id,
+          body.version_label, body.due_date, body.final_location,
+          body.is_finalized, body.is_sent, body.sent_at,
+          body.summary, body.notes, body.source, body.source_id,
           body.external_refs, now, now))
     db.commit()
     return {"id": did}

@@ -5,7 +5,8 @@ FastAPI auto-returns 422 with structured errors when validation fails.
 All Optional fields default to None. Required fields raise 422 if missing.
 """
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from datetime import datetime as dt
+from pydantic import BaseModel, Field, model_validator
 
 
 # ── People ───────────────────────────────────────────────────────────────────
@@ -33,6 +34,7 @@ class CreatePerson(BaseModel):
     include_in_team_workload: int = 0
     include_in_team: Optional[bool] = None  # alias accepted from frontend
     relationship_assigned_to_person_id: Optional[str] = None
+    is_active: int = 1
     source: str = "manual"
     source_id: Optional[str] = None
     external_refs: Optional[str] = None
@@ -65,6 +67,9 @@ class UpdatePerson(BaseModel):
     include_in_team_workload: Optional[int] = None
     relationship_assigned_to_person_id: Optional[str] = None
     is_active: Optional[int] = None
+    source: Optional[str] = None
+    source_id: Optional[str] = None
+    external_refs: Optional[str] = None
 
 
 # ── Organizations ────────────────────────────────────────────────────────────
@@ -76,6 +81,7 @@ class CreateOrganization(BaseModel):
     parent_organization_id: Optional[str] = None
     jurisdiction: Optional[str] = None
     notes: Optional[str] = None
+    is_active: int = 1
     source: str = "manual"
     source_id: Optional[str] = None
     external_refs: Optional[str] = None
@@ -89,6 +95,9 @@ class UpdateOrganization(BaseModel):
     jurisdiction: Optional[str] = None
     notes: Optional[str] = None
     is_active: Optional[int] = None
+    source: Optional[str] = None
+    source_id: Optional[str] = None
+    external_refs: Optional[str] = None
 
 
 # ── Meetings ─────────────────────────────────────────────────────────────────
@@ -98,6 +107,9 @@ class MeetingParticipant(BaseModel):
     organization_id: Optional[str] = None
     meeting_role: str = "attendee"
     attendance_status: str = "invited"
+    attended: Optional[int] = None
+    follow_up_expected: Optional[int] = None
+    notes: Optional[str] = None
 
 
 class CreateMeeting(BaseModel):
@@ -109,6 +121,9 @@ class CreateMeeting(BaseModel):
     purpose: Optional[str] = None
     prep_needed: Optional[str] = None
     notes: Optional[str] = None
+    decisions_made: Optional[str] = None
+    readout_summary: Optional[str] = None
+    created_followups: int = 0
     boss_attends: int = 0
     external_parties_attend: int = 0
     assigned_to_person_id: Optional[str] = None
@@ -158,6 +173,10 @@ class CreateTask(BaseModel):
     due_date: Optional[str] = None
     deadline_type: Optional[str] = None
     sort_order: Optional[int] = None
+    next_follow_up_date: Optional[str] = None
+    completion_notes: Optional[str] = None
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
     source: str = "manual"
     source_id: Optional[str] = None
     ai_confidence: Optional[float] = None
@@ -186,8 +205,17 @@ class UpdateTask(BaseModel):
     completed_at: Optional[str] = None
     next_follow_up_date: Optional[str] = None
     completion_notes: Optional[str] = None
-    waiting_on_description: Optional[str] = None
     sort_order: Optional[int] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def auto_fill_timestamps(cls, values):
+        if isinstance(values, dict):
+            if values.get("status") == "done" and not values.get("completed_at"):
+                values["completed_at"] = dt.now().isoformat()
+            if values.get("status") == "in progress" and not values.get("started_at"):
+                values["started_at"] = dt.now().isoformat()
+        return values
 
 
 # ── Matters ──────────────────────────────────────────────────────────────────
@@ -273,6 +301,14 @@ class UpdateMatter(BaseModel):
     automation_hold: Optional[int] = None
     external_refs: Optional[str] = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def auto_fill_closed(cls, values):
+        if isinstance(values, dict):
+            if values.get("status") == "closed" and not values.get("closed_at"):
+                values["closed_at"] = dt.now().isoformat()
+        return values
+
 
 # ── Matter sub-resources ─────────────────────────────────────────────────────
 
@@ -326,6 +362,14 @@ class UpdateDecision(BaseModel):
     made_at: Optional[str] = None
     notes: Optional[str] = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def auto_fill_made(cls, values):
+        if isinstance(values, dict):
+            if values.get("status") == "made" and not values.get("made_at"):
+                values["made_at"] = dt.now().isoformat()
+        return values
+
 
 # ── Documents ────────────────────────────────────────────────────────────────
 
@@ -339,6 +383,10 @@ class CreateDocument(BaseModel):
     due_date: Optional[str] = None
     summary: Optional[str] = None
     notes: Optional[str] = None
+    final_location: Optional[str] = None
+    is_finalized: int = 0
+    is_sent: int = 0
+    sent_at: Optional[str] = None
     source: str = "manual"
     source_id: Optional[str] = None
     external_refs: Optional[str] = None
@@ -354,3 +402,15 @@ class UpdateDocument(BaseModel):
     due_date: Optional[str] = None
     summary: Optional[str] = None
     notes: Optional[str] = None
+    final_location: Optional[str] = None
+    is_finalized: Optional[int] = None
+    is_sent: Optional[int] = None
+    sent_at: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def auto_fill_sent(cls, values):
+        if isinstance(values, dict):
+            if values.get("is_sent") in (1, True) and not values.get("sent_at"):
+                values["sent_at"] = dt.now().isoformat()
+        return values
