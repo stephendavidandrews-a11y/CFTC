@@ -8,7 +8,8 @@ ENUMS = {
         "rulemaking", "interpretive guidance", "no-action letter", "exemptive letter",
         "staff advisory", "other letter", "interagency coordination", "enforcement support",
         "congressional response", "speech / testimony / briefing prep", "litigation-sensitive issue",
-        "personnel / management", "administrative / ethics / process", "industry inquiry", "international matter",
+        "personnel / management", "administrative / ethics / process", "industry inquiry",
+        "international matter", "regulatory review", "prospective policy", "other",
     ],
     "matter_status": [
         "new intake", "framing issue", "research in progress", "draft in progress", "internal review",
@@ -47,6 +48,14 @@ ENUMS = {
         "internal working meeting", "leadership meeting", "client meeting", "interagency meeting",
         "industry meeting", "Hill meeting", "briefing", "check-in", "commissioner office", "other",
     ],
+    "meeting_role": [
+        "chair", "presenter", "attendee", "decision-maker", "note-taker", "guest",
+    ],
+    "attendance_status": ["invited", "attended", "declined", "tentative"],
+    "position_strength": ["tentative", "qualified", "firm"],
+    "meeting_matter_relationship_type": [
+        "primary topic", "secondary topic", "status update", "decision point", "coordination",
+    ],
     "document_type": [
         "memo", "briefing paper", "talking points", "redline", "regulatory text",
         "comment summary", "clearance memo", "email draft", "hearing prep", "FAQ / Q&A",
@@ -55,6 +64,13 @@ ENUMS = {
     "document_status": [
         "not started", "drafting", "under review", "awaiting comments",
         "finalized", "sent", "superseded", "archived",
+    ],
+    "review_role": [
+        "drafter", "primary reviewer", "legal reviewer", "client reviewer",
+        "leadership reviewer", "clearance reviewer", "final approver",
+    ],
+    "review_status": [
+        "not set", "pending", "in review", "comments returned", "approved", "declined",
     ],
     "decision_type": [
         "boss decision", "leadership decision", "client decision",
@@ -74,6 +90,10 @@ ENUMS = {
     "relationship_lane": [
         "Decision-maker", "Recommender", "Drafter", "Blocker", "Influencer", "FYI only",
     ],
+    "next_interaction_type": [
+        "briefing", "follow-up", "check-in", "escalation", "decision request",
+        "relationship maintenance", "outreach", "coordination", "other",
+    ],
     "matter_role": [
         "lead attorney", "supervisor", "requesting stakeholder", "substantive client",
         "reviewing stakeholder", "leadership stakeholder", "external partner",
@@ -88,7 +108,27 @@ ENUMS = {
         "status update", "meeting readout", "document milestone", "decision made",
         "blocker identified", "deadline changed", "escalation", "closure note",
     ],
+    "task_dependency_type": [
+        "cannot start until complete", "should follow", "needs input from", "parallel but linked",
+    ],
+    "matter_dependency_type": [
+        "legal dependency", "policy dependency", "sequencing dependency",
+        "approval dependency", "external dependency", "shared deadline", "related risk",
+    ],
+    "comment_period_type": ["original", "extension", "reopening", "supplemental"],
+    "cba_status": ["not_started", "in_progress", "under_review", "completed"],
+    "task_update_type": [
+        "status update", "reassigned", "waiting state changed", "due date changed",
+        "note added", "completion note", "escalation", "blocker identified",
+    ],
     "source": ["manual", "sync", "sauron", "api", "import"],
+}
+
+# Aliases for backward compatibility — frontend uses short names for some enums
+ENUM_ALIASES = {
+    "priority": "matter_priority",
+    "sensitivity": "matter_sensitivity",
+    "boss_involvement": "boss_involvement_level",
 }
 
 @router.get("/enums")
@@ -99,6 +139,8 @@ async def get_all_enums():
 @router.get("/enums/{enum_name}")
 async def get_enum(enum_name: str):
     """Return values for a specific enum."""
-    if enum_name not in ENUMS:
+    # Check direct match first, then aliases
+    resolved = ENUM_ALIASES.get(enum_name, enum_name)
+    if resolved not in ENUMS:
         return {"error": f"Unknown enum: {enum_name}"}
-    return {enum_name: ENUMS[enum_name]}
+    return {enum_name: ENUMS[resolved]}
