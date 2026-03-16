@@ -8,6 +8,7 @@ import {
   listPeople, listOrganizations, listMatters,
   addMatterDependency, removeMatterDependency,
   getMatterTags, addMatterTag, removeMatterTag, listTags, createTag,
+  getEnums,
 } from "../../api/tracker";
 import { useDrawer } from "../../contexts/DrawerContext";
 import Badge from "../../components/shared/Badge";
@@ -76,7 +77,7 @@ export default function MatterDetailPage() {
 
   // Update form state
   const [showUpdateForm, setShowUpdateForm] = useState(false);
-  const [updateType, setUpdateType] = useState("note");
+  const [updateType, setUpdateType] = useState("status update");
   const [updateSummary, setUpdateSummary] = useState("");
   const [savingUpdate, setSavingUpdate] = useState(false);
 
@@ -157,6 +158,12 @@ export default function MatterDetailPage() {
     getMatterTags(id).then(setTags).catch(() => {});
     listTags("matter").then(setAllTags).catch(() => {});
   }, [id]);
+
+  // Fetch enums for inline forms
+  const [enums, setLoadedEnums] = useState({});
+  useEffect(() => {
+    getEnums().then((data) => setLoadedEnums(data || {})).catch(() => {});
+  }, []);
 
   const handleAddTag = useCallback(async () => {
     if (!selectedTagId) return;
@@ -386,8 +393,8 @@ export default function MatterDetailPage() {
               }}>
                 <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
                   <select style={{ ...inputStyle, width: 160 }} value={updateType} onChange={(e) => setUpdateType(e.target.value)}>
-                    {["note", "status_change", "decision", "meeting", "deadline", "escalation", "external"].map((t) => (
-                      <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
+                    {(enums.update_type || ["status update", "meeting readout", "document milestone", "decision made", "blocker identified", "deadline changed", "escalation", "closure note"]).map((t) => (
+                      <option key={t} value={t}>{t}</option>
                     ))}
                   </select>
                 </div>
@@ -491,7 +498,7 @@ export default function MatterDetailPage() {
                   onChange={(e) => setStakeholderForm((p) => ({ ...p, matter_role: e.target.value }))}
                 >
                   <option value="">Role...</option>
-                  {["lead", "reviewer", "advisor", "stakeholder", "approver", "observer"].map((r) => (
+                  {(enums.matter_role || []).map((r) => (
                     <option key={r} value={r}>{r}</option>
                   ))}
                 </select>
@@ -500,7 +507,7 @@ export default function MatterDetailPage() {
                   onChange={(e) => setStakeholderForm((p) => ({ ...p, engagement_level: e.target.value }))}
                 >
                   <option value="">Engagement...</option>
-                  {["high", "medium", "low"].map((l) => <option key={l} value={l}>{l}</option>)}
+                  {(enums.engagement_level || []).map((l) => <option key={l} value={l}>{l}</option>)}
                 </select>
                 <button style={btnPrimary} onClick={handleAddStakeholder}>Add</button>
               </div>
@@ -563,7 +570,7 @@ export default function MatterDetailPage() {
                   onChange={(e) => setOrgForm((p) => ({ ...p, organization_role: e.target.value }))}
                 >
                   <option value="">Role...</option>
-                  {["client", "reviewing", "collaborating", "regulated", "external"].map((r) => (
+                  {(enums.organization_role || []).map((r) => (
                     <option key={r} value={r}>{r}</option>
                   ))}
                 </select>

@@ -57,7 +57,7 @@ const ADD_BTN = {
   whiteSpace: "nowrap",
 };
 
-const MEETING_ROLES = ["chair", "presenter", "attendee", "decision-maker", "note-taker", "guest"];
+const MEETING_ROLES_FALLBACK = ["chair", "presenter", "attendee", "decision-maker", "note-taker", "guest"];
 
 const EMPTY = {
   title: "",
@@ -90,10 +90,11 @@ export default function MeetingDrawer({ isOpen, onClose, meeting, onSaved }) {
     if (!isOpen) return;
     Promise.all([
       fetchJSON("/tracker/lookups/enums/meeting_type").catch(() => []),
+      fetchJSON("/tracker/lookups/enums/meeting_role").catch(() => MEETING_ROLES_FALLBACK),
       fetchJSON("/tracker/people?limit=100").catch(() => ({ items: [] })),
       fetchJSON("/tracker/matters?limit=200").catch(() => ({ items: [] })),
     ]).then(([meetingType, ppl, matterList]) => {
-      setEnums({ meeting_type: meetingType });
+      setEnums({ meeting_type: meetingType, meeting_role: Array.isArray(meetingRoles) ? meetingRoles : (meetingRoles?.meeting_role || MEETING_ROLES_FALLBACK) });
       setPeople(ppl.items || ppl || []);
       setMatters(matterList.items || matterList || []);
     });
@@ -304,7 +305,7 @@ export default function MeetingDrawer({ isOpen, onClose, meeting, onSaved }) {
                 onChange={(e) => handleParticipantRoleChange(i, e.target.value)}
                 style={{ ...INPUT_STYLE, width: "auto", padding: "2px 6px", fontSize: 11, marginLeft: 6, minWidth: 100 }}
               >
-                {MEETING_ROLES.map((r) => (
+                {(enums.meeting_role || MEETING_ROLES_FALLBACK).map((r) => (
                   <option key={r} value={r}>{r}</option>
                 ))}
               </select>
@@ -329,7 +330,7 @@ export default function MeetingDrawer({ isOpen, onClose, meeting, onSaved }) {
               value={newParticipant.meeting_role}
               onChange={(e) => setNewParticipant((np) => ({ ...np, meeting_role: e.target.value }))}
             >
-              {MEETING_ROLES.map((r) => (
+              {(enums.meeting_role || MEETING_ROLES_FALLBACK).map((r) => (
                 <option key={r} value={r}>{r}</option>
               ))}
             </select>
