@@ -1,6 +1,13 @@
 import React from "react";
 import DrawerShell from "./DrawerShell";
-import { fetchJSON } from "../../api/client";
+import {
+  createOrganization,
+  updateOrganization,
+  getEnum,
+  listOrganizations,
+  getOrganization,
+} from "../../api/tracker";
+import { validate } from "../../utils/validation";
 
 const INPUT_STYLE = {
   width: "100%",
@@ -32,12 +39,14 @@ export default function OrganizationDrawer({ isOpen, onClose, organization, onSa
   const [orgs, setOrgs] = React.useState([]);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState(null);
+  const [fieldErrors, setFieldErrors] = React.useState({});
+  const [etag, setEtag] = React.useState(null);
 
   React.useEffect(() => {
     if (!isOpen) return;
     Promise.all([
-      fetchJSON("/tracker/lookups/enums/organization_type").catch(() => []),
-      fetchJSON("/tracker/organizations?limit=200").catch(() => ({ items: [] })),
+      getEnum("organization_type").catch(() => []),
+      listOrganizations({ limit: 200 }).catch(() => ({ items: [] })),
     ]).then(([orgType, orgList]) => {
       setEnums({ organization_type: orgType });
       setOrgs(orgList.items || orgList || []);
@@ -56,9 +65,18 @@ export default function OrganizationDrawer({ isOpen, onClose, organization, onSa
         is_active: organization.is_active !== undefined ? organization.is_active : 1,
       });
     } else {
+      setEtag(null);
       setForm({ ...EMPTY });
     }
     setError(null);
+    setFieldErrors({});
+  }, [organization, isOpen]);
+
+  // Fetch detail on edit to capture ETag for concurrency control
+  React.useEffect(() => {
+    if (organization && organization.id) {
+      getOrganization(organization.id).then(d => setEtag(d._etag || null)).catch(() => {});
+    }
   }, [organization, isOpen]);
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
@@ -66,6 +84,7 @@ export default function OrganizationDrawer({ isOpen, onClose, organization, onSa
 
   const handleSave = async () => {
     setError(null);
+    setFieldErrors({});
     setSaving(true);
     try {
       const payload = { ...form };
@@ -73,19 +92,29 @@ export default function OrganizationDrawer({ isOpen, onClose, organization, onSa
       payload.is_active = form.is_active ? 1 : 0;
       if (!organization?.id) { Object.keys(payload).forEach((k) => { if (payload[k] === null || payload[k] === undefined) delete payload[k]; }); }
 
-      const missing = [];
-      if (!payload.name) missing.push("Name");
-      if (missing.length > 0) { setError("Required fields missing: " + missing.join(", ")); setSaving(false); return; }
+      const v = validate("organization", payload);
+      if (!v.valid) { setFieldErrors(v.errors); setError(Object.values(v.errors).join(", ")); setSaving(false); return; }
 
       if (organization?.id) {
-        await fetchJSON(`/tracker/organizations/${organization.id}`, { method: "PUT", body: JSON.stringify(payload) });
+        await updateOrganization(organization.id, payload, etag);
       } else {
-        await fetchJSON("/tracker/organizations", { method: "POST", body: JSON.stringify(payload) });
+        await createOrganization(payload);
       }
       if (onSaved) onSaved();
       onClose();
     } catch (err) {
-      setError(err.message);
+      if (err.status === 409 && !err.fieldErrors) {
+        setError("This record was modified by someone else. Please close, reopen to load the latest version, and review before saving again.");
+        setSaving(false);
+        return;
+      }
+      if (err.fieldErrors && Object.keys(err.fieldErrors).length) {
+        setFieldErrors(err.fieldErrors);
+        setError(Object.entries(err.fieldErrors).map(([k, v]) => `${k}: ${v}`).join("; "));
+      } else {
+        setFieldErrors({});
+        setError(err.message);
+      }
     } finally {
       setSaving(false);
     }

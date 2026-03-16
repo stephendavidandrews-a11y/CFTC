@@ -56,8 +56,9 @@ export function getMatter(id) {
   return fetchJSON(`${P}/matters/${id}`);
 }
 
-export function updateMatter(id, data) {
-  return fetchJSON(`${P}/matters/${id}`, { method: "PUT", body: JSON.stringify(data) });
+export function updateMatter(id, data, etag) {
+  const headers = etag ? { "If-Match": etag } : {};
+  return fetchJSON(`${P}/matters/${id}`, { method: "PUT", headers, body: JSON.stringify(data) });
 }
 
 export function deleteMatter(id) {
@@ -104,8 +105,9 @@ export function getTask(id) {
   return fetchJSON(`${P}/tasks/${id}`);
 }
 
-export function updateTask(id, data) {
-  return fetchJSON(`${P}/tasks/${id}`, { method: "PUT", body: JSON.stringify(data) });
+export function updateTask(id, data, etag) {
+  const headers = etag ? { "If-Match": etag } : {};
+  return fetchJSON(`${P}/tasks/${id}`, { method: "PUT", headers, body: JSON.stringify(data) });
 }
 
 export function deleteTask(id) {
@@ -126,12 +128,14 @@ export function getPerson(id) {
   return fetchJSON(`${P}/people/${id}`);
 }
 
-export function updatePerson(id, data) {
-  return fetchJSON(`${P}/people/${id}`, { method: "PUT", body: JSON.stringify(data) });
+export function updatePerson(id, data, etag) {
+  const headers = etag ? { "If-Match": etag } : {};
+  return fetchJSON(`${P}/people/${id}`, { method: "PUT", headers, body: JSON.stringify(data) });
 }
 
-export function deletePerson(id) {
-  return fetchJSON(`${P}/people/${id}`, { method: "DELETE" });
+export function deletePerson(id, etag) {
+  const headers = etag ? { "If-Match": etag } : {};
+  return fetchJSON(`${P}/people/${id}`, { method: "DELETE", headers });
 }
 
 // ── Organizations ───────────────────────────────────────────────────────────
@@ -148,8 +152,9 @@ export function getOrganization(id) {
   return fetchJSON(`${P}/organizations/${id}`);
 }
 
-export function updateOrganization(id, data) {
-  return fetchJSON(`${P}/organizations/${id}`, { method: "PUT", body: JSON.stringify(data) });
+export function updateOrganization(id, data, etag) {
+  const headers = etag ? { "If-Match": etag } : {};
+  return fetchJSON(`${P}/organizations/${id}`, { method: "PUT", headers, body: JSON.stringify(data) });
 }
 
 export function deleteOrganization(id) {
@@ -170,8 +175,9 @@ export function getMeeting(id) {
   return fetchJSON(`${P}/meetings/${id}`);
 }
 
-export function updateMeeting(id, data) {
-  return fetchJSON(`${P}/meetings/${id}`, { method: "PUT", body: JSON.stringify(data) });
+export function updateMeeting(id, data, etag) {
+  const headers = etag ? { "If-Match": etag } : {};
+  return fetchJSON(`${P}/meetings/${id}`, { method: "PUT", headers, body: JSON.stringify(data) });
 }
 
 export function deleteMeeting(id) {
@@ -180,8 +186,8 @@ export function deleteMeeting(id) {
 
 // ── Documents ───────────────────────────────────────────────────────────────
 
-export function listDocuments({ matter_id, document_type, limit, offset } = {}) {
-  return fetchJSON(`${P}/documents${qs({ matter_id, document_type, limit, offset })}`);
+export function listDocuments({ matter_id, document_type, status, limit, offset } = {}) {
+  return fetchJSON(`${P}/documents${qs({ matter_id, document_type, status, limit, offset })}`);
 }
 
 export function createDocument(data) {
@@ -192,8 +198,9 @@ export function getDocument(id) {
   return fetchJSON(`${P}/documents/${id}`);
 }
 
-export function updateDocument(id, data) {
-  return fetchJSON(`${P}/documents/${id}`, { method: "PUT", body: JSON.stringify(data) });
+export function updateDocument(id, data, etag) {
+  const headers = etag ? { "If-Match": etag } : {};
+  return fetchJSON(`${P}/documents/${id}`, { method: "PUT", headers, body: JSON.stringify(data) });
 }
 
 export function deleteDocument(id) {
@@ -218,8 +225,9 @@ export function getDecision(id) {
   return fetchJSON(`${P}/decisions/${id}`);
 }
 
-export function updateDecision(id, data) {
-  return fetchJSON(`${P}/decisions/${id}`, { method: "PUT", body: JSON.stringify(data) });
+export function updateDecision(id, data, etag) {
+  const headers = etag ? { "If-Match": etag } : {};
+  return fetchJSON(`${P}/decisions/${id}`, { method: "PUT", headers, body: JSON.stringify(data) });
 }
 
 export function deleteDecision(id) {

@@ -1,13 +1,18 @@
 import React from "react";
 import DrawerShell from "./DrawerShell";
-import { fetchJSON } from "../../api/client";
 import {
   createMeeting,
   updateMeeting,
+  getMeeting,
   addMeetingParticipant,
   removeMeetingParticipant,
+  updateMeetingParticipant,
   updateMeetingMatters,
+  getEnum,
+  listPeople,
+  listMatters,
 } from "../../api/tracker";
+import { validate } from "../../utils/validation";
 
 const INPUT_STYLE = {
   width: "100%",
@@ -57,6 +62,11 @@ const ADD_BTN = {
   whiteSpace: "nowrap",
 };
 
+function formatLocalDateTime(d) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes());
+}
+
 const MEETING_ROLES_FALLBACK = ["chair", "presenter", "attendee", "decision-maker", "note-taker", "guest"];
 
 const EMPTY = {
@@ -89,15 +99,17 @@ export default function MeetingDrawer({ isOpen, onClose, meeting, onSaved }) {
   const [matters, setMatters] = React.useState([]);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState(null);
+  const [fieldErrors, setFieldErrors] = React.useState({});
+  const [etag, setEtag] = React.useState(null);
 
   // Load lookups on open
   React.useEffect(() => {
     if (!isOpen) return;
     Promise.all([
-      fetchJSON("/tracker/lookups/enums/meeting_type").catch(() => []),
-      fetchJSON("/tracker/lookups/enums/meeting_role").catch(() => MEETING_ROLES_FALLBACK),
-      fetchJSON("/tracker/people?limit=100").catch(() => ({ items: [] })),
-      fetchJSON("/tracker/matters?limit=200").catch(() => ({ items: [] })),
+      getEnum("meeting_type").catch(() => []),
+      getEnum("meeting_role").catch(() => MEETING_ROLES_FALLBACK),
+      listPeople({ limit: 100 }).catch(() => ({ items: [] })),
+      listMatters({ limit: 200 }).catch(() => ({ items: [] })),
     ]).then(([meetingType, meetingRoles, ppl, matterList]) => {
       setEnums({ meeting_type: meetingType, meeting_role: Array.isArray(meetingRoles) ? meetingRoles : MEETING_ROLES_FALLBACK });
       setPeople(ppl.items || ppl || []);
@@ -105,48 +117,71 @@ export default function MeetingDrawer({ isOpen, onClose, meeting, onSaved }) {
     });
   }, [isOpen]);
 
+  // Hydrate a meeting object into form + participants + linked matters
+  const hydrate = React.useCallback((m) => {
+    let duration = "";
+    if (m.date_time_start && m.date_time_end) {
+      const diffMs = new Date(m.date_time_end) - new Date(m.date_time_start);
+      if (diffMs > 0) duration = String(Math.round(diffMs / 60000));
+    }
+    setForm({
+      title: m.title || "",
+      meeting_type: m.meeting_type || "",
+      date_time_start: m.date_time_start ? m.date_time_start.slice(0, 16) : "",
+      duration_minutes: duration || "",
+      location_or_link: m.location_or_link || "",
+      purpose: m.purpose || "",
+      boss_attends: m.boss_attends || false,
+      external_parties_attend: m.external_parties_attend || false,
+      prep_needed: m.prep_needed || "",
+      assigned_to_person_id: m.assigned_to_person_id || "",
+      notes: m.notes || "",
+      decisions_made: m.decisions_made || "",
+      readout_summary: m.readout_summary || "",
+    });
+    setParticipants(
+      (m.participants || []).map((p) => ({
+        id: p.id,
+        person_id: p.person_id,
+        meeting_role: p.meeting_role || "attendee",
+        full_name: p.full_name || "",
+        isNew: false,
+      }))
+    );
+    setLinkedMatterIds((m.matters || []).map((x) => x.matter_id || x.id));
+  }, []);
+
+  // Store the full detail so handleSave can diff against it
+  const [fullMeeting, setFullMeeting] = React.useState(null);
+
   // Populate form when meeting changes
   React.useEffect(() => {
-    if (meeting) {
-      let duration = "";
-      if (meeting.date_time_start && meeting.date_time_end) {
-        const diffMs = new Date(meeting.date_time_end) - new Date(meeting.date_time_start);
-        if (diffMs > 0) duration = String(Math.round(diffMs / 60000));
+    if (meeting && meeting.id) {
+      // Always hydrate immediately from whatever data we have
+      hydrate(meeting);
+      // Then fetch full detail (with participants + matters) if missing
+      if (!meeting.participants) {
+        getMeeting(meeting.id).then((detail) => {
+          setFullMeeting(detail);
+          setEtag(detail._etag || null);
+          hydrate(detail);
+        }).catch(() => {});
+      } else {
+        setFullMeeting(meeting);
+        setEtag(meeting._etag || null);
       }
-      setForm({
-        title: meeting.title || "",
-        meeting_type: meeting.meeting_type || "",
-        date_time_start: meeting.date_time_start ? meeting.date_time_start.slice(0, 16) : "",
-        duration_minutes: duration || "",
-        location_or_link: meeting.location_or_link || "",
-        purpose: meeting.purpose || "",
-        boss_attends: meeting.boss_attends || false,
-        external_parties_attend: meeting.external_parties_attend || false,
-        prep_needed: meeting.prep_needed || "",
-        assigned_to_person_id: meeting.assigned_to_person_id || "",
-        notes: meeting.notes || "",
-        decisions_made: meeting.decisions_made || "",
-        readout_summary: meeting.readout_summary || "",
-      });
-      setParticipants(
-        (meeting.participants || []).map((p) => ({
-          id: p.id,
-          person_id: p.person_id,
-          meeting_role: p.meeting_role || "attendee",
-          full_name: p.full_name || "",
-          isNew: false,
-        }))
-      );
-      setLinkedMatterIds((meeting.matters || []).map((m) => m.matter_id));
     } else {
       setForm({ ...EMPTY });
       setParticipants([]);
       setLinkedMatterIds([]);
+      setFullMeeting(null);
+      setEtag(null);
     }
     setNewParticipant({ person_id: "", meeting_role: "attendee" });
     setNewMatterId("");
     setError(null);
-  }, [meeting, isOpen]);
+    setFieldErrors({});
+  }, [meeting, isOpen, hydrate]);
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
   const setCheck = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.checked }));
@@ -197,6 +232,7 @@ export default function MeetingDrawer({ isOpen, onClose, meeting, onSaved }) {
 
   const handleSave = async () => {
     setError(null);
+    setFieldErrors({});
     setSaving(true);
     try {
       const payload = {
@@ -217,18 +253,16 @@ export default function MeetingDrawer({ isOpen, onClose, meeting, onSaved }) {
       if (form.date_time_start && form.duration_minutes) {
         const start = new Date(form.date_time_start);
         const end = new Date(start.getTime() + parseInt(form.duration_minutes, 10) * 60000);
-        payload.date_time_end = end.toISOString().slice(0, 16);
+        payload.date_time_end = formatLocalDateTime(end);
       }
 
       if (!isEdit) { Object.keys(payload).forEach((k) => { if (payload[k] === null || payload[k] === undefined) delete payload[k]; }); }
 
-      const missing = [];
-      if (!payload.title) missing.push("Title");
-      if (!payload.date_time_start) missing.push("Start Time");
-      if (missing.length > 0) { setError("Required fields missing: " + missing.join(", ")); setSaving(false); return; }
+      const v = validate("meeting", payload);
+      if (!v.valid) { setFieldErrors(v.errors); setError(Object.values(v.errors).join(", ")); setSaving(false); return; }
 
       if (isEdit) {
-        await updateMeeting(meeting.id, payload);
+        await updateMeeting(meeting.id, payload, etag);
 
         const currentOrigIds = participants.filter((p) => !p.isNew).map((p) => p.id);
         for (const p of meeting.participants || []) {
@@ -238,6 +272,14 @@ export default function MeetingDrawer({ isOpen, onClose, meeting, onSaved }) {
         }
         for (const p of participants.filter((p) => p.isNew)) {
           await addMeetingParticipant(meeting.id, { person_id: p.person_id, meeting_role: p.meeting_role });
+        }
+
+        // Update existing participants whose role changed
+        for (const p of participants.filter((p) => !p.isNew)) {
+          const orig = (meeting.participants || []).find((op) => op.id === p.id);
+          if (orig && orig.meeting_role !== p.meeting_role) {
+            await updateMeetingParticipant(meeting.id, p.id, { meeting_role: p.meeting_role });
+          }
         }
 
         await updateMeetingMatters(meeting.id, linkedMatterIds);
@@ -253,7 +295,18 @@ export default function MeetingDrawer({ isOpen, onClose, meeting, onSaved }) {
       if (onSaved) onSaved();
       onClose();
     } catch (err) {
-      setError(err.message);
+      if (err.status === 409 && !err.fieldErrors) {
+        setError("This record was modified by someone else. Please close, reopen to load the latest version, and review before saving again.");
+        setSaving(false);
+        return;
+      }
+      if (err.fieldErrors && Object.keys(err.fieldErrors).length) {
+        setFieldErrors(err.fieldErrors);
+        setError(Object.entries(err.fieldErrors).map(([k, v]) => `${k}: ${v}`).join("; "));
+      } else {
+        setFieldErrors({});
+        setError(err.message);
+      }
     } finally {
       setSaving(false);
     }

@@ -168,7 +168,7 @@ export default function MatterDetailPage() {
   const handleAddTag = useCallback(async () => {
     if (!selectedTagId) return;
     try {
-      await addMatterTag(id, parseInt(selectedTagId));
+      await addMatterTag(id, selectedTagId);
       const updated = await getMatterTags(id);
       setTags(Array.isArray(updated) ? updated : (updated?.items || updated || []));
       setSelectedTagId("");
@@ -236,7 +236,7 @@ export default function MatterDetailPage() {
   const updates = matter.updates || [];
   const peopleList = allPeople?.items || allPeople || [];
   const orgsList = allOrgs?.items || allOrgs || [];
-  const mattersList = (allMatters?.items || allMatters || []).filter((m) => m.id !== parseInt(id));
+  const mattersList = (allMatters?.items || allMatters || []).filter((m) => m.id !== id);
   const dependencies = matter.dependencies || [];
   const assignedTagIds = new Set((tags || []).map((t) => t.id || t.tag_id));
   const availableTags = (allTags || []).filter((t) => !assignedTagIds.has(t.id));
@@ -491,7 +491,7 @@ export default function MatterDetailPage() {
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
               <div style={sectionTitle}>Tasks</div>
-              <button style={btnPrimary} onClick={() => openDrawer("task", { matter_id: parseInt(id) }, refetchTasks)}>
+              <button style={btnPrimary} onClick={() => openDrawer("task", { matter_id: id }, refetchTasks)}>
                 + Add Task
               </button>
             </div>
@@ -675,7 +675,7 @@ export default function MatterDetailPage() {
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
               <div style={sectionTitle}>Meetings</div>
-              <button style={btnPrimary} onClick={() => openDrawer("meeting", { matter_id: parseInt(id) }, refetchMeetings)}>
+              <button style={btnPrimary} onClick={() => openDrawer("meeting", { matter_id: id }, refetchMeetings)}>
                 + Add Meeting
               </button>
             </div>

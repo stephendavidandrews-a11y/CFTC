@@ -60,6 +60,9 @@ async def lifespan(app: FastAPI):
         if created:
             logger.info(f"Schema: created {len(created)} new tables: {created}")
         seed_all(conn)
+        # Clean up expired idempotency keys (>24h)
+        conn.execute("DELETE FROM idempotency_keys WHERE created_at < datetime('now', '-24 hours')")
+        conn.commit()
         logger.info("Database ready.")
     finally:
         conn.close()

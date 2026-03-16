@@ -4,6 +4,13 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.db import get_db
 from app.validators import CreateMeeting, UpdateMeeting
+import json
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from app.deps import get_write_source
+from app.audit import log_event
+from app.concurrency import get_etag, check_etag
+from app.idempotency import claim_idempotency_key, finalize_idempotency_key
 
 router = APIRouter(prefix="/meetings", tags=["meetings"])
 
@@ -58,13 +65,23 @@ async def get_meeting(meeting_id: str, db=Depends(get_db)):
         JOIN matters m ON mm.matter_id = m.id
         WHERE mm.meeting_id = ?
     """, (meeting_id,))]
-    return result
+    return JSONResponse(content=result, headers={"ETag": get_etag(row)})
 
 
 @router.post("")
-async def create_meeting(body: CreateMeeting, db=Depends(get_db)):
+async def create_meeting(body: CreateMeeting, request: Request, db=Depends(get_db),
+                      write_source: str = Depends(get_write_source)):
+    idem_key = request.headers.get("idempotency-key")
+    cached = claim_idempotency_key(db, idem_key, body.model_dump(), "/tracker/meetings")
+    if cached == "conflict":
+        raise HTTPException(409, detail="Idempotency key reused with different payload")
+    if cached == "pending":
+        raise HTTPException(409, detail="Request with this idempotency key is still in progress")
+    if isinstance(cached, dict):
+        return JSONResponse(status_code=cached["status_code"], content=json.loads(cached["body"]))
     mid = str(uuid.uuid4())
     now = datetime.now().isoformat()
+    source_val = write_source if body.source == "manual" else body.source
     db.execute("""
         INSERT INTO meetings (id, title, meeting_type, date_time_start, date_time_end,
             location_or_link, purpose, prep_needed, notes,
@@ -79,7 +96,7 @@ async def create_meeting(body: CreateMeeting, db=Depends(get_db)):
           body.decisions_made, body.readout_summary, body.created_followups,
           body.boss_attends, body.external_parties_attend,
           body.assigned_to_person_id, body.created_by_person_id,
-          body.source, body.source_id, body.external_refs,
+          source_val, body.source_id, body.external_refs,
           now, now))
     # Add participants if provided
     for p in body.participants:
@@ -96,15 +113,23 @@ async def create_meeting(body: CreateMeeting, db=Depends(get_db)):
             INSERT INTO meeting_matters (id, meeting_id, matter_id, relationship_type, created_at, updated_at)
             VALUES (?, ?, ?, 'primary topic', ?, ?)
         """, (str(uuid.uuid4()), mid, m, now, now))
+    new_data = body.model_dump()
+    new_data.update({"id": mid, "source": source_val, "created_at": now, "updated_at": now})
+    log_event(db, table_name="meetings", record_id=mid, action="create",
+              source=write_source, new_data=new_data)
+    result = {"id": mid}
+    finalize_idempotency_key(db, idem_key, 200, result)
     db.commit()
-    return {"id": mid}
+    return result
 
 
 @router.put("/{meeting_id}")
-async def update_meeting(meeting_id: str, body: UpdateMeeting, db=Depends(get_db)):
-    existing = db.execute("SELECT id FROM meetings WHERE id = ?", (meeting_id,)).fetchone()
-    if not existing:
+async def update_meeting(meeting_id: str, body: UpdateMeeting, request: Request, db=Depends(get_db),
+                      write_source: str = Depends(get_write_source)):
+    old = db.execute("SELECT * FROM meetings WHERE id = ?", (meeting_id,)).fetchone()
+    if not old:
         raise HTTPException(status_code=404, detail="Meeting not found")
+    check_etag(request, old)
     data = body.model_dump(exclude_unset=True)
     if not data:
         raise HTTPException(status_code=400, detail="No fields to update")
@@ -114,19 +139,25 @@ async def update_meeting(meeting_id: str, body: UpdateMeeting, db=Depends(get_db
     sets.append("updated_at = ?")
     params.extend([now, meeting_id])
     db.execute(f"UPDATE meetings SET {', '.join(sets)} WHERE id = ?", params)
+    log_event(db, table_name="meetings", record_id=meeting_id, action="update",
+              source=write_source, old_record=old, new_data=data)
     db.commit()
     return {"id": meeting_id, "updated": True}
 
 
 @router.delete("/{meeting_id}")
-async def delete_meeting(meeting_id: str, db=Depends(get_db)):
+async def delete_meeting(meeting_id: str, request: Request, db=Depends(get_db),
+                      write_source: str = Depends(get_write_source)):
     """Delete a meeting and its participant/matter links."""
-    existing = db.execute("SELECT id FROM meetings WHERE id = ?", (meeting_id,)).fetchone()
-    if not existing:
+    old = db.execute("SELECT * FROM meetings WHERE id = ?", (meeting_id,)).fetchone()
+    if not old:
         raise HTTPException(status_code=404, detail="Meeting not found")
+    check_etag(request, old)
     db.execute("DELETE FROM meeting_participants WHERE meeting_id = ?", (meeting_id,))
     db.execute("DELETE FROM meeting_matters WHERE meeting_id = ?", (meeting_id,))
     db.execute("DELETE FROM meetings WHERE id = ?", (meeting_id,))
+    log_event(db, table_name="meetings", record_id=meeting_id, action="delete",
+              source=write_source, old_record=old)
     db.commit()
     return {"id": meeting_id, "deleted": True}
 

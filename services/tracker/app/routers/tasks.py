@@ -4,6 +4,13 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.db import get_db
 from app.validators import CreateTask, UpdateTask
+import json
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from app.deps import get_write_source
+from app.audit import log_event
+from app.concurrency import get_etag, check_etag
+from app.idempotency import claim_idempotency_key, finalize_idempotency_key
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -73,13 +80,23 @@ async def get_task(task_id: str, db=Depends(get_db)):
     """, (task_id,)).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Task not found")
-    return dict(row)
+    return JSONResponse(content=dict(row), headers={"ETag": get_etag(row)})
 
 
 @router.post("")
-async def create_task(body: CreateTask, db=Depends(get_db)):
+async def create_task(body: CreateTask, request: Request, db=Depends(get_db),
+                      write_source: str = Depends(get_write_source)):
+    idem_key = request.headers.get("idempotency-key")
+    cached = claim_idempotency_key(db, idem_key, body.model_dump(), "/tracker/tasks")
+    if cached == "conflict":
+        raise HTTPException(409, detail="Idempotency key reused with different payload")
+    if cached == "pending":
+        raise HTTPException(409, detail="Request with this idempotency key is still in progress")
+    if isinstance(cached, dict):
+        return JSONResponse(status_code=cached["status_code"], content=json.loads(cached["body"]))
     task_id = str(uuid.uuid4())
     now = datetime.now().isoformat()
+    source_val = write_source if body.source == "manual" else body.source
     db.execute("""
         INSERT INTO tasks (id, matter_id, title, description, task_type, status, task_mode,
             priority, assigned_to_person_id, created_by_person_id, delegated_by_person_id,
@@ -100,19 +117,27 @@ async def create_task(body: CreateTask, db=Depends(get_db)):
         body.sort_order,
         body.next_follow_up_date, body.completion_notes,
         body.started_at, body.completed_at,
-        body.source, body.source_id,
+        source_val, body.source_id,
         body.ai_confidence, body.automation_hold, body.external_refs,
         now, now,
     ))
+    new_data = body.model_dump()
+    new_data.update({"id": task_id, "source": source_val, "created_at": now, "updated_at": now})
+    log_event(db, table_name="tasks", record_id=task_id, action="create",
+              source=write_source, new_data=new_data)
+    result = {"id": task_id}
+    finalize_idempotency_key(db, idem_key, 200, result)
     db.commit()
-    return {"id": task_id}
+    return result
 
 
 @router.put("/{task_id}")
-async def update_task(task_id: str, body: UpdateTask, db=Depends(get_db)):
-    existing = db.execute("SELECT id FROM tasks WHERE id = ?", (task_id,)).fetchone()
-    if not existing:
+async def update_task(task_id: str, body: UpdateTask, request: Request, db=Depends(get_db),
+                      write_source: str = Depends(get_write_source)):
+    old = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    if not old:
         raise HTTPException(status_code=404, detail="Task not found")
+    check_etag(request, old)
 
     data = body.model_dump(exclude_unset=True)
     if not data:
@@ -124,12 +149,21 @@ async def update_task(task_id: str, body: UpdateTask, db=Depends(get_db)):
     sets.append("updated_at = ?")
     params.extend([now, task_id])
     db.execute(f"UPDATE tasks SET {', '.join(sets)} WHERE id = ?", params)
+    log_event(db, table_name="tasks", record_id=task_id, action="update",
+              source=write_source, old_record=old, new_data=data)
     db.commit()
     return {"id": task_id, "updated": True}
 
 
 @router.delete("/{task_id}")
-async def delete_task(task_id: str, db=Depends(get_db)):
+async def delete_task(task_id: str, request: Request, db=Depends(get_db),
+                      write_source: str = Depends(get_write_source)):
+    old = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    if not old:
+        raise HTTPException(status_code=404, detail="Task not found")
+    check_etag(request, old)
     db.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+    log_event(db, table_name="tasks", record_id=task_id, action="delete",
+              source=write_source, old_record=old)
     db.commit()
     return {"deleted": True}

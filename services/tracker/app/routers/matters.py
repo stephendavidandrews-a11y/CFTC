@@ -4,6 +4,13 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.db import get_db
 from app.validators import CreateMatter, UpdateMatter, AddMatterPerson, AddMatterOrg, AddMatterUpdate
+import json
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from app.deps import get_write_source
+from app.audit import log_event
+from app.concurrency import get_etag, check_etag
+from app.idempotency import claim_idempotency_key, finalize_idempotency_key
 
 router = APIRouter(prefix="/matters", tags=["matters"])
 
@@ -210,16 +217,26 @@ async def get_matter(matter_id: str, db=Depends(get_db)):
         ORDER BY t.name
     """, (matter_id,))]
 
-    return result
+    return JSONResponse(content=result, headers={"ETag": get_etag(matter)})
 
 
 @router.post("")
-async def create_matter(body: CreateMatter, db=Depends(get_db)):
+async def create_matter(body: CreateMatter, request: Request, db=Depends(get_db),
+                      write_source: str = Depends(get_write_source)):
     """Create a new matter."""
+    idem_key = request.headers.get("idempotency-key")
+    cached = claim_idempotency_key(db, idem_key, body.model_dump(), "/tracker/matters")
+    if cached == "conflict":
+        raise HTTPException(409, detail="Idempotency key reused with different payload")
+    if cached == "pending":
+        raise HTTPException(409, detail="Request with this idempotency key is still in progress")
+    if isinstance(cached, dict):
+        return JSONResponse(status_code=cached["status_code"], content=json.loads(cached["body"]))
     matter_id = str(uuid.uuid4())
     matter_number = next_matter_number(db)
     now = datetime.now().isoformat()
 
+    source_val = write_source if body.source == "manual" else body.source
     db.execute("""
         INSERT INTO matters (
             id, matter_number, title, matter_type, description, problem_statement,
@@ -263,22 +280,30 @@ async def create_matter(body: CreateMatter, db=Depends(get_db)):
         body.federal_register_citation,
         body.unified_agenda_priority, body.cfr_citation, body.docket_number,
         body.fr_doc_number,
-        body.source, body.source_id,
+        source_val, body.source_id,
         body.ai_confidence, body.automation_hold,
         body.external_refs,
         now, body.created_by_person_id, now, now,
     ))
+    new_data = body.model_dump()
+    new_data.update({"id": matter_id, "source": source_val, "created_at": now, "updated_at": now})
+    log_event(db, table_name="matters", record_id=matter_id, action="create",
+              source=write_source, new_data=new_data)
+    result = {"id": matter_id, "matter_number": matter_number}
+    finalize_idempotency_key(db, idem_key, 200, result)
     db.commit()
 
-    return {"id": matter_id, "matter_number": matter_number}
+    return result
 
 
 @router.put("/{matter_id}")
-async def update_matter(matter_id: str, body: UpdateMatter, db=Depends(get_db)):
+async def update_matter(matter_id: str, body: UpdateMatter, request: Request, db=Depends(get_db),
+                      write_source: str = Depends(get_write_source)):
     """Update an existing matter."""
-    existing = db.execute("SELECT id FROM matters WHERE id = ?", (matter_id,)).fetchone()
-    if not existing:
+    old = db.execute("SELECT * FROM matters WHERE id = ?", (matter_id,)).fetchone()
+    if not old:
         raise HTTPException(status_code=404, detail="Matter not found")
+    check_etag(request, old)
 
     data = body.model_dump(exclude_unset=True)
     if not data:
@@ -292,19 +317,28 @@ async def update_matter(matter_id: str, body: UpdateMatter, db=Depends(get_db)):
     params.extend([now, now, matter_id])
 
     db.execute(f"UPDATE matters SET {', '.join(sets)} WHERE id = ?", params)
+    log_event(db, table_name="matters", record_id=matter_id, action="update",
+              source=write_source, old_record=old, new_data=data)
     db.commit()
 
     return {"id": matter_id, "updated": True}
 
 
 @router.delete("/{matter_id}")
-async def delete_matter(matter_id: str, db=Depends(get_db)):
+async def delete_matter(matter_id: str, request: Request, db=Depends(get_db),
+                      write_source: str = Depends(get_write_source)):
     """Soft-delete a matter by setting status to closed."""
+    old = db.execute("SELECT * FROM matters WHERE id = ?", (matter_id,)).fetchone()
+    if not old:
+        raise HTTPException(status_code=404, detail="Matter not found")
+    check_etag(request, old)
     now = datetime.now().isoformat()
     db.execute(
         "UPDATE matters SET status = 'closed', closed_at = ?, updated_at = ? WHERE id = ?",
         (now, now, matter_id)
     )
+    log_event(db, table_name="matters", record_id=matter_id, action="delete",
+              source=write_source, old_record=old)
     db.commit()
     return {"id": matter_id, "deleted": True}
 
