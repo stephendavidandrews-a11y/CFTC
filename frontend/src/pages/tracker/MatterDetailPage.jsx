@@ -83,11 +83,11 @@ export default function MatterDetailPage() {
 
   // Stakeholder inline add
   const [showStakeholderAdd, setShowStakeholderAdd] = useState(false);
-  const [stakeholderForm, setStakeholderForm] = useState({ person_id: "", matter_role: "", engagement_level: "" });
+  const [stakeholderForm, setStakeholderForm] = useState({ person_id: "", matter_role: "", engagement_level: "", notes: "" });
 
   // Org inline add
   const [showOrgAdd, setShowOrgAdd] = useState(false);
-  const [orgForm, setOrgForm] = useState({ organization_id: "", organization_role: "" });
+  const [orgForm, setOrgForm] = useState({ organization_id: "", organization_role: "", notes: "" });
 
   // Dependencies
   const { data: allMatters } = useApi(() => listMatters({ limit: 1000 }), []);
@@ -120,7 +120,7 @@ export default function MatterDetailPage() {
     if (!stakeholderForm.person_id) return;
     try {
       await addMatterPerson(id, stakeholderForm);
-      setStakeholderForm({ person_id: "", matter_role: "", engagement_level: "" });
+      setStakeholderForm({ person_id: "", matter_role: "", engagement_level: "", notes: "" });
       setShowStakeholderAdd(false);
       refetch();
     } catch (e) { console.error(e); }
@@ -146,7 +146,7 @@ export default function MatterDetailPage() {
     if (!orgForm.organization_id) return;
     try {
       await addMatterOrg(id, orgForm);
-      setOrgForm({ organization_id: "", organization_role: "" });
+      setOrgForm({ organization_id: "", organization_role: "", notes: "" });
       setShowOrgAdd(false);
       refetch();
     } catch (e) { console.error(e); }
@@ -249,14 +249,17 @@ export default function MatterDetailPage() {
     { label: "Boss Involvement", value: matter.boss_involvement_level },
     { label: "RIN", value: matter.rin },
     { label: "Regulatory Stage", value: matter.regulatory_stage },
+    { label: "Risk Level", value: matter.risk_level },
   ];
 
   const infoRight = [
     { label: "Owner", value: matter.owner_name || matter.owner },
     { label: "Supervisor", value: matter.supervisor_name || matter.supervisor },
     { label: "Client Org", value: matter.client_org_name || matter.client_org },
+    { label: "Requesting Org", value: matter.requesting_org_name || matter.requesting_org },
     { label: "Reviewing Org", value: matter.reviewing_org_name || matter.reviewing_org },
     { label: "Opened Date", value: formatDate(matter.opened_date || matter.created_at) },
+    { label: "Revisit Date", value: formatDate(matter.revisit_date) },
     { label: "Work Deadline", value: formatDate(matter.work_deadline) },
     { label: "External Deadline", value: formatDate(matter.external_deadline) },
     { label: "Decision Deadline", value: formatDate(matter.decision_deadline) },
@@ -304,6 +307,56 @@ export default function MatterDetailPage() {
           ))}
         </div>
       </div>
+
+
+      {/* Context Section */}
+      {(matter.problem_statement || matter.why_it_matters || matter.description || matter.pending_decision || matter.outcome_summary) && (
+        <div style={{ ...cardStyle, marginBottom: 24 }}>
+          <div style={sectionTitle}>Context</div>
+          {matter.description && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={labelStyle}>Description</div>
+              <div style={{ ...valStyle, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{matter.description}</div>
+            </div>
+          )}
+          {matter.problem_statement && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={labelStyle}>Problem Statement</div>
+              <div style={{ ...valStyle, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{matter.problem_statement}</div>
+            </div>
+          )}
+          {matter.why_it_matters && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={labelStyle}>Why It Matters</div>
+              <div style={{ ...valStyle, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{matter.why_it_matters}</div>
+            </div>
+          )}
+          {matter.pending_decision && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={labelStyle}>Pending Decision</div>
+              <div style={{ ...valStyle, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{matter.pending_decision}</div>
+            </div>
+          )}
+          {matter.outcome_summary && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={labelStyle}>Outcome Summary</div>
+              <div style={{ ...valStyle, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{matter.outcome_summary}</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Rulemaking Details */}
+      {matter.matter_type === "rulemaking" && (matter.federal_register_citation || matter.unified_agenda_priority || matter.docket_number) && (
+        <div style={{ ...cardStyle, marginBottom: 24 }}>
+          <div style={sectionTitle}>Rulemaking Details</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+            <div><div style={labelStyle}>FR Citation</div><div style={valStyle}>{matter.federal_register_citation || "\u2014"}</div></div>
+            <div><div style={labelStyle}>Unified Agenda Priority</div><div style={valStyle}>{matter.unified_agenda_priority || "\u2014"}</div></div>
+            <div><div style={labelStyle}>Docket Number</div><div style={valStyle}>{matter.docket_number || "\u2014"}</div></div>
+          </div>
+        </div>
+      )}
 
       {/* Tags */}
       <div style={{ ...cardStyle, marginBottom: 24, padding: "14px 24px" }}>
@@ -509,6 +562,11 @@ export default function MatterDetailPage() {
                   <option value="">Engagement...</option>
                   {(enums.engagement_level || []).map((l) => <option key={l} value={l}>{l}</option>)}
                 </select>
+                <input style={{ ...inputStyle, width: 180 }}
+                  placeholder="Notes..."
+                  value={stakeholderForm.notes}
+                  onChange={(e) => setStakeholderForm((p) => ({ ...p, notes: e.target.value }))}
+                />
                 <button style={btnPrimary} onClick={handleAddStakeholder}>Add</button>
               </div>
             )}
@@ -574,6 +632,11 @@ export default function MatterDetailPage() {
                     <option key={r} value={r}>{r}</option>
                   ))}
                 </select>
+                <input style={{ ...inputStyle, width: 180 }}
+                  placeholder="Notes..."
+                  value={orgForm.notes}
+                  onChange={(e) => setOrgForm((p) => ({ ...p, notes: e.target.value }))}
+                />
                 <button style={btnPrimary} onClick={handleAddOrg}>Add</button>
               </div>
             )}

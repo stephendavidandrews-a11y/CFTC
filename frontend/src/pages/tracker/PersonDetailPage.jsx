@@ -82,6 +82,10 @@ export default function PersonDetailPage() {
     { label: "Manager", value: person.manager_name },
     { label: "Organization", value: person.org_name },
     { label: "Team Workload", value: person.include_in_team_workload ? "Yes" : "No" },
+    { label: "Assistant", value: person.assistant_name },
+    { label: "Assistant Contact", value: person.assistant_contact },
+    { label: "Next Interaction Type", value: person.next_interaction_type },
+    { label: "Next Interaction Purpose", value: person.next_interaction_purpose },
   ];
 
   return (
@@ -92,7 +96,14 @@ export default function PersonDetailPage() {
           &larr; Back
         </button>
         <div style={{ flex: 1 }}>
-          <div style={titleStyle}>{fullName}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={titleStyle}>{fullName}</span>
+            {person.is_active === false ? (
+              <Badge bg="rgba(239,68,68,0.12)" text="#ef4444" label="Inactive" />
+            ) : (
+              <Badge bg="rgba(34,197,94,0.12)" text="#22c55e" label="Active" />
+            )}
+          </div>
           <div style={{ fontSize: 13, color: theme.text.muted }}>
             {[person.title, person.org_name].filter(Boolean).join(" \u2022 ")}
           </div>
@@ -116,6 +127,24 @@ export default function PersonDetailPage() {
           ))}
         </div>
       </div>
+
+      {/* Detail Notes */}
+      {(person.working_style_notes || person.substantive_areas) && (
+        <div style={{ ...cardStyle, marginBottom: 24 }}>
+          {person.substantive_areas && (
+            <div style={{ marginBottom: person.working_style_notes ? 12 : 0 }}>
+              <div style={labelStyle}>Substantive Areas</div>
+              <div style={{ ...valStyle, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{person.substantive_areas}</div>
+            </div>
+          )}
+          {person.working_style_notes && (
+            <div>
+              <div style={labelStyle}>Working Style Notes</div>
+              <div style={{ ...valStyle, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{person.working_style_notes}</div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Matters */}
       <div style={{ ...cardStyle, marginBottom: 24 }}>

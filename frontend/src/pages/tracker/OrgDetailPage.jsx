@@ -17,6 +17,8 @@ const cardStyle = {
 
 const titleStyle = { fontSize: 22, fontWeight: 700, color: theme.text.primary, marginBottom: 4 };
 const sectionTitle = { fontSize: 14, fontWeight: 700, color: theme.text.secondary, marginBottom: 14 };
+const labelStyle = { fontSize: 11, fontWeight: 700, color: theme.text.faint, textTransform: "uppercase", letterSpacing: "0.05em" };
+const valStyle = { fontSize: 13, color: theme.text.secondary, marginTop: 2 };
 
 const btnPrimary = {
   padding: "7px 16px", borderRadius: 6, fontSize: 12, fontWeight: 600,
@@ -66,7 +68,15 @@ export default function OrgDetailPage() {
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={titleStyle}>{org.name}</span>
+            {org.short_name && (
+              <span style={{ fontSize: 14, color: theme.text.muted, fontWeight: 400 }}>({org.short_name})</span>
+            )}
             {typeStyle && <Badge bg={typeStyle.bg} text={typeStyle.text} label={typeStyle.label} />}
+            {org.is_active === false ? (
+              <Badge bg="rgba(239,68,68,0.12)" text="#ef4444" label="Inactive" />
+            ) : (
+              <Badge bg="rgba(34,197,94,0.12)" text="#22c55e" label="Active" />
+            )}
           </div>
           {org.parent_org_name && (
             <div style={{ fontSize: 12, color: theme.text.faint, marginTop: 2 }}>
@@ -78,6 +88,24 @@ export default function OrgDetailPage() {
           Edit
         </button>
       </div>
+
+      {/* Info */}
+      {(org.jurisdiction || org.notes) && (
+        <div style={{ ...cardStyle, marginBottom: 24 }}>
+          {org.jurisdiction && (
+            <div style={{ marginBottom: org.notes ? 12 : 0 }}>
+              <div style={labelStyle}>Jurisdiction</div>
+              <div style={valStyle}>{org.jurisdiction}</div>
+            </div>
+          )}
+          {org.notes && (
+            <div>
+              <div style={labelStyle}>Notes</div>
+              <div style={{ ...valStyle, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{org.notes}</div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* People */}
       <div style={{ ...cardStyle, marginBottom: 24 }}>
