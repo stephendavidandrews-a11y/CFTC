@@ -9,10 +9,12 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 
 from app.core.database import get_connection, run_db
+from fastapi import Depends
 from app.core.config import settings
+from app.core.auth import verify_comment_auth
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(verify_comment_auth)])
 
 
 def _row_to_dict(row):
@@ -21,7 +23,7 @@ def _row_to_dict(row):
         return None
     d = dict(row)
     # Parse JSON text fields
-    for key in ("ai_summary_structured", "name_variations"):
+    for key in ("ai_summary_structured", "name_variations", "statutory_analysis", "narrative_summary"):
         if key in d and isinstance(d[key], str):
             try:
                 d[key] = json.loads(d[key])
@@ -46,7 +48,7 @@ async def list_rules(
     def _query():
         conn = get_connection()
         try:
-            sql = "SELECT * FROM proposed_rules WHERE 1=1"
+            sql = "SELECT * FROM proposed_rules WHERE deleted_at IS NULL"
             params = []
             if status:
                 sql += " AND status = ?"
@@ -75,12 +77,35 @@ async def get_rule(docket_number: str):
         conn = get_connection()
         try:
             row = conn.execute(
-                "SELECT * FROM proposed_rules WHERE docket_number = ?",
+                "SELECT * FROM proposed_rules WHERE docket_number = ? AND deleted_at IS NULL",
                 (docket_number,)
             ).fetchone()
             if not row:
                 raise HTTPException(status_code=404, detail="Rule not found")
             return _row_to_dict(row)
+        finally:
+            conn.close()
+    return await run_db(_query)
+
+
+@router.delete("/rules/{docket_number}")
+async def soft_delete_rule(docket_number: str):
+    """Soft-delete a proposed rule (sets deleted_at timestamp)."""
+    def _query():
+        conn = get_connection()
+        try:
+            row = conn.execute(
+                "SELECT id FROM proposed_rules WHERE docket_number = ? AND deleted_at IS NULL",
+                (docket_number,)
+            ).fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Rule not found")
+            conn.execute(
+                "UPDATE proposed_rules SET deleted_at = datetime('now') WHERE docket_number = ?",
+                (docket_number,)
+            )
+            conn.commit()
+            return {"message": f"Soft-deleted rule {docket_number}"}
         finally:
             conn.close()
     return await run_db(_query)
@@ -186,7 +211,7 @@ async def list_comments(
     def _query():
         conn = get_connection()
         try:
-            where_clauses = []
+            where_clauses = ["deleted_at IS NULL"]
             params = []
 
             if docket_number:
@@ -216,7 +241,7 @@ async def list_comments(
                 )
                 params.extend([f"%{search}%"] * 4)
 
-            where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
+            where_sql = " AND ".join(where_clauses)
 
             # Count
             count_sql = f"SELECT COUNT(*) as cnt FROM comments WHERE {where_sql}"
@@ -253,16 +278,15 @@ async def extraction_status(docket_number: Optional[str] = None):
     def _query():
         conn = get_connection()
         try:
-            where = "WHERE docket_number = ?" if docket_number else ""
+            where = "WHERE deleted_at IS NULL AND docket_number = ?" if docket_number else "WHERE deleted_at IS NULL"
             params = [docket_number] if docket_number else []
 
             total = conn.execute(
                 f"SELECT COUNT(*) as cnt FROM comments {where}", params
             ).fetchone()["cnt"]
 
-            and_or_where = "AND" if where else "WHERE"
             has_text = conn.execute(
-                f"SELECT COUNT(*) as cnt FROM comments {where} {and_or_where} comment_text IS NOT NULL AND comment_text != ''",
+                f"SELECT COUNT(*) as cnt FROM comments {where} AND comment_text IS NOT NULL AND comment_text != ''",
                 params
             ).fetchone()["cnt"]
 
@@ -284,7 +308,7 @@ async def get_docket_stats(docket_number: str):
         conn = get_connection()
         try:
             total = conn.execute(
-                "SELECT COUNT(*) as cnt FROM comments WHERE docket_number = ?",
+                "SELECT COUNT(*) as cnt FROM comments WHERE docket_number = ? AND deleted_at IS NULL",
                 (docket_number,)
             ).fetchone()["cnt"]
 
@@ -301,30 +325,30 @@ async def get_docket_stats(docket_number: str):
             tier_counts = {}
             for t in [1, 2, 3]:
                 tier_counts[t] = conn.execute(
-                    "SELECT COUNT(*) as cnt FROM comments WHERE docket_number = ? AND tier = ?",
+                    "SELECT COUNT(*) as cnt FROM comments WHERE docket_number = ? AND tier = ? AND deleted_at IS NULL",
                     (docket_number, t)
                 ).fetchone()["cnt"]
 
             sent_counts = {}
             for s in ["SUPPORT", "OPPOSE", "MIXED", "NEUTRAL"]:
                 sent_counts[s] = conn.execute(
-                    "SELECT COUNT(*) as cnt FROM comments WHERE docket_number = ? AND sentiment = ?",
+                    "SELECT COUNT(*) as cnt FROM comments WHERE docket_number = ? AND sentiment = ? AND deleted_at IS NULL",
                     (docket_number, s)
                 ).fetchone()["cnt"]
 
             form_count = conn.execute(
-                "SELECT COUNT(*) as cnt FROM comments WHERE docket_number = ? AND is_form_letter = 1",
+                "SELECT COUNT(*) as cnt FROM comments WHERE docket_number = ? AND is_form_letter = 1 AND deleted_at IS NULL",
                 (docket_number,)
             ).fetchone()["cnt"]
 
             avg_row = conn.execute(
-                "SELECT AVG(page_count) as avg_pc FROM comments WHERE docket_number = ? AND page_count IS NOT NULL",
+                "SELECT AVG(page_count) as avg_pc FROM comments WHERE docket_number = ? AND page_count IS NOT NULL AND deleted_at IS NULL",
                 (docket_number,)
             ).fetchone()
             avg_pages = avg_row["avg_pc"]
 
             t1_summarized = conn.execute(
-                "SELECT COUNT(*) as cnt FROM comments WHERE docket_number = ? AND tier = 1 AND ai_summary IS NOT NULL",
+                "SELECT COUNT(*) as cnt FROM comments WHERE docket_number = ? AND tier = 1 AND ai_summary IS NOT NULL AND deleted_at IS NULL",
                 (docket_number,)
             ).fetchone()["cnt"]
 
@@ -358,12 +382,12 @@ async def get_tier_breakdown(docket_number: str):
                 sent_counts = {}
                 for s in ["SUPPORT", "OPPOSE", "MIXED", "NEUTRAL"]:
                     sent_counts[s.lower()] = conn.execute(
-                        "SELECT COUNT(*) as cnt FROM comments WHERE docket_number = ? AND tier = ? AND sentiment = ?",
+                        "SELECT COUNT(*) as cnt FROM comments WHERE docket_number = ? AND tier = ? AND sentiment = ? AND deleted_at IS NULL",
                         (docket_number, tier, s)
                     ).fetchone()["cnt"]
 
                 total = conn.execute(
-                    "SELECT COUNT(*) as cnt FROM comments WHERE docket_number = ? AND tier = ?",
+                    "SELECT COUNT(*) as cnt FROM comments WHERE docket_number = ? AND tier = ? AND deleted_at IS NULL",
                     (docket_number, tier)
                 ).fetchone()["cnt"]
 
@@ -371,7 +395,7 @@ async def get_tier_breakdown(docket_number: str):
                     """SELECT COALESCE(commenter_name, commenter_organization, 'Anonymous') as name,
                               sentiment, document_id
                        FROM comments
-                       WHERE docket_number = ? AND tier = ?
+                       WHERE docket_number = ? AND tier = ? AND deleted_at IS NULL
                        ORDER BY page_count DESC
                        LIMIT 10""",
                     (docket_number, tier)
@@ -393,20 +417,28 @@ async def get_statutory_analysis(docket_number: str):
         conn = get_connection()
         try:
             rule = conn.execute(
-                "SELECT * FROM proposed_rules WHERE docket_number = ?", (docket_number,)
+                "SELECT * FROM proposed_rules WHERE docket_number = ? AND deleted_at IS NULL", (docket_number,)
             ).fetchone()
 
-            # Check cache
-            if rule and rule["summary"] and rule["summary"].startswith('{'):
+            # Check new dedicated column first, then fall back to legacy summary field
+            if rule and rule["statutory_analysis"]:
                 try:
-                    cached = json.loads(rule["summary"])
+                    cached = json.loads(rule["statutory_analysis"])
                     if 'disputes' in cached:
                         return {"cached": cached}
                 except json.JSONDecodeError:
                     pass
+            # Legacy fallback: check summary field
+            if rule and rule["summary"] and rule["summary"].startswith('{'):
+                try:
+                    cached = json.loads(rule["summary"])
+                    if 'disputes' in cached:
+                        return {"cached": cached, "migrate": True}
+                except json.JSONDecodeError:
+                    pass
 
             t1_rows = conn.execute(
-                "SELECT * FROM comments WHERE docket_number = ? AND tier = 1",
+                "SELECT * FROM comments WHERE docket_number = ? AND tier = 1 AND deleted_at IS NULL",
                 (docket_number,)
             ).fetchall()
             return {"rule": dict(rule) if rule else None, "tier1_comments": [_row_to_dict(r) for r in t1_rows]}
@@ -416,20 +448,44 @@ async def get_statutory_analysis(docket_number: str):
     data = await run_db(_get_data)
 
     if "cached" in data:
+        # Migrate legacy data to new column if needed
+        if data.get("migrate"):
+            cached_data = data["cached"]
+            def _migrate():
+                conn = get_connection()
+                try:
+                    conn.execute(
+                        "UPDATE proposed_rules SET statutory_analysis = ? WHERE docket_number = ?",
+                        (json.dumps(cached_data), docket_number)
+                    )
+                    conn.commit()
+                finally:
+                    conn.close()
+            await run_db(_migrate)
         return data["cached"]
 
     if not data["tier1_comments"]:
         return {"overview": "No Tier 1 comments available for analysis.", "disputes": []}
 
+    # Check cost caps before calling AI
+    from app.core.cost_tracking import check_daily_cap, check_docket_cap
+    daily_ok, daily_spent, daily_cap = check_daily_cap()
+    if not daily_ok:
+        raise HTTPException(status_code=429, detail=f"Daily AI spending cap reached (${daily_spent:.2f}/${daily_cap:.2f})")
+    docket_ok, docket_spent, docket_cap = check_docket_cap(docket_number)
+    if not docket_ok:
+        raise HTTPException(status_code=429, detail=f"Per-docket AI spending cap reached for {docket_number} (${docket_spent:.2f}/${docket_cap:.2f})")
+
     analysis = await _generate_statutory_analysis(data["tier1_comments"])
 
     if analysis and data["rule"]:
+        analysis_json = json.dumps(analysis)
         def _cache():
             conn = get_connection()
             try:
                 conn.execute(
-                    "UPDATE proposed_rules SET summary = ? WHERE docket_number = ?",
-                    (json.dumps(analysis), docket_number)
+                    "UPDATE proposed_rules SET statutory_analysis = ? WHERE docket_number = ?",
+                    (analysis_json, docket_number)
                 )
                 conn.commit()
             finally:
@@ -445,27 +501,35 @@ async def get_comment_narrative(docket_number: str):
         conn = get_connection()
         try:
             rule = conn.execute(
-                "SELECT * FROM proposed_rules WHERE docket_number = ?", (docket_number,)
+                "SELECT * FROM proposed_rules WHERE docket_number = ? AND deleted_at IS NULL", (docket_number,)
             ).fetchone()
 
-            # Check cache
+            # Check new dedicated column first
+            if rule and rule["narrative_summary"]:
+                try:
+                    cached = json.loads(rule["narrative_summary"])
+                    if cached.get('narrative'):
+                        return {"cached": {"narrative": cached['narrative'], "saved_at": cached.get('narrative_saved_at')}}
+                except json.JSONDecodeError:
+                    pass
+            # Legacy fallback: check summary field
             if rule and rule["summary"] and rule["summary"].startswith('{'):
                 try:
                     cached = json.loads(rule["summary"])
                     if cached.get('narrative'):
-                        return {"cached": {"narrative": cached['narrative'], "saved_at": cached.get('narrative_saved_at')}}
+                        return {"cached": {"narrative": cached['narrative'], "saved_at": cached.get('narrative_saved_at')}, "migrate": True}
                 except json.JSONDecodeError:
                     pass
 
             rows = conn.execute(
                 """SELECT * FROM comments
-                   WHERE docket_number = ? AND tier IN (1, 2) AND ai_summary IS NOT NULL
+                   WHERE docket_number = ? AND tier IN (1, 2) AND ai_summary IS NOT NULL AND deleted_at IS NULL
                    ORDER BY tier ASC, page_count DESC""",
                 (docket_number,)
             ).fetchall()
 
             total = conn.execute(
-                "SELECT COUNT(*) as cnt FROM comments WHERE docket_number = ?",
+                "SELECT COUNT(*) as cnt FROM comments WHERE docket_number = ? AND deleted_at IS NULL",
                 (docket_number,)
             ).fetchone()["cnt"]
 
@@ -480,11 +544,34 @@ async def get_comment_narrative(docket_number: str):
     data = await run_db(_get_data)
 
     if "cached" in data:
+        # Migrate legacy data to new column if needed
+        if data.get("migrate"):
+            cached_data = data["cached"]
+            def _migrate():
+                conn = get_connection()
+                try:
+                    conn.execute(
+                        "UPDATE proposed_rules SET narrative_summary = ? WHERE docket_number = ?",
+                        (json.dumps(cached_data), docket_number)
+                    )
+                    conn.commit()
+                finally:
+                    conn.close()
+            await run_db(_migrate)
         return data["cached"]
 
     comments = data["comments"]
     if not comments:
         return {"narrative": None, "saved_at": None}
+
+    # Check cost caps before calling AI
+    from app.core.cost_tracking import check_daily_cap, check_docket_cap
+    daily_ok, daily_spent, daily_cap = check_daily_cap()
+    if not daily_ok:
+        raise HTTPException(status_code=429, detail=f"Daily AI spending cap reached (${daily_spent:.2f}/${daily_cap:.2f})")
+    docket_ok, docket_spent, docket_cap = check_docket_cap(docket_number)
+    if not docket_ok:
+        raise HTTPException(status_code=429, detail=f"Per-docket AI spending cap reached for {docket_number} (${docket_spent:.2f}/${docket_cap:.2f})")
 
     # Build context
     context_parts = []
@@ -524,29 +611,29 @@ async def get_comment_narrative(docket_number: str):
             }],
         )
         narrative_text = response.content[0].text.strip()
+
+        # Log cost
+        from app.core.cost_tracking import log_api_call
+        log_api_call(
+            model="claude-sonnet-4-20250514",
+            input_tokens=response.usage.input_tokens,
+            output_tokens=response.usage.output_tokens,
+            operation="narrative_generation",
+            docket_number=docket_number,
+        )
     except Exception as e:
         logger.error(f"Error generating narrative: {e}")
         return {"narrative": None, "saved_at": None}
 
-    # Cache
+    # Cache in dedicated column
     now = datetime.utcnow().isoformat()
+    narrative_data = json.dumps({"narrative": narrative_text, "narrative_saved_at": now})
     def _cache():
         conn = get_connection()
         try:
-            rule = conn.execute(
-                "SELECT summary FROM proposed_rules WHERE docket_number = ?", (docket_number,)
-            ).fetchone()
-            existing = {}
-            if rule and rule["summary"] and rule["summary"].startswith('{'):
-                try:
-                    existing = json.loads(rule["summary"])
-                except json.JSONDecodeError:
-                    pass
-            existing['narrative'] = narrative_text
-            existing['narrative_saved_at'] = now
             conn.execute(
-                "UPDATE proposed_rules SET summary = ? WHERE docket_number = ?",
-                (json.dumps(existing), docket_number)
+                "UPDATE proposed_rules SET narrative_summary = ? WHERE docket_number = ?",
+                (narrative_data, docket_number)
             )
             conn.commit()
         finally:
@@ -600,7 +687,7 @@ async def get_comment(document_id: str):
         conn = get_connection()
         try:
             row = conn.execute(
-                "SELECT * FROM comments WHERE document_id = ?", (document_id,)
+                "SELECT * FROM comments WHERE document_id = ? AND deleted_at IS NULL", (document_id,)
             ).fetchone()
             if not row:
                 raise HTTPException(status_code=404, detail="Comment not found")
@@ -612,6 +699,29 @@ async def get_comment(document_id: str):
             ).fetchall()
             comment["tags"] = [dict(t) for t in tags]
             return comment
+        finally:
+            conn.close()
+    return await run_db(_query)
+
+
+@router.delete("/comments/{document_id}")
+async def soft_delete_comment(document_id: str):
+    """Soft-delete a comment (sets deleted_at timestamp)."""
+    def _query():
+        conn = get_connection()
+        try:
+            row = conn.execute(
+                "SELECT id FROM comments WHERE document_id = ? AND deleted_at IS NULL",
+                (document_id,)
+            ).fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Comment not found")
+            conn.execute(
+                "UPDATE comments SET deleted_at = datetime('now') WHERE document_id = ?",
+                (document_id,)
+            )
+            conn.commit()
+            return {"message": f"Soft-deleted comment {document_id}"}
         finally:
             conn.close()
     return await run_db(_query)
@@ -699,6 +809,15 @@ async def ai_tier_comments(
     skip_form_letters: bool = Query(True),
     force_retier: bool = Query(False),
 ):
+    # Check cost caps before AI processing
+    from app.core.cost_tracking import check_daily_cap, check_docket_cap
+    daily_ok, daily_spent, daily_cap = check_daily_cap()
+    if not daily_ok:
+        raise HTTPException(status_code=429, detail=f"Daily AI spending cap reached (${daily_spent:.2f}/${daily_cap:.2f})")
+    docket_ok, docket_spent, docket_cap = check_docket_cap(docket_number)
+    if not docket_ok:
+        raise HTTPException(status_code=429, detail=f"Per-docket AI spending cap reached for {docket_number} (${docket_spent:.2f}/${docket_cap:.2f})")
+
     from app.services.ai_tiering import run_ai_tiering_batch
     def _query():
         conn = get_connection()
@@ -722,6 +841,15 @@ async def ai_summarize_comments(
     batch_size: int = Query(10, ge=1, le=300),
     force_resummarize: bool = Query(False),
 ):
+    # Check cost caps before AI processing
+    from app.core.cost_tracking import check_daily_cap, check_docket_cap
+    daily_ok, daily_spent, daily_cap = check_daily_cap()
+    if not daily_ok:
+        raise HTTPException(status_code=429, detail=f"Daily AI spending cap reached (${daily_spent:.2f}/${daily_cap:.2f})")
+    docket_ok, docket_spent, docket_cap = check_docket_cap(docket_number)
+    if not docket_ok:
+        raise HTTPException(status_code=429, detail=f"Per-docket AI spending cap reached for {docket_number} (${docket_spent:.2f}/${docket_cap:.2f})")
+
     from app.services.ai_summarization import run_summarization_batch
     def _query():
         conn = get_connection()
@@ -736,6 +864,17 @@ async def ai_summarize_comments(
         finally:
             conn.close()
     return await run_db(_query)
+
+
+# ===========================================================================
+# Cost Tracking
+# ===========================================================================
+
+@router.get("/ai-costs")
+async def get_ai_costs():
+    """Get AI cost tracking statistics."""
+    from app.core.cost_tracking import get_usage_stats
+    return await run_db(get_usage_stats)
 
 
 # ===========================================================================
@@ -780,7 +919,7 @@ async def export_all_pdfs(
     def _query():
         conn = get_connection()
         try:
-            sql = "SELECT * FROM comments WHERE docket_number = ?"
+            sql = "SELECT * FROM comments WHERE docket_number = ? AND deleted_at IS NULL"
             params = [docket_number]
             if tier:
                 sql += " AND tier = ?"

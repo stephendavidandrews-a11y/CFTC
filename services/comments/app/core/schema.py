@@ -21,12 +21,15 @@ TABLES = [
         status                      TEXT DEFAULT 'OPEN',
         full_text_url               TEXT,
         summary                     TEXT,
+        statutory_analysis          TEXT,
+        narrative_summary           TEXT,
         regulations_gov_url         TEXT,
         page_count                  INTEGER,
         created_at                  TEXT DEFAULT (datetime('now')),
         updated_at                  TEXT DEFAULT (datetime('now')),
         last_comment_pull           TEXT,
-        total_comments              INTEGER DEFAULT 0
+        total_comments              INTEGER DEFAULT 0,
+        deleted_at                  TEXT
     )
     """),
 
@@ -53,7 +56,8 @@ TABLES = [
         pdf_extraction_method       TEXT,
         created_at                  TEXT DEFAULT (datetime('now')),
         updated_at                  TEXT DEFAULT (datetime('now')),
-        regulations_gov_url         TEXT
+        regulations_gov_url         TEXT,
+        deleted_at                  TEXT
     )
     """),
 
@@ -99,6 +103,26 @@ INDEXES = [
     "CREATE INDEX IF NOT EXISTS ix_proposed_rules_priority_status ON proposed_rules(priority_level, status)",
 ]
 
+# Columns to add to existing tables (for migration of existing databases)
+MIGRATIONS = [
+    ("proposed_rules", "statutory_analysis", "TEXT"),
+    ("proposed_rules", "narrative_summary", "TEXT"),
+    ("proposed_rules", "deleted_at", "TEXT"),
+    ("comments", "deleted_at", "TEXT"),
+]
+
+
+def _migrate_add_columns(conn: sqlite3.Connection):
+    """Add new columns to existing tables (idempotent)."""
+    cursor = conn.cursor()
+    for table, column, col_type in MIGRATIONS:
+        existing = cursor.execute(f"PRAGMA table_info({table})").fetchall()
+        col_names = [row[1] for row in existing]
+        if column not in col_names:
+            cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+            logger.info(f"Migration: added {table}.{column} ({col_type})")
+    conn.commit()
+
 
 def init_schema(conn: sqlite3.Connection) -> list:
     """Create all tables and indexes. Returns list of newly created table names."""
@@ -117,4 +141,8 @@ def init_schema(conn: sqlite3.Connection) -> list:
         cursor.execute(idx_sql)
 
     conn.commit()
+
+    # Run migrations for existing databases
+    _migrate_add_columns(conn)
+
     return created

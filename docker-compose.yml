@@ -11,6 +11,8 @@ services:
     environment:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?Set ANTHROPIC_API_KEY in .env}
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env}
+      PIPELINE_USER: ${PIPELINE_USER:?Set PIPELINE_USER in .env}
+      PIPELINE_PASS: ${PIPELINE_PASS:?Set PIPELINE_PASS in .env}
       CORS_ORIGINS: '["https://${DOMAIN:-localhost}"]'
       APP_ENV: production
       LOG_LEVEL: INFO

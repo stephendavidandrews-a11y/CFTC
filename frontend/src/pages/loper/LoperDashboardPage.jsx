@@ -31,7 +31,7 @@ const cardStyle = {
 export default function LoperDashboardPage() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery("(max-width: 768px)");
-  const { data, loading, error } = useApi(() => getDashboard(), []);
+  const { data, loading, error } = useApi(() => getDashboard(), [], { refetchOnFocus: true });
 
   const dimAvgs = useMemo(() => {
     if (!data?.dimension_averages) return [];

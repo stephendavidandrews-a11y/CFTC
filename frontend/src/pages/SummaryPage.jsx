@@ -29,10 +29,11 @@ export default function SummaryPage() {
     return () => clearInterval(t);
   }, []);
 
-  const { data: summary, refetch: refetchSummary } = useApi(() => getExecutiveSummary(), []);
-  const { data: kanban } = useApi(() => getKanban("rulemaking"), []);
-  const { data: metrics, refetch: refetchMetrics } = useApi(() => getMetrics(), []);
-  const { data: unreadData, refetch: refetchUnread } = useApi(() => getUnreadCount(), []);
+  const opts = { refetchOnFocus: true };
+  const { data: summary, refetch: refetchSummary } = useApi(() => getExecutiveSummary(), [], opts);
+  const { data: kanban } = useApi(() => getKanban("rulemaking"), [], opts);
+  const { data: metrics, refetch: refetchMetrics } = useApi(() => getMetrics(), [], opts);
+  const { data: unreadData, refetch: refetchUnread } = useApi(() => getUnreadCount(), [], opts);
   const { data: workDash, refetch: refetchWork } = useApi(() => getWorkDashboard().catch(() => null), []);
   const { data: workProjects } = useApi(() => listProjects({ status: "active" }).catch(() => []), []);
   const { data: withdrawnResp } = useApi(
