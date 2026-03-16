@@ -127,7 +127,7 @@ async def create_person(body: CreatePerson, db=Depends(get_db)):
         body.last_interaction_date, body.next_interaction_needed_date,
         body.next_interaction_type, body.next_interaction_purpose,
         body.manager_person_id, body.include_in_team_workload,
-        body.relationship_assigned_to_person_id, 1,
+        body.relationship_assigned_to_person_id, body.is_active,
         body.source, body.source_id, body.external_refs,
         now, now,
     ))

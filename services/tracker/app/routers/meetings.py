@@ -67,13 +67,16 @@ async def create_meeting(body: CreateMeeting, db=Depends(get_db)):
     now = datetime.now().isoformat()
     db.execute("""
         INSERT INTO meetings (id, title, meeting_type, date_time_start, date_time_end,
-            location_or_link, purpose, prep_needed, notes, boss_attends, external_parties_attend,
+            location_or_link, purpose, prep_needed, notes,
+            decisions_made, readout_summary, created_followups,
+            boss_attends, external_parties_attend,
             assigned_to_person_id, created_by_person_id, source, source_id, external_refs,
             created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (mid, body.title, body.meeting_type, body.date_time_start,
           body.date_time_end, body.location_or_link, body.purpose,
           body.prep_needed, body.notes,
+          body.decisions_made, body.readout_summary, body.created_followups,
           body.boss_attends, body.external_parties_attend,
           body.assigned_to_person_id, body.created_by_person_id,
           body.source, body.source_id, body.external_refs,
@@ -81,10 +84,12 @@ async def create_meeting(body: CreateMeeting, db=Depends(get_db)):
     # Add participants if provided
     for p in body.participants:
         db.execute("""
-            INSERT INTO meeting_participants (id, meeting_id, person_id, organization_id, meeting_role, attendance_status)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO meeting_participants (id, meeting_id, person_id, organization_id,
+                meeting_role, attendance_status, attended, follow_up_expected, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (str(uuid.uuid4()), mid, p.person_id, p.organization_id,
-              p.meeting_role, p.attendance_status))
+              p.meeting_role, p.attendance_status,
+              p.attended, p.follow_up_expected, p.notes))
     # Link matters if provided
     for m in body.matter_ids:
         db.execute("""
@@ -136,12 +141,16 @@ async def add_participant(meeting_id: str, body: dict, db=Depends(get_db)):
         raise HTTPException(status_code=400, detail="person_id required")
     pid = str(uuid.uuid4())
     db.execute("""
-        INSERT INTO meeting_participants (id, meeting_id, person_id, organization_id, meeting_role, attendance_status)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO meeting_participants (id, meeting_id, person_id, organization_id,
+            meeting_role, attendance_status, attended, follow_up_expected, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (pid, meeting_id, person_id,
           body.get("organization_id"),
           body.get("meeting_role", "attendee"),
-          body.get("attendance_status", "invited")))
+          body.get("attendance_status", "invited"),
+          body.get("attended"),
+          body.get("follow_up_expected"),
+          body.get("notes")))
     db.commit()
     return {"id": pid}
 
@@ -151,7 +160,7 @@ async def update_participant(meeting_id: str, participant_id: str, body: dict, d
     """Update a meeting participant."""
     updates = []
     params = []
-    for field in ["meeting_role", "attendance_status", "attended", "notes"]:
+    for field in ["meeting_role", "attendance_status", "attended", "follow_up_expected", "notes"]:
         val = body.get(field)
         if val is not None:
             updates.append(f"{field} = ?")

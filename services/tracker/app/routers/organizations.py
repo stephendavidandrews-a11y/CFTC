@@ -90,10 +90,10 @@ async def create_organization(body: CreateOrganization, db=Depends(get_db)):
         INSERT INTO organizations (id, name, short_name, organization_type,
             parent_organization_id, jurisdiction, notes, is_active,
             source, source_id, external_refs, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (oid, body.name, body.short_name, body.organization_type,
           body.parent_organization_id, body.jurisdiction,
-          body.notes, body.source, body.source_id,
+          body.notes, body.is_active, body.source, body.source_id,
           body.external_refs, now, now))
     db.commit()
     return {"id": oid}
