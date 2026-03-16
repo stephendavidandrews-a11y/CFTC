@@ -68,6 +68,11 @@ const EMPTY = {
   purpose: "",
   boss_attends: false,
   external_parties_attend: false,
+  prep_needed: "",
+  assigned_to_person_id: "",
+  notes: "",
+  decisions_made: "",
+  readout_summary: "",
 };
 
 export default function MeetingDrawer({ isOpen, onClose, meeting, onSaved }) {
@@ -117,6 +122,11 @@ export default function MeetingDrawer({ isOpen, onClose, meeting, onSaved }) {
         purpose: meeting.purpose || "",
         boss_attends: meeting.boss_attends || false,
         external_parties_attend: meeting.external_parties_attend || false,
+        prep_needed: meeting.prep_needed || "",
+        assigned_to_person_id: meeting.assigned_to_person_id || "",
+        notes: meeting.notes || "",
+        decisions_made: meeting.decisions_made || "",
+        readout_summary: meeting.readout_summary || "",
       });
       setParticipants(
         (meeting.participants || []).map((p) => ({
@@ -197,7 +207,11 @@ export default function MeetingDrawer({ isOpen, onClose, meeting, onSaved }) {
         purpose: form.purpose || null,
         boss_attends: form.boss_attends,
         external_parties_attend: form.external_parties_attend,
-        assigned_to_person_id: null,
+        assigned_to_person_id: form.assigned_to_person_id || null,
+        prep_needed: form.prep_needed || null,
+        notes: form.notes || null,
+        decisions_made: form.decisions_made || null,
+        readout_summary: form.readout_summary || null,
       };
 
       if (form.date_time_start && form.duration_minutes) {
@@ -280,6 +294,11 @@ export default function MeetingDrawer({ isOpen, onClose, meeting, onSaved }) {
         <textarea style={{ ...INPUT_STYLE, minHeight: 80, resize: "vertical" }} value={form.purpose} onChange={set("purpose")} />
       </div>
 
+      <div style={{ marginBottom: 14 }}>
+        <label style={LABEL_STYLE}>Prep Needed</label>
+        <textarea style={{ ...INPUT_STYLE, minHeight: 60, resize: "vertical" }} value={form.prep_needed} onChange={set("prep_needed")} />
+      </div>
+
       {/* Checkboxes */}
       <div style={{ display: "flex", gap: 20, marginBottom: 14 }}>
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#e2e8f0", cursor: "pointer" }}>
@@ -291,6 +310,8 @@ export default function MeetingDrawer({ isOpen, onClose, meeting, onSaved }) {
           External parties attend
         </label>
       </div>
+
+      {renderSelect("Owner", "assigned_to_person_id", personOpts)}
 
       {/* Participants */}
       <div style={{ marginBottom: 14 }}>
@@ -337,6 +358,20 @@ export default function MeetingDrawer({ isOpen, onClose, meeting, onSaved }) {
             <button style={ADD_BTN} onClick={handleAddParticipant}>+ Add</button>
           </div>
         </div>
+      </div>
+
+      {/* Post-Meeting Fields */}
+      <div style={{ marginBottom: 14 }}>
+        <label style={LABEL_STYLE}>Meeting Notes</label>
+        <textarea style={{ ...INPUT_STYLE, minHeight: 80, resize: "vertical" }} value={form.notes} onChange={set("notes")} />
+      </div>
+      <div style={{ marginBottom: 14 }}>
+        <label style={LABEL_STYLE}>Decisions Made</label>
+        <textarea style={{ ...INPUT_STYLE, minHeight: 60, resize: "vertical" }} value={form.decisions_made} onChange={set("decisions_made")} />
+      </div>
+      <div style={{ marginBottom: 14 }}>
+        <label style={LABEL_STYLE}>Readout Summary</label>
+        <textarea style={{ ...INPUT_STYLE, minHeight: 60, resize: "vertical" }} value={form.readout_summary} onChange={set("readout_summary")} />
       </div>
 
       {/* Linked Matters */}

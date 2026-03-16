@@ -23,12 +23,19 @@ const EMPTY = {
   organization_id: "",
   email: "",
   phone: "",
+  assistant_name: "",
+  assistant_contact: "",
   relationship_category: "",
   relationship_lane: "",
+  working_style_notes: "",
+  substantive_areas: "",
   include_in_team_workload: false,
+  is_active: true,
   manager_person_id: "",
   last_interaction_date: "",
   next_interaction_needed_date: "",
+  next_interaction_type: "",
+  next_interaction_purpose: "",
 };
 
 export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
@@ -44,10 +51,11 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
     Promise.all([
       fetchJSON("/tracker/lookups/enums/relationship_category").catch(() => []),
       fetchJSON("/tracker/lookups/enums/relationship_lane").catch(() => []),
+      fetchJSON("/tracker/lookups/enums/next_interaction_type").catch(() => []),
       fetchJSON("/tracker/organizations?limit=100").catch(() => ({ items: [] })),
       fetchJSON("/tracker/people?limit=100").catch(() => ({ items: [] })),
-    ]).then(([relCat, relLane, orgList, ppl]) => {
-      setEnums({ relationship_category: relCat, relationship_lane: relLane });
+    ]).then(([relCat, relLane, nextIntType, orgList, ppl]) => {
+      setEnums({ relationship_category: relCat, relationship_lane: relLane, next_interaction_type: nextIntType });
       setOrgs(orgList.items || orgList || []);
       setPeople(ppl.items || ppl || []);
     });
@@ -62,12 +70,19 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
         organization_id: person.organization_id || "",
         email: person.email || "",
         phone: person.phone || "",
+        assistant_name: person.assistant_name || "",
+        assistant_contact: person.assistant_contact || "",
         relationship_category: person.relationship_category || "",
         relationship_lane: person.relationship_lane || "",
+        working_style_notes: person.working_style_notes || "",
+        substantive_areas: person.substantive_areas || "",
         include_in_team_workload: !!person.include_in_team_workload,
+        is_active: person.is_active !== undefined ? !!person.is_active : true,
         manager_person_id: person.manager_person_id || "",
         last_interaction_date: person.last_interaction_date || "",
         next_interaction_needed_date: person.next_interaction_needed_date || "",
+        next_interaction_type: person.next_interaction_type || "",
+        next_interaction_purpose: person.next_interaction_purpose || "",
       });
     } else {
       setForm({ ...EMPTY });
@@ -84,7 +99,7 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
     try {
       const payload = { ...form };
       Object.keys(payload).forEach((k) => {
-        if (k === "include_in_team_workload") return;
+        if (k === "include_in_team_workload" || k === "is_active") return;
         if (payload[k] === "") payload[k] = null;
       });
 
@@ -141,8 +156,18 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
       {renderSelect("Organization", "organization_id", orgOpts)}
       {renderInput("Email", "email", "email")}
       {renderInput("Phone", "phone", "tel")}
+      {renderInput("Assistant Name", "assistant_name")}
+      {renderInput("Assistant Contact", "assistant_contact")}
       {renderSelect("Relationship Category", "relationship_category", enums.relationship_category)}
       {renderSelect("Relationship Lane", "relationship_lane", enums.relationship_lane)}
+      <div style={{ marginBottom: 14 }}>
+        <label style={LABEL_STYLE}>Working Style Notes</label>
+        <textarea style={{ ...INPUT_STYLE, minHeight: 80, resize: "vertical" }} value={form.working_style_notes} onChange={set("working_style_notes")} />
+      </div>
+      <div style={{ marginBottom: 14 }}>
+        <label style={LABEL_STYLE}>Substantive Areas</label>
+        <textarea style={{ ...INPUT_STYLE, minHeight: 80, resize: "vertical" }} value={form.substantive_areas} onChange={set("substantive_areas")} />
+      </div>
 
       <div style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
         <input
@@ -157,9 +182,24 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
         </label>
       </div>
 
+      <div style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+        <input
+          type="checkbox"
+          checked={form.is_active}
+          onChange={setCheck("is_active")}
+          id="is-active-chk"
+          style={{ accentColor: "#1e40af" }}
+        />
+        <label htmlFor="is-active-chk" style={{ fontSize: 12, fontWeight: 600, color: "#94a3b8", cursor: "pointer" }}>
+          Active
+        </label>
+      </div>
+
       {renderSelect("Manager", "manager_person_id", personOpts)}
       {renderInput("Last Interaction", "last_interaction_date", "date")}
       {renderInput("Next Interaction Needed", "next_interaction_needed_date", "date")}
+      {renderSelect("Next Interaction Type", "next_interaction_type", enums.next_interaction_type)}
+      {renderInput("Next Interaction Purpose", "next_interaction_purpose")}
 
       {error && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 10 }}>{error}</div>}
 

@@ -37,6 +37,10 @@ const EMPTY = {
   due_date: "",
   summary: "",
   notes: "",
+  final_location: "",
+  is_finalized: 0,
+  is_sent: 0,
+  sent_at: "",
 };
 
 function formatFileSize(bytes) {
@@ -81,6 +85,10 @@ export default function DocumentDrawer({ isOpen, onClose, document: doc, matterI
         due_date: doc.due_date || "",
         summary: doc.summary || "",
         notes: doc.notes || "",
+        final_location: doc.final_location || "",
+        is_finalized: doc.is_finalized || 0,
+        is_sent: doc.is_sent || 0,
+        sent_at: doc.sent_at ? doc.sent_at.slice(0, 16) : "",
       });
     } else {
       setForm({ ...EMPTY, matter_id: matterId || "" });
@@ -90,6 +98,7 @@ export default function DocumentDrawer({ isOpen, onClose, document: doc, matterI
   }, [doc, matterId, isOpen]);
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+  const setCheck = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.checked ? 1 : 0 }));
 
   const handleFileChange = (e) => {
     const selected = e.target.files[0];
@@ -102,6 +111,8 @@ export default function DocumentDrawer({ isOpen, onClose, document: doc, matterI
     try {
       const payload = { ...form };
       Object.keys(payload).forEach((k) => { if (payload[k] === "") payload[k] = null; });
+      payload.is_finalized = form.is_finalized ? 1 : 0;
+      payload.is_sent = form.is_sent ? 1 : 0;
       if (!payload.title) { setError("Title is required"); setSaving(false); return; }
       if (!payload.document_type) { setError("Document type is required"); setSaving(false); return; }
 
@@ -174,6 +185,19 @@ export default function DocumentDrawer({ isOpen, onClose, document: doc, matterI
         <label style={LABEL_STYLE}>Notes</label>
         <textarea style={{ ...INPUT_STYLE, minHeight: 60, resize: "vertical" }} value={form.notes} onChange={set("notes")} />
       </div>
+
+      {renderInput("Final Location", "final_location")}
+      <div style={{ display: "flex", gap: 20, marginBottom: 14 }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#e2e8f0", cursor: "pointer" }}>
+          <input type="checkbox" checked={!!form.is_finalized} onChange={setCheck("is_finalized")} style={{ accentColor: "#1e40af" }} />
+          Finalized
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#e2e8f0", cursor: "pointer" }}>
+          <input type="checkbox" checked={!!form.is_sent} onChange={setCheck("is_sent")} style={{ accentColor: "#1e40af" }} />
+          Sent
+        </label>
+      </div>
+      {!!form.is_sent && renderInput("Sent At", "sent_at", "datetime-local")}
 
       {/* File Upload */}
       <div style={{ marginBottom: 14 }}>

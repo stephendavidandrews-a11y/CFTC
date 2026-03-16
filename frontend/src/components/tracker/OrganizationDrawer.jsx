@@ -23,6 +23,7 @@ const EMPTY = {
   parent_organization_id: "",
   jurisdiction: "",
   notes: "",
+  is_active: 1,
 };
 
 export default function OrganizationDrawer({ isOpen, onClose, organization, onSaved }) {
@@ -52,6 +53,7 @@ export default function OrganizationDrawer({ isOpen, onClose, organization, onSa
         parent_organization_id: organization.parent_organization_id || "",
         jurisdiction: organization.jurisdiction || "",
         notes: organization.notes || "",
+        is_active: organization.is_active !== undefined ? organization.is_active : 1,
       });
     } else {
       setForm({ ...EMPTY });
@@ -60,6 +62,7 @@ export default function OrganizationDrawer({ isOpen, onClose, organization, onSa
   }, [organization, isOpen]);
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+  const setCheck = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.checked ? 1 : 0 }));
 
   const handleSave = async () => {
     setError(null);
@@ -67,6 +70,7 @@ export default function OrganizationDrawer({ isOpen, onClose, organization, onSa
     try {
       const payload = { ...form };
       Object.keys(payload).forEach((k) => { if (payload[k] === "") payload[k] = null; });
+      payload.is_active = form.is_active ? 1 : 0;
       if (!payload.name) { setError("Name is required"); setSaving(false); return; }
 
       if (organization?.id) {
@@ -118,6 +122,13 @@ export default function OrganizationDrawer({ isOpen, onClose, organization, onSa
       <div style={{ marginBottom: 14 }}>
         <label style={LABEL_STYLE}>Notes</label>
         <textarea style={{ ...INPUT_STYLE, minHeight: 80, resize: "vertical" }} value={form.notes} onChange={set("notes")} />
+      </div>
+
+      <div style={{ display: "flex", gap: 20, marginBottom: 14 }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#e2e8f0", cursor: "pointer" }}>
+          <input type="checkbox" checked={!!form.is_active} onChange={setCheck("is_active")} style={{ accentColor: "#1e40af" }} />
+          Active
+        </label>
       </div>
 
       {error && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 10 }}>{error}</div>}
