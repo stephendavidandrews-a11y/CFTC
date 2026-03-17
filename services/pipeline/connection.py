@@ -67,7 +67,7 @@ def get_readonly_regulatory_connection() -> sqlite3.Connection:
         raise FileNotFoundError(
             f"cftc_regulatory.db not found at: {CFTC_REGULATORY_DB_PATH}"
         )
-    uri = f"file:{CFTC_REGULATORY_DB_PATH}?mode=ro"
+    uri = f"file:{CFTC_REGULATORY_DB_PATH}?mode=ro&immutable=1"
     conn = sqlite3.connect(uri, uri=True)
     conn.row_factory = sqlite3.Row
     return conn
@@ -79,7 +79,7 @@ def get_readonly_eo_connection() -> sqlite3.Connection:
         raise FileNotFoundError(
             f"eo_tracker.db not found at: {EO_TRACKER_DB_PATH}"
         )
-    uri = f"file:{EO_TRACKER_DB_PATH}?mode=ro"
+    uri = f"file:{EO_TRACKER_DB_PATH}?mode=ro&immutable=1"
     conn = sqlite3.connect(uri, uri=True)
     conn.row_factory = sqlite3.Row
     return conn

@@ -1,3 +1,4 @@
+import os
 """
 Rulemaking pipeline sync service.
 
@@ -30,7 +31,24 @@ CFTC_AGENCY_CODE = "3038"
 CFTC_FR_SLUG = "commodity-futures-trading-commission"
 
 FR_API_BASE = "https://www.federalregister.gov/api/v1"
-UA_XML_URL = "https://www.reginfo.gov/public/do/XMLViewFileAction?f=REGINFO_RIN_DATA_202504.xml"
+def _ua_xml_url():
+    """Build Unified Agenda XML URL. Uses env var or computes current edition."""
+    url = os.environ.get("UA_XML_URL")
+    if url:
+        return url
+    from datetime import datetime
+    now = datetime.utcnow()
+    # Reginfo publishes Spring (04) and Fall (10) editions.
+    # Use the most recently PUBLISHED edition (not the upcoming one).
+    if now.month >= 11:
+        year, month = now.year, "10"
+    elif now.month >= 5:
+        year, month = now.year, "04"
+    else:
+        year, month = now.year - 1, "10"
+    return f"https://www.reginfo.gov/public/do/XMLViewFileAction?f=REGINFO_RIN_DATA_{year}{month}.xml"
+
+UA_XML_URL = _ua_xml_url()
 
 FR_FIELDS = [
     "title", "type", "action", "document_number", "publication_date",

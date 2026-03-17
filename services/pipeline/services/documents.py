@@ -65,7 +65,8 @@ def create_document(
     # Save file
     storage = _ensure_storage(item_id)
     file_hash = hashlib.sha256(file_content).hexdigest()[:16]
-    safe_name = f"v{version}_{file_hash}_{filename}"
+    clean_filename = Path(filename).name.replace("..", "_") if filename else "upload"
+    safe_name = f"v{version}_{file_hash}_{clean_filename}"
     file_path = storage / safe_name
 
     file_path.write_bytes(file_content)

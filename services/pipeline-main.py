@@ -5,7 +5,7 @@ import logging
 import os
 import secrets
 from contextlib import asynccontextmanager
-from datetime import datetime, time as dt_time
+from datetime import datetime, time as dt_time, timedelta
 
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -184,7 +184,7 @@ async def _wait_until(target_hour: int, target_minute: int = 0):
             hour=target_utc_hour, minute=target_minute, second=0, microsecond=0
         )
         if target <= now_utc:
-            target = target.replace(day=target.day + 1)
+            target = target + timedelta(days=1)
         wait_secs = (target - now_utc).total_seconds()
         if wait_secs > 0:
             return wait_secs
@@ -212,7 +212,10 @@ async def _status_email_loop():
                     if not _should_run(conn, "status_email"):
                         return {"skipped": True}
                     from app.pipeline.services.email_service import send_status_email
-                    result = send_status_email(conn)
+                    from app.work.db import get_connection as get_work_connection
+                    work_conn = get_work_connection()
+                    result = send_status_email(conn, work_conn)
+                    work_conn.close()
                     _mark_run(conn, "status_email")
                     return result
                 finally:
@@ -245,7 +248,10 @@ async def _bottleneck_alert_loop():
                     if not _should_run(conn, "bottleneck_alert"):
                         return {"skipped": True}
                     from app.pipeline.services.email_service import send_bottleneck_alert
-                    result = send_bottleneck_alert(conn)
+                    from app.work.db import get_connection as get_work_connection
+                    work_conn = get_work_connection()
+                    result = send_bottleneck_alert(conn, work_conn)
+                    work_conn.close()
                     _mark_run(conn, "bottleneck_alert")
                     return result
                 finally:
@@ -286,7 +292,15 @@ async def _weekly_processing_loop():
 
                     try:
                         from app.pipeline.services.email_service import send_note_digest
-                        digest = send_note_digest(conn)
+                        from app.work.db import get_connection as get_work_connection
+                        work_conn = get_work_connection()
+                        insights = []
+                        if work_conn.execute("SELECT 1 FROM sqlite_master WHERE name='ai_processing_log'").fetchone():
+                            insights = [dict(r) for r in work_conn.execute(
+                                "SELECT * FROM ai_processing_log WHERE created_at > datetime('now', '-7 days')"
+                            ).fetchall()]
+                        digest = send_note_digest(conn, insights)
+                        work_conn.close()
                         results["note_digest"] = digest
                     except Exception as e:
                         logger.error(f"Note digest failed: {e}")
@@ -294,7 +308,9 @@ async def _weekly_processing_loop():
 
                     try:
                         from app.pipeline.services.email_service import send_contact_reminder
-                        reminder = send_contact_reminder(conn)
+                        from app.pipeline.services.contacts import get_dormant_contacts
+                        dormant = get_dormant_contacts(conn, days=90)
+                        reminder = send_contact_reminder(conn, dormant)
                         results["contact_reminder"] = reminder
                     except Exception as e:
                         logger.error(f"Contact reminder failed: {e}")

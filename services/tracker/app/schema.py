@@ -126,6 +126,7 @@ TABLES = [
         supervising_person_id TEXT REFERENCES people(id),
         waiting_on_person_id TEXT REFERENCES people(id),
         waiting_on_org_id TEXT REFERENCES organizations(id),
+        waiting_on_description TEXT,
         expected_output TEXT,
         due_date TEXT,
         deadline_type TEXT,

@@ -16,14 +16,14 @@ PIPELINE_DB_PATH = Path(__file__).parent / "data" / "pipeline.db"
 CFTC_REGULATORY_DB_PATH = Path(
     os.environ.get(
         "CFTC_REGULATORY_DB_PATH",
-        r"C:\Users\steph\OneDrive\Documents\CFTC\Authorities Scrapper\cftc_regulatory\cftc_regulatory.db",
+        "/data/cftc_regulatory.db",
     )
 )
 
 EO_TRACKER_DB_PATH = Path(
     os.environ.get(
         "EO_TRACKER_DB_PATH",
-        r"C:\Users\steph\OneDrive\Documents\CFTC\Executive Order Tracker\eo_tracker\data\eo_tracker.db",
+        "/data/eo_tracker.db",
     )
 )
 

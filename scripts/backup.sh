@@ -1,5 +1,6 @@
-#!/bin/bash
+#\!/bin/bash
 # CFTC Database Backup Script
+# Backs up LIVE databases from Docker volumes via python3 (no sqlite3 CLI in containers).
 # Run daily via crontab: 0 3 * * * /path/to/backup.sh >> /var/log/cftc-backup.log 2>&1
 
 set -euo pipefail
@@ -11,47 +12,59 @@ DATE=$(date +%Y%m%d_%H%M%S)
 BACKUP_PATH="$BACKUP_DIR/$DATE"
 
 echo "[$DATE] Starting CFTC database backup..."
-
-# Create backup directory
 mkdir -p "$BACKUP_PATH"
 
-# SQLite databases to back up
-DATABASES=(
-    "$CFTC_DIR/data/cftc_regulatory.db"
-    "$CFTC_DIR/data/eo_tracker.db"
-    "$CFTC_DIR/services/pipeline/data/pipeline.db"
-    "$CFTC_DIR/services/tracker/data/tracker.db"
-    "$CFTC_DIR/services/work/data/work.db"
-)
+backup_from_container() {
+    local container=$1 db_path=$2 name=$3
+    echo "  Backing up $name from $container..."
+    docker exec "$container" python3 -c "
+import sqlite3, shutil
+src = sqlite3.connect('"$db_path"')
+dst = sqlite3.connect('/tmp/backup.db')
+src.backup(dst)
+src.close()
+dst.close()
+" && docker cp "$container:/tmp/backup.db" "$BACKUP_PATH/$name"    && docker exec "$container" rm -f /tmp/backup.db    && echo "  Done: $(du -h "$BACKUP_PATH/$name" | cut -f1)"    || echo "  FAILED: $name"
+}
 
-# Back up each database using sqlite3 .backup (safe even if DB is in use)
-for db in "${DATABASES[@]}"; do
+# Live databases from Docker volumes
+backup_from_container cftc-pipeline-backend /app/app/pipeline/data/pipeline.db pipeline.db
+backup_from_container cftc-pipeline-backend /app/app/work/data/work.db work.db
+backup_from_container cftc-tracker /app/data/tracker.db tracker.db
+
+# Host-side read-only databases
+for db in "$CFTC_DIR/data/cftc_regulatory.db" "$CFTC_DIR/data/eo_tracker.db"; do
     if [ -f "$db" ]; then
         name=$(basename "$db")
-        echo "  Backing up $name..."
-        sqlite3 "$db" ".backup '$BACKUP_PATH/$name'" 2>/dev/null || {
-            # Fallback to copy if sqlite3 backup fails
-            echo "  sqlite3 backup failed for $name, using cp..."
-            cp "$db" "$BACKUP_PATH/$name"
-        }
-        echo "  Done: $(du -h "$BACKUP_PATH/$name" | cut -f1)"
-    else
-        echo "  SKIP: $db (not found)"
+        echo "  Backing up $name (host)..."
+        python3 -c "
+import sqlite3
+src = sqlite3.connect('"$db"')
+dst = sqlite3.connect('"$BACKUP_PATH/$name"')
+src.backup(dst)
+src.close()
+dst.close()
+" && echo "  Done: $(du -h "$BACKUP_PATH/$name" | cut -f1)" || echo "  FAILED: $name"
     fi
 done
 
-# Verify backups
+# Verify
 echo ""
 echo "Backup verification:"
 for f in "$BACKUP_PATH"/*.db; do
-    if [ -f "$f" ]; then
-        name=$(basename "$f")
-        tables=$(sqlite3 "$f" ".tables" 2>/dev/null | wc -w || echo "0")
-        echo "  $name: $tables tables, $(du -h "$f" | cut -f1)"
-    fi
+    [ -f "$f" ] || continue
+    name=$(basename "$f")
+    size=$(du -h "$f" | cut -f1)
+    tables=$(python3 -c "
+import sqlite3
+c = sqlite3.connect('"$f"')
+print(len(c.execute('SELECT name FROM sqlite_master WHERE type=\"table\"').fetchall()))
+c.close()
+" 2>/dev/null || echo "?")
+    echo "  $name: $tables tables, $size"
 done
 
-# Rotate old backups (keep last N days)
+# Rotate
 echo ""
 echo "Rotating backups older than $RETAIN_DAYS days..."
 find "$BACKUP_DIR" -maxdepth 1 -type d -mtime +$RETAIN_DAYS -exec rm -rf {} \; 2>/dev/null || true
