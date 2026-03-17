@@ -6,8 +6,11 @@
 # databases and data
 /data/
 *.db
+*.db-shm
+*.db-wal
 *.sql
 *.dump
+*.db.bak*
 
 # node
 node_modules/
@@ -15,15 +18,27 @@ node_modules/
 # python
 __pycache__/
 *.pyc
+.venv/
 venv/
 *.egg-info/
 
-# pdf storage
-cftc-comment-system/pdf_storage/
+# build artifacts
+frontend/build/
+frontend/.htpasswd
+
+# runtime data — services
+services/tracker/data/
+services/tracker/uploads/
+services/comments/pdf_storage/
+services/comments/data/
+services/pipeline/data/*.db*
+services/work/data/*.db*
 
 # docker
 *.log
 
 # backups
 *.bak
-.gitnexus
+
+# gitnexus
+.gitnexus/
