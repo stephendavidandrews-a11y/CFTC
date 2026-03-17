@@ -24,7 +24,6 @@ const SECTIONS = [
   { path: "/eo", label: "EO Tracker", icon: "\u2691" },
   { path: "/interagency", label: "Interagency", icon: "\u229f" },
   { path: "/research", label: "Research", icon: "\u2692" },
-  { path: "/comments", label: "Comments", icon: "\u2709" },
   { path: "/intelligence", label: "Intelligence", icon: "\u25c9" },
   { path: "/reports", label: "Reports", icon: "\u229f" },
   { path: "/loper", label: "Loper Bright", icon: "\u2696" },
