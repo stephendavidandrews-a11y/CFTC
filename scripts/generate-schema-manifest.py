@@ -26,8 +26,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 SCHEMA_SOURCES = {
     "tracker": REPO_ROOT / "services" / "tracker" / "app" / "schema.py",
-    "pipeline": REPO_ROOT / "services" / "pipeline" / "schema.py",
-    "work": REPO_ROOT / "services" / "work" / "schema.py",
+    "intake": REPO_ROOT / "services" / "intake" / "db" / "schema.py",
 }
 
 LOOKUPS_PATH = REPO_ROOT / "services" / "tracker" / "app" / "routers" / "lookups.py"
@@ -35,8 +34,7 @@ OUTPUT_PATH = REPO_ROOT / "frontend" / "src" / "data" / "schema-manifest.json"
 
 SERVICE_META = {
     "tracker": {"port": 8004, "db": "tracker.db", "tech": "FastAPI + SQLite (WAL)"},
-    "pipeline": {"port": 8002, "db": "pipeline.db", "tech": "FastAPI + SQLite (WAL)"},
-    "work": {"port": 8000, "db": "work.db", "tech": "FastAPI + SQLite (WAL)"},
+    "intake": {"port": 8005, "db": "intake.db", "tech": "FastAPI + SQLite (WAL) — native/GPU"},
 }
 
 # ---------------------------------------------------------------------------
@@ -230,7 +228,7 @@ def parse_column_line(line: str) -> dict | None:
         return None
 
     # Column pattern: name TYPE [constraints...]
-    m = re.match(r"(\w+)\s+(TEXT|INTEGER|REAL|BLOB|NUMERIC)(\b.*)?", line, re.IGNORECASE)
+    m = re.match(r"(\w+)\s+(TEXT|INTEGER|REAL|BLOB|NUMERIC|BOOLEAN|DATETIME)(\b.*)?", line, re.IGNORECASE)
     if not m:
         return None
 
@@ -330,14 +328,16 @@ def build_field(
         tags.append("ENUM")
 
     # BOOL check
-    if col["type"] == "INTEGER" and (
+    if col["type"] in ("INTEGER", "BOOLEAN") and (
         col_lower.startswith("is_") or col_lower.startswith("has_")
+        or col_lower.endswith("_confirmed") or col_lower == "confirmed"
+        or col_lower == "user_corrected"
         or col.get("default") in ("0", "1")
     ):
         tags.append("BOOL")
 
     # Timestamp check
-    if col_lower in ("created_at", "updated_at") or (
+    if col_lower in ("created_at", "updated_at", "captured_at") or (
         col.get("default") and "datetime('now')" in str(col.get("default", ""))
     ):
         tags.append("TS")
@@ -354,7 +354,7 @@ def build_field(
             "topics", "key_dates", "linked_pipeline_ids",
             "strengths", "growth_areas", "recent_wins",
             "name_variations", "tags", "changed_fields",
-            "old_values", "new_values",
+            "old_values", "new_values", "word_timestamps",
         )
     ):
         tags.append("JSON")
