@@ -183,9 +183,9 @@ sync.py runs:
 | `app/pipeline/seed.py` | Team members + stage templates |
 | `app/pipeline/services/items.py` | CRUD for pipeline items |
 | `app/pipeline/config.py` | Item types, priority weights, deadline types |
-| `cftc-comments/frontend/src/pages/Dashboard.js` | Executive Summary (dark theme) |
-| `cftc-comments/frontend/src/pages/PipelinePage.js` | Pipeline kanban view |
-| `cftc-comments/frontend/src/pages/PipelineItemPage.js` | Item detail page |
+| `frontend/src/pages/tracker/TrackerDashboardPage.jsx` | Executive Summary (dark theme) |
+| `frontend/src/pages/PipelinePage.jsx` | Pipeline kanban view |
+| `frontend/src/pages/ItemDetailPage.jsx` | Item detail page |
 
 ---
 

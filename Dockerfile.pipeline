@@ -1,24 +1,21 @@
 FROM python:3.11-slim
 
-# Install system deps
-RUN apt-get update && apt-get install -y --no-install-recommends     tesseract-ocr     poppler-utils     gcc     && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
 
 # Install Python deps
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy pipeline core config (replaces former comments app.core dependency)
+# Copy pipeline core config
 COPY services/pipeline/core/ ./app/core/
 
-# Copy pipeline module into app/pipeline/
+# Copy pipeline module
 COPY services/pipeline/ ./app/pipeline/
 
-# Copy work management module into app/work/
+# Copy work management module
 COPY services/work/ ./app/work/
 
-# Override main.py with the pipeline-backend entry point
+# Entry point
 COPY services/pipeline-main.py ./app/main.py
 
 # Create storage directories

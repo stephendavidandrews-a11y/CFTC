@@ -22,7 +22,6 @@ DATABASES=(
     "$CFTC_DIR/services/pipeline/data/pipeline.db"
     "$CFTC_DIR/services/tracker/data/tracker.db"
     "$CFTC_DIR/services/work/data/work.db"
-    "$CFTC_DIR/services/comments/data/comments.db"
 )
 
 # Back up each database using sqlite3 .backup (safe even if DB is in use)

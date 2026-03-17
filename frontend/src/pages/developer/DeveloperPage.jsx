@@ -27,7 +27,6 @@ const TABS = [
 const SVC = {
   tracker:  { color: "#3b82f6", bg: "rgba(59,130,246,0.08)",  border: "rgba(59,130,246,0.25)", label: "Tracker" },
   pipeline: { color: "#a78bfa", bg: "rgba(167,139,250,0.08)", border: "rgba(167,139,250,0.25)", label: "Pipeline" },
-  comments: { color: "#22c55e", bg: "rgba(34,197,94,0.08)",   border: "rgba(34,197,94,0.25)",   label: "Comments" },
   work:     { color: "#f59e0b", bg: "rgba(245,158,11,0.08)",  border: "rgba(245,158,11,0.25)",  label: "Work" },
 };
 
@@ -80,9 +79,6 @@ const API_ENDPOINTS = [
   { method: "GET",    path: "/tracker/lookups/enums",        desc: "All enum values (full dict)" },
   { method: "GET",    path: "/api/v1/pipeline/items",        desc: "List pipeline items" },
   { method: "GET",    path: "/api/v1/pipeline/deadlines",    desc: "Upcoming deadlines" },
-  { method: "GET",    path: "/api/v1/proposed-rules",        desc: "List proposed rules with comment stats" },
-  { method: "GET",    path: "/api/v1/comments",              desc: "Search/list comments" },
-  { method: "GET",    path: "/api/v1/comments/:id",          desc: "Comment detail with AI analysis" },
 ];
 
 
@@ -326,9 +322,6 @@ function SchemaTab() {
     if (serviceFilter === "all" || serviceFilter === "pipeline") {
       addGroup("Pipeline Service", filtered.filter(t => t.service === "pipeline"));
     }
-    if (serviceFilter === "all" || serviceFilter === "comments") {
-      addGroup("Comments Service", filtered.filter(t => t.service === "comments"));
-    }
     if (serviceFilter === "all" || serviceFilter === "work") {
       addGroup("Work Service", filtered.filter(t => t.service === "work"));
     }
@@ -532,7 +525,6 @@ function ServicesTab() {
 \u2502  \u2502  nginx (port 80)  \u2014 SPA + reverse proxy                          \u2502  \u2502
 \u2502  \u2502                                                                   \u2502  \u2502
 \u2502  \u2502  /tracker/*     \u2192 Tracker API    :${SERVICES_META.tracker?.port || 8004}   (SQLite: tracker.db)    \u2502  \u2502
-\u2502  \u2502  /api/v1/*      \u2192 Comments API   :${SERVICES_META.comments?.port || 8001}   (SQLite: comments.db)   \u2502  \u2502
 \u2502  \u2502  /pipeline/*    \u2192 Pipeline API   :${SERVICES_META.pipeline?.port || 8000}   (SQLite: pipeline.db)   \u2502  \u2502
 \u2502  \u2502  /work/*        \u2192 Work API       :${SERVICES_META.work?.port || 8005}   (SQLite: work.db)       \u2502  \u2502
 \u2502  \u2502  /*             \u2192 React SPA      (index.html fallback)           \u2502  \u2502

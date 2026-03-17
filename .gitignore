@@ -2,6 +2,7 @@
 .env
 .env.save
 .env.*
+!.env.example
 
 # databases and data
 /data/

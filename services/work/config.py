@@ -19,7 +19,7 @@ PRIORITY_LABELS = ("critical", "high", "medium", "low")
 ASSIGNMENT_ROLES = ("lead", "assigned", "reviewer", "contributor")
 NOTE_TYPES = ("general", "one_on_one", "decision", "followup", "meeting")
 NOTE_CONTEXT_TYPES = ("general", "one_on_one", "team_meeting", "hallway", "email", "work_review")
-TASK_SOURCES = ("manual", "pipeline", "eo_tracker", "comments", "bottleneck_alert")
+TASK_SOURCES = ("manual", "pipeline", "eo_tracker", "bottleneck_alert")
 
 # Project sources
 PROJECT_SOURCES = (
