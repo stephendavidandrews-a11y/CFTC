@@ -29,8 +29,6 @@ frontend/.htpasswd
 # runtime data — services
 services/tracker/data/
 services/tracker/uploads/
-services/comments/pdf_storage/
-services/comments/data/
 services/pipeline/data/*.db*
 services/work/data/*.db*
 

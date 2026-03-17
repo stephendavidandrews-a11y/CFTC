@@ -1,26 +1,5 @@
 services:
   # ---------------------------------------------------------------------------
-  # Comment Analysis Backend (FastAPI + SQLite)
-  # ---------------------------------------------------------------------------
-  backend:
-    build:
-      context: ./services/comments
-      dockerfile: Dockerfile
-    container_name: cftc-backend
-    restart: always
-    environment:
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?Set ANTHROPIC_API_KEY in .env}
-      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env}
-      PIPELINE_USER: ${PIPELINE_USER:?Set PIPELINE_USER in .env}
-      PIPELINE_PASS: ${PIPELINE_PASS:?Set PIPELINE_PASS in .env}
-      CORS_ORIGINS: '["https://${DOMAIN:-localhost}"]'
-      APP_ENV: production
-      LOG_LEVEL: INFO
-    volumes:
-      - comments_data:/app/data
-      - pdf_storage:/app/pdf_storage
-
-  # ---------------------------------------------------------------------------
   # Pipeline Manager Backend (FastAPI + SQLite)
   # ---------------------------------------------------------------------------
   pipeline-backend:
@@ -48,7 +27,6 @@ services:
     volumes:
       - pipeline_data:/app/app/pipeline/data
       - work_data:/app/app/work/data
-      - pdf_storage:/app/pdf_storage
       - ./data/cftc_regulatory.db:/data/cftc_regulatory.db:ro
       - ./data/eo_tracker.db:/data/eo_tracker.db:ro
 
@@ -84,7 +62,6 @@ services:
       - "8080:80"
     depends_on:
       - pipeline-backend
-      - backend
       - tracker
 
   # ---------------------------------------------------------------------------
@@ -103,8 +80,6 @@ services:
       - ../personal-site:/srv/personal-site:ro
 
 volumes:
-  comments_data:
-  pdf_storage:
   pipeline_data:
   work_data:
   tracker_data:

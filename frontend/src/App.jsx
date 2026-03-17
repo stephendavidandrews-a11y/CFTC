@@ -21,11 +21,6 @@ import DocumentsPage from "./pages/tracker/DocumentsPage";
 import SummaryPage from "./pages/SummaryPage";
 import EOPage from "./pages/EOPage";
 import IntelligencePage from "./pages/IntelligencePage";
-import CommentsDashboard from "./pages/CommentsDashboard";
-import CommentList from "./pages/CommentList";
-import CommentDetail from "./pages/CommentDetail";
-import Processing from "./pages/Processing";
-import NewDocket from "./pages/NewDocket";
 import InteragencyPage from "./pages/InteragencyPage";
 import ResearchPage from "./pages/ResearchPage";
 import ReportsPage from "./pages/ReportsPage";
@@ -68,13 +63,7 @@ export default function App() {
           {/* ── Analysis ── */}
           <Route path="/summary" element={<SummaryPage />} />
           <Route path="/eo" element={<EOPage />} />
-          <Route path="/intelligence" element={<IntelligencePage />} />
-          <Route path="/comments" element={<CommentsDashboard />} />
-          <Route path="/comments/browse" element={<CommentList />} />
-          <Route path="/comments/detail/:documentId" element={<CommentDetail />} />
-          <Route path="/comments/processing" element={<Processing />} />
-          <Route path="/comments/new-docket" element={<NewDocket />} />
-          <Route path="/interagency" element={<InteragencyPage />} />
+          <Route path="/intelligence" element={<IntelligencePage />} />          <Route path="/interagency" element={<InteragencyPage />} />
           <Route path="/research" element={<ResearchPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/loper" element={<LoperDashboardPage />} />
