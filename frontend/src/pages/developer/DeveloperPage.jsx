@@ -25,9 +25,8 @@ const TABS = [
 
 // ── Colors for services ──────────────────────────────────────────────
 const SVC = {
-  tracker:  { color: "#3b82f6", bg: "rgba(59,130,246,0.08)",  border: "rgba(59,130,246,0.25)", label: "Tracker" },
-  pipeline: { color: "#a78bfa", bg: "rgba(167,139,250,0.08)", border: "rgba(167,139,250,0.25)", label: "Pipeline" },
-  work:     { color: "#f59e0b", bg: "rgba(245,158,11,0.08)",  border: "rgba(245,158,11,0.25)",  label: "Work" },
+  tracker: { color: "#3b82f6", bg: "rgba(59,130,246,0.08)",  border: "rgba(59,130,246,0.25)", label: "Tracker" },
+  intake:  { color: "#10b981", bg: "rgba(16,185,129,0.08)",  border: "rgba(16,185,129,0.25)", label: "Intake" },
 };
 
 // ── Field type badge colors ──────────────────────────────────────────
@@ -43,8 +42,10 @@ const TYPE_COLORS = {
 
 // ── API REFERENCE (static — not in schema files) ─────────────────────
 const API_ENDPOINTS = [
-  { method: "GET",    path: "/tracker/dashboard",            desc: "Dashboard overview \u2014 counts, deadlines, recent activity" },
+  // ── Tracker: Dashboard ──
+  { method: "GET",    path: "/tracker/dashboard",            desc: "Dashboard overview — counts, deadlines, recent activity" },
   { method: "GET",    path: "/tracker/dashboard/stats",      desc: "Table row counts for all entities" },
+  // ── Tracker: Matters ──
   { method: "GET",    path: "/tracker/matters",              desc: "List matters (filters: status, priority, type, assigned_to, search)" },
   { method: "POST",   path: "/tracker/matters",              desc: "Create a new matter" },
   { method: "GET",    path: "/tracker/matters/:id",          desc: "Matter detail with people, orgs, tasks" },
@@ -54,31 +55,57 @@ const API_ENDPOINTS = [
   { method: "DELETE", path: "/tracker/matters/:id/people/:pid", desc: "Remove person from matter" },
   { method: "POST",   path: "/tracker/matters/:id/orgs",     desc: "Add org to matter" },
   { method: "POST",   path: "/tracker/matters/:id/updates",  desc: "Add timeline update" },
+  // ── Tracker: Tasks ──
   { method: "GET",    path: "/tracker/tasks",                desc: "List tasks (filters: status, priority, matter_id, assigned_to)" },
   { method: "POST",   path: "/tracker/tasks",                desc: "Create task" },
   { method: "GET",    path: "/tracker/tasks/:id",            desc: "Task detail" },
   { method: "PUT",    path: "/tracker/tasks/:id",            desc: "Update task" },
   { method: "DELETE", path: "/tracker/tasks/:id",            desc: "Delete task" },
+  // ── Tracker: People ──
   { method: "GET",    path: "/tracker/people",               desc: "List people (filters: person_type, org, search)" },
   { method: "POST",   path: "/tracker/people",               desc: "Create person" },
   { method: "GET",    path: "/tracker/people/:id",           desc: "Person detail with matters, tasks, meetings" },
   { method: "PUT",    path: "/tracker/people/:id",           desc: "Update person" },
+  // ── Tracker: Organizations ──
   { method: "GET",    path: "/tracker/organizations",        desc: "List organizations" },
   { method: "POST",   path: "/tracker/organizations",        desc: "Create organization" },
   { method: "GET",    path: "/tracker/organizations/:id",    desc: "Org detail with people, matters" },
   { method: "PUT",    path: "/tracker/organizations/:id",    desc: "Update org" },
+  // ── Tracker: Meetings ──
   { method: "GET",    path: "/tracker/meetings",             desc: "List meetings (filters: date range, meeting_type)" },
   { method: "POST",   path: "/tracker/meetings",             desc: "Create meeting" },
   { method: "GET",    path: "/tracker/meetings/:id",         desc: "Meeting detail with participants, matters" },
   { method: "PUT",    path: "/tracker/meetings/:id",         desc: "Update meeting" },
+  // ── Tracker: Documents & Decisions ──
   { method: "GET",    path: "/tracker/documents",            desc: "List documents (filters: matter_id, doc_type, status)" },
   { method: "POST",   path: "/tracker/documents",            desc: "Create/upload document" },
   { method: "GET",    path: "/tracker/decisions",            desc: "List decisions" },
   { method: "POST",   path: "/tracker/decisions",            desc: "Create decision" },
+  // ── Tracker: Lookups ──
   { method: "GET",    path: "/tracker/lookups/enums/:name",  desc: "Enum values for dropdown fields" },
   { method: "GET",    path: "/tracker/lookups/enums",        desc: "All enum values (full dict)" },
-  { method: "GET",    path: "/api/v1/pipeline/items",        desc: "List pipeline items" },
-  { method: "GET",    path: "/api/v1/pipeline/deadlines",    desc: "Upcoming deadlines" },
+  // ── Intake: Conversations ──
+  { method: "GET",    path: "/intake/api/conversations",                      desc: "List conversations (filters: status, source)" },
+  { method: "GET",    path: "/intake/api/conversations/queue-counts",         desc: "Queue counts by processing status" },
+  { method: "GET",    path: "/intake/api/conversations/:id",                  desc: "Conversation detail with transcript + speakers" },
+  { method: "GET",    path: "/intake/api/conversations/:id/speaker-matches",  desc: "Speaker voiceprint match suggestions" },
+  { method: "PATCH",  path: "/intake/api/conversations/transcripts/:id",      desc: "Edit transcript segment text" },
+  { method: "POST",   path: "/intake/api/conversations/:id/confirm-speakers", desc: "Confirm speaker identities for conversation" },
+  { method: "PATCH",  path: "/intake/api/conversations/:id/discard",          desc: "Discard a conversation" },
+  // ── Intake: Speakers ──
+  { method: "POST",   path: "/intake/api/correct-speaker",                    desc: "Correct a speaker identity assignment" },
+  { method: "POST",   path: "/intake/api/merge-speakers",                     desc: "Merge two speaker labels into one" },
+  { method: "POST",   path: "/intake/api/reassign-segment",                   desc: "Reassign a transcript segment to a different speaker" },
+  { method: "GET",    path: "/intake/api/speaker-suggestions/:id",            desc: "Get speaker suggestions for a conversation" },
+  // ── Intake: Audio ──
+  { method: "GET",    path: "/intake/api/audio/:id",                          desc: "Serve full audio file for conversation" },
+  { method: "GET",    path: "/intake/api/audio/:id/clip",                     desc: "Serve audio clip (query: start, end)" },
+  { method: "GET",    path: "/intake/api/audio/:id/speaker-sample/:label",    desc: "Serve speaker voice sample" },
+  // ── Intake: Pipeline ──
+  { method: "POST",   path: "/intake/api/pipeline/upload",                    desc: "Upload audio file for processing" },
+  { method: "POST",   path: "/intake/api/pipeline/process-pending",           desc: "Trigger processing of pending conversations" },
+  { method: "POST",   path: "/intake/api/pipeline/process/:id",              desc: "Process a specific conversation" },
+  { method: "GET",    path: "/intake/api/pipeline/status",                    desc: "Pipeline processing status" },
 ];
 
 
@@ -114,6 +141,7 @@ function MethodBadge({ method }) {
     GET:    { bg: "#14532d", text: "#4ade80" },
     POST:   { bg: "#172554", text: "#60a5fa" },
     PUT:    { bg: "#422006", text: "#fbbf24" },
+    PATCH:  { bg: "#3b1f06", text: "#fb923c" },
     DELETE: { bg: "#450a0a", text: "#f87171" },
   };
   const c = colors[method] || colors.GET;
@@ -298,13 +326,16 @@ function SchemaTab() {
     return m;
   }, []);
 
-  // Dynamic grouping: group tracker tables into core/junction/rulemaking/support/system; other services get one group each
+  // Dynamic grouping: tracker tables into core/junction/rulemaking/support/system; intake gets its own groups
   const groups = useMemo(() => {
     const trackerCore = ["organizations", "people", "matters", "tasks", "meetings", "documents", "decisions"];
     const trackerJunction = ["matter_people", "matter_organizations", "meeting_participants", "meeting_matters", "matter_tags", "document_reviewers", "task_dependencies", "matter_dependencies"];
     const trackerRulemaking = ["rulemaking_publication_status", "rulemaking_comment_periods", "rulemaking_cba_tracking"];
     const trackerSupport = ["matter_updates", "task_updates", "document_files", "tags"];
     const trackerSystem = ["system_events", "sync_state"];
+
+    const intakePipeline = ["conversations", "audio_files", "transcripts"];
+    const intakeSpeakers = ["voice_samples", "speaker_voice_profiles", "speaker_mappings"];
 
     const groups = [];
     const addGroup = (label, tables) => { if (tables.length) groups.push({ label, tables }); };
@@ -319,11 +350,12 @@ function SchemaTab() {
       const allTrackerKnown = new Set([...trackerCore, ...trackerJunction, ...trackerRulemaking, ...trackerSupport, ...trackerSystem]);
       addGroup("Tracker (Other)", filtered.filter(t => t.service === "tracker" && !allTrackerKnown.has(t.name)));
     }
-    if (serviceFilter === "all" || serviceFilter === "pipeline") {
-      addGroup("Pipeline Service", filtered.filter(t => t.service === "pipeline"));
-    }
-    if (serviceFilter === "all" || serviceFilter === "work") {
-      addGroup("Work Service", filtered.filter(t => t.service === "work"));
+    if (serviceFilter === "all" || serviceFilter === "intake") {
+      addGroup("Intake — Pipeline & Transcripts", filtered.filter(t => t.service === "intake" && intakePipeline.includes(t.name)));
+      addGroup("Intake — Speaker Identity", filtered.filter(t => t.service === "intake" && intakeSpeakers.includes(t.name)));
+      // Catch any intake table not in the above
+      const allIntakeKnown = new Set([...intakePipeline, ...intakeSpeakers]);
+      addGroup("Intake (Other)", filtered.filter(t => t.service === "intake" && !allIntakeKnown.has(t.name)));
     }
     return groups;
   }, [filtered, serviceFilter]);
@@ -465,10 +497,15 @@ function EnumsTab() {
 
 function ApiTab() {
   const [methodFilter, setMethodFilter] = useState("all");
+  const [serviceFilter, setServiceFilter] = useState("all");
   const [search, setSearch] = useState("");
 
   const filtered = API_ENDPOINTS.filter(e => {
     if (methodFilter !== "all" && e.method !== methodFilter) return false;
+    if (serviceFilter !== "all") {
+      if (serviceFilter === "tracker" && !e.path.startsWith("/tracker/")) return false;
+      if (serviceFilter === "intake" && !e.path.startsWith("/intake/")) return false;
+    }
     if (search) {
       const q = search.toLowerCase();
       return e.path.toLowerCase().includes(q) || e.desc.toLowerCase().includes(q);
@@ -480,7 +517,7 @@ function ApiTab() {
     <div>
       <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", padding: "14px 0", borderBottom: `1px solid ${theme.border.subtle}`, marginBottom: 16 }}>
         <div style={{ display: "flex", gap: 4 }}>
-          {["all", "GET", "POST", "PUT", "DELETE"].map(m => (
+          {["all", "GET", "POST", "PUT", "PATCH", "DELETE"].map(m => (
             <button key={m} onClick={() => setMethodFilter(m)} style={{
               padding: "5px 10px", fontSize: 10, fontWeight: 600, border: "none", borderRadius: 4, cursor: "pointer",
               background: methodFilter === m ? "rgba(255,255,255,0.08)" : "transparent",
@@ -488,18 +525,34 @@ function ApiTab() {
             }}>{m}</button>
           ))}
         </div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {[{ key: "all", label: "All", color: theme.text.muted }].concat(
+            Object.entries(SVC).map(([k, v]) => ({ key: k, label: v.label, color: v.color }))
+          ).map(s => (
+            <button key={s.key} onClick={() => setServiceFilter(s.key)} style={{
+              padding: "5px 10px", fontSize: 10, fontWeight: 600, border: "none", borderRadius: 4, cursor: "pointer",
+              background: serviceFilter === s.key ? (SVC[s.key]?.bg || "rgba(255,255,255,0.08)") : "transparent",
+              color: serviceFilter === s.key ? s.color : theme.text.dim,
+            }}>{s.label}</button>
+          ))}
+        </div>
         <input placeholder="Search endpoints..." value={search} onChange={e => setSearch(e.target.value)}
           style={{ background: theme.bg.input, border: `1px solid ${theme.border.default}`, borderRadius: 6, padding: "6px 12px", color: theme.text.secondary, fontSize: 12, fontFamily: theme.font.mono, outline: "none", width: 260 }} />
         <span style={{ fontSize: 11, color: theme.text.faint, marginLeft: "auto" }}>{filtered.length} endpoint{filtered.length !== 1 ? "s" : ""}</span>
       </div>
       <div style={{ background: theme.bg.card, border: `1px solid ${theme.border.default}`, borderRadius: 8, overflow: "hidden" }}>
-        {filtered.map((e, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 16px", borderBottom: i < filtered.length - 1 ? `1px solid ${theme.border.subtle}` : "none" }}>
-            <MethodBadge method={e.method} />
-            <span style={{ fontFamily: theme.font.mono, fontSize: 12, color: theme.text.secondary, minWidth: 320 }}>{e.path}</span>
-            <span style={{ fontSize: 11, color: theme.text.dim }}>{e.desc}</span>
-          </div>
-        ))}
+        {filtered.map((e, i) => {
+          const svcKey = e.path.startsWith("/intake/") ? "intake" : "tracker";
+          const svc = SVC[svcKey];
+          return (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 16px", borderBottom: i < filtered.length - 1 ? `1px solid ${theme.border.subtle}` : "none" }}>
+              <MethodBadge method={e.method} />
+              <span style={{ fontFamily: theme.font.mono, fontSize: 12, color: svc.color, minWidth: 380 }}>{e.path}</span>
+              <span style={{ fontSize: 11, color: theme.text.dim, flex: 1 }}>{e.desc}</span>
+              <ServiceBadge service={svcKey} />
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -524,13 +577,21 @@ function ServicesTab() {
 \u2502  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510  \u2502
 \u2502  \u2502  nginx (port 80)  \u2014 SPA + reverse proxy                          \u2502  \u2502
 \u2502  \u2502                                                                   \u2502  \u2502
-\u2502  \u2502  /tracker/*     \u2192 Tracker API    :${SERVICES_META.tracker?.port || 8004}   (SQLite: tracker.db)    \u2502  \u2502
-\u2502  \u2502  /pipeline/*    \u2192 Pipeline API   :${SERVICES_META.pipeline?.port || 8000}   (SQLite: pipeline.db)   \u2502  \u2502
-\u2502  \u2502  /work/*        \u2192 Work API       :${SERVICES_META.work?.port || 8005}   (SQLite: work.db)       \u2502  \u2502
+\u2502  \u2502  /tracker/*     \u2192 Tracker API    :8004   (SQLite: tracker.db)    \u2502  \u2502
+\u2502  \u2502  /intake/api/*  \u2192 Intake API     :8005   (SQLite: intake.db)     \u2502  \u2502
 \u2502  \u2502  /*             \u2192 React SPA      (index.html fallback)           \u2502  \u2502
 \u2502  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518  \u2502
 \u2502                                                                           \u2502
 \u2502  Auth: HTTP Basic  \u00b7  DB: SQLite + WAL  \u00b7  Infra: Docker Compose         \u2502
+\u2502                                                                           \u2502
+\u2502  Intake runs native (GPU/Metal) on Mac Mini, not in Docker              \u2502
+\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518
+
+\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510
+\u2502  cftctools.stephenandrews.org (separate Docker Compose)                  \u2502
+\u2502                                                                           \u2502
+\u2502  Analysis, Loper Bright, Pipeline, Work (legacy apps)                    \u2502
+\u2502  Shares cftc-shared Docker network for tracker bridge                    \u2502
 \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518`}
         </div>
       </div>

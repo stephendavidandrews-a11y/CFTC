@@ -6,9 +6,10 @@ RUN apk add --no-cache python3
 
 WORKDIR /repo
 
-# Copy schema source files for manifest generation (tracker only)
+# Copy schema source files for manifest generation (tracker + intake)
 COPY scripts/generate-schema-manifest.py ./scripts/
 COPY services/tracker/app/schema.py ./services/tracker/app/
+COPY services/intake/db/schema.py ./services/intake/db/
 COPY services/tracker/app/routers/lookups.py ./services/tracker/app/routers/
 
 # Install frontend dependencies
