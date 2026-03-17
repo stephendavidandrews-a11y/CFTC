@@ -11,7 +11,6 @@ COPY scripts/generate-schema-manifest.py ./scripts/
 COPY services/tracker/app/schema.py ./services/tracker/app/
 COPY services/tracker/app/routers/lookups.py ./services/tracker/app/routers/
 COPY services/pipeline/schema.py ./services/pipeline/
-COPY services/comments/app/core/schema.py ./services/comments/app/core/
 COPY services/work/schema.py ./services/work/
 
 # Install frontend dependencies

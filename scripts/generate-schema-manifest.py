@@ -27,7 +27,6 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_SOURCES = {
     "tracker": REPO_ROOT / "services" / "tracker" / "app" / "schema.py",
     "pipeline": REPO_ROOT / "services" / "pipeline" / "schema.py",
-    "comments": REPO_ROOT / "services" / "comments" / "app" / "core" / "schema.py",
     "work": REPO_ROOT / "services" / "work" / "schema.py",
 }
 
@@ -37,7 +36,6 @@ OUTPUT_PATH = REPO_ROOT / "frontend" / "src" / "data" / "schema-manifest.json"
 SERVICE_META = {
     "tracker": {"port": 8004, "db": "tracker.db", "tech": "FastAPI + SQLite (WAL)"},
     "pipeline": {"port": 8002, "db": "pipeline.db", "tech": "FastAPI + SQLite (WAL)"},
-    "comments": {"port": 8001, "db": "comments.db", "tech": "FastAPI + SQLite"},
     "work": {"port": 8005, "db": "work.db", "tech": "FastAPI + SQLite (WAL)"},
 }
 
