@@ -1,15 +1,12 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import Pulse from "../shared/Pulse";
 import theme from "../../styles/theme";
 
 const SECTIONS = [
-  // ── Operations ──
+  // -- Operations --
   { separator: true, label: "Operations" },
   { path: "/", label: "Dashboard", icon: "\u25eb" },
   { path: "/matters", label: "Matters", icon: "\u25a4" },
-  { path: "/pipeline", label: "Regulatory Pipeline", icon: "\u25c7", indent: true },
-  { path: "/regulatory", label: "Reg Actions", icon: "\u25c6", indent: true },
   { path: "/people", label: "People", icon: "\u22a1" },
   { path: "/organizations", label: "Organizations", icon: "\u2b21" },
   { path: "/tasks", label: "Tasks", icon: "\u2611" },
@@ -18,23 +15,21 @@ const SECTIONS = [
   { path: "/decisions", label: "Decisions", icon: "\u2696" },
   { path: "/documents", label: "Documents", icon: "\u2b1a" },
 
-  // ── Analysis ──
-  { separator: true, label: "Analysis" },
-  { path: "/summary", label: "Executive Summary", icon: "\u25a3" },
-  { path: "/eo", label: "EO Tracker", icon: "\u2691" },
-  { path: "/interagency", label: "Interagency", icon: "\u229f" },
-  { path: "/research", label: "Research", icon: "\u2692" },
-  { path: "/intelligence", label: "Intelligence", icon: "\u25c9" },
-  { path: "/reports", label: "Reports", icon: "\u229f" },
-  { path: "/loper", label: "Loper Bright", icon: "\u2696" },
+  // -- Intake --
+  { separator: true, label: "Intake" },
+  { path: "/intake/speaker-review", label: "Speaker Review", icon: "\u25ce" },
+  { path: "/intake/review-queue", label: "Review Queue", icon: "\u2610" },
 
+  // -- Tools --
+  { separator: true, label: "Tools" },
+  { path: "https://cftctools.stephenandrews.org", label: "CFTC Tools", icon: "\u2b21", external: true },
 
-  // Developer
+  // -- Developer --
   { separator: true, label: "Developer" },
-  { path: "/developer", label: "Dev Console", icon: "⚙" },
+  { path: "/developer", label: "Dev Console", icon: "\u2699" },
 ];
 
-export default function Sidebar({ badgeCounts = {}, isMobile = false, onNavigate }) {
+export default function Sidebar({ isMobile = false, onNavigate }) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -48,11 +43,11 @@ export default function Sidebar({ badgeCounts = {}, isMobile = false, onNavigate
       width: isMobile ? 270 : theme.sidebar.width,
       height: "100%",
       background: theme.bg.sidebar,
-      borderRight: `1px solid ${theme.border.subtle}`,
+      borderRight: "1px solid " + theme.border.subtle,
       display: "flex", flexDirection: "column", flexShrink: 0,
     }}>
       {/* Logo */}
-      <div style={{ padding: "22px 18px 18px", borderBottom: `1px solid ${theme.border.subtle}` }}>
+      <div style={{ padding: "22px 18px 18px", borderBottom: "1px solid " + theme.border.subtle }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{
             width: 32, height: 32, borderRadius: 8,
@@ -64,7 +59,7 @@ export default function Sidebar({ badgeCounts = {}, isMobile = false, onNavigate
             <div style={{ fontSize: 14, fontWeight: 700, color: theme.text.primary, letterSpacing: "-0.01em" }}>
               Command Center
             </div>
-            <div style={{ fontSize: 10, color: theme.text.faint }}>CFTC · Office of GC</div>
+            <div style={{ fontSize: 10, color: theme.text.faint }}>CFTC &middot; Office of GC</div>
           </div>
         </div>
       </div>
@@ -74,7 +69,7 @@ export default function Sidebar({ badgeCounts = {}, isMobile = false, onNavigate
         {SECTIONS.map((s, idx) => {
           if (s.separator) {
             return (
-              <div key={`sep-${idx}`} style={{ margin: "8px 12px" }}>
+              <div key={"sep-" + idx} style={{ margin: "8px 12px" }}>
                 <div style={{ height: 1, background: theme.border.subtle }} />
                 {s.label && (
                   <div style={{
@@ -86,15 +81,14 @@ export default function Sidebar({ badgeCounts = {}, isMobile = false, onNavigate
               </div>
             );
           }
-          // For query-filtered links like /matters?matter_type=rulemaking,
-          // match on both pathname and search params
+
           const isActive = s.path.includes("?")
             ? (location.pathname + location.search) === s.path
             : location.pathname === s.path ||
-              (s.path !== "/" && s.path !== "/summary" && location.pathname.startsWith(s.path));
+              (s.path !== "/" && location.pathname.startsWith(s.path));
 
           const handleItemClick = s.external
-            ? () => { window.location.href = s.path; }
+            ? () => { window.open(s.path, "_blank"); }
             : () => handleClick(s.path);
 
           return (
@@ -112,23 +106,18 @@ export default function Sidebar({ badgeCounts = {}, isMobile = false, onNavigate
                 transition: "all 0.15s ease", textAlign: "left",
               }}
             >
-              <span style={{ fontSize: s.indent ? 12 : 14, width: 20, textAlign: "center", marginLeft: s.indent ? 12 : 0 }}>{s.icon}</span>
+              <span style={{ fontSize: 14, width: 20, textAlign: "center" }}>{s.icon}</span>
               <span style={{ flex: 1 }}>{s.label}</span>
-              {badgeCounts[s.path] && (
-                <span style={{
-                  background: s.path === "/eo" ? "#7f1d1d" : "#172554",
-                  color: s.path === "/eo" ? "#fca5a5" : theme.accent.blueLight,
-                  borderRadius: 10, padding: "1px 7px", fontSize: 9, fontWeight: 700,
-                }}>{badgeCounts[s.path]}</span>
+              {s.external && (
+                <span style={{ fontSize: 10, color: theme.text.faint, opacity: 0.6 }}>&nearr;</span>
               )}
-              {s.path === "/intelligence" && <Pulse color={theme.accent.green} />}
             </button>
           );
         })}
       </nav>
 
       {/* User */}
-      <div style={{ padding: "14px 16px", borderTop: `1px solid ${theme.border.subtle}`, fontSize: 11 }}>
+      <div style={{ padding: "14px 16px", borderTop: "1px solid " + theme.border.subtle, fontSize: 11 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{
             width: 28, height: 28, borderRadius: 8,

@@ -1,11 +1,12 @@
-#\!/bin/bash
+#!/bin/bash
 # CFTC Database Backup Script
 # Backs up LIVE databases from Docker volumes via python3 (no sqlite3 CLI in containers).
-# Run daily via crontab: 0 3 * * * /path/to/backup.sh >> /var/log/cftc-backup.log 2>&1
+# Run daily via crontab: 0 3 * * * /path/to/backup.sh >> /tmp/cftc-backup.log 2>&1
 
 set -euo pipefail
 
-CFTC_DIR="$HOME/Documents/Website/cftc"
+export PATH=/opt/homebrew/bin:$PATH
+
 BACKUP_DIR="$HOME/Documents/Website/backups/cftc"
 RETAIN_DAYS=7
 DATE=$(date +%Y%m%d_%H%M%S)
@@ -24,29 +25,14 @@ dst = sqlite3.connect('/tmp/backup.db')
 src.backup(dst)
 src.close()
 dst.close()
-" && docker cp "$container:/tmp/backup.db" "$BACKUP_PATH/$name"    && docker exec "$container" rm -f /tmp/backup.db    && echo "  Done: $(du -h "$BACKUP_PATH/$name" | cut -f1)"    || echo "  FAILED: $name"
+" && docker cp "$container:/tmp/backup.db" "$BACKUP_PATH/$name" \
+   && docker exec "$container" rm -f /tmp/backup.db \
+   && echo "  Done: $(du -h "$BACKUP_PATH/$name" | cut -f1)" \
+   || echo "  FAILED: $name"
 }
 
-# Live databases from Docker volumes
-backup_from_container cftc-pipeline-backend /app/app/pipeline/data/pipeline.db pipeline.db
-backup_from_container cftc-pipeline-backend /app/app/work/data/work.db work.db
+# Tracker database (only remaining service)
 backup_from_container cftc-tracker /app/data/tracker.db tracker.db
-
-# Host-side read-only databases
-for db in "$CFTC_DIR/data/cftc_regulatory.db" "$CFTC_DIR/data/eo_tracker.db"; do
-    if [ -f "$db" ]; then
-        name=$(basename "$db")
-        echo "  Backing up $name (host)..."
-        python3 -c "
-import sqlite3
-src = sqlite3.connect('"$db"')
-dst = sqlite3.connect('"$BACKUP_PATH/$name"')
-src.backup(dst)
-src.close()
-dst.close()
-" && echo "  Done: $(du -h "$BACKUP_PATH/$name" | cut -f1)" || echo "  FAILED: $name"
-    fi
-done
 
 # Verify
 echo ""

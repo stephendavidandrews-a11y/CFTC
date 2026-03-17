@@ -2,8 +2,6 @@ import React, { useState, useCallback } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import theme from "../../styles/theme";
-import { useApi } from "../../hooks/useApi";
-import { getExecutiveSummary } from "../../api/pipeline";
 import useMediaQuery from "../../hooks/useMediaQuery";
 import { DrawerProvider, useDrawer } from "../../contexts/DrawerContext";
 import MatterDrawer from "../tracker/MatterDrawer";
@@ -80,15 +78,6 @@ export default function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
 
-  const { data: summary } = useApi(() => getExecutiveSummary(), []);
-
-  const badgeCounts = {};
-  if (summary) {
-    if (summary.active_rulemakings) badgeCounts["/pipeline"] = summary.active_rulemakings;
-    if (summary.active_reg_actions) badgeCounts["/regulatory"] = summary.active_reg_actions;
-    if (summary.total_overdue_deadlines) badgeCounts["/eo"] = summary.total_overdue_deadlines;
-  }
-
   const handleNavigation = useCallback(() => {
     if (isMobile) setSidebarOpen(false);
   }, [isMobile]);
@@ -158,7 +147,6 @@ export default function AppShell() {
           } : {}),
         }}>
           <Sidebar
-            badgeCounts={badgeCounts}
             isMobile={isMobile}
             onNavigate={handleNavigation}
           />

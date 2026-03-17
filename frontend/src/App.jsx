@@ -3,7 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import { ToastProvider } from "./contexts/ToastContext";
 import AppShell from "./components/layout/AppShell";
 
-// ── Tracker (Operations) ──
+// -- Tracker (Operations) --
 import TrackerDashboardPage from "./pages/tracker/TrackerDashboardPage";
 import MattersPage from "./pages/tracker/MattersPage";
 import MatterDetailPage from "./pages/tracker/MatterDetailPage";
@@ -17,36 +17,20 @@ import TeamWorkloadPage from "./pages/tracker/TeamWorkloadPage";
 import DecisionsPage from "./pages/tracker/DecisionsPage";
 import DocumentsPage from "./pages/tracker/DocumentsPage";
 
-// ── Analysis (existing pages) ──
-import SummaryPage from "./pages/SummaryPage";
-import EOPage from "./pages/EOPage";
-import IntelligencePage from "./pages/IntelligencePage";
-import InteragencyPage from "./pages/InteragencyPage";
-import ResearchPage from "./pages/ResearchPage";
-import ReportsPage from "./pages/ReportsPage";
-import LoperDashboardPage from "./pages/loper/LoperDashboardPage";
-import LoperExplorerPage from "./pages/loper/LoperExplorerPage";
-import LoperRuleDetailPage from "./pages/loper/LoperRuleDetailPage";
-import LoperGuidanceDetailPage from "./pages/loper/LoperGuidanceDetailPage";
-import LoperAnalyticsPage from "./pages/loper/LoperAnalyticsPage";
+// -- Intake --
+import SpeakerReviewListPage from "./pages/intake/SpeakerReviewListPage";
+import SpeakerReviewDetailPage from "./pages/intake/SpeakerReviewDetailPage";
 
-// ── Legacy (kept for backward compat, redirects optional) ──
-import TeamPage from "./pages/TeamPage";
-import PipelinePage from "./pages/PipelinePage";
-import RegActionsPage from "./pages/RegActionsPage";
-import ItemDetailPage from "./pages/ItemDetailPage";
-import WorkPage from "./pages/WorkPage";
-import ProjectDetailPage from "./pages/ProjectDetailPage";
-import TasksPage from "./pages/TasksPage";
-import NotFoundPage from "./pages/NotFoundPage";
+// -- Developer --
 import DeveloperPage from "./pages/developer/DeveloperPage";
+import NotFoundPage from "./pages/NotFoundPage";
 
 export default function App() {
   return (
     <ToastProvider>
       <Routes>
         <Route element={<AppShell />}>
-          {/* ── Operations (Tracker) ── */}
+          {/* -- Operations (Tracker) -- */}
           <Route index element={<TrackerDashboardPage />} />
           <Route path="/matters" element={<MattersPage />} />
           <Route path="/matters/:id" element={<MatterDetailPage />} />
@@ -60,30 +44,11 @@ export default function App() {
           <Route path="/decisions" element={<DecisionsPage />} />
           <Route path="/documents" element={<DocumentsPage />} />
 
-          {/* ── Analysis ── */}
-          <Route path="/summary" element={<SummaryPage />} />
-          <Route path="/eo" element={<EOPage />} />
-          <Route path="/intelligence" element={<IntelligencePage />} />          <Route path="/interagency" element={<InteragencyPage />} />
-          <Route path="/research" element={<ResearchPage />} />
-          <Route path="/reports" element={<ReportsPage />} />
-          <Route path="/loper" element={<LoperDashboardPage />} />
-          <Route path="/loper/rules" element={<LoperExplorerPage />} />
-          <Route path="/loper/guidance" element={<LoperExplorerPage />} />
-          <Route path="/loper/rules/:frCitation" element={<LoperRuleDetailPage />} />
-          <Route path="/loper/guidance/:docId" element={<LoperGuidanceDetailPage />} />
-          <Route path="/loper/analytics" element={<LoperAnalyticsPage />} />
+          {/* -- Intake -- */}
+          <Route path="/intake/speaker-review" element={<SpeakerReviewListPage />} />
+          <Route path="/intake/speaker-review/:id" element={<SpeakerReviewDetailPage />} />
 
-          {/* ── Legacy routes (kept for bookmarks/links) ── */}
-          <Route path="/team" element={<TeamPage />} />
-          <Route path="/pipeline" element={<PipelinePage />} />
-          <Route path="/pipeline/:id" element={<ItemDetailPage />} />
-          <Route path="/regulatory" element={<RegActionsPage />} />
-          <Route path="/regulatory/:id" element={<ItemDetailPage />} />
-          <Route path="/work" element={<WorkPage />} />
-          <Route path="/work/tasks" element={<TasksPage />} />
-          <Route path="/work/:id" element={<ProjectDetailPage />} />
-
-          {/* ── Developer (Internal) ── */}
+          {/* -- Developer -- */}
           <Route path="/developer" element={<DeveloperPage />} />
 
           <Route path="*" element={<NotFoundPage />} />

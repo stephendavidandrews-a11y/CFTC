@@ -1,8 +1,9 @@
 /**
  * Dev proxy configuration for multiple backends.
  *
- * /tracker/*  → Tracker service (port 8004)
- * /pipeline/* → Pipeline service (port 8000)
+ * /tracker/*  -> Tracker service (port 8004)
+ * /pipeline/* -> Pipeline service (port 8000)
+ * /intake/*   -> Intake service (port 8005)
  */
 const { createProxyMiddleware } = require("http-proxy-middleware");
 
@@ -21,6 +22,15 @@ module.exports = function (app) {
     "/pipeline",
     createProxyMiddleware({
       target: "http://localhost:8000",
+      changeOrigin: true,
+    })
+  );
+
+  // Intake backend (voice pipeline + speaker review)
+  app.use(
+    "/intake",
+    createProxyMiddleware({
+      target: "http://localhost:8005",
       changeOrigin: true,
     })
   );
