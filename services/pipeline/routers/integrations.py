@@ -125,7 +125,7 @@ async def get_eo_actions(
             rows = conn.execute(
                 f"""SELECT * FROM action_items
                     {where}
-                    ORDER BY deadline ASC""",
+                    ORDER BY priority DESC, updated_at DESC""",
                 params,
             ).fetchall()
             return [dict(r) for r in rows]

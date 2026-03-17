@@ -8,10 +8,11 @@ from app.config import UPLOAD_DIR, MAX_UPLOAD_SIZE
 from app.validators import CreateDocument, UpdateDocument
 import json
 from fastapi import Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from app.deps import get_write_source
 from app.audit import log_event
 from app.concurrency import get_etag, check_etag
+import shutil
 from app.idempotency import claim_idempotency_key, finalize_idempotency_key
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -150,7 +151,8 @@ async def upload_file(doc_id: str, file: UploadFile = File(...), db=Depends(get_
     file_id = str(uuid.uuid4())
     doc_dir = UPLOAD_DIR / doc_id
     doc_dir.mkdir(parents=True, exist_ok=True)
-    file_path = doc_dir / f"{file_id}_{file.filename}"
+    safe_filename = Path(file.filename).name.replace("..", "_") if file.filename else "upload"
+    file_path = doc_dir / f"{file_id}_{safe_filename}"
     file_path.write_bytes(content)
 
     now = datetime.now().isoformat()
@@ -170,6 +172,25 @@ async def upload_file(doc_id: str, file: UploadFile = File(...), db=Depends(get_
     return {"file_id": file_id, "filename": file.filename, "size": len(content)}
 
 
+
+@router.get("/{doc_id}/files/{file_id}/download")
+async def download_file(doc_id: str, file_id: str, db=Depends(get_db)):
+    """Download a file by ID."""
+    row = db.execute(
+        "SELECT * FROM document_files WHERE id = ? AND document_id = ?",
+        (file_id, doc_id)
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="File not found")
+    file_path = UPLOAD_DIR / row["storage_path"]
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found on disk")
+    return FileResponse(
+        path=str(file_path),
+        filename=row["original_filename"],
+        media_type=row["mime_type"] or "application/octet-stream"
+    )
+
 @router.delete("/{doc_id}")
 async def delete_document(doc_id: str, request: Request, db=Depends(get_db),
                       write_source: str = Depends(get_write_source)):
@@ -181,6 +202,10 @@ async def delete_document(doc_id: str, request: Request, db=Depends(get_db),
     db.execute("DELETE FROM document_reviewers WHERE document_id = ?", (doc_id,))
     db.execute("DELETE FROM document_files WHERE document_id = ?", (doc_id,))
     db.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+    # Clean up files on disk
+    doc_dir = UPLOAD_DIR / doc_id
+    if doc_dir.exists():
+        shutil.rmtree(doc_dir)
     log_event(db, table_name="documents", record_id=doc_id, action="delete",
               source=write_source, old_record=old)
     db.commit()

@@ -36,7 +36,7 @@ OUTPUT_PATH = REPO_ROOT / "frontend" / "src" / "data" / "schema-manifest.json"
 SERVICE_META = {
     "tracker": {"port": 8004, "db": "tracker.db", "tech": "FastAPI + SQLite (WAL)"},
     "pipeline": {"port": 8002, "db": "pipeline.db", "tech": "FastAPI + SQLite (WAL)"},
-    "work": {"port": 8005, "db": "work.db", "tech": "FastAPI + SQLite (WAL)"},
+    "work": {"port": 8000, "db": "work.db", "tech": "FastAPI + SQLite (WAL)"},
 }
 
 # ---------------------------------------------------------------------------
