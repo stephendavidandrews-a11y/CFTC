@@ -1,20 +1,16 @@
 FROM python:3.11-slim
 
 # Install system deps
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    tesseract-ocr \
-    poppler-utils \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends     tesseract-ocr     poppler-utils     gcc     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install Python deps (same requirements as comment system)
+# Install Python deps
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy comment system shared code (core, models, api, schemas, services, tasks)
-COPY services/comments/app/ ./app/
+# Copy pipeline core config (replaces former comments app.core dependency)
+COPY services/pipeline/core/ ./app/core/
 
 # Copy pipeline module into app/pipeline/
 COPY services/pipeline/ ./app/pipeline/
@@ -26,7 +22,7 @@ COPY services/work/ ./app/work/
 COPY services/pipeline-main.py ./app/main.py
 
 # Create storage directories
-RUN mkdir -p /app/app/pipeline/data /app/app/pipeline/data/documents /app/app/work/data /app/pdf_storage
+RUN mkdir -p /app/app/pipeline/data /app/app/pipeline/data/documents /app/app/work/data
 
 EXPOSE 8000
 
