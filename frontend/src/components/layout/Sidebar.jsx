@@ -29,9 +29,6 @@ const SECTIONS = [
   { path: "/reports", label: "Reports", icon: "\u229f" },
   { path: "/loper", label: "Loper Bright", icon: "\u2696" },
 
-  // ── Personal ──
-  { separator: true, label: "Personal" },
-  { path: "/network/", label: "Network", icon: "\u{1F310}", external: true },
 
   // Developer
   { separator: true, label: "Developer" },
