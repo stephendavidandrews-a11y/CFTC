@@ -18,7 +18,6 @@ const SECTIONS = [
   // -- Intake --
   { separator: true, label: "Intake" },
   { path: "/intake/speaker-review", label: "Speaker Review", icon: "\u25ce" },
-  { path: "/intake/review-queue", label: "Review Queue", icon: "\u2610" },
 
   // -- Tools --
   { separator: true, label: "Tools" },

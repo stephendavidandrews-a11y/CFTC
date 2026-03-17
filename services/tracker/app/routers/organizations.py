@@ -19,6 +19,7 @@ async def list_organizations(
     db=Depends(get_db),
     search: str = Query(None),
     organization_type: str = Query(None),
+    parent_id: str = Query(None),
     is_active: bool = Query(True),
     sort_by: str = Query("name"),
     sort_dir: str = Query("asc"),
@@ -33,6 +34,9 @@ async def list_organizations(
     if organization_type:
         conditions.append("o.organization_type = ?")
         params.append(organization_type)
+    if parent_id:
+        conditions.append("o.parent_organization_id = ?")
+        params.append(parent_id)
 
     where = "WHERE " + " AND ".join(conditions)
     allowed_sorts = {"name", "organization_type", "created_at"}

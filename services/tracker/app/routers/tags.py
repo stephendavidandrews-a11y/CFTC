@@ -34,7 +34,7 @@ async def create_tag(body: CreateTag, db=Depends(get_db)):
     db.execute("INSERT INTO tags (id, name, tag_type) VALUES (?, ?, ?)",
                (tag_id, body.name, body.tag_type))
     db.commit()
-    return {"id": tag_id}
+    return {"id": tag_id, "name": body.name, "tag_type": body.tag_type}
 
 
 @router.delete("/{tag_id}")
