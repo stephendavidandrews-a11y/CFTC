@@ -1,36 +1,5 @@
 services:
   # ---------------------------------------------------------------------------
-  # Pipeline Manager Backend (FastAPI + SQLite)
-  # ---------------------------------------------------------------------------
-  pipeline-backend:
-    build:
-      context: .
-      dockerfile: Dockerfile.pipeline
-    container_name: cftc-pipeline-backend
-    restart: always
-    environment:
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env}
-      PIPELINE_USER: ${PIPELINE_USER:?Set PIPELINE_USER in .env}
-      PIPELINE_PASS: ${PIPELINE_PASS:?Set PIPELINE_PASS in .env}
-      CORS_ORIGINS: '["https://${DOMAIN:-localhost}"]'
-      APP_ENV: production
-      LOG_LEVEL: INFO
-      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASS: ${SMTP_PASS:-}
-      FROM_EMAIL: ${FROM_EMAIL:-}
-      MANAGER_EMAIL: ${MANAGER_EMAIL:-}
-      CFTC_REGULATORY_DB_PATH: /data/cftc_regulatory.db
-      EO_TRACKER_DB_PATH: /data/eo_tracker.db
-    volumes:
-      - pipeline_data:/app/app/pipeline/data
-      - work_data:/app/app/work/data
-      - ./data/cftc_regulatory.db:/data/cftc_regulatory.db:ro
-      - ./data/eo_tracker.db:/data/eo_tracker.db:ro
-
-  # ---------------------------------------------------------------------------
   # Tracker Backend (FastAPI + SQLite) — Regulatory Ops Tracker
   # ---------------------------------------------------------------------------
   tracker:
@@ -48,6 +17,9 @@ services:
     volumes:
       - tracker_data:/app/data
       - tracker_uploads:/app/uploads
+    networks:
+      - default
+      - cftc-shared
 
   # ---------------------------------------------------------------------------
   # Command Center Frontend (React + nginx reverse proxy — main entry point)
@@ -60,8 +32,9 @@ services:
     restart: always
     ports:
       - "8080:80"
+    extra_hosts:
+      - "host-services:host-gateway"
     depends_on:
-      - pipeline-backend
       - tracker
 
   # ---------------------------------------------------------------------------
@@ -80,9 +53,11 @@ services:
       - ../personal-site:/srv/personal-site:ro
 
 volumes:
-  pipeline_data:
-  work_data:
   tracker_data:
   tracker_uploads:
   caddy_data:
   caddy_config:
+
+networks:
+  cftc-shared:
+    external: true
