@@ -71,7 +71,7 @@ export default function TeamWorkloadPage() {
     []
   );
   const { data: tasksData, loading: loadingTasks } = useApi(
-    () => listTasks({ limit: 2000 }),
+    () => listTasks({ limit: 500 }),
     []
   );
 
