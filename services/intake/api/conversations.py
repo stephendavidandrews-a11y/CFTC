@@ -24,16 +24,21 @@ def list_conversations(
     """List conversations with optional status filter."""
     conn = get_connection()
     try:
+        count_query = "SELECT COUNT(*) as c FROM conversations"
         query = "SELECT * FROM conversations"
+        count_params = []
         params = []
         if status:
+            count_query += " WHERE processing_status = ?"
             query += " WHERE processing_status = ?"
+            count_params.append(status)
             params.append(status)
         query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
         params.extend([limit, offset])
 
+        total = conn.execute(count_query, count_params).fetchone()["c"]
         rows = conn.execute(query, params).fetchall()
-        return [dict(r) for r in rows]
+        return {"items": [dict(r) for r in rows], "total": total, "limit": limit, "offset": offset}
     finally:
         conn.close()
 

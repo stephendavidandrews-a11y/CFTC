@@ -1,29 +1,17 @@
 {
-  "generated_at": "2026-03-16T14:12:09.206328+00:00",
+  "generated_at": "2026-03-17T20:20:05.350212+00:00",
   "services": {
     "tracker": {
-      "tables": 24,
+      "tables": 25,
       "port": 8004,
       "db": "tracker.db",
       "tech": "FastAPI + SQLite (WAL)"
     },
-    "pipeline": {
-      "tables": 24,
-      "port": 8002,
-      "db": "pipeline.db",
-      "tech": "FastAPI + SQLite (WAL)"
-    },
-    "comments": {
-      "tables": 5,
-      "port": 8001,
-      "db": "comments.db",
-      "tech": "FastAPI + SQLite"
-    },
-    "work": {
-      "tables": 8,
+    "intake": {
+      "tables": 6,
       "port": 8005,
-      "db": "work.db",
-      "tech": "FastAPI + SQLite (WAL)"
+      "db": "intake.db",
+      "tech": "FastAPI + SQLite (WAL) — native/GPU"
     }
   },
   "tables": [
@@ -264,7 +252,9 @@
         {
           "name": "next_interaction_type",
           "type": "TEXT",
-          "tags": [],
+          "tags": [
+            "ENUM"
+          ],
           "not_null": false
         },
         {
@@ -853,6 +843,12 @@
           ],
           "not_null": false,
           "note": "REFERENCES organizations.id"
+        },
+        {
+          "name": "waiting_on_description",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
         },
         {
           "name": "expected_output",
@@ -1673,7 +1669,8 @@
           "name": "organization_id",
           "type": "TEXT",
           "tags": [
-            "FK"
+            "FK",
+            "IDX"
           ],
           "not_null": false,
           "note": "REFERENCES organizations.id"
@@ -1681,13 +1678,17 @@
         {
           "name": "meeting_role",
           "type": "TEXT",
-          "tags": [],
+          "tags": [
+            "ENUM"
+          ],
           "not_null": false
         },
         {
           "name": "attendance_status",
           "type": "TEXT",
-          "tags": [],
+          "tags": [
+            "ENUM"
+          ],
           "not_null": false
         },
         {
@@ -1711,7 +1712,9 @@
         {
           "name": "position_strength",
           "type": "TEXT",
-          "tags": [],
+          "tags": [
+            "ENUM"
+          ],
           "not_null": false
         },
         {
@@ -1879,13 +1882,17 @@
         {
           "name": "review_role",
           "type": "TEXT",
-          "tags": [],
+          "tags": [
+            "ENUM"
+          ],
           "not_null": false
         },
         {
           "name": "review_status",
           "type": "TEXT",
-          "tags": [],
+          "tags": [
+            "ENUM"
+          ],
           "not_null": false
         },
         {
@@ -2515,7 +2522,9 @@
         {
           "name": "comment_period_type",
           "type": "TEXT",
-          "tags": [],
+          "tags": [
+            "ENUM"
+          ],
           "not_null": false
         },
         {
@@ -2604,7 +2613,9 @@
         {
           "name": "cba_status",
           "type": "TEXT",
-          "tags": [],
+          "tags": [
+            "ENUM"
+          ],
           "not_null": false
         },
         {
@@ -2786,6 +2797,65 @@
       ]
     },
     {
+      "name": "idempotency_keys",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "key",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "method",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "path",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "request_hash",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "status_code",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "response_body",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
       "name": "sync_state",
       "service": "tracker",
       "fields": [
@@ -2860,2380 +2930,11 @@
       ]
     },
     {
-      "name": "team_members",
-      "service": "pipeline",
+      "name": "conversations",
+      "service": "intake",
       "fields": [
         {
           "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "name",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "email",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false,
-          "note": "UNIQUE"
-        },
-        {
-          "name": "role",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "gs_level",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "division",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false,
-          "note": "DEFAULT 'Regulation'",
-          "default": "'Regulation'"
-        },
-        {
-          "name": "specializations",
-          "type": "TEXT",
-          "tags": [
-            "JSON"
-          ],
-          "not_null": false,
-          "note": "DEFAULT '[]'",
-          "default": "'[]'"
-        },
-        {
-          "name": "max_concurrent",
-          "type": "INTEGER",
-          "tags": [],
-          "not_null": false,
-          "note": "DEFAULT 5",
-          "default": "5"
-        },
-        {
-          "name": "is_active",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL",
-            "IDX"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 1",
-          "default": "1"
-        },
-        {
-          "name": "created_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        },
-        {
-          "name": "updated_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        },
-        {
-          "name": "background_summary",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "working_style",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false,
-          "note": "DEFAULT 'balanced'",
-          "default": "'balanced'"
-        },
-        {
-          "name": "communication_preference",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false,
-          "note": "DEFAULT 'email'",
-          "default": "'email'"
-        },
-        {
-          "name": "current_capacity",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false,
-          "note": "DEFAULT 'available'",
-          "default": "'available'"
-        },
-        {
-          "name": "strengths",
-          "type": "TEXT",
-          "tags": [
-            "JSON"
-          ],
-          "not_null": false,
-          "note": "DEFAULT '[]'",
-          "default": "'[]'"
-        },
-        {
-          "name": "growth_areas",
-          "type": "TEXT",
-          "tags": [
-            "JSON"
-          ],
-          "not_null": false,
-          "note": "DEFAULT '[]'",
-          "default": "'[]'"
-        },
-        {
-          "name": "personal_context",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "recent_wins",
-          "type": "TEXT",
-          "tags": [
-            "JSON"
-          ],
-          "not_null": false,
-          "note": "DEFAULT '[]'",
-          "default": "'[]'"
-        }
-      ]
-    },
-    {
-      "name": "stage_templates",
-      "service": "pipeline",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "module",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "item_type",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "stage_order",
-          "type": "INTEGER",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "stage_key",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "stage_label",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "stage_color",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "is_terminal",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
-        },
-        {
-          "name": "sla_days",
-          "type": "INTEGER",
-          "tags": [],
-          "not_null": false
-        }
-      ]
-    },
-    {
-      "name": "pipeline_items",
-      "service": "pipeline",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "module",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "item_type",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "title",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "short_title",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "description",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "docket_number",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": false
-        },
-        {
-          "name": "rin",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "fr_citation",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": false
-        },
-        {
-          "name": "fr_doc_number",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "current_stage",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "stage_entered_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        },
-        {
-          "name": "priority_composite",
-          "type": "REAL",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0.0",
-          "default": "0.0"
-        },
-        {
-          "name": "priority_override",
-          "type": "REAL",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "priority_label",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false,
-          "note": "DEFAULT 'medium'",
-          "default": "'medium'"
-        },
-        {
-          "name": "chairman_priority",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
-        },
-        {
-          "name": "lead_attorney_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": false,
-          "note": "REFERENCES team_members.id"
-        },
-        {
-          "name": "backup_attorney_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK"
-          ],
-          "not_null": false,
-          "note": "REFERENCES team_members.id"
-        },
-        {
-          "name": "action_subtype",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "requesting_party",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "related_rulemaking_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK"
-          ],
-          "not_null": false,
-          "note": "REFERENCES pipeline_items.id"
-        },
-        {
-          "name": "enforcement_referral",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
-        },
-        {
-          "name": "foia_request_count",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
-        },
-        {
-          "name": "unified_agenda_rin",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "unified_agenda_stage",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "stage1_fr_citation",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "stage1_doc_id",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "eo_action_item_id",
-          "type": "INTEGER",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "comment_docket",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "status",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 'active'",
-          "default": "'active'"
-        },
-        {
-          "name": "archived_at",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "archived_reason",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "created_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        },
-        {
-          "name": "updated_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        },
-        {
-          "name": "created_by",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        }
-      ]
-    },
-    {
-      "name": "pipeline_stages",
-      "service": "pipeline",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "item_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL; REFERENCES pipeline_items.id"
-        },
-        {
-          "name": "stage_order",
-          "type": "INTEGER",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "stage_key",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "stage_label",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "stage_color",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "is_terminal",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
-        },
-        {
-          "name": "sla_days",
-          "type": "INTEGER",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "entered_at",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "completed_at",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        }
-      ]
-    },
-    {
-      "name": "pipeline_item_assignments",
-      "service": "pipeline",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "item_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL; REFERENCES pipeline_items.id"
-        },
-        {
-          "name": "team_member_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL; REFERENCES team_members.id"
-        },
-        {
-          "name": "role",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL; DEFAULT 'contributor'",
-          "default": "'contributor'"
-        },
-        {
-          "name": "assigned_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        }
-      ]
-    },
-    {
-      "name": "pipeline_deadlines",
-      "service": "pipeline",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "item_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL; REFERENCES pipeline_items.id"
-        },
-        {
-          "name": "deadline_type",
-          "type": "TEXT",
-          "tags": [
-            "ENUM",
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "title",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "due_date",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "source",
-          "type": "TEXT",
-          "tags": [
-            "ENUM"
-          ],
-          "not_null": false
-        },
-        {
-          "name": "source_detail",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "is_hard_deadline",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 1",
-          "default": "1"
-        },
-        {
-          "name": "days_warning",
-          "type": "INTEGER",
-          "tags": [],
-          "not_null": false,
-          "note": "DEFAULT 14",
-          "default": "14"
-        },
-        {
-          "name": "days_critical",
-          "type": "INTEGER",
-          "tags": [],
-          "not_null": false,
-          "note": "DEFAULT 3",
-          "default": "3"
-        },
-        {
-          "name": "predecessor_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK"
-          ],
-          "not_null": false,
-          "note": "REFERENCES pipeline_deadlines.id"
-        },
-        {
-          "name": "offset_days",
-          "type": "INTEGER",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "status",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 'pending'",
-          "default": "'pending'"
-        },
-        {
-          "name": "completed_at",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "extended_to",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "extension_reason",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "owner_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK"
-          ],
-          "not_null": false,
-          "note": "REFERENCES team_members.id"
-        },
-        {
-          "name": "created_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        },
-        {
-          "name": "updated_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        }
-      ]
-    },
-    {
-      "name": "pipeline_documents",
-      "service": "pipeline",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "item_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL; REFERENCES pipeline_items.id"
-        },
-        {
-          "name": "document_type",
-          "type": "TEXT",
-          "tags": [
-            "ENUM"
-          ],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "title",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "version",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 1",
-          "default": "1"
-        },
-        {
-          "name": "file_path",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "file_size",
-          "type": "INTEGER",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "file_hash",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "mime_type",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "uploaded_by",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "change_summary",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "is_current",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL",
-            "IDX"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 1",
-          "default": "1"
-        },
-        {
-          "name": "parent_version_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK"
-          ],
-          "not_null": false,
-          "note": "REFERENCES pipeline_documents.id"
-        },
-        {
-          "name": "created_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        }
-      ]
-    },
-    {
-      "name": "pipeline_decision_log",
-      "service": "pipeline",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "item_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL; REFERENCES pipeline_items.id"
-        },
-        {
-          "name": "action_type",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "description",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "old_value",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "new_value",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "decided_by",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "rationale",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "created_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        }
-      ]
-    },
-    {
-      "name": "pipeline_stakeholders",
-      "service": "pipeline",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "name",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "organization",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "stakeholder_type",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "title",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "email",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "phone",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "notes",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "created_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        }
-      ]
-    },
-    {
-      "name": "pipeline_stakeholder_links",
-      "service": "pipeline",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "item_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL; REFERENCES pipeline_items.id"
-        },
-        {
-          "name": "stakeholder_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL; REFERENCES pipeline_stakeholders.id"
-        },
-        {
-          "name": "interest_level",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false,
-          "note": "DEFAULT 'medium'",
-          "default": "'medium'"
-        },
-        {
-          "name": "position",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "notes",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        }
-      ]
-    },
-    {
-      "name": "pipeline_meetings",
-      "service": "pipeline",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "item_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": false,
-          "note": "REFERENCES pipeline_items.id"
-        },
-        {
-          "name": "meeting_type",
-          "type": "TEXT",
-          "tags": [
-            "ENUM"
-          ],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "title",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "date",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "attendees",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "summary",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "follow_up_items",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "is_ex_parte",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
-        },
-        {
-          "name": "ex_parte_filed",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
-        },
-        {
-          "name": "created_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        }
-      ]
-    },
-    {
-      "name": "pipeline_dependencies",
-      "service": "pipeline",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "source_item_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL; REFERENCES pipeline_items.id"
-        },
-        {
-          "name": "target_item_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL; REFERENCES pipeline_items.id"
-        },
-        {
-          "name": "dependency_type",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "description",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        }
-      ]
-    },
-    {
-      "name": "pipeline_notifications",
-      "service": "pipeline",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "recipient_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": false,
-          "note": "REFERENCES team_members.id"
-        },
-        {
-          "name": "item_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK"
-          ],
-          "not_null": false,
-          "note": "REFERENCES pipeline_items.id"
-        },
-        {
-          "name": "notification_type",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "title",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "message",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "severity",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false,
-          "note": "DEFAULT 'info'",
-          "default": "'info'"
-        },
-        {
-          "name": "is_read",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL",
-            "IDX"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
-        },
-        {
-          "name": "is_dismissed",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
-        },
-        {
-          "name": "created_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        }
-      ]
-    },
-    {
-      "name": "pipeline_cba_tracking",
-      "service": "pipeline",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "item_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK"
-          ],
-          "not_null": true,
-          "note": "NOT NULL; REFERENCES pipeline_items.id"
-        },
-        {
-          "name": "cba_status",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false,
-          "note": "DEFAULT 'not_started'",
-          "default": "'not_started'"
-        },
-        {
-          "name": "analyst_assigned",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "estimated_costs",
-          "type": "REAL",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "estimated_benefits",
-          "type": "REAL",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "net_benefit",
-          "type": "REAL",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "methodology",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "oira_review_required",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
-        },
-        {
-          "name": "oira_submitted",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "oira_completed",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "small_entity_impact",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "rfa_required",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
-        },
-        {
-          "name": "irfa_completed",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
-        },
-        {
-          "name": "frfa_completed",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
-        },
-        {
-          "name": "notes",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "updated_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        }
-      ]
-    },
-    {
-      "name": "pipeline_publication_status",
-      "service": "pipeline",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "item_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK"
-          ],
-          "not_null": true,
-          "note": "NOT NULL; REFERENCES pipeline_items.id"
-        },
-        {
-          "name": "ofr_submitted",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "ofr_accepted",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "ofr_publication_date",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "ofr_doc_number",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "pra_required",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
-        },
-        {
-          "name": "pra_icr_number",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "pra_submitted_oira",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "pra_approved",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "pra_burden_hours",
-          "type": "INTEGER",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "oira_submitted",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "oira_review_type",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "oira_completed",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "oira_changes",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "cra_submitted",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "cra_review_period_end",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "cra_is_major",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
-        },
-        {
-          "name": "cra_resolution_introduced",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
-        },
-        {
-          "name": "fr_volume",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "fr_start_page",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "fr_end_page",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "effective_date",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "notes",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "updated_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        }
-      ]
-    },
-    {
-      "name": "pipeline_unified_agenda",
-      "service": "pipeline",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "item_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK"
-          ],
-          "not_null": true,
-          "note": "NOT NULL; REFERENCES pipeline_items.id"
-        },
-        {
-          "name": "rin",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "agenda_stage",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "priority_designation",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "abstract",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "timetable",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "legal_authority",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "last_unified_agenda_update",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "next_action",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "next_action_date",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "notes",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "updated_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        }
-      ]
-    },
-    {
-      "name": "pipeline_foia",
-      "service": "pipeline",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "item_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": false,
-          "note": "REFERENCES pipeline_items.id"
-        },
-        {
-          "name": "foia_number",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "requester",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "request_date",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "due_date",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "status",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false,
-          "note": "DEFAULT 'pending'",
-          "default": "'pending'"
-        },
-        {
-          "name": "assigned_to",
-          "type": "INTEGER",
-          "tags": [
-            "FK"
-          ],
-          "not_null": false,
-          "note": "REFERENCES team_members.id"
-        },
-        {
-          "name": "notes",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "created_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        }
-      ]
-    },
-    {
-      "name": "pipeline_enforcement_referrals",
-      "service": "pipeline",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "item_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": false,
-          "note": "REFERENCES pipeline_items.id"
-        },
-        {
-          "name": "referral_date",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "referring_division",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "subject",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "status",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false,
-          "note": "DEFAULT 'pending'",
-          "default": "'pending'"
-        },
-        {
-          "name": "enforcement_case_id",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "notes",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "created_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        }
-      ]
-    },
-    {
-      "name": "pipeline_priority_signals",
-      "service": "pipeline",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "item_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL; REFERENCES pipeline_items.id"
-        },
-        {
-          "name": "signal_type",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "signal_value",
-          "type": "REAL",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "signal_source",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "signal_detail",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "computed_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        }
-      ]
-    },
-    {
-      "name": "interagency_contacts",
-      "service": "pipeline",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "name",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "title",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "agency",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "email",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "phone",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "areas_of_focus",
-          "type": "TEXT",
-          "tags": [
-            "JSON"
-          ],
-          "not_null": false,
-          "note": "DEFAULT '[]'",
-          "default": "'[]'"
-        },
-        {
-          "name": "relationship_status",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 'acquaintance'",
-          "default": "'acquaintance'"
-        },
-        {
-          "name": "last_contact_date",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "notes",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "created_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        },
-        {
-          "name": "updated_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        }
-      ]
-    },
-    {
-      "name": "interagency_rulemakings",
-      "service": "pipeline",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "title",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "agency",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "rulemaking_type",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "topics",
-          "type": "TEXT",
-          "tags": [
-            "JSON"
-          ],
-          "not_null": false,
-          "note": "DEFAULT '[]'",
-          "default": "'[]'"
-        },
-        {
-          "name": "status",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 'active'",
-          "default": "'active'"
-        },
-        {
-          "name": "key_dates",
-          "type": "TEXT",
-          "tags": [
-            "JSON"
-          ],
-          "not_null": false,
-          "note": "DEFAULT '{}'",
-          "default": "'{}'"
-        },
-        {
-          "name": "url",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "summary",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "cftc_position",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "impact_on_cftc_work",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "linked_pipeline_ids",
-          "type": "TEXT",
-          "tags": [
-            "JSON"
-          ],
-          "not_null": false,
-          "note": "DEFAULT '[]'",
-          "default": "'[]'"
-        },
-        {
-          "name": "created_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        },
-        {
-          "name": "updated_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        }
-      ]
-    },
-    {
-      "name": "email_log",
-      "service": "pipeline",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "email_type",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "recipients",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "subject",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "body_html",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "body_text",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "status",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false,
-          "note": "DEFAULT 'sent'",
-          "default": "'sent'"
-        },
-        {
-          "name": "error_message",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "sent_at",
-          "type": "TEXT",
-          "tags": [
-            "TS",
-            "IDX"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        }
-      ]
-    },
-    {
-      "name": "ai_processing_log",
-      "service": "pipeline",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "processing_type",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "source_id",
-          "type": "INTEGER",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "source_table",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "prompt_summary",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "result_text",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "model_used",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "input_tokens",
-          "type": "INTEGER",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "output_tokens",
-          "type": "INTEGER",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "cost_estimate",
-          "type": "REAL",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "created_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        }
-      ]
-    },
-    {
-      "name": "scheduler_state",
-      "service": "pipeline",
-      "fields": [
-        {
-          "name": "task_key",
           "type": "TEXT",
           "tags": [
             "PK"
@@ -5242,321 +2943,53 @@
           "note": "UUID"
         },
         {
-          "name": "last_run_at",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "last_status",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "next_run_at",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        }
-      ]
-    },
-    {
-      "name": "proposed_rules",
-      "service": "comments",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "docket_number",
+          "name": "source",
           "type": "TEXT",
           "tags": [
-            "IDX"
+            "ENUM"
           ],
-          "not_null": true,
-          "note": "NOT NULL; UNIQUE"
-        },
-        {
-          "name": "rin",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "title",
-          "type": "TEXT",
-          "tags": [],
           "not_null": true,
           "note": "NOT NULL"
         },
         {
-          "name": "publication_date",
+          "name": "file_path",
           "type": "TEXT",
           "tags": [],
           "not_null": false
         },
         {
-          "name": "comment_period_start",
+          "name": "processing_status",
           "type": "TEXT",
           "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "comment_period_end",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "federal_register_citation",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "federal_register_doc_number",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "priority_level",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
           "not_null": false,
-          "note": "DEFAULT 'STANDARD'",
-          "default": "'STANDARD'"
+          "note": "DEFAULT 'pending'",
+          "default": "'pending'"
         },
         {
-          "name": "status",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 'OPEN'",
-          "default": "'OPEN'"
-        },
-        {
-          "name": "full_text_url",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "summary",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "regulations_gov_url",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "page_count",
-          "type": "INTEGER",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "created_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        },
-        {
-          "name": "updated_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        },
-        {
-          "name": "last_comment_pull",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "total_comments",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
-        }
-      ]
-    },
-    {
-      "name": "comments",
-      "service": "comments",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "docket_number",
-          "type": "TEXT",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL; REFERENCES proposed_rules.docket_number"
-        },
-        {
-          "name": "document_id",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL; UNIQUE"
-        },
-        {
-          "name": "commenter_name",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "commenter_organization",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": false
-        },
-        {
-          "name": "submission_date",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": false
-        },
-        {
-          "name": "comment_text",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "original_pdf_url",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "page_count",
-          "type": "INTEGER",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "has_attachments",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
-        },
-        {
-          "name": "attachment_count",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
-        },
-        {
-          "name": "tier",
-          "type": "INTEGER",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": false
-        },
-        {
-          "name": "sentiment",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "is_form_letter",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
-        },
-        {
-          "name": "form_letter_group_id",
-          "type": "INTEGER",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "ai_summary",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "ai_summary_structured",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "pdf_extraction_confidence",
+          "name": "duration_seconds",
           "type": "REAL",
           "tags": [],
           "not_null": false
         },
         {
-          "name": "pdf_extraction_method",
+          "name": "title",
           "type": "TEXT",
           "tags": [],
           "not_null": false
         },
         {
+          "name": "speakers_confirmed",
+          "type": "BOOLEAN",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
           "name": "created_at",
-          "type": "TEXT",
+          "type": "DATETIME",
           "tags": [
             "TS"
           ],
@@ -5566,319 +2999,51 @@
         },
         {
           "name": "updated_at",
-          "type": "TEXT",
+          "type": "DATETIME",
           "tags": [
             "TS"
           ],
           "not_null": false,
           "note": "DEFAULT datetime('now')",
           "default": "datetime('now')"
-        },
-        {
-          "name": "regulations_gov_url",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
         }
       ]
     },
     {
-      "name": "comment_tags",
-      "service": "comments",
+      "name": "audio_files",
+      "service": "intake",
       "fields": [
         {
           "name": "id",
-          "type": "INTEGER",
+          "type": "TEXT",
           "tags": [
             "PK"
           ],
           "not_null": true,
-          "note": "AUTOINCREMENT"
+          "note": "UUID"
         },
         {
-          "name": "comment_id",
-          "type": "INTEGER",
+          "name": "conversation_id",
+          "type": "TEXT",
           "tags": [
             "FK",
             "IDX"
           ],
-          "not_null": true,
-          "note": "NOT NULL; REFERENCES comments.id"
+          "not_null": false,
+          "note": "REFERENCES conversations.id"
         },
         {
-          "name": "tag_type",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "tag_value",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL"
-        }
-      ]
-    },
-    {
-      "name": "tier1_organizations",
-      "service": "comments",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "name",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL; UNIQUE"
-        },
-        {
-          "name": "category",
+          "name": "file_path",
           "type": "TEXT",
           "tags": [],
           "not_null": true,
           "note": "NOT NULL"
         },
         {
-          "name": "name_variations",
-          "type": "TEXT",
-          "tags": [
-            "JSON"
-          ],
-          "not_null": false,
-          "note": "DEFAULT '[]'",
-          "default": "'[]'"
-        },
-        {
-          "name": "created_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        }
-      ]
-    },
-    {
-      "name": "weekly_reports",
-      "service": "comments",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "week_ending_date",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "generated_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        },
-        {
-          "name": "pdf_file_url",
+          "name": "original_filename",
           "type": "TEXT",
           "tags": [],
           "not_null": false
-        },
-        {
-          "name": "html_content",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        }
-      ]
-    },
-    {
-      "name": "project_types",
-      "service": "work",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "type_key",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL; UNIQUE"
-        },
-        {
-          "name": "label",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "description",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "sort_order",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
-        }
-      ]
-    },
-    {
-      "name": "projects",
-      "service": "work",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "title",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "short_title",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "description",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "project_type",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "status",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL; DEFAULT 'active'",
-          "default": "'active'"
-        },
-        {
-          "name": "priority_label",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL; DEFAULT 'medium'",
-          "default": "'medium'"
-        },
-        {
-          "name": "lead_attorney_id",
-          "type": "INTEGER",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": false
-        },
-        {
-          "name": "linked_pipeline_id",
-          "type": "INTEGER",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "linked_docket",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "linked_eo_doc_id",
-          "type": "INTEGER",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "sort_order",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
-        },
-        {
-          "name": "created_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        },
-        {
-          "name": "updated_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
         },
         {
           "name": "source",
@@ -5889,206 +3054,34 @@
           "not_null": false
         },
         {
-          "name": "why_me",
+          "name": "format",
           "type": "TEXT",
           "tags": [],
           "not_null": false
         },
         {
-          "name": "completion_notes",
-          "type": "TEXT",
+          "name": "duration_seconds",
+          "type": "REAL",
           "tags": [],
           "not_null": false
         },
         {
-          "name": "due_date",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        }
-      ]
-    },
-    {
-      "name": "work_items",
-      "service": "work",
-      "fields": [
-        {
-          "name": "id",
+          "name": "file_size_bytes",
           "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "project_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL; REFERENCES projects.id"
-        },
-        {
-          "name": "parent_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": false,
-          "note": "REFERENCES work_items.id"
-        },
-        {
-          "name": "title",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "description",
-          "type": "TEXT",
           "tags": [],
           "not_null": false
         },
         {
-          "name": "status",
-          "type": "TEXT",
+          "name": "captured_at",
+          "type": "DATETIME",
           "tags": [
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL; DEFAULT 'not_started'",
-          "default": "'not_started'"
-        },
-        {
-          "name": "priority_label",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "due_date",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
+            "TS"
           ],
           "not_null": false
-        },
-        {
-          "name": "blocked_reason",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "sort_order",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
         },
         {
           "name": "created_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        },
-        {
-          "name": "updated_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        },
-        {
-          "name": "completed_at",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "context",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "last_update_notes",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "last_update_date",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "completion_notes",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        }
-      ]
-    },
-    {
-      "name": "work_item_assignments",
-      "service": "work",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "work_item_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL; REFERENCES work_items.id"
-        },
-        {
-          "name": "team_member_id",
-          "type": "INTEGER",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "role",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL; DEFAULT 'assigned'",
-          "default": "'assigned'"
-        },
-        {
-          "name": "assigned_at",
-          "type": "TEXT",
+          "type": "DATETIME",
           "tags": [
             "TS"
           ],
@@ -6099,108 +3092,30 @@
       ]
     },
     {
-      "name": "work_item_dependencies",
-      "service": "work",
+      "name": "transcripts",
+      "service": "intake",
       "fields": [
         {
           "name": "id",
-          "type": "INTEGER",
+          "type": "TEXT",
           "tags": [
             "PK"
           ],
           "not_null": true,
-          "note": "AUTOINCREMENT"
+          "note": "UUID"
         },
         {
-          "name": "blocked_item_id",
-          "type": "INTEGER",
+          "name": "conversation_id",
+          "type": "TEXT",
           "tags": [
             "FK",
             "IDX"
           ],
-          "not_null": true,
-          "note": "NOT NULL; REFERENCES work_items.id"
-        },
-        {
-          "name": "blocking_item_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL; REFERENCES work_items.id"
-        },
-        {
-          "name": "description",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "resolved",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
           "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
+          "note": "REFERENCES conversations.id"
         },
         {
-          "name": "resolved_at",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        }
-      ]
-    },
-    {
-      "name": "tasks",
-      "service": "work",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "title",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "description",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "status",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL; DEFAULT 'todo'",
-          "default": "'todo'"
-        },
-        {
-          "name": "priority_label",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false,
-          "note": "DEFAULT 'medium'",
-          "default": "'medium'"
-        },
-        {
-          "name": "due_date",
+          "name": "speaker_label",
           "type": "TEXT",
           "tags": [
             "IDX"
@@ -6208,74 +3123,240 @@
           "not_null": false
         },
         {
-          "name": "project_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": false,
-          "note": "REFERENCES projects.id"
-        },
-        {
-          "name": "work_item_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": false,
-          "note": "REFERENCES work_items.id"
-        },
-        {
-          "name": "linked_member_id",
-          "type": "INTEGER",
-          "tags": [
-            "IDX"
-          ],
+          "name": "speaker_id",
+          "type": "TEXT",
+          "tags": [],
           "not_null": false
         },
         {
-          "name": "parent_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": false,
-          "note": "REFERENCES tasks.id"
+          "name": "start_time",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
         },
         {
-          "name": "tags",
+          "name": "end_time",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "text",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "word_timestamps",
           "type": "TEXT",
           "tags": [
             "JSON"
           ],
+          "not_null": false
+        },
+        {
+          "name": "original_text",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "user_corrected",
+          "type": "BOOLEAN",
+          "tags": [
+            "BOOL"
+          ],
           "not_null": false,
-          "note": "DEFAULT '[]'",
-          "default": "'[]'"
+          "note": "DEFAULT 0",
+          "default": "0"
         },
         {
-          "name": "notes",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "source_system",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "source_id",
-          "type": "TEXT",
+          "name": "confidence",
+          "type": "REAL",
           "tags": [],
           "not_null": false
         },
         {
           "name": "created_at",
+          "type": "DATETIME",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "voice_samples",
+      "service": "intake",
+      "fields": [
+        {
+          "name": "id",
           "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "source_conversation_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES conversations.id"
+        },
+        {
+          "name": "speaker_label",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "embedding",
+          "type": "BLOB",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "speaker_voice_profiles",
+      "service": "intake",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "tracker_person_id",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "embedding",
+          "type": "BLOB",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "source_conversation_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES conversations.id"
+        },
+        {
+          "name": "quality_score",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 0.0",
+          "default": "0.0"
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "speaker_mappings",
+      "service": "intake",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "conversation_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES conversations.id"
+        },
+        {
+          "name": "speaker_label",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "tracker_person_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "confidence",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "method",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 'manual'",
+          "default": "'manual'"
+        },
+        {
+          "name": "confirmed",
+          "type": "BOOLEAN",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
           "tags": [
             "TS"
           ],
@@ -6285,164 +3366,13 @@
         },
         {
           "name": "updated_at",
-          "type": "TEXT",
+          "type": "DATETIME",
           "tags": [
             "TS"
           ],
           "not_null": false,
           "note": "DEFAULT datetime('now')",
           "default": "datetime('now')"
-        },
-        {
-          "name": "completed_at",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        }
-      ]
-    },
-    {
-      "name": "manager_notes",
-      "service": "work",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "content",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "project_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": false,
-          "note": "REFERENCES projects.id"
-        },
-        {
-          "name": "work_item_id",
-          "type": "INTEGER",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": false,
-          "note": "REFERENCES work_items.id"
-        },
-        {
-          "name": "linked_member_id",
-          "type": "INTEGER",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": false
-        },
-        {
-          "name": "note_type",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false,
-          "note": "DEFAULT 'general'",
-          "default": "'general'"
-        },
-        {
-          "name": "created_at",
-          "type": "TEXT",
-          "tags": [
-            "TS"
-          ],
-          "not_null": false,
-          "note": "DEFAULT datetime('now')",
-          "default": "datetime('now')"
-        },
-        {
-          "name": "context_type",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false,
-          "note": "DEFAULT 'general'",
-          "default": "'general'"
-        },
-        {
-          "name": "processed",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
-        },
-        {
-          "name": "ai_insights",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        }
-      ]
-    },
-    {
-      "name": "project_type_templates",
-      "service": "work",
-      "fields": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "tags": [
-            "PK"
-          ],
-          "not_null": true,
-          "note": "AUTOINCREMENT"
-        },
-        {
-          "name": "project_type",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "item_title",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "item_description",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "item_sort_order",
-          "type": "INTEGER",
-          "tags": [
-            "BOOL"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 0",
-          "default": "0"
-        },
-        {
-          "name": "parent_ref",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
         }
       ]
     }
@@ -6799,268 +3729,37 @@
       "label": "FK"
     },
     {
-      "from": "pipeline_items",
-      "fromField": "lead_attorney_id",
-      "to": "team_members",
+      "from": "audio_files",
+      "fromField": "conversation_id",
+      "to": "conversations",
       "toField": "id",
       "label": "FK"
     },
     {
-      "from": "pipeline_items",
-      "fromField": "backup_attorney_id",
-      "to": "team_members",
+      "from": "transcripts",
+      "fromField": "conversation_id",
+      "to": "conversations",
       "toField": "id",
       "label": "FK"
     },
     {
-      "from": "pipeline_items",
-      "fromField": "related_rulemaking_id",
-      "to": "pipeline_items",
+      "from": "voice_samples",
+      "fromField": "source_conversation_id",
+      "to": "conversations",
       "toField": "id",
       "label": "FK"
     },
     {
-      "from": "pipeline_stages",
-      "fromField": "item_id",
-      "to": "pipeline_items",
+      "from": "speaker_voice_profiles",
+      "fromField": "source_conversation_id",
+      "to": "conversations",
       "toField": "id",
       "label": "FK"
     },
     {
-      "from": "pipeline_item_assignments",
-      "fromField": "item_id",
-      "to": "pipeline_items",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "pipeline_item_assignments",
-      "fromField": "team_member_id",
-      "to": "team_members",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "pipeline_deadlines",
-      "fromField": "item_id",
-      "to": "pipeline_items",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "pipeline_deadlines",
-      "fromField": "predecessor_id",
-      "to": "pipeline_deadlines",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "pipeline_deadlines",
-      "fromField": "owner_id",
-      "to": "team_members",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "pipeline_documents",
-      "fromField": "item_id",
-      "to": "pipeline_items",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "pipeline_documents",
-      "fromField": "parent_version_id",
-      "to": "pipeline_documents",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "pipeline_decision_log",
-      "fromField": "item_id",
-      "to": "pipeline_items",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "pipeline_stakeholder_links",
-      "fromField": "item_id",
-      "to": "pipeline_items",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "pipeline_stakeholder_links",
-      "fromField": "stakeholder_id",
-      "to": "pipeline_stakeholders",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "pipeline_meetings",
-      "fromField": "item_id",
-      "to": "pipeline_items",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "pipeline_dependencies",
-      "fromField": "source_item_id",
-      "to": "pipeline_items",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "pipeline_dependencies",
-      "fromField": "target_item_id",
-      "to": "pipeline_items",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "pipeline_notifications",
-      "fromField": "recipient_id",
-      "to": "team_members",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "pipeline_notifications",
-      "fromField": "item_id",
-      "to": "pipeline_items",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "pipeline_cba_tracking",
-      "fromField": "item_id",
-      "to": "pipeline_items",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "pipeline_publication_status",
-      "fromField": "item_id",
-      "to": "pipeline_items",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "pipeline_unified_agenda",
-      "fromField": "item_id",
-      "to": "pipeline_items",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "pipeline_foia",
-      "fromField": "item_id",
-      "to": "pipeline_items",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "pipeline_foia",
-      "fromField": "assigned_to",
-      "to": "team_members",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "pipeline_enforcement_referrals",
-      "fromField": "item_id",
-      "to": "pipeline_items",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "pipeline_priority_signals",
-      "fromField": "item_id",
-      "to": "pipeline_items",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "comments",
-      "fromField": "docket_number",
-      "to": "proposed_rules",
-      "toField": "docket_number",
-      "label": "FK"
-    },
-    {
-      "from": "comment_tags",
-      "fromField": "comment_id",
-      "to": "comments",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "work_items",
-      "fromField": "project_id",
-      "to": "projects",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "work_items",
-      "fromField": "parent_id",
-      "to": "work_items",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "work_item_assignments",
-      "fromField": "work_item_id",
-      "to": "work_items",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "work_item_dependencies",
-      "fromField": "blocked_item_id",
-      "to": "work_items",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "work_item_dependencies",
-      "fromField": "blocking_item_id",
-      "to": "work_items",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "tasks",
-      "fromField": "project_id",
-      "to": "projects",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "tasks",
-      "fromField": "work_item_id",
-      "to": "work_items",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "tasks",
-      "fromField": "parent_id",
-      "to": "tasks",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "manager_notes",
-      "fromField": "project_id",
-      "to": "projects",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "manager_notes",
-      "fromField": "work_item_id",
-      "to": "work_items",
+      "from": "speaker_mappings",
+      "fromField": "conversation_id",
+      "to": "conversations",
       "toField": "id",
       "label": "FK"
     }
@@ -7081,7 +3780,10 @@
       "personnel / management",
       "administrative / ethics / process",
       "industry inquiry",
-      "international matter"
+      "international matter",
+      "regulatory review",
+      "prospective policy",
+      "other"
     ],
     "matter_status": [
       "new intake",
@@ -7194,6 +3896,32 @@
       "commissioner office",
       "other"
     ],
+    "meeting_role": [
+      "chair",
+      "presenter",
+      "attendee",
+      "decision-maker",
+      "note-taker",
+      "guest"
+    ],
+    "attendance_status": [
+      "invited",
+      "attended",
+      "declined",
+      "tentative"
+    ],
+    "position_strength": [
+      "tentative",
+      "qualified",
+      "firm"
+    ],
+    "meeting_matter_relationship_type": [
+      "primary topic",
+      "secondary topic",
+      "status update",
+      "decision point",
+      "coordination"
+    ],
     "document_type": [
       "memo",
       "briefing paper",
@@ -7217,6 +3945,23 @@
       "sent",
       "superseded",
       "archived"
+    ],
+    "review_role": [
+      "drafter",
+      "primary reviewer",
+      "legal reviewer",
+      "client reviewer",
+      "leadership reviewer",
+      "clearance reviewer",
+      "final approver"
+    ],
+    "review_status": [
+      "not set",
+      "pending",
+      "in review",
+      "comments returned",
+      "approved",
+      "declined"
     ],
     "decision_type": [
       "boss decision",
@@ -7267,6 +4012,17 @@
       "Influencer",
       "FYI only"
     ],
+    "next_interaction_type": [
+      "briefing",
+      "follow-up",
+      "check-in",
+      "escalation",
+      "decision request",
+      "relationship maintenance",
+      "outreach",
+      "coordination",
+      "other"
+    ],
     "matter_role": [
       "lead attorney",
       "supervisor",
@@ -7308,6 +4064,43 @@
       "deadline changed",
       "escalation",
       "closure note"
+    ],
+    "task_dependency_type": [
+      "cannot start until complete",
+      "should follow",
+      "needs input from",
+      "parallel but linked"
+    ],
+    "matter_dependency_type": [
+      "legal dependency",
+      "policy dependency",
+      "sequencing dependency",
+      "approval dependency",
+      "external dependency",
+      "shared deadline",
+      "related risk"
+    ],
+    "comment_period_type": [
+      "original",
+      "extension",
+      "reopening",
+      "supplemental"
+    ],
+    "cba_status": [
+      "not_started",
+      "in_progress",
+      "under_review",
+      "completed"
+    ],
+    "task_update_type": [
+      "status update",
+      "reassigned",
+      "waiting state changed",
+      "due date changed",
+      "note added",
+      "completion note",
+      "escalation",
+      "blocker identified"
     ],
     "source": [
       "manual",
