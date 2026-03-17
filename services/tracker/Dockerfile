@@ -12,7 +12,7 @@ RUN mkdir -p /app/data /app/uploads
 
 ENV PYTHONUNBUFFERED=1
 ENV TRACKER_DB_PATH=/app/data/tracker.db
-ENV UPLOAD_DIR=/app/uploads
+ENV TRACKER_UPLOAD_DIR=/app/uploads
 
 EXPOSE 8004
 
