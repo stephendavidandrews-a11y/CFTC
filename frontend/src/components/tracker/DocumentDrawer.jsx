@@ -109,10 +109,27 @@ export default function DocumentDrawer({ isOpen, onClose, document: doc, matterI
     setFieldErrors({});
   }, [doc, matterId, isOpen]);
 
-  // Fetch detail on edit to capture ETag for concurrency control
+  // Fetch full detail on edit to prevent data loss and capture ETag
   React.useEffect(() => {
     if (doc && doc.id) {
-      getDocument(doc.id).then(d => setEtag(d._etag || null)).catch(() => {});
+      getDocument(doc.id).then(d => {
+        setEtag(d._etag || null);
+        setForm({
+          title: d.title || "",
+          document_type: d.document_type || "",
+          matter_id: d.matter_id || "",
+          status: d.status || "",
+          assigned_to_person_id: d.assigned_to_person_id || "",
+          version_label: d.version_label || "",
+          due_date: (d.due_date || "").slice(0, 10),
+          summary: d.summary || "",
+          notes: d.notes || "",
+          final_location: d.final_location || "",
+          is_finalized: d.is_finalized || 0,
+          is_sent: d.is_sent || 0,
+          sent_at: d.sent_at ? d.sent_at.slice(0, 16) : "",
+        });
+      }).catch(() => {});
     }
   }, [doc, isOpen]);
 

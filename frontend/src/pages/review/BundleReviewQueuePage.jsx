@@ -202,7 +202,7 @@ export default function BundleReviewQueuePage() {
 
         {!loading && !error && items.length === 0 && (
           <EmptyState
-            icon="\u25a4"
+            icon="▤"
             title="No communications awaiting review"
             message="When the AI pipeline extracts bundles from a communication, they will appear here for your review."
           />

@@ -67,18 +67,18 @@ async def create_decision(body: CreateDecision, request: Request, db=Depends(get
     db.execute("""
         INSERT INTO decisions (id, matter_id, title, decision_type, status,
             decision_assigned_to_person_id, decision_due_date, options_summary,
-            recommended_option, notes, source, source_id, ai_confidence,
-            automation_hold, external_refs, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            recommended_option, decision_result, made_at, notes, source, source_id,
+            ai_confidence, automation_hold, external_refs, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (did, body.matter_id, body.title, body.decision_type,
           body.status, body.decision_assigned_to_person_id,
           body.decision_due_date, body.options_summary,
-          body.recommended_option, body.notes,
-          source_val, body.source_id,
+          body.recommended_option, body.decision_result, body.made_at,
+          body.notes, source_val, body.source_id,
           body.ai_confidence, body.automation_hold,
           body.external_refs, now, now))
     new_data = body.model_dump()
-    new_data.update({"id": did, "source": source_val, "created_at": now, "updated_at": now})
+    new_data.update({"id": did, "source": source_val, "created_at": now, "updated_at": now, "made_at": body.made_at, "decision_result": body.decision_result})
     log_event(db, table_name="decisions", record_id=did, action="create",
               source=write_source, new_data=new_data)
     result = {"id": did}

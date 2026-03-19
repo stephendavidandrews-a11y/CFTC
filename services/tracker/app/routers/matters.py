@@ -98,11 +98,31 @@ async def list_matters(
         LIMIT ? OFFSET ?
     """, params + [limit, offset]).fetchall()
 
+    items = [dict(row) for row in rows]
+
+    # Compute summary counts (always against unfiltered open matters)
+    summary_rows = db.execute("""
+        SELECT
+            COUNT(*) as open_matters,
+            SUM(CASE WHEN m.priority = 'critical this week' THEN 1 ELSE 0 END) as critical_this_week,
+            SUM(CASE WHEN m.status IN ('awaiting comments', 'awaiting decision') OR m.pending_decision IS NOT NULL AND m.pending_decision != '' THEN 1 ELSE 0 END) as awaiting_decision,
+            SUM(CASE WHEN m.updated_at < datetime('now', '-14 days') THEN 1 ELSE 0 END) as stale_matters
+        FROM matters m
+        WHERE m.status != 'closed'
+    """).fetchone()
+    summary = {
+        "open_matters": summary_rows["open_matters"] or 0,
+        "critical_this_week": summary_rows["critical_this_week"] or 0,
+        "awaiting_decision": summary_rows["awaiting_decision"] or 0,
+        "stale_matters": summary_rows["stale_matters"] or 0,
+    }
+
     return {
-        "items": [dict(row) for row in rows],
+        "items": items,
         "total": total,
         "limit": limit,
         "offset": offset,
+        "summary": summary,
     }
 
 

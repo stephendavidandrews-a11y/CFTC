@@ -22,17 +22,20 @@ async def list_people(
     relationship_category: str = Query(None),
     relationship_lane: str = Query(None),
     include_in_team: bool = Query(None),
-    is_active: bool = Query(True),
+    is_active: bool = Query(None),
     sort_by: str = Query("full_name"),
     sort_dir: str = Query("asc"),
     limit: int = Query(100, le=500),
     offset: int = Query(0),
 ):
-    conditions = ["p.is_active = ?"]
-    params = [1 if is_active else 0]
+    conditions = []
+    params = []
+    if is_active is not None:
+        conditions.append("p.is_active = ?")
+        params.append(1 if is_active else 0)
     if search:
-        conditions.append("(p.full_name LIKE ? OR p.email LIKE ? OR p.title LIKE ?)")
-        params.extend([f"%{search}%"] * 3)
+        conditions.append("(p.full_name LIKE ? OR p.email LIKE ? OR p.title LIKE ? OR o.name LIKE ? OR o.short_name LIKE ? OR p.relationship_category LIKE ?)")
+        params.extend([f"%{search}%"] * 6)
     if organization_id:
         conditions.append("p.organization_id = ?")
         params.append(organization_id)
@@ -47,22 +50,54 @@ async def list_people(
         params.append(1 if include_in_team else 0)
 
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
-    allowed_sorts = {"full_name", "title", "organization_id", "last_interaction_date", "created_at"}
+    allowed_sorts = {"full_name", "title", "organization_id", "last_interaction_date",
+                     "next_interaction_needed_date", "created_at", "active_matters", "open_tasks"}
     if sort_by not in allowed_sorts:
         sort_by = "full_name"
     direction = "DESC" if sort_dir.lower() == "desc" else "ASC"
 
-    total = db.execute(f"SELECT COUNT(*) as c FROM people p {where}", params).fetchone()["c"]
+    total = db.execute(f"""
+        SELECT COUNT(*) as c FROM people p
+        LEFT JOIN organizations o ON p.organization_id = o.id
+        {where}
+    """, params).fetchone()["c"]
+    order_expr = {
+        "active_matters": "active_matters",
+        "open_tasks": "open_tasks",
+    }.get(sort_by, f"p.{sort_by}")
     rows = db.execute(f"""
-        SELECT p.*, o.name as org_name, o.short_name as org_short_name
+        SELECT p.*, o.name as org_name, o.short_name as org_short_name,
+            (SELECT COUNT(DISTINCT mp.matter_id) FROM matter_people mp
+             JOIN matters m ON mp.matter_id = m.id
+             WHERE mp.person_id = p.id AND m.status != 'closed') AS active_matters,
+            (SELECT COUNT(*) FROM tasks t
+             WHERE t.assigned_to_person_id = p.id AND t.status NOT IN ('completed', 'deferred')) AS open_tasks
         FROM people p
         LEFT JOIN organizations o ON p.organization_id = o.id
         {where}
-        ORDER BY p.{sort_by} {direction}
+        ORDER BY {order_expr} {direction}
         LIMIT ? OFFSET ?
     """, params + [limit, offset]).fetchall()
 
-    return {"items": [dict(row) for row in rows], "total": total, "limit": limit, "offset": offset}
+    items = [dict(row) for row in rows]
+
+    # Summary counts (always unfiltered active people)
+    summary_rows = db.execute("""
+        SELECT
+            SUM(CASE WHEN p.include_in_team_workload = 1 THEN 1 ELSE 0 END) as team,
+            SUM(CASE WHEN p.relationship_category = 'Internal client' THEN 1 ELSE 0 END) as internal_clients,
+            SUM(CASE WHEN p.relationship_category IN ('Partner agency', 'Hill', 'Outside party') THEN 1 ELSE 0 END) as external_stakeholders,
+            SUM(CASE WHEN p.next_interaction_needed_date IS NOT NULL AND p.next_interaction_needed_date <= date('now', '+7 days') THEN 1 ELSE 0 END) as follow_up_needed
+        FROM people p WHERE p.is_active = 1
+    """).fetchone()
+    summary = {
+        "team": summary_rows["team"] or 0,
+        "internal_clients": summary_rows["internal_clients"] or 0,
+        "external_stakeholders": summary_rows["external_stakeholders"] or 0,
+        "follow_up_needed": summary_rows["follow_up_needed"] or 0,
+    }
+
+    return {"items": items, "total": total, "limit": limit, "offset": offset, "summary": summary}
 
 
 @router.get("/{person_id}")
@@ -80,6 +115,16 @@ async def get_person(person_id: str, db=Depends(get_db)):
 
     result = dict(row)
 
+    # Relationship owner name
+    if result.get("relationship_assigned_to_person_id"):
+        owner_row = db.execute(
+            "SELECT full_name FROM people WHERE id = ?",
+            (result["relationship_assigned_to_person_id"],)
+        ).fetchone()
+        result["relationship_owner_name"] = owner_row["full_name"] if owner_row else None
+    else:
+        result["relationship_owner_name"] = None
+
     # Matters this person is on
     result["matters"] = [dict(r) for r in db.execute("""
         SELECT mp.matter_role, mp.engagement_level, m.id, m.title, m.matter_number, m.status, m.priority
@@ -91,9 +136,13 @@ async def get_person(person_id: str, db=Depends(get_db)):
 
     # Tasks assigned
     result["tasks"] = [dict(r) for r in db.execute("""
-        SELECT t.id, t.title, t.status, t.due_date, t.priority, m.title as matter_title
+        SELECT t.id, t.title, t.status, t.due_date, t.priority,
+               t.expected_output, t.waiting_on_description,
+               m.title as matter_title,
+               wp.full_name as waiting_on_person_name
         FROM tasks t
         LEFT JOIN matters m ON t.matter_id = m.id
+        LEFT JOIN people wp ON t.waiting_on_person_id = wp.id
         WHERE t.assigned_to_person_id = ? AND t.status NOT IN ('done', 'deferred')
         ORDER BY t.due_date
     """, (person_id,))]

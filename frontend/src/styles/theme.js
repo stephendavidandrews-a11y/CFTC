@@ -99,6 +99,23 @@ const theme = {
     regulatory: { accent: "#34d399", bg: "rgba(52,211,153,0.08)" },
   },
 
+  // Organization type badge styles
+  orgType: {
+    "CFTC office":              { bg: "#1e3a5f", text: "#60a5fa" },
+    "CFTC division":            { bg: "#1e3a5f", text: "#60a5fa" },
+    "Commissioner office":      { bg: "#3b1f6e", text: "#a78bfa" },
+    "Federal agency":           { bg: "#1a4731", text: "#34d399" },
+    "White House / OMB":        { bg: "#4a3728", text: "#fbbf24" },
+    "Congressional office":     { bg: "#4a2832", text: "#f87171" },
+    "Exchange":                 { bg: "#1a3a4a", text: "#38bdf8" },
+    "Clearinghouse":            { bg: "#1a3a4a", text: "#38bdf8" },
+    "Trade association":        { bg: "#3a3a1a", text: "#facc15" },
+    "Regulated entity":         { bg: "#2a3a2a", text: "#86efac" },
+    "Outside counsel":          { bg: "#3a2a3a", text: "#c084fc" },
+    "Inspector General / auditor": { bg: "#3a3028", text: "#fb923c" },
+    "Other":                    { bg: "#2a2a2a", text: "#9ca3af" },
+  },
+
   // Typography
   font: {
     family: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif",

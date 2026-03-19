@@ -44,6 +44,8 @@ const EMPTY = {
   next_interaction_needed_date: "",
   next_interaction_type: "",
   next_interaction_purpose: "",
+  personality: "",
+  relationship_assigned_to_person_id: "",
 };
 
 export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
@@ -89,10 +91,12 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
         include_in_team_workload: !!person.include_in_team_workload,
         is_active: person.is_active !== undefined ? !!person.is_active : true,
         manager_person_id: person.manager_person_id || "",
-        last_interaction_date: person.last_interaction_date || "",
-        next_interaction_needed_date: person.next_interaction_needed_date || "",
+        last_interaction_date: (person.last_interaction_date || "").slice(0, 10),
+        next_interaction_needed_date: (person.next_interaction_needed_date || "").slice(0, 10),
         next_interaction_type: person.next_interaction_type || "",
         next_interaction_purpose: person.next_interaction_purpose || "",
+        personality: person.personality || "",
+        relationship_assigned_to_person_id: person.relationship_assigned_to_person_id || "",
       });
     } else {
       setEtag(null);
@@ -127,6 +131,10 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
       const first = payload.first_name || "";
       const last = payload.last_name || "";
       payload.full_name = `${first} ${last}`.trim() || null;
+
+      // Convert booleans to integers for SQLite
+      payload.is_active = form.is_active ? 1 : 0;
+      payload.include_in_team_workload = form.include_in_team_workload ? 1 : 0;
 
       if (!person?.id) { Object.keys(payload).forEach((k) => { if (payload[k] === null || payload[k] === undefined) delete payload[k]; }); }
 
@@ -202,6 +210,10 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
         <label style={LABEL_STYLE}>Substantive Areas</label>
         <textarea style={{ ...INPUT_STYLE, minHeight: 80, resize: "vertical" }} value={form.substantive_areas} onChange={set("substantive_areas")} />
       </div>
+      <div style={{ marginBottom: 14 }}>
+        <label style={LABEL_STYLE}>Personality / Communication Style</label>
+        <textarea style={{ ...INPUT_STYLE, minHeight: 80, resize: "vertical" }} value={form.personality} onChange={set("personality")} placeholder="Communication preferences, temperament, what to avoid..." />
+      </div>
 
       <div style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
         <input
@@ -230,6 +242,7 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
       </div>
 
       {renderSelect("Manager", "manager_person_id", personOpts)}
+      {renderSelect("Relationship Owner", "relationship_assigned_to_person_id", personOpts)}
       {renderInput("Last Interaction", "last_interaction_date", "date")}
       {renderInput("Next Interaction Needed", "next_interaction_needed_date", "date")}
       {renderSelect("Next Interaction Type", "next_interaction_type", enums.next_interaction_type)}

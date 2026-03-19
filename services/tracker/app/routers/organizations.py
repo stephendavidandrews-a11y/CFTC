@@ -19,38 +19,68 @@ async def list_organizations(
     db=Depends(get_db),
     search: str = Query(None),
     organization_type: str = Query(None),
-    is_active: bool = Query(True),
+    is_active: bool = Query(None),
     sort_by: str = Query("name"),
     sort_dir: str = Query("asc"),
     limit: int = Query(100, le=500),
     offset: int = Query(0),
 ):
-    conditions = ["o.is_active = ?"]
-    params = [1 if is_active else 0]
+    conditions = []
+    params = []
+    if is_active is not None:
+        conditions.append("o.is_active = ?")
+        params.append(1 if is_active else 0)
     if search:
-        conditions.append("(o.name LIKE ? OR o.short_name LIKE ?)")
-        params.extend([f"%{search}%"] * 2)
+        conditions.append("(o.name LIKE ? OR o.short_name LIKE ? OR o.jurisdiction LIKE ? OR o.notes LIKE ?)")
+        params.extend([f"%{search}%"] * 4)
     if organization_type:
         conditions.append("o.organization_type = ?")
         params.append(organization_type)
 
-    where = "WHERE " + " AND ".join(conditions)
+    where = "WHERE " + " AND ".join(conditions) if conditions else ""
     allowed_sorts = {"name", "organization_type", "created_at"}
     if sort_by not in allowed_sorts:
         sort_by = "name"
     direction = "DESC" if sort_dir.lower() == "desc" else "ASC"
 
+    allowed_sorts = allowed_sorts | {"active_matters", "people_count"}
     total = db.execute(f"SELECT COUNT(*) as c FROM organizations o {where}", params).fetchone()["c"]
     rows = db.execute(f"""
-        SELECT o.*, po.name as parent_org_name
+        SELECT o.*, po.name as parent_org_name,
+            (SELECT COUNT(*) FROM matter_organizations mo
+             JOIN matters m ON mo.matter_id = m.id
+             WHERE mo.organization_id = o.id AND m.status != 'closed') AS active_matters,
+            (SELECT COUNT(*) FROM people p
+             WHERE p.organization_id = o.id AND p.is_active = 1) AS people_count
         FROM organizations o
         LEFT JOIN organizations po ON o.parent_organization_id = po.id
         {where}
-        ORDER BY o.{sort_by} {direction}
+        ORDER BY {"active_matters" if sort_by == "active_matters" else "people_count" if sort_by == "people_count" else "o." + sort_by} {direction}
         LIMIT ? OFFSET ?
     """, params + [limit, offset]).fetchall()
 
-    return {"items": [dict(row) for row in rows], "total": total, "limit": limit, "offset": offset}
+    items = [dict(row) for row in rows]
+
+    # Compute summary counts by category
+    cat_rows = db.execute(f"""
+        SELECT o.organization_type, COUNT(*) as cnt
+        FROM organizations o {where}
+        GROUP BY o.organization_type
+    """, params).fetchall()
+    cat_map = {r["organization_type"]: r["cnt"] for r in cat_rows}
+    cftc_types = {"CFTC office", "CFTC division", "Commissioner office"}
+    federal_types = {"Federal agency", "White House / OMB"}
+    external_types = {"Exchange", "Clearinghouse", "Trade association", "Regulated entity", "Outside counsel"}
+    congressional_types = {"Congressional office"}
+    summary = {
+        "total_active": total,
+        "cftc_internal": sum(cat_map.get(t, 0) for t in cftc_types),
+        "federal_interagency": sum(cat_map.get(t, 0) for t in federal_types),
+        "external": sum(cat_map.get(t, 0) for t in external_types),
+        "congressional": sum(cat_map.get(t, 0) for t in congressional_types),
+    }
+
+    return {"items": items, "total": total, "limit": limit, "offset": offset, "summary": summary}
 
 
 @router.get("/{org_id}")
@@ -65,15 +95,17 @@ async def get_organization(org_id: str, db=Depends(get_db)):
         raise HTTPException(status_code=404, detail="Organization not found")
 
     result = dict(row)
-    # Key people
+    # Key people (expanded fields for detail page)
     result["people"] = [dict(r) for r in db.execute("""
-        SELECT id, full_name, title, email, relationship_category
+        SELECT id, full_name, title, email, relationship_category,
+               relationship_lane, last_interaction_date, next_interaction_needed_date
         FROM people WHERE organization_id = ? AND is_active = 1
         ORDER BY full_name
     """, (org_id,))]
-    # Active matters
+    # Active matters (expanded for detail page)
     result["matters"] = [dict(r) for r in db.execute("""
-        SELECT DISTINCT m.id, m.title, m.matter_number, m.status, m.priority, mo.organization_role
+        SELECT DISTINCT m.id, m.title, m.matter_number, m.status, m.priority,
+               m.next_step, mo.organization_role
         FROM matter_organizations mo
         JOIN matters m ON mo.matter_id = m.id
         WHERE mo.organization_id = ? AND m.status != 'closed'
@@ -85,6 +117,17 @@ async def get_organization(org_id: str, db=Depends(get_db)):
         FROM organizations WHERE parent_organization_id = ? AND is_active = 1
         ORDER BY name
     """, (org_id,))]
+    # Recent meetings (via participant org or via linked matters)
+    result["meetings"] = [dict(r) for r in db.execute("""
+        SELECT DISTINCT mtg.id, mtg.title, mtg.date_time_start, mtg.meeting_type
+        FROM meetings mtg
+        LEFT JOIN meeting_participants mp ON mp.meeting_id = mtg.id
+        LEFT JOIN meeting_matters mm ON mm.meeting_id = mtg.id
+        LEFT JOIN matter_organizations mo2 ON mo2.matter_id = mm.matter_id
+        WHERE mp.organization_id = ? OR mo2.organization_id = ?
+        ORDER BY mtg.date_time_start DESC
+        LIMIT 10
+    """, (org_id, org_id))]
 
     return JSONResponse(content=result, headers={"ETag": get_etag(row)})
 

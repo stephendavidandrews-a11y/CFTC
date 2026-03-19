@@ -259,7 +259,7 @@ export default function CommunicationsArchivePage() {
 
         {!loading && !error && items.length === 0 && (
           <EmptyState
-            icon="\u25ce"
+            icon="◎"
             title="No communications found"
             message={statusFilter
               ? `No communications with status "${statusFilter}".`

@@ -48,12 +48,12 @@ function formatDateTime(d) {
 
 export default function MeetingsPage() {
   const { openDrawer } = useDrawer();
-  const [filters, setFilters] = useState({ date_from: "", date_to: "", matter_id: "" });
+  const [filters, setFilters] = useState({ search: "", date_from: "", date_to: "", matter_id: "" });
 
   const { data: mattersData } = useApi(() => listMatters({ limit: 500 }), []);
   const { data, loading, error, refetch } = useApi(
     () => listMeetings(filters),
-    [filters.date_from, filters.date_to, filters.matter_id]
+    [filters.search, filters.date_from, filters.date_to, filters.matter_id]
   );
 
   const handleFilter = useCallback((key, val) => {
@@ -96,6 +96,12 @@ export default function MeetingsPage() {
 
       {/* Filters */}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+        <input
+          style={{ ...inputStyle, minWidth: 280 }}
+          placeholder="Search meetings by title or purpose..."
+          value={filters.search}
+          onChange={(e) => handleFilter("search", e.target.value)}
+        />
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ fontSize: 12, color: theme.text.faint }}>From</span>
           <input

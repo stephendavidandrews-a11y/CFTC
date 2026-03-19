@@ -4,21 +4,42 @@ import theme from "../../styles/theme";
 import useApi from "../../hooks/useApi";
 import { getPerson, deletePerson } from "../../api/tracker";
 import Badge from "../../components/shared/Badge";
-import DataTable from "../../components/shared/DataTable";
-import EmptyState from "../../components/shared/EmptyState";
 import { useDrawer } from "../../contexts/DrawerContext";
+
+/* ── Styles ──────────────────────────────────────────────────── */
 
 const cardStyle = {
   background: theme.bg.card,
   borderRadius: 10,
   border: `1px solid ${theme.border.default}`,
-  padding: 24,
+  padding: 20,
 };
 
-const titleStyle = { fontSize: 22, fontWeight: 700, color: theme.text.primary, marginBottom: 4 };
-const sectionTitle = { fontSize: 14, fontWeight: 700, color: theme.text.secondary, marginBottom: 14 };
-const labelStyle = { fontSize: 11, fontWeight: 700, color: theme.text.faint, textTransform: "uppercase", letterSpacing: "0.05em" };
-const valStyle = { fontSize: 13, color: theme.text.secondary, marginTop: 2 };
+const sidebarCardStyle = {
+  ...cardStyle,
+  background: theme.bg.input,
+};
+
+const sectionLabel = {
+  fontSize: 11,
+  fontWeight: 700,
+  color: theme.text.faint,
+  textTransform: "uppercase",
+  letterSpacing: "0.05em",
+  marginBottom: 12,
+};
+
+const fieldLabel = {
+  fontSize: 12,
+  fontWeight: 600,
+  color: theme.text.secondary,
+};
+
+const fieldValue = {
+  fontSize: 13,
+  color: theme.text.muted,
+  marginTop: 1,
+};
 
 const btnPrimary = {
   padding: "7px 16px", borderRadius: 6, fontSize: 12, fontWeight: 600,
@@ -31,10 +52,93 @@ const btnSecondary = {
   border: `1px solid ${theme.border.default}`, cursor: "pointer",
 };
 
+/* ── Badge color maps ────────────────────────────────────────── */
+
+const CATEGORY_COLORS = {
+  "Boss":                 { bg: "#3b1f6e", text: "#a78bfa" },
+  "Leadership":           { bg: "#3b1f6e", text: "#a78bfa" },
+  "Direct report":        { bg: "#1e3a5f", text: "#60a5fa" },
+  "OGC peer":             { bg: "#1a4731", text: "#34d399" },
+  "Internal client":      { bg: "#1a4731", text: "#34d399" },
+  "Commissioner office":  { bg: "#3b1f6e", text: "#a78bfa" },
+  "Partner agency":       { bg: "#1a3a4a", text: "#38bdf8" },
+  "Hill":                 { bg: "#4a3728", text: "#fbbf24" },
+  "Outside party":        { bg: "#3a2a3a", text: "#c084fc" },
+};
+
+const LANE_COLORS = {
+  "Decision-maker": { bg: "#4a2020", text: "#f87171" },
+  "Recommender":    { bg: "#4a3728", text: "#fbbf24" },
+  "Drafter":        { bg: "#1e3a5f", text: "#60a5fa" },
+  "Blocker":        { bg: "#4a2020", text: "#f87171" },
+  "Influencer":     { bg: "#3b1f6e", text: "#a78bfa" },
+  "FYI only":       { bg: "#2a2a2a", text: "#9ca3af" },
+};
+
+const STATUS_COLORS = {
+  "not started":    { bg: "#2a2a2a", text: "#9ca3af" },
+  "in progress":    { bg: "#1e3a5f", text: "#60a5fa" },
+  "needs review":   { bg: "#4a3728", text: "#fbbf24" },
+  "blocked":        { bg: "#4a2020", text: "#f87171" },
+  "waiting":        { bg: "#3b1f6e", text: "#a78bfa" },
+  "completed":      { bg: "#1a4731", text: "#34d399" },
+  "done":           { bg: "#1a4731", text: "#34d399" },
+};
+
+const ENGAGEMENT_COLORS = {
+  "Core":       { bg: "#1e3a5f", text: "#60a5fa" },
+  "Consulted":  { bg: "#3b1f6e", text: "#a78bfa" },
+  "Informed":   { bg: "#2a2a2a", text: "#9ca3af" },
+  "FYI":        { bg: "#2a2a2a", text: "#9ca3af" },
+};
+
+/* ── Helpers ─────────────────────────────────────────────────── */
+
+function SmallBadge({ label, colorMap }) {
+  const c = colorMap?.[label] || { bg: theme.bg.input, text: theme.text.faint };
+  return (
+    <span style={{
+      background: c.bg, color: c.text,
+      padding: "2px 8px", borderRadius: 10,
+      fontSize: 11, fontWeight: 500, whiteSpace: "nowrap",
+    }}>
+      {label || "\u2014"}
+    </span>
+  );
+}
+
+function timeAgo(d) {
+  if (!d) return "\u2014";
+  const now = new Date();
+  const then = new Date(d);
+  const diffDays = Math.floor((now - then) / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 14) return "1 week ago";
+  return `${Math.floor(diffDays / 7)} weeks ago`;
+}
+
+function nextNeededLabel(d) {
+  if (!d) return "\u2014";
+  const now = new Date();
+  const then = new Date(d);
+  const diffDays = Math.floor((then - now) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return "Overdue";
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Tomorrow";
+  if (diffDays <= 7) return "This week";
+  const val = typeof d === "string" && d.length === 10 ? d + "T12:00:00" : d;
+  return new Date(val).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 function formatDate(d) {
   if (!d) return "\u2014";
-  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const val = typeof d === "string" && d.length === 10 ? d + "T12:00:00" : d;
+  return new Date(val).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
+
+/* ── Component ───────────────────────────────────────────────── */
 
 export default function PersonDetailPage() {
   const { id } = useParams();
@@ -78,137 +182,319 @@ export default function PersonDetailPage() {
   const personMatters = person.matters || [];
   const personMeetings = person.meetings || [];
 
-  const infoItems = [
-    { label: "Email", value: person.email },
-    { label: "Phone", value: person.phone },
-    { label: "Category", value: person.relationship_category },
-    { label: "Lane", value: person.relationship_lane },
-    { label: "Manager", value: person.manager_name },
-    { label: "Organization", value: person.org_name },
-    { label: "Team Workload", value: person.include_in_team_workload ? "Yes" : "No" },
-    { label: "Assistant", value: person.assistant_name },
-    { label: "Assistant Contact", value: person.assistant_contact },
-    { label: "Next Interaction Type", value: person.next_interaction_type },
-    { label: "Next Interaction Purpose", value: person.next_interaction_purpose },
-  ];
+  const nextLabel = nextNeededLabel(person.next_interaction_needed_date);
+  const nextIsUrgent = nextLabel === "Overdue" || nextLabel === "Today" || nextLabel === "Tomorrow";
 
   return (
-    <div style={{ padding: "24px 32px", maxWidth: 1200 }}>
+    <div style={{ padding: "24px 32px", maxWidth: 1500 }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
         <button onClick={() => navigate("/people")} style={{ ...btnSecondary, padding: "5px 10px", fontSize: 11 }}>
-          &larr; Back
+          &larr; People
         </button>
-        <div style={{ flex: 1 }}>
+      </div>
+
+      <div style={{
+        ...cardStyle,
+        marginBottom: 24,
+        padding: "20px 24px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+      }}>
+        <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={titleStyle}>{fullName}</span>
-            {person.is_active === false ? (
+            <span style={{ fontSize: 22, fontWeight: 700, color: theme.text.primary }}>{fullName}</span>
+            {person.is_active === false || person.is_active === 0 ? (
               <Badge bg="rgba(239,68,68,0.12)" text="#ef4444" label="Inactive" />
-            ) : (
-              <Badge bg="rgba(34,197,94,0.12)" text="#22c55e" label="Active" />
+            ) : null}
+          </div>
+          <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 13, color: theme.text.muted }}>
+            {person.title && <span>{person.title}</span>}
+            {person.title && person.org_name && <span style={{ color: theme.text.faint }}>&#8226;</span>}
+            {person.org_name && (
+              <span
+                style={{ color: theme.accent.blueLight, cursor: "pointer" }}
+                onClick={() => person.organization_id && navigate(`/organizations/${person.organization_id}`)}
+              >
+                {person.org_short_name || person.org_name}
+              </span>
+            )}
+            {(person.title || person.org_name) && person.relationship_category && (
+              <span style={{ color: theme.text.faint }}>&#8226;</span>
+            )}
+            {person.relationship_category && (
+              <SmallBadge label={person.relationship_category} colorMap={CATEGORY_COLORS} />
+            )}
+            {person.relationship_lane && (
+              <SmallBadge label={person.relationship_lane} colorMap={LANE_COLORS} />
             )}
           </div>
-          <div style={{ fontSize: 13, color: theme.text.muted }}>
-            {[person.title, person.org_name].filter(Boolean).join(" \u2022 ")}
+        </div>
+        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+          <button style={{ ...btnSecondary, color: "#ef4444", borderColor: "#7f1d1d" }} onClick={() => setShowDeleteConfirm(true)}>
+            Delete
+          </button>
+          <button style={btnPrimary} onClick={() => openDrawer("person", person, refetch)}>
+            Edit Person
+          </button>
+        </div>
+      </div>
+
+      {/* Two-column layout: sidebar + main */}
+      <div style={{ display: "grid", gridTemplateColumns: "360px minmax(0, 1fr)", gap: 24 }}>
+        {/* ── Sidebar ── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+          {/* Relationship panel */}
+          <div style={sidebarCardStyle}>
+            <div style={sectionLabel}>Relationship</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <RelField label="Relationship owner" value={person.relationship_owner_name || "You"} />
+              <RelField label="Last interaction" value={timeAgo(person.last_interaction_date)} />
+              <RelField
+                label="Next interaction needed"
+                value={nextLabel}
+                valueStyle={nextIsUrgent ? { color: theme.accent.yellowLight, fontWeight: 600 } : undefined}
+              />
+              {person.next_interaction_type && (
+                <RelField label="Next interaction type" value={person.next_interaction_type} />
+              )}
+              {person.next_interaction_purpose && (
+                <RelField label="Next interaction purpose" value={person.next_interaction_purpose} />
+              )}
+              <div style={{ height: 1, background: theme.border.subtle, margin: "2px 0" }} />
+              <RelField label="Email" value={person.email} />
+              <RelField label="Phone" value={person.phone} />
+              <RelField label="Assistant" value={
+                person.assistant_name
+                  ? `${person.assistant_name}${person.assistant_contact ? ` (${person.assistant_contact})` : ""}`
+                  : null
+              } />
+              {person.manager_name && <RelField label="Manager" value={person.manager_name} />}
+            </div>
+          </div>
+
+          {/* Working Style */}
+          {person.working_style_notes && (
+            <div style={sidebarCardStyle}>
+              <div style={sectionLabel}>Working Style / Notes</div>
+              <div style={{ fontSize: 13, color: theme.text.muted, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                {person.working_style_notes}
+              </div>
+            </div>
+          )}
+
+          {/* Substantive Areas */}
+          {person.substantive_areas && (
+            <div style={sidebarCardStyle}>
+              <div style={sectionLabel}>Substantive Areas</div>
+              <div style={{ fontSize: 13, color: theme.text.muted, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                {person.substantive_areas}
+              </div>
+            </div>
+          )}
+
+          {/* Personality */}
+          {person.personality && (
+            <div style={sidebarCardStyle}>
+              <div style={sectionLabel}>Personality</div>
+              <div style={{ fontSize: 13, color: theme.text.muted, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                {person.personality}
+              </div>
+            </div>
+          )}
+
+          {/* Interaction Timing cards */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={sidebarCardStyle}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: theme.text.faint, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                Last interaction
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 600, color: theme.text.primary, marginTop: 4 }}>
+                {timeAgo(person.last_interaction_date)}
+              </div>
+            </div>
+            <div style={sidebarCardStyle}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: theme.text.faint, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                Next needed
+              </div>
+              <div style={{
+                fontSize: 16, fontWeight: 600, marginTop: 4,
+                color: nextIsUrgent ? theme.accent.yellowLight : theme.text.primary,
+              }}>
+                {nextLabel}
+              </div>
+            </div>
           </div>
         </div>
-        <button style={{ ...btnSecondary, color: "#ef4444", borderColor: "#7f1d1d" }} onClick={() => setShowDeleteConfirm(true)}>
-          Delete
-        </button>
-        <button style={btnPrimary} onClick={() => openDrawer("person", person, refetch)}>
-          Edit
-        </button>
-      </div>
 
-      {/* Info Card */}
-      <div style={{ ...cardStyle, marginBottom: 24 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
-          {infoItems.map((item) => (
-            <div key={item.label}>
-              <div style={labelStyle}>{item.label}</div>
-              <div style={valStyle}>{item.value || "\u2014"}</div>
-            </div>
-          ))}
+        {/* ── Main content ── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+          {/* Active Matters */}
+          <div style={cardStyle}>
+            <div style={sectionLabel}>Active Matters ({personMatters.length})</div>
+            {personMatters.length === 0 ? (
+              <div style={{ fontSize: 13, color: theme.text.faint, padding: "12px 0" }}>
+                No active matters linked to this person.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {personMatters.map((m) => (
+                  <div
+                    key={m.id}
+                    onClick={() => navigate(`/matters/${m.id}`)}
+                    style={{
+                      background: theme.bg.input,
+                      borderRadius: 8,
+                      border: `1px solid ${theme.border.subtle}`,
+                      padding: "12px 16px",
+                      cursor: "pointer",
+                      transition: "border-color 0.15s",
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.borderColor = theme.accent.blue}
+                    onMouseLeave={(e) => e.currentTarget.style.borderColor = theme.border.subtle}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: theme.accent.blueLight }}>
+                        {m.title}
+                      </span>
+                      {m.matter_number && (
+                        <span style={{ fontSize: 11, color: theme.text.faint }}>{m.matter_number}</span>
+                      )}
+                    </div>
+                    <div style={{ marginTop: 6, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                      {m.matter_role && <SmallBadge label={m.matter_role} colorMap={LANE_COLORS} />}
+                      {m.engagement_level && <SmallBadge label={m.engagement_level} colorMap={ENGAGEMENT_COLORS} />}
+                      {m.status && <SmallBadge label={m.status} colorMap={STATUS_COLORS} />}
+                      {m.priority && (
+                        <span style={{ fontSize: 11, color: theme.text.faint }}>
+                          {m.priority}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Assigned Tasks */}
+          <div style={cardStyle}>
+            <div style={sectionLabel}>Assigned Tasks ({tasks.length})</div>
+            {tasks.length === 0 ? (
+              <div style={{ fontSize: 13, color: theme.text.faint, padding: "12px 0" }}>
+                No open tasks assigned to this person.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {tasks.map((t) => (
+                  <div
+                    key={t.id}
+                    onClick={() => openDrawer("task", t, refetch)}
+                    style={{
+                      background: theme.bg.input,
+                      borderRadius: 8,
+                      border: `1px solid ${theme.border.subtle}`,
+                      padding: "12px 16px",
+                      cursor: "pointer",
+                      transition: "border-color 0.15s",
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.borderColor = theme.accent.blue}
+                    onMouseLeave={(e) => e.currentTarget.style.borderColor = theme.border.subtle}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: theme.text.primary }}>
+                        {t.title}
+                      </span>
+                    </div>
+                    <div style={{ marginTop: 6, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                      {t.matter_title && (
+                        <span style={{ fontSize: 11, color: theme.text.muted }}>{t.matter_title}</span>
+                      )}
+                      {t.matter_title && t.status && <span style={{ color: theme.text.faint }}>&#8226;</span>}
+                      {t.status && <SmallBadge label={t.status} colorMap={STATUS_COLORS} />}
+                      {t.due_date && (
+                        <>
+                          <span style={{ color: theme.text.faint }}>&#8226;</span>
+                          <span style={{
+                            fontSize: 11,
+                            color: new Date(t.due_date) < new Date() ? "#f87171" : theme.text.muted,
+                            fontWeight: new Date(t.due_date) < new Date() ? 600 : 400,
+                          }}>
+                            Due {formatDate(t.due_date)}
+                          </span>
+                        </>
+                      )}
+                      {(t.waiting_on_person_name || t.waiting_on_description) && (
+                        <>
+                          <span style={{ color: theme.text.faint }}>&#8226;</span>
+                          <span style={{ fontSize: 11, color: "#a78bfa" }}>
+                            Waiting on: {t.waiting_on_person_name || t.waiting_on_description}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    {t.expected_output && (
+                      <div style={{ marginTop: 6, fontSize: 12, color: theme.text.muted, lineHeight: 1.5 }}>
+                        {t.expected_output}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Recent Meetings */}
+          <div style={cardStyle}>
+            <div style={sectionLabel}>Recent Meetings ({personMeetings.length})</div>
+            {personMeetings.length === 0 ? (
+              <div style={{ fontSize: 13, color: theme.text.faint, padding: "12px 0" }}>
+                No meetings found.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {personMeetings.map((mtg) => (
+                  <div
+                    key={mtg.id}
+                    onClick={() => openDrawer("meeting", mtg, refetch)}
+                    style={{
+                      background: theme.bg.input,
+                      borderRadius: 8,
+                      border: `1px solid ${theme.border.subtle}`,
+                      padding: "12px 16px",
+                      cursor: "pointer",
+                      transition: "border-color 0.15s",
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.borderColor = theme.accent.blue}
+                    onMouseLeave={(e) => e.currentTarget.style.borderColor = theme.border.subtle}
+                  >
+                    <div style={{ fontSize: 13, fontWeight: 600, color: theme.text.primary }}>
+                      {mtg.title}
+                    </div>
+                    <div style={{ marginTop: 4, display: "flex", gap: 6, alignItems: "center", fontSize: 11, color: theme.text.muted }}>
+                      <span>{formatDate(mtg.date_time_start)}</span>
+                      {mtg.meeting_type && (
+                        <>
+                          <span style={{ color: theme.text.faint }}>&#8226;</span>
+                          <span>{mtg.meeting_type}</span>
+                        </>
+                      )}
+                      {mtg.meeting_role && (
+                        <>
+                          <span style={{ color: theme.text.faint }}>&#8226;</span>
+                          <span>{mtg.meeting_role}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-
-      {/* Detail Notes */}
-      {(person.working_style_notes || person.substantive_areas) && (
-        <div style={{ ...cardStyle, marginBottom: 24 }}>
-          {person.substantive_areas && (
-            <div style={{ marginBottom: person.working_style_notes ? 12 : 0 }}>
-              <div style={labelStyle}>Substantive Areas</div>
-              <div style={{ ...valStyle, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{person.substantive_areas}</div>
-            </div>
-          )}
-          {person.working_style_notes && (
-            <div>
-              <div style={labelStyle}>Working Style Notes</div>
-              <div style={{ ...valStyle, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{person.working_style_notes}</div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Matters */}
-      <div style={{ ...cardStyle, marginBottom: 24 }}>
-        <div style={sectionTitle}>Matters</div>
-        {personMatters.length === 0 ? (
-          <EmptyState title="No matters" message="This person is not linked to any matters." />
-        ) : (
-          <DataTable
-            columns={[
-              { key: "title", label: "Matter" },
-              { key: "matter_role", label: "Role", width: 130 },
-              { key: "engagement_level", label: "Engagement", width: 120 },
-            ]}
-            data={personMatters}
-            onRowClick={(row) => (row.id || row.matter_id) && navigate(`/matters/${row.id || row.matter_id}`)}
-          />
-        )}
-      </div>
-
-      {/* Tasks */}
-      <div style={{ ...cardStyle, marginBottom: 24 }}>
-        <div style={sectionTitle}>Tasks</div>
-        {tasks.length === 0 ? (
-          <EmptyState title="No tasks" message="No tasks assigned to this person." />
-        ) : (
-          <DataTable
-            columns={[
-              { key: "title", label: "Title" },
-              { key: "matter_title", label: "Matter", width: 180 },
-              {
-                key: "status", label: "Status", width: 110,
-                render: (val) => {
-                  const s = theme.status[val] || { bg: theme.bg.input, text: theme.text.faint, label: val };
-                  return <Badge bg={s.bg} text={s.text} label={s.label || val || "\u2014"} />;
-                },
-              },
-              { key: "due_date", label: "Due Date", width: 120, render: (v) => formatDate(v) },
-            ]}
-            data={tasks}
-            onRowClick={(row) => openDrawer("task", row, refetch)}
-          />
-        )}
-      </div>
-
-      {/* Meetings */}
-      <div style={cardStyle}>
-        <div style={sectionTitle}>Meetings</div>
-        {personMeetings.length === 0 ? (
-          <EmptyState title="No meetings" message="No meetings found." />
-        ) : (
-          <DataTable
-            columns={[
-              { key: "title", label: "Title" },
-              { key: "date_time_start", label: "Date", width: 140, render: (v) => formatDate(v) },
-              { key: "meeting_type", label: "Type", width: 120 },
-            ]}
-            data={personMeetings}
-            onRowClick={(row) => openDrawer("meeting", row, refetch)}
-          />
-        )}
       </div>
 
       {/* Delete Confirmation */}
@@ -245,6 +531,19 @@ export default function PersonDetailPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── Sidebar field row ───────────────────────────────────────── */
+
+function RelField({ label, value, valueStyle }) {
+  return (
+    <div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: theme.text.secondary }}>{label}</div>
+      <div style={{ fontSize: 13, color: theme.text.muted, marginTop: 1, ...valueStyle }}>
+        {value || "\u2014"}
+      </div>
     </div>
   );
 }

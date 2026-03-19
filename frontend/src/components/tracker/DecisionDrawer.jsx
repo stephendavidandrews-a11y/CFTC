@@ -85,10 +85,25 @@ export default function DecisionDrawer({ isOpen, onClose, decision, matterId, on
     setFieldErrors({});
   }, [decision, matterId, isOpen]);
 
-  // Fetch detail on edit to capture ETag for concurrency control
+  // Fetch full detail on edit to prevent data loss and capture ETag
   React.useEffect(() => {
     if (decision && decision.id) {
-      getDecision(decision.id).then(d => setEtag(d._etag || null)).catch(() => {});
+      getDecision(decision.id).then(d => {
+        setEtag(d._etag || null);
+        setForm({
+          title: d.title || "",
+          matter_id: d.matter_id || "",
+          decision_type: d.decision_type || "",
+          status: d.status || "",
+          decision_assigned_to_person_id: d.decision_assigned_to_person_id || "",
+          decision_due_date: (d.decision_due_date || "").slice(0, 10),
+          options_summary: d.options_summary || "",
+          recommended_option: d.recommended_option || "",
+          decision_result: d.decision_result || "",
+          notes: d.notes || "",
+          made_at: d.made_at ? d.made_at.slice(0, 16) : "",
+        });
+      }).catch(() => {});
     }
   }, [decision, isOpen]);
 
@@ -174,7 +189,7 @@ export default function DecisionDrawer({ isOpen, onClose, decision, matterId, on
         <label style={LABEL_STYLE}>Recommended Option</label>
         <textarea style={{ ...INPUT_STYLE, minHeight: 60, resize: "vertical" }} value={form.recommended_option} onChange={set("recommended_option")} />
       </div>
-      {isEdit && (
+      {(isEdit || form.status === "made") && (
         <div style={{ marginBottom: 14 }}>
           <label style={LABEL_STYLE}>Decision Result</label>
           <textarea style={{ ...INPUT_STYLE, minHeight: 60, resize: "vertical" }} value={form.decision_result} onChange={set("decision_result")} />

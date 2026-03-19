@@ -131,8 +131,8 @@ export default function MeetingDrawer({ isOpen, onClose, meeting, onSaved }) {
       duration_minutes: duration || "",
       location_or_link: m.location_or_link || "",
       purpose: m.purpose || "",
-      boss_attends: m.boss_attends || false,
-      external_parties_attend: m.external_parties_attend || false,
+      boss_attends: !!m.boss_attends,
+      external_parties_attend: !!m.external_parties_attend,
       prep_needed: m.prep_needed || "",
       assigned_to_person_id: m.assigned_to_person_id || "",
       notes: m.notes || "",
@@ -241,8 +241,8 @@ export default function MeetingDrawer({ isOpen, onClose, meeting, onSaved }) {
         date_time_start: form.date_time_start || null,
         location_or_link: form.location_or_link || null,
         purpose: form.purpose || null,
-        boss_attends: form.boss_attends,
-        external_parties_attend: form.external_parties_attend,
+        boss_attends: form.boss_attends ? 1 : 0,
+        external_parties_attend: form.external_parties_attend ? 1 : 0,
         assigned_to_person_id: form.assigned_to_person_id || null,
         prep_needed: form.prep_needed || null,
         notes: form.notes || null,
@@ -265,7 +265,7 @@ export default function MeetingDrawer({ isOpen, onClose, meeting, onSaved }) {
         await updateMeeting(meeting.id, payload, etag);
 
         const currentOrigIds = participants.filter((p) => !p.isNew).map((p) => p.id);
-        for (const p of meeting.participants || []) {
+        for (const p of (fullMeeting || meeting).participants || []) {
           if (!currentOrigIds.includes(p.id)) {
             await removeMeetingParticipant(meeting.id, p.id);
           }
@@ -276,7 +276,7 @@ export default function MeetingDrawer({ isOpen, onClose, meeting, onSaved }) {
 
         // Update existing participants whose role changed
         for (const p of participants.filter((p) => !p.isNew)) {
-          const orig = (meeting.participants || []).find((op) => op.id === p.id);
+          const orig = ((fullMeeting || meeting).participants || []).find((op) => op.id === p.id);
           if (orig && orig.meeting_role !== p.meeting_role) {
             await updateMeetingParticipant(meeting.id, p.id, { meeting_role: p.meeting_role });
           }
