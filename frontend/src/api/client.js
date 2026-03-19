@@ -36,9 +36,10 @@ export class ApiError extends Error {
 }
 
 export async function fetchJSON(url, options = {}) {
+  const { headers: customHeaders, ...restOptions } = options;
   const response = await fetch(`${BASE}${url}`, {
-    headers: { "Content-Type": "application/json", "X-Write-Source": "human", ...options.headers },
-    ...options,
+    headers: { "Content-Type": "application/json", "X-Write-Source": "human", ...customHeaders },
+    ...restOptions,
   });
 
   if (!response.ok) {

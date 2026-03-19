@@ -15,6 +15,7 @@ export default function DataTable({
   columns = [],
   data = [],
   onRowClick,
+  rowStyle,
   pageSize = 25,
   emptyMessage = "No data available",
 }) {
@@ -104,6 +105,7 @@ export default function DataTable({
                 style={{
                   cursor: onRowClick ? "pointer" : "default",
                   transition: "background 0.1s",
+                  ...(typeof rowStyle === "function" ? rowStyle(row) : {}),
                 }}
                 onMouseEnter={(e) => e.currentTarget.style.background = theme.bg.cardHover}
                 onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}

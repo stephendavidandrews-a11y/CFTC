@@ -19,6 +19,7 @@ async def list_meetings(
     db=Depends(get_db),
     search: str = Query(None),
     meeting_type: str = Query(None),
+    matter_id: str = Query(None),
     sort_by: str = Query("date_time_start"),
     sort_dir: str = Query("desc"),
     limit: int = Query(100),
@@ -31,11 +32,17 @@ async def list_meetings(
     if meeting_type:
         conditions.append("m.meeting_type = ?")
         params.append(meeting_type)
+    if matter_id:
+        conditions.append("m.id IN (SELECT mm.meeting_id FROM meeting_matters mm WHERE mm.matter_id = ?)")
+        params.append(matter_id)
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
 
     total = db.execute(f"SELECT COUNT(*) as c FROM meetings m {where}", params).fetchone()["c"]
     rows = db.execute(f"""
-        SELECT m.*, p.full_name as owner_name
+        SELECT m.*, p.full_name as owner_name,
+               (SELECT mat.title FROM meeting_matters mm
+                JOIN matters mat ON mm.matter_id = mat.id
+                WHERE mm.meeting_id = m.id LIMIT 1) as matter_title
         FROM meetings m
         LEFT JOIN people p ON m.assigned_to_person_id = p.id
         {where}

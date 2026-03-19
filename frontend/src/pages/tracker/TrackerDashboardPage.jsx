@@ -25,7 +25,8 @@ function daysColor(days) {
 
 function formatDate(d) {
   if (!d) return "\u2014";
-  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const val = typeof d === "string" && d.length === 10 ? d + "T12:00:00" : d;
+  return new Date(val).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 function HBar({ label, value, max, color }) {

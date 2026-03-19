@@ -8,7 +8,7 @@ import {
   listPeople, listOrganizations, listMatters,
   addMatterDependency, removeMatterDependency,
   getMatterTags, addMatterTag, removeMatterTag, listTags, createTag,
-  getEnums,
+  getEnums, deleteMatter,
 } from "../../api/tracker";
 import { useDrawer } from "../../contexts/DrawerContext";
 import Badge from "../../components/shared/Badge";
@@ -52,7 +52,8 @@ const valStyle = { fontSize: 13, color: theme.text.secondary, marginTop: 2 };
 
 function formatDate(d) {
   if (!d) return "\u2014";
-  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const val = typeof d === "string" && d.length === 10 ? d + "T12:00:00" : d;
+  return new Date(val).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 const TABS = ["Updates", "Tasks", "Stakeholders", "Organizations", "Meetings", "Documents", "Decisions", "Dependencies"];
@@ -119,7 +120,8 @@ export default function MatterDetailPage() {
   const handleAddStakeholder = useCallback(async () => {
     if (!stakeholderForm.person_id) return;
     try {
-      await addMatterPerson(id, stakeholderForm);
+      const cleanStakeholder = Object.fromEntries(Object.entries(stakeholderForm).filter(([_, v]) => v !== ""));
+      await addMatterPerson(id, cleanStakeholder);
       setStakeholderForm({ person_id: "", matter_role: "", engagement_level: "", notes: "" });
       setShowStakeholderAdd(false);
       refetch();
@@ -145,7 +147,8 @@ export default function MatterDetailPage() {
   const handleAddOrg = useCallback(async () => {
     if (!orgForm.organization_id) return;
     try {
-      await addMatterOrg(id, orgForm);
+      const cleanOrg = Object.fromEntries(Object.entries(orgForm).filter(([_, v]) => v !== ""));
+      await addMatterOrg(id, cleanOrg);
       setOrgForm({ organization_id: "", organization_role: "", notes: "" });
       setShowOrgAdd(false);
       refetch();
@@ -285,6 +288,24 @@ export default function MatterDetailPage() {
         </div>
         <button style={btnPrimary} onClick={() => openDrawer("matter", matter, refetch)}>
           Edit
+        </button>
+        <button
+          style={{
+            padding: "7px 16px", borderRadius: 6, fontSize: 12, fontWeight: 600,
+            background: "rgba(239,68,68,0.1)", color: "#f87171",
+            border: "1px solid rgba(239,68,68,0.25)", cursor: "pointer",
+          }}
+          onClick={async () => {
+            if (!window.confirm(`Delete "${matter.title}"? This will close the matter.`)) return;
+            try {
+              await deleteMatter(matter.id);
+              navigate("/matters");
+            } catch (e) {
+              alert(e.message);
+            }
+          }}
+        >
+          Delete
         </button>
       </div>
 
@@ -689,6 +710,7 @@ export default function MatterDetailPage() {
                   { key: "meeting_type", label: "Type", width: 120 },
                 ]}
                 data={meetings}
+                onRowClick={(row) => openDrawer("meeting", row, refetchMeetings)}
               />
             )}
           </div>

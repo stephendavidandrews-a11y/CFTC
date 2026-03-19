@@ -42,6 +42,7 @@ const EMPTY = {
   completion_notes: "",
   next_follow_up_date: "",
   delegated_by_person_id: "",
+  supervising_person_id: "",
 };
 
 export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved }) {
@@ -93,6 +94,7 @@ export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved })
         completion_notes: task.completion_notes || "",
         next_follow_up_date: task.next_follow_up_date || "",
         delegated_by_person_id: task.delegated_by_person_id || "",
+        supervising_person_id: task.supervising_person_id || "",
       });
     } else {
       setEtag(null);
@@ -102,10 +104,31 @@ export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved })
     setFieldErrors({});
   }, [task, matterId, isOpen]);
 
-  // Fetch detail on edit to capture ETag for concurrency control
+  // Fetch full detail on edit to prevent data loss and capture ETag
   React.useEffect(() => {
     if (task && task.id) {
-      getTask(task.id).then(d => setEtag(d._etag || null)).catch(() => {});
+      getTask(task.id).then(d => {
+        setEtag(d._etag || null);
+        setForm({
+          title: d.title || "",
+          description: d.description || "",
+          status: d.status || "",
+          task_mode: d.task_mode || "",
+          task_type: d.task_type || "",
+          priority: d.priority || "",
+          assigned_to_person_id: d.assigned_to_person_id || "",
+          due_date: (d.due_date || "").slice(0, 10),
+          deadline_type: d.deadline_type || "",
+          matter_id: d.matter_id || "",
+          waiting_on_person_id: d.waiting_on_person_id || "",
+          waiting_on_org_id: d.waiting_on_org_id || "",
+          expected_output: d.expected_output || "",
+          completion_notes: d.completion_notes || "",
+          next_follow_up_date: (d.next_follow_up_date || "").slice(0, 10),
+          delegated_by_person_id: d.delegated_by_person_id || "",
+          supervising_person_id: d.supervising_person_id || "",
+        });
+      }).catch(() => {});
     }
   }, [task, isOpen]);
 
@@ -202,6 +225,7 @@ export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved })
       {renderSelect("Waiting On Person", "waiting_on_person_id", personOpts)}
       {renderSelect("Waiting On Org", "waiting_on_org_id", orgOpts)}
       {renderSelect("Delegated By", "delegated_by_person_id", personOpts)}
+      {renderSelect("Supervising Person", "supervising_person_id", personOpts)}
 
       {error && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 10 }}>{error}</div>}
 

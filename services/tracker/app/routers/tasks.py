@@ -22,16 +22,23 @@ async def list_tasks(
     matter_id: str = Query(None),
     assigned_to: str = Query(None),
     mode: str = Query(None),
+    task_type: str = Query(None),
+    deadline_type: str = Query(None),
+    exclude_done: bool = Query(None),
     sort_by: str = Query("due_date"),
     sort_dir: str = Query("asc"),
-    limit: int = Query(100, le=500),
+    limit: int = Query(500, le=500),
     offset: int = Query(0),
 ):
     conditions = []
     params = []
     if search:
-        conditions.append("(t.title LIKE ? OR t.description LIKE ?)")
-        params.extend([f"%{search}%"] * 2)
+        conditions.append(
+            "(t.title LIKE ? OR t.description LIKE ? OR m.title LIKE ? OR m.matter_number LIKE ?"
+            " OR p.full_name LIKE ? OR wp.full_name LIKE ? OR wo.name LIKE ?"
+            " OR t.waiting_on_description LIKE ? OR t.expected_output LIKE ?)"
+        )
+        params.extend([f"%{search}%"] * 9)
     if status:
         conditions.append("t.status = ?")
         params.append(status)
@@ -44,26 +51,71 @@ async def list_tasks(
     if mode:
         conditions.append("t.task_mode = ?")
         params.append(mode)
+    if task_type:
+        conditions.append("t.task_type = ?")
+        params.append(task_type)
+    if deadline_type:
+        conditions.append("t.deadline_type = ?")
+        params.append(deadline_type)
+    if exclude_done is True:
+        conditions.append("t.status NOT IN ('done', 'completed', 'deferred')")
 
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
-    allowed_sorts = {"title", "status", "due_date", "priority", "created_at", "updated_at"}
+    allowed_sorts = {"title", "status", "due_date", "priority", "created_at", "updated_at",
+                     "task_mode", "task_type", "owner_name"}
     if sort_by not in allowed_sorts:
         sort_by = "due_date"
     sort_direction = "DESC" if sort_dir.lower() == "desc" else "ASC"
+    order_expr = {
+        "owner_name": "p.full_name",
+    }.get(sort_by, f"t.{sort_by}")
 
-    total = db.execute(f"SELECT COUNT(*) as c FROM tasks t {where}", params).fetchone()["c"]
+    total = db.execute(f"""
+        SELECT COUNT(*) as c FROM tasks t
+        LEFT JOIN people p ON t.assigned_to_person_id = p.id
+        LEFT JOIN matters m ON t.matter_id = m.id
+        LEFT JOIN people wp ON t.waiting_on_person_id = wp.id
+        LEFT JOIN organizations wo ON t.waiting_on_org_id = wo.id
+        {where}
+    """, params).fetchone()["c"]
 
     rows = db.execute(f"""
-        SELECT t.*, p.full_name as owner_name, m.title as matter_title, m.matter_number
+        SELECT t.*, p.full_name as owner_name, m.title as matter_title, m.matter_number,
+               wp.full_name as waiting_on_person_name, wo.name as waiting_on_org_name,
+               db_person.full_name as delegated_by_name
         FROM tasks t
         LEFT JOIN people p ON t.assigned_to_person_id = p.id
         LEFT JOIN matters m ON t.matter_id = m.id
+        LEFT JOIN people wp ON t.waiting_on_person_id = wp.id
+        LEFT JOIN organizations wo ON t.waiting_on_org_id = wo.id
+        LEFT JOIN people db_person ON t.delegated_by_person_id = db_person.id
         {where}
-        ORDER BY t.{sort_by} {sort_direction} NULLS LAST
+        ORDER BY {order_expr} {sort_direction} NULLS LAST
         LIMIT ? OFFSET ?
     """, params + [limit, offset]).fetchall()
 
-    return {"items": [dict(row) for row in rows], "total": total, "limit": limit, "offset": offset}
+    items = [dict(row) for row in rows]
+
+    # Summary counts (always across all open tasks)
+    summary_rows = db.execute("""
+        SELECT
+            SUM(CASE WHEN t.due_date IS NOT NULL AND t.due_date <= date('now')
+                     AND t.status NOT IN ('done', 'completed', 'deferred') THEN 1 ELSE 0 END) as overdue,
+            SUM(CASE WHEN t.due_date = date('now')
+                     AND t.status NOT IN ('done', 'completed', 'deferred') THEN 1 ELSE 0 END) as due_today,
+            SUM(CASE WHEN t.status = 'waiting on others' THEN 1 ELSE 0 END) as waiting_on_others,
+            SUM(CASE WHEN t.status = 'needs review' THEN 1 ELSE 0 END) as needs_review
+        FROM tasks t
+        WHERE t.status NOT IN ('done', 'completed', 'deferred')
+    """).fetchone()
+    summary = {
+        "overdue": summary_rows["overdue"] or 0,
+        "due_today": summary_rows["due_today"] or 0,
+        "waiting_on_others": summary_rows["waiting_on_others"] or 0,
+        "needs_review": summary_rows["needs_review"] or 0,
+    }
+
+    return {"items": items, "total": total, "limit": limit, "offset": offset, "summary": summary}
 
 
 @router.get("/{task_id}")

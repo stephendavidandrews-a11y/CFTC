@@ -55,6 +55,9 @@ const EMPTY = {
   federal_register_citation: "",
   unified_agenda_priority: "",
   docket_number: "",
+  cfr_citation: "",
+  fr_doc_number: "",
+  lead_external_org_id: "",
 };
 
 export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
@@ -116,21 +119,24 @@ export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
         client_organization_id: matter.client_organization_id || "",
         requesting_organization_id: matter.requesting_organization_id || "",
         reviewing_organization_id: matter.reviewing_organization_id || "",
-        work_deadline: matter.work_deadline || "",
-        external_deadline: matter.external_deadline || "",
-        decision_deadline: matter.decision_deadline || "",
-        opened_date: matter.opened_date || "",
+        work_deadline: (matter.work_deadline || "").slice(0, 10),
+        external_deadline: (matter.external_deadline || "").slice(0, 10),
+        decision_deadline: (matter.decision_deadline || "").slice(0, 10),
+        opened_date: (matter.opened_date || "").slice(0, 10),
         next_step: matter.next_step || "",
         next_step_assigned_to_person_id: matter.next_step_assigned_to_person_id || "",
         pending_decision: matter.pending_decision || "",
-        revisit_date: matter.revisit_date || "",
+        revisit_date: (matter.revisit_date || "").slice(0, 10),
         outcome_summary: matter.outcome_summary || "",
-        closed_at: matter.closed_at || "",
+        closed_at: (matter.closed_at || "").slice(0, 10),
         rin: matter.rin || "",
         regulatory_stage: matter.regulatory_stage || "",
         federal_register_citation: matter.federal_register_citation || "",
         unified_agenda_priority: matter.unified_agenda_priority || "",
         docket_number: matter.docket_number || "",
+        cfr_citation: matter.cfr_citation || "",
+        fr_doc_number: matter.fr_doc_number || "",
+        lead_external_org_id: matter.lead_external_org_id || "",
       });
     } else {
       setEtag(null);
@@ -240,6 +246,7 @@ export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
       {renderSelect("Client Organization", "client_organization_id", orgOpts)}
       {renderSelect("Requesting Organization", "requesting_organization_id", orgOpts)}
       {renderSelect("Reviewing Organization", "reviewing_organization_id", orgOpts)}
+      {renderSelect("Lead External Organization", "lead_external_org_id", orgOpts)}
       {renderInput("Work Deadline", "work_deadline", "date")}
       {renderInput("External Deadline", "external_deadline", "date")}
       {renderInput("Revisit Date", "revisit_date", "date")}
@@ -259,6 +266,8 @@ export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
       {isRulemaking && renderInput("FR Citation", "federal_register_citation")}
       {isRulemaking && renderSelect("Unified Agenda Priority", "unified_agenda_priority", enums.unified_agenda_priority)}
       {isRulemaking && renderInput("Docket Number", "docket_number")}
+      {isRulemaking && renderInput("CFR Citation", "cfr_citation")}
+      {isRulemaking && renderInput("FR Document Number", "fr_doc_number")}
 
       {form.status === "parked / monitoring" && !form.revisit_date && (
         <div style={{ color: "#f59e0b", fontSize: 12, marginBottom: 10, padding: "6px 10px", background: "#422006", borderRadius: 6, border: "1px solid #854d0e" }}>Revisit date is recommended for parked/monitoring matters</div>

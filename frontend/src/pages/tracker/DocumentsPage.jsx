@@ -42,20 +42,21 @@ const btnPrimary = {
 
 function formatDate(d) {
   if (!d) return "\u2014";
-  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const val = typeof d === "string" && d.length === 10 ? d + "T12:00:00" : d;
+  return new Date(val).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 export default function DocumentsPage() {
   const navigate = useNavigate();
   const { openDrawer } = useDrawer();
-  const [filters, setFilters] = useState({ status: "", matter_id: "", document_type: "" });
+  const [filters, setFilters] = useState({ search: "", status: "", matter_id: "", document_type: "" });
 
   const { data: enums } = useApi(() => getEnums(), []);
   const { data: mattersData } = useApi(() => listMatters({ limit: 500 }), []);
 
   const { data, loading, error, refetch } = useApi(
     () => listDocuments(filters),
-    [filters.status, filters.matter_id, filters.document_type]
+    [filters.search, filters.status, filters.matter_id, filters.document_type]
   );
 
   const handleFilter = useCallback((key, val) => {
@@ -102,6 +103,12 @@ export default function DocumentsPage() {
 
       {/* Filters */}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+        <input
+          style={{ ...inputStyle, minWidth: 280 }}
+          placeholder="Search documents by title..."
+          value={filters.search}
+          onChange={(e) => handleFilter("search", e.target.value)}
+        />
         <select style={inputStyle} value={filters.status} onChange={(e) => handleFilter("status", e.target.value)}>
           <option value="">All Statuses</option>
           {statusOpts.map((s) => <option key={s} value={s}>{s}</option>)}

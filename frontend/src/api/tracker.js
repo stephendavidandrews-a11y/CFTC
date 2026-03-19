@@ -93,8 +93,8 @@ export function addMatterUpdate(matterId, data) {
 
 // ── Tasks ───────────────────────────────────────────────────────────────────
 
-export function listTasks({ matter_id, assigned_to, status, mode, sort, order, limit, offset } = {}) {
-  return fetchJSON(`${P}/tasks${qs({ matter_id, assigned_to, status, mode, sort, order, limit, offset })}`);
+export function listTasks({ matter_id, assigned_to, status, mode, task_type, deadline_type, exclude_done, search, sort_by, sort_dir, limit, offset } = {}) {
+  return fetchJSON(`${P}/tasks${qs({ matter_id, assigned_to, status, mode, task_type, deadline_type, exclude_done, search, sort_by, sort_dir, limit, offset })}`);
 }
 
 export function createTask(data) {
@@ -116,8 +116,8 @@ export function deleteTask(id) {
 
 // ── People ──────────────────────────────────────────────────────────────────
 
-export function listPeople({ organization_id, is_active, search, relationship_category, relationship_lane, limit, offset } = {}) {
-  return fetchJSON(`${P}/people${qs({ organization_id, is_active, search, relationship_category, relationship_lane, limit, offset })}`);
+export function listPeople({ organization_id, is_active, search, relationship_category, relationship_lane, include_in_team, sort_by, sort_dir, limit, offset } = {}) {
+  return fetchJSON(`${P}/people${qs({ organization_id, is_active, search, relationship_category, relationship_lane, include_in_team, sort_by, sort_dir, limit, offset })}`);
 }
 
 export function createPerson(data) {
@@ -140,8 +140,8 @@ export function deletePerson(id, etag) {
 
 // ── Organizations ───────────────────────────────────────────────────────────
 
-export function listOrganizations({ parent_id, organization_type, search, limit, offset } = {}) {
-  return fetchJSON(`${P}/organizations${qs({ parent_id, organization_type, search, limit, offset })}`);
+export function listOrganizations({ parent_id, organization_type, search, sort_by, sort_dir, is_active, limit, offset } = {}) {
+  return fetchJSON(`${P}/organizations${qs({ parent_id, organization_type, search, sort_by, sort_dir, is_active, limit, offset })}`);
 }
 
 export function createOrganization(data) {
@@ -163,8 +163,8 @@ export function deleteOrganization(id) {
 
 // ── Meetings ────────────────────────────────────────────────────────────────
 
-export function listMeetings({ matter_id, date_from, date_to, limit, offset } = {}) {
-  return fetchJSON(`${P}/meetings${qs({ matter_id, date_from, date_to, limit, offset })}`);
+export function listMeetings({ search, matter_id, date_from, date_to, limit, offset } = {}) {
+  return fetchJSON(`${P}/meetings${qs({ search, matter_id, date_from, date_to, limit, offset })}`);
 }
 
 export function createMeeting(data) {
@@ -186,8 +186,8 @@ export function deleteMeeting(id) {
 
 // ── Documents ───────────────────────────────────────────────────────────────
 
-export function listDocuments({ matter_id, document_type, status, limit, offset } = {}) {
-  return fetchJSON(`${P}/documents${qs({ matter_id, document_type, status, limit, offset })}`);
+export function listDocuments({ search, matter_id, document_type, status, limit, offset } = {}) {
+  return fetchJSON(`${P}/documents${qs({ search, matter_id, document_type, status, limit, offset })}`);
 }
 
 export function createDocument(data) {

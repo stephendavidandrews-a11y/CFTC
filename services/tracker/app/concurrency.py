@@ -14,6 +14,11 @@ def check_etag(request: Request, current_record):
     if_match = request.headers.get("if-match")
     if not if_match:
         return
+    # Strip W/ prefix — nginx adds it when gzip is applied to responses,
+    # converting our strong ETag to a weak one.  The client echoes back
+    # the weak form, so we must normalise before comparison.
+    if if_match.startswith('W/'):
+        if_match = if_match[2:]
     expected = get_etag(current_record)
     if if_match != expected:
         raise HTTPException(
