@@ -44,8 +44,8 @@ function qs(params) {
   return str ? `?${str}` : "";
 }
 
-export function listMatters({ status, priority, matter_type, assigned_to, search, source, source_id, sort_by, sort_dir, limit, offset } = {}) {
-  return fetchJSON(`${P}/matters${qs({ status, priority, matter_type, assigned_to, search, source, source_id, sort_by, sort_dir, limit, offset })}`);
+export function listMatters({ status, priority, matter_type, assigned_to, search, source, source_id, sort, order, limit, offset } = {}) {
+  return fetchJSON(`${P}/matters${qs({ status, priority, matter_type, assigned_to, search, source, source_id, sort, order, limit, offset })}`);
 }
 
 export function createMatter(data) {
@@ -61,9 +61,8 @@ export function updateMatter(id, data, etag) {
   return fetchJSON(`${P}/matters/${id}`, { method: "PUT", headers, body: JSON.stringify(data) });
 }
 
-export function deleteMatter(id, etag) {
-  const headers = etag ? { "If-Match": etag } : {};
-  return fetchJSON(`${P}/matters/${id}`, { method: "DELETE", headers });
+export function deleteMatter(id) {
+  return fetchJSON(`${P}/matters/${id}`, { method: "DELETE" });
 }
 
 // ── Matter Stakeholders (People) ────────────────────────────────────────────
@@ -94,8 +93,8 @@ export function addMatterUpdate(matterId, data) {
 
 // ── Tasks ───────────────────────────────────────────────────────────────────
 
-export function listTasks({ matter_id, assigned_to, status, mode, sort_by, sort_dir, limit, offset } = {}) {
-  return fetchJSON(`${P}/tasks${qs({ matter_id, assigned_to, status, mode, sort_by, sort_dir, limit, offset })}`);
+export function listTasks({ matter_id, assigned_to, status, mode, sort, order, limit, offset } = {}) {
+  return fetchJSON(`${P}/tasks${qs({ matter_id, assigned_to, status, mode, sort, order, limit, offset })}`);
 }
 
 export function createTask(data) {
@@ -111,9 +110,8 @@ export function updateTask(id, data, etag) {
   return fetchJSON(`${P}/tasks/${id}`, { method: "PUT", headers, body: JSON.stringify(data) });
 }
 
-export function deleteTask(id, etag) {
-  const headers = etag ? { "If-Match": etag } : {};
-  return fetchJSON(`${P}/tasks/${id}`, { method: "DELETE", headers });
+export function deleteTask(id) {
+  return fetchJSON(`${P}/tasks/${id}`, { method: "DELETE" });
 }
 
 // ── People ──────────────────────────────────────────────────────────────────
@@ -159,9 +157,8 @@ export function updateOrganization(id, data, etag) {
   return fetchJSON(`${P}/organizations/${id}`, { method: "PUT", headers, body: JSON.stringify(data) });
 }
 
-export function deleteOrganization(id, etag) {
-  const headers = etag ? { "If-Match": etag } : {};
-  return fetchJSON(`${P}/organizations/${id}`, { method: "DELETE", headers });
+export function deleteOrganization(id) {
+  return fetchJSON(`${P}/organizations/${id}`, { method: "DELETE" });
 }
 
 // ── Meetings ────────────────────────────────────────────────────────────────
@@ -183,9 +180,8 @@ export function updateMeeting(id, data, etag) {
   return fetchJSON(`${P}/meetings/${id}`, { method: "PUT", headers, body: JSON.stringify(data) });
 }
 
-export function deleteMeeting(id, etag) {
-  const headers = etag ? { "If-Match": etag } : {};
-  return fetchJSON(`${P}/meetings/${id}`, { method: "DELETE", headers });
+export function deleteMeeting(id) {
+  return fetchJSON(`${P}/meetings/${id}`, { method: "DELETE" });
 }
 
 // ── Documents ───────────────────────────────────────────────────────────────
@@ -207,9 +203,8 @@ export function updateDocument(id, data, etag) {
   return fetchJSON(`${P}/documents/${id}`, { method: "PUT", headers, body: JSON.stringify(data) });
 }
 
-export function deleteDocument(id, etag) {
-  const headers = etag ? { "If-Match": etag } : {};
-  return fetchJSON(`${P}/documents/${id}`, { method: "DELETE", headers });
+export function deleteDocument(id) {
+  return fetchJSON(`${P}/documents/${id}`, { method: "DELETE" });
 }
 
 export function uploadDocumentFile(id, formData) {
@@ -235,9 +230,8 @@ export function updateDecision(id, data, etag) {
   return fetchJSON(`${P}/decisions/${id}`, { method: "PUT", headers, body: JSON.stringify(data) });
 }
 
-export function deleteDecision(id, etag) {
-  const headers = etag ? { "If-Match": etag } : {};
-  return fetchJSON(`${P}/decisions/${id}`, { method: "DELETE", headers });
+export function deleteDecision(id) {
+  return fetchJSON(`${P}/decisions/${id}`, { method: "DELETE" });
 }
 
 // ── Recent Updates ──────────────────────────────────────────────────────────

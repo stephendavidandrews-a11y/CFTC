@@ -30,6 +30,9 @@ from app.routers import (
     lookups,
     dashboard,
     tags,
+    ai_context,
+    batch,
+    schema_version,
 )
 
 logger = logging.getLogger(__name__)
@@ -98,6 +101,9 @@ app.include_router(decisions.router, prefix=router_prefix, dependencies=[Depends
 app.include_router(updates.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 app.include_router(lookups.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 app.include_router(tags.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
+app.include_router(ai_context.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
+app.include_router(batch.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
+app.include_router(schema_version.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 
 
 @app.get("/tracker/health")

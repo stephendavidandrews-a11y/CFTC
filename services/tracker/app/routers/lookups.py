@@ -121,7 +121,7 @@ ENUMS = {
         "status update", "reassigned", "waiting state changed", "due date changed",
         "note added", "completion note", "escalation", "blocker identified",
     ],
-    "source": ["manual", "sync", "sauron", "api", "import"],
+    "source": ["manual", "sync", "sauron", "api", "import", "ai"],
 }
 
 # Aliases for backward compatibility — frontend uses short names for some enums

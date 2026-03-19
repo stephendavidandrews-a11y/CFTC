@@ -29,7 +29,7 @@ async def get_dashboard(db=Depends(get_db)):
     ).fetchone()["c"]
 
     # Upcoming deadlines (past 7 days through next 30 days) across matters
-    _dl_rows = [dict(row) for row in db.execute("""
+    upcoming_deadlines = [dict(row) for row in db.execute("""
         SELECT m.id, m.title, m.matter_type, m.work_deadline, m.decision_deadline,
                m.external_deadline, m.assigned_to_person_id, m.priority, m.status,
                p.full_name as owner_name
@@ -44,31 +44,6 @@ async def get_dashboard(db=Depends(get_db)):
         ORDER BY COALESCE(m.external_deadline, m.decision_deadline, m.work_deadline)
         LIMIT 15
     """)]
-    # Flatten deadline rows for the frontend: one entry per deadline type
-    from datetime import date as _date
-    upcoming_deadlines = []
-    _today = _date.today()
-    for row in _dl_rows:
-        for dtype, field in [("External", "external_deadline"), ("Decision", "decision_deadline"), ("Work", "work_deadline")]:
-            dval = row.get(field)
-            if not dval:
-                continue
-            try:
-                dd = _date.fromisoformat(dval[:10])
-                days_until = (dd - _today).days
-            except Exception:
-                days_until = None
-            upcoming_deadlines.append({
-                "matter_id": row["id"],
-                "matter_title": row["title"],
-                "deadline_type": dtype,
-                "date": dval,
-                "days_until": days_until,
-                "owner_name": row.get("owner_name"),
-                "priority": row.get("priority"),
-            })
-    upcoming_deadlines.sort(key=lambda x: x.get("date") or "9999")
-    upcoming_deadlines = upcoming_deadlines[:15]
 
     # Recent matters (last 5 updated)
     recent_matters = [dict(row) for row in db.execute("""

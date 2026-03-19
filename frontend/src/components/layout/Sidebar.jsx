@@ -15,9 +15,22 @@ const SECTIONS = [
   { path: "/decisions", label: "Decisions", icon: "\u2696" },
   { path: "/documents", label: "Documents", icon: "\u2b1a" },
 
-  // -- Intake --
-  { separator: true, label: "Intake" },
-  { path: "/intake/speaker-review", label: "Speaker Review", icon: "\u25ce" },
+  // -- AI Review --
+  { separator: true, label: "AI Review" },
+  { path: "/review/communications", label: "Communications", icon: "◎" },
+  { path: "/review/speakers", label: "Speaker Review", icon: "\u25ce" },
+  { path: "/review/entities", label: "Entity Review", icon: "\u22a1" },
+  { path: "/review/bundles", label: "Bundle Review", icon: "\u25a4" },
+  { path: "/review/commit", label: "Ready to Commit", icon: "\u2611" },
+
+  // -- Intelligence --
+  { separator: true, label: "Intelligence" },
+  { path: "/intelligence/digests", label: "Digests", icon: "\u25eb" },
+  { path: "/intelligence/briefs", label: "Briefs", icon: "\u229e" },
+
+  // -- Settings --
+  { separator: true, label: "Settings" },
+  { path: "/settings/ai", label: "AI Configuration", icon: "\u2699" },
 
   // -- Tools --
   { separator: true, label: "Tools" },

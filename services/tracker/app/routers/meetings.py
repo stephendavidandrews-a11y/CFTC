@@ -19,32 +19,18 @@ async def list_meetings(
     db=Depends(get_db),
     search: str = Query(None),
     meeting_type: str = Query(None),
-    date_from: str = Query(None),
-    date_to: str = Query(None),
-    matter_id: str = Query(None),
     sort_by: str = Query("date_time_start"),
     sort_dir: str = Query("desc"),
     limit: int = Query(100),
     offset: int = Query(0),
 ):
     conditions, params = [], []
-    # Exclude cancelled (soft-deleted) meetings
-    conditions.append("(m.status IS NULL OR m.status != 'cancelled')")
     if search:
         conditions.append("(m.title LIKE ? OR m.purpose LIKE ?)")
         params.extend([f"%{search}%"] * 2)
     if meeting_type:
         conditions.append("m.meeting_type = ?")
         params.append(meeting_type)
-    if date_from:
-        conditions.append("m.date_time_start >= ?")
-        params.append(date_from)
-    if date_to:
-        conditions.append("m.date_time_start <= ?")
-        params.append(date_to)
-    if matter_id:
-        conditions.append("m.id IN (SELECT meeting_id FROM meeting_matters WHERE matter_id = ?)")
-        params.append(matter_id)
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
 
     total = db.execute(f"SELECT COUNT(*) as c FROM meetings m {where}", params).fetchone()["c"]
@@ -53,7 +39,7 @@ async def list_meetings(
         FROM meetings m
         LEFT JOIN people p ON m.assigned_to_person_id = p.id
         {where}
-        ORDER BY m.date_time_start {"DESC" if sort_dir.lower() == "desc" else "ASC"}
+        ORDER BY m.date_time_start {"DESC" if sort_dir == "desc" else "ASC"}
         LIMIT ? OFFSET ?
     """, params + [limit, offset]).fetchall()
     return {"items": [dict(row) for row in rows], "total": total, "limit": limit, "offset": offset}
@@ -167,11 +153,9 @@ async def delete_meeting(meeting_id: str, request: Request, db=Depends(get_db),
     if not old:
         raise HTTPException(status_code=404, detail="Meeting not found")
     check_etag(request, old)
-    now = datetime.now().isoformat()
-    db.execute(
-        "UPDATE meetings SET status = 'cancelled', updated_at = ? WHERE id = ?",
-        (now, meeting_id)
-    )
+    db.execute("DELETE FROM meeting_participants WHERE meeting_id = ?", (meeting_id,))
+    db.execute("DELETE FROM meeting_matters WHERE meeting_id = ?", (meeting_id,))
+    db.execute("DELETE FROM meetings WHERE id = ?", (meeting_id,))
     log_event(db, table_name="meetings", record_id=meeting_id, action="delete",
               source=write_source, old_record=old)
     db.commit()

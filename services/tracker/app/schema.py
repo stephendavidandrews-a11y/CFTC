@@ -28,7 +28,6 @@ TABLES = [
         source TEXT DEFAULT 'manual',
         source_id TEXT,
         external_refs TEXT,
-        status TEXT DEFAULT 'active',
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
     )"""),

@@ -69,7 +69,7 @@ export default function TrackerDashboardPage() {
   }
 
   const d = data || {};
-  // Stats are at top level of dashboard response, not nested
+  const stats = d.stats || {};
   const mattersByStatus = d.matters_by_status || {};
   const mattersByPriority = d.matters_by_priority || {};
   const deadlines = (d.upcoming_deadlines || []).slice(0, 5);
@@ -96,7 +96,7 @@ export default function TrackerDashboardPage() {
     low: theme.text.faint,
   };
 
-  const overdueCount = d.overdue_tasks || 0;
+  const overdueCount = stats.overdue_tasks || 0;
 
   return (
     <div style={{ padding: "24px 32px", maxWidth: 1200 }}>
@@ -105,15 +105,15 @@ export default function TrackerDashboardPage() {
 
       {/* Row 1: Stat cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
-        <StatCard value={d.total_open_matters ?? 0} label="Open Matters" accent={theme.accent.blue} />
-        <StatCard value={d.total_open_tasks ?? 0} label="Open Tasks" accent={theme.accent.teal} />
+        <StatCard value={stats.open_matters ?? 0} label="Open Matters" accent={theme.accent.blue} />
+        <StatCard value={stats.open_tasks ?? 0} label="Open Tasks" accent={theme.accent.teal} />
         <StatCard
           value={overdueCount}
           label="Overdue Tasks"
           accent={overdueCount > 0 ? theme.accent.red : theme.text.faint}
           pulse={overdueCount > 0}
         />
-        <StatCard value={(Array.isArray(d.pending_decisions) ? d.pending_decisions.length : (d.pending_decisions ?? 0))} label="Pending Decisions" accent={theme.accent.purple} />
+        <StatCard value={stats.pending_decisions ?? 0} label="Pending Decisions" accent={theme.accent.purple} />
       </div>
 
       {/* Row 2: Matters by Status + Priority */}
