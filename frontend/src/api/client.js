@@ -36,10 +36,9 @@ export class ApiError extends Error {
 }
 
 export async function fetchJSON(url, options = {}) {
-  const { headers: optHeaders, ...rest } = options;
   const response = await fetch(`${BASE}${url}`, {
-    ...rest,
-    headers: { "Content-Type": "application/json", "X-Write-Source": "human", ...optHeaders },
+    headers: { "Content-Type": "application/json", "X-Write-Source": "human", ...options.headers },
+    ...options,
   });
 
   if (!response.ok) {
@@ -61,7 +60,6 @@ export async function fetchJSON(url, options = {}) {
 export async function uploadFile(url, formData) {
   const response = await fetch(`${BASE}${url}`, {
     method: "POST",
-    headers: { "X-Write-Source": "human" },
     body: formData,
   });
 

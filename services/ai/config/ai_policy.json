@@ -1,0 +1,143 @@
+{
+  "user_config": {
+    "tracker_person_id": null,
+    "email_addresses": [],
+    "name": "",
+    "title": ""
+  },
+  "routing_policy": {
+    "new_matter_threshold": "medium",
+    "match_confidence_minimum": 0.7,
+    "multi_matter_enabled": true,
+    "max_new_matters_per_communication": 5,
+    "standalone_items_enabled": true
+  },
+  "extraction_policy": {
+    "propose_tasks": true,
+    "propose_decisions": false,
+    "propose_matter_updates": true,
+    "propose_meeting_records": true,
+    "propose_new_matters": false,
+    "propose_stakeholders": true,
+    "propose_follow_ups": true,
+    "propose_new_people": true,
+    "propose_new_organizations": true,
+    "propose_status_changes": false,
+    "propose_documents": true,
+    "capture_stance_data": true,
+    "capture_intelligence_notes": true
+  },
+  "sensitivity_policy": {
+    "flag_enforcement_sensitive": true,
+    "flag_congressional_sensitive": true,
+    "flag_deliberative": true
+  },
+  "trust_config": {
+    "task": {
+      "mode": "review_required",
+      "auto_commit_threshold": null
+    },
+    "matter_update": {
+      "mode": "review_required",
+      "auto_commit_threshold": null
+    },
+    "decision": {
+      "mode": "review_required",
+      "auto_commit_threshold": null
+    },
+    "status_change": {
+      "mode": "review_required",
+      "auto_commit_threshold": null
+    },
+    "meeting_record": {
+      "mode": "review_required",
+      "auto_commit_threshold": null
+    },
+    "stakeholder_addition": {
+      "mode": "review_required",
+      "auto_commit_threshold": null
+    },
+    "new_matter": {
+      "mode": "review_required",
+      "auto_commit_threshold": null
+    },
+    "new_person": {
+      "mode": "review_required",
+      "auto_commit_threshold": null
+    },
+    "new_organization": {
+      "mode": "review_required",
+      "auto_commit_threshold": null
+    },
+    "follow_up": {
+      "mode": "review_required",
+      "auto_commit_threshold": null
+    },
+    "document": {
+      "mode": "review_required",
+      "auto_commit_threshold": null
+    }
+  },
+  "model_config": {
+    "primary_extraction_model": "claude-sonnet-4-20250514",
+    "escalation_model": "claude-opus-4-6",
+    "haiku_model": "claude-haiku-4-5-20251001",
+    "opus_retry_triggers": {
+      "low_confidence": true,
+      "over_splitting": true,
+      "uncertainty_flags": true,
+      "validation_failure": true
+    },
+    "active_prompt_versions": {
+      "extraction": "v1.0.0",
+      "haiku_cleanup": "v1.0.0",
+      "haiku_enrichment": "v1.0.0"
+    },
+    "daily_budget_usd": 10.0,
+    "budget_warning_threshold": 0.8
+  },
+  "proactive_config": {
+    "daily_digest": {
+      "enabled": false,
+      "schedule_time": "06:00",
+      "email_digest": false
+    },
+    "weekly_brief": {
+      "enabled": false,
+      "schedule_day": "sunday",
+      "schedule_time": "20:00",
+      "auto_boss_brief": false
+    },
+    "realtime_alerts": {
+      "enabled": false,
+      "check_interval_minutes": 60
+    },
+    "deadline_thresholds": {
+      "critical_days": 3,
+      "warning_days": 7,
+      "external_deadline_critical_days": 3,
+      "decision_deadline_critical_days": 3,
+      "work_deadline_critical_days": 3
+    },
+    "staleness_thresholds": {
+      "critical_this_week_days": 5,
+      "important_this_month_days": 10,
+      "strategic_slow_burn_days": 21,
+      "monitoring_only_days": 30
+    },
+    "followup_thresholds": {
+      "overdue_alert": true,
+      "upcoming_days": 3
+    },
+    "workload_thresholds": {
+      "multiplier": 2.0,
+      "max_matters_flag": 5
+    },
+    "snooze_options_days": [
+      3,
+      7,
+      14,
+      30
+    ]
+  }
+}

@@ -16,18 +16,13 @@ router = APIRouter(prefix="/matters", tags=["matters"])
 
 
 def next_matter_number(db) -> str:
-    """Generate MAT-YYYY-NNNN using MAX to avoid gaps/collisions."""
+    """Generate MAT-YYYY-NNNN."""
     year = datetime.now().year
-    prefix = f"MAT-{year}-"
     row = db.execute(
-        """SELECT COALESCE(
-                MAX(CAST(SUBSTR(matter_number, ?) AS INTEGER)), 0
-            ) + 1 AS seq
-            FROM matters
-            WHERE matter_number LIKE ?""",
-        (len(prefix) + 1, f"{prefix}%",)
+        "SELECT COUNT(*) as c FROM matters WHERE matter_number LIKE ?",
+        (f"MAT-{year}-%",)
     ).fetchone()
-    seq = row["seq"]
+    seq = (row["c"] or 0) + 1
     return f"MAT-{year}-{seq:04d}"
 
 

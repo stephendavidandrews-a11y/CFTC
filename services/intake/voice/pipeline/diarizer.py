@@ -26,12 +26,12 @@ def _get_pipeline():
 
         import os
         hf_token = os.environ.get("HF_TOKEN")
-        if not hf_token:
-            raise RuntimeError(
-                "HF_TOKEN not set. pyannote/speaker-diarization-3.1 is a gated model. "
-                "Set HF_TOKEN in environment."
-            )
-        _diarization_pipeline = Pipeline.from_pretrained(PYANNOTE_PIPELINE, token=hf_token)
+        if hf_token:
+            _diarization_pipeline = Pipeline.from_pretrained(PYANNOTE_PIPELINE, token=hf_token)
+        else:
+            # Models cached locally — load without auth (works offline)
+            logger.info("HF_TOKEN not set — loading pyannote from local cache")
+            _diarization_pipeline = Pipeline.from_pretrained(PYANNOTE_PIPELINE, token=False)
 
         if torch.backends.mps.is_available():
             _diarization_pipeline.to(torch.device("mps"))
