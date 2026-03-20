@@ -13,6 +13,7 @@ import PersonDetailPage from "./pages/tracker/PersonDetailPage";
 import OrganizationsPage from "./pages/tracker/OrganizationsPage";
 import OrgDetailPage from "./pages/tracker/OrgDetailPage";
 import MeetingsPage from "./pages/tracker/MeetingsPage";
+import MeetingDetailPage from "./pages/tracker/MeetingDetailPage";
 import TeamWorkloadPage from "./pages/tracker/TeamWorkloadPage";
 import DecisionsPage from "./pages/tracker/DecisionsPage";
 import DocumentsPage from "./pages/tracker/DocumentsPage";
@@ -57,6 +58,7 @@ export default function App() {
           <Route path="/organizations" element={<OrganizationsPage />} />
           <Route path="/organizations/:id" element={<OrgDetailPage />} />
           <Route path="/meetings" element={<MeetingsPage />} />
+          <Route path="/meetings/:id" element={<MeetingDetailPage />} />
           <Route path="/team-workload" element={<TeamWorkloadPage />} />
           <Route path="/decisions" element={<DecisionsPage />} />
           <Route path="/documents" element={<DocumentsPage />} />

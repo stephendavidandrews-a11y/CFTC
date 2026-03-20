@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
 import useApi from "../../hooks/useApi";
 import { listMeetings, listMatters } from "../../api/tracker";
@@ -47,6 +48,7 @@ function formatDateTime(d) {
 }
 
 export default function MeetingsPage() {
+  const navigate = useNavigate();
   const { openDrawer } = useDrawer();
   const [filters, setFilters] = useState({ search: "", date_from: "", date_to: "", matter_id: "" });
 
@@ -143,7 +145,7 @@ export default function MeetingsPage() {
           <DataTable
             columns={columns}
             data={meetings}
-            onRowClick={(row) => openDrawer("meeting", row, refetch)}
+            onRowClick={(row) => navigate(`/meetings/${row.id}`)}
           />
         )}
       </div>

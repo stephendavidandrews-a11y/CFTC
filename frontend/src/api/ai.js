@@ -360,4 +360,10 @@ export async function applyCorrections(communicationId, correctionId, correction
   });
 }
 
+
+// -- Meeting Intelligence ------------------------------------------------
+export function getMeetingIntelligence(meetingId) {
+  return fetchJSON(`/ai/api/meeting-intelligence/by-meeting/${meetingId}`);
+}
+
 export { ApiError };

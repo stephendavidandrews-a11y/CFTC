@@ -144,8 +144,6 @@ def convert_new_person(item: dict, bundle: dict, refs: dict) -> list[tuple[dict,
         "is_active": 1,
         "source": "ai",
         "source_id": item["id"],
-        "ai_confidence": item.get("confidence"),
-        "automation_hold": 1,
         "external_refs": _external_refs(
             bundle.get("_communication_id", ""), bundle["id"], item["id"]),
     }
@@ -169,7 +167,7 @@ def convert_task(item: dict, bundle: dict, refs: dict) -> list[tuple[dict, str]]
         "description": data.get("description"),
         "task_type": data.get("task_type"),
         "status": data.get("status", "not started"),
-        "task_mode": data.get("task_mode"),
+        "task_mode": data.get("task_mode", "action"),
         "priority": data.get("priority"),
         "assigned_to_person_id": _resolve_ref(
             data.get("assigned_to"), refs, "person") or data.get("assigned_to_person_id"),

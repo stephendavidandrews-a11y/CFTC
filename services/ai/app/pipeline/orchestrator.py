@@ -34,7 +34,6 @@ HUMAN_GATE_STATES = {
     "awaiting_participant_review",
     "awaiting_entity_review",
     "awaiting_bundle_review",
-    "reviewed",
 }
 
 # Valid transitions: current_status -> next_status
@@ -389,6 +388,24 @@ async def _handle_preprocessing(db, communication_id: str) -> str:
             updated_at = datetime('now')
         WHERE id = ?
     """, (json.dumps(metadata), communication_id))
+
+    # If metadata contains a creation_time from the file, use it as captured_at
+    creation_time = metadata.get("creation_time")
+    if creation_time:
+        try:
+            from datetime import datetime as dt
+            parsed = dt.fromisoformat(creation_time.replace("Z", "+00:00"))
+            db.execute("""
+                UPDATE audio_files
+                SET captured_at = ?
+                WHERE communication_id = ? AND format != 'wav_normalized'
+            """, (parsed.isoformat(), communication_id))
+            logger.info("[%s] Set captured_at from file metadata: %s",
+                        communication_id[:8], parsed.isoformat())
+        except (ValueError, TypeError) as e:
+            logger.warning("[%s] Could not parse creation_time '%s': %s",
+                           communication_id[:8], creation_time, e)
+
     db.commit()
 
     # Store the normalized path for downstream stages
@@ -600,4 +617,17 @@ async def _handle_committing(db, communication_id: str) -> str:
         result.total_records,
         result.bundles_skipped,
     )
+
+    # Post-commit hook: generate meeting intelligence if a meeting was committed
+    try:
+        from app.pipeline.stages.meeting_intelligence import generate_meeting_intelligence
+        intel = await generate_meeting_intelligence(db, communication_id)
+        if intel:
+            logger.info("[%s] Meeting intelligence generated successfully",
+                        communication_id[:8])
+    except Exception as e:
+        # Meeting intelligence is non-critical -- log and continue
+        logger.warning("[%s] Meeting intelligence generation failed (non-fatal): %s",
+                       communication_id[:8], e)
+
     return "complete"  # next state

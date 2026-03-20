@@ -710,7 +710,7 @@ export default function MatterDetailPage() {
                   { key: "meeting_type", label: "Type", width: 120 },
                 ]}
                 data={meetings}
-                onRowClick={(row) => openDrawer("meeting", row, refetchMeetings)}
+                onRowClick={(row) => navigate(`/meetings/${row.id}`)}
               />
             )}
           </div>

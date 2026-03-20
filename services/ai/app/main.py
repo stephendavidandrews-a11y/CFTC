@@ -15,6 +15,7 @@ from app.db import get_connection
 from app.schema import init_schema
 
 from app.routers import events, config_api, health, communications, entity_review, bundle_review, participant_review, speaker_review
+from app.routers import meeting_intelligence as meeting_intelligence_api
 
 logging.basicConfig(
     level=logging.INFO,
@@ -99,3 +100,4 @@ app.include_router(entity_review.router, prefix=api_prefix)
 app.include_router(bundle_review.router, prefix=api_prefix)
 app.include_router(participant_review.router, prefix=api_prefix)
 app.include_router(speaker_review.router, prefix=api_prefix)
+app.include_router(meeting_intelligence_api.router, prefix=api_prefix)

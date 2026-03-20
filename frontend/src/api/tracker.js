@@ -93,8 +93,8 @@ export function addMatterUpdate(matterId, data) {
 
 // ── Tasks ───────────────────────────────────────────────────────────────────
 
-export function listTasks({ matter_id, assigned_to, status, mode, task_type, deadline_type, exclude_done, search, sort_by, sort_dir, limit, offset } = {}) {
-  return fetchJSON(`${P}/tasks${qs({ matter_id, assigned_to, status, mode, task_type, deadline_type, exclude_done, search, sort_by, sort_dir, limit, offset })}`);
+export function listTasks({ matter_id, assigned_to, status, mode, task_type, deadline_type, exclude_done, search, source_id, sort_by, sort_dir, limit, offset } = {}) {
+  return fetchJSON(`${P}/tasks${qs({ matter_id, assigned_to, status, mode, task_type, deadline_type, exclude_done, search, source_id, sort_by, sort_dir, limit, offset })}`);
 }
 
 export function createTask(data) {

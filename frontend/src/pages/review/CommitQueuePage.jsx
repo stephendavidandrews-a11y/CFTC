@@ -233,7 +233,7 @@ export default function CommitQueuePage() {
               <div key={c.id} style={cardStyle}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: theme.text.primary, marginBottom: 4 }}>
-                    {c.original_filename || "Untitled"}
+                    {c.title || c.original_filename || "Untitled"}
                   </div>
                   <div style={{ fontSize: 12, color: theme.text.dim, display: "flex", gap: 12 }}>
                     <span>{formatDuration(c.duration_seconds)}</span>
@@ -256,7 +256,7 @@ export default function CommitQueuePage() {
               <div key={c.id} style={cardStyle}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: theme.text.primary, marginBottom: 4 }}>
-                    {c.original_filename || "Untitled"}
+                    {c.title || c.original_filename || "Untitled"}
                   </div>
                   <div style={{ fontSize: 12, color: theme.text.dim, display: "flex", gap: 12 }}>
                     <span>{formatDuration(c.duration_seconds)}</span>
@@ -293,7 +293,7 @@ export default function CommitQueuePage() {
               <div key={c.id} style={{ ...cardStyle, borderColor: "rgba(239,68,68,0.3)" }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: theme.text.primary, marginBottom: 4 }}>
-                    {c.original_filename || "Untitled"}
+                    {c.title || c.original_filename || "Untitled"}
                   </div>
                   <div style={{ fontSize: 12, color: theme.accent.red, fontWeight: 600, marginBottom: 2 }}>
                     {err.summary}

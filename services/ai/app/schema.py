@@ -353,6 +353,43 @@ TABLES = [
         details TEXT,
         created_at TEXT DEFAULT (datetime('now'))
     )"""),
+
+    # ---- Table 19: meeting_intelligence ----
+    ("meeting_intelligence", """CREATE TABLE IF NOT EXISTS meeting_intelligence (
+        id TEXT PRIMARY KEY,
+        meeting_id TEXT NOT NULL,
+        communication_id TEXT,
+        version INTEGER NOT NULL DEFAULT 1,
+        tier TEXT NOT NULL DEFAULT 'core',
+        executive_summary TEXT NOT NULL,
+        decisions_made TEXT,
+        non_decisions TEXT,
+        action_items_summary TEXT,
+        risks_surfaced TEXT,
+        briefing_required TEXT,
+        key_issues_discussed TEXT,
+        participant_positions TEXT,
+        dependencies_surfaced TEXT,
+        what_changed_in_matter TEXT,
+        commitments_made TEXT,
+        recommended_next_move TEXT,
+        purpose_and_context TEXT,
+        materials_referenced TEXT,
+        detailed_notes TEXT,
+        tags TEXT,
+        why_this_meeting_mattered TEXT,
+        what_changed TEXT,
+        what_i_need_to_do TEXT,
+        what_boss_needs_to_know TEXT,
+        what_can_wait TEXT,
+        generated_by TEXT,
+        prompt_version TEXT,
+        input_tokens INTEGER,
+        output_tokens INTEGER,
+        cost_usd REAL,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+    )"""),
 ]
 
 # ---------------------------------------------------------------------------
@@ -391,6 +428,10 @@ INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_msg_hash ON communication_messages(message_hash);",
     "CREATE INDEX IF NOT EXISTS idx_msg_new ON communication_messages(communication_id, is_new);",
     "CREATE INDEX IF NOT EXISTS idx_msg_sender ON communication_messages(sender_email);",
+
+    # -- meeting_intelligence --
+    "CREATE INDEX IF NOT EXISTS idx_meeting_intel_meeting ON meeting_intelligence(meeting_id);",
+    "CREATE INDEX IF NOT EXISTS idx_meeting_intel_comm ON meeting_intelligence(communication_id);",
 
     # -- communication_artifacts --
     "CREATE INDEX IF NOT EXISTS idx_artifact_comm ON communication_artifacts(communication_id);",

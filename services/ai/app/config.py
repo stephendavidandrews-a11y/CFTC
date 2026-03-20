@@ -32,6 +32,8 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 PORT = int(os.environ.get("AI_PORT", "8006"))
 HOST = os.environ.get("AI_HOST", "0.0.0.0")
 
+LOCAL_TIMEZONE = os.environ.get("LOCAL_TIMEZONE", "America/New_York")
+
 APP_ENV = os.environ.get("APP_ENV", "development")
 if APP_ENV == "production" and not ANTHROPIC_API_KEY:
     print("FATAL: ANTHROPIC_API_KEY env var required in production", file=sys.stderr)
