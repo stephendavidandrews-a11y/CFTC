@@ -15,7 +15,7 @@ from app.bundle_review.validation import compute_blockers
 def get_queue(db) -> dict:
     """List all communications awaiting bundle review with summary counts."""
     rows = db.execute("""
-        SELECT c.id, c.original_filename, c.processing_status,
+        SELECT c.id, c.title, c.original_filename, c.processing_status,
                c.duration_seconds, c.created_at, c.updated_at,
                c.sensitivity_flags,
                (SELECT COUNT(*) FROM review_bundles rb
@@ -57,7 +57,7 @@ def get_detail(db, communication_id: str) -> dict:
     visibility, provenance, and readiness-to-complete assessment.
     """
     comm = db.execute("""
-        SELECT id, processing_status, original_filename, duration_seconds,
+        SELECT id, processing_status, title, original_filename, duration_seconds,
                topic_segments_json, sensitivity_flags, created_at
         FROM communications WHERE id = ?
     """, (communication_id,)).fetchone()
@@ -143,6 +143,7 @@ def get_detail(db, communication_id: str) -> dict:
     return {
         "communication_id": communication_id,
         "processing_status": comm["processing_status"],
+        "title": comm["title"],
         "original_filename": comm["original_filename"],
         "duration_seconds": comm["duration_seconds"],
         "created_at": comm["created_at"],
