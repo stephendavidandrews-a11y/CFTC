@@ -18,6 +18,8 @@ ITEM_TYPE_ORDER = {
     "matter_update": 7,
     "decision": 8,
     "status_change": 9,
+    "context_note": 10,
+    "person_detail_update": 11,
 }
 
 

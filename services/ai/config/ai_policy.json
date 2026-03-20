@@ -25,7 +25,9 @@
     "propose_status_changes": false,
     "propose_documents": true,
     "capture_stance_data": true,
-    "capture_intelligence_notes": true
+    "capture_intelligence_notes": true,
+    "propose_context_notes": true,
+    "propose_person_detail_updates": true
   },
   "sensitivity_policy": {
     "flag_enforcement_sensitive": true,
@@ -74,6 +76,14 @@
       "auto_commit_threshold": null
     },
     "document": {
+      "mode": "review_required",
+      "auto_commit_threshold": null
+    },
+    "context_note": {
+      "mode": "review_required",
+      "auto_commit_threshold": null
+    },
+    "person_detail_update": {
       "mode": "review_required",
       "auto_commit_threshold": null
     }

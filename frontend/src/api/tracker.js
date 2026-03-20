@@ -308,3 +308,49 @@ export function removeMatterDependency(matterId, depId) {
 export function findMatterByPipelineItem(pipelineItemId) {
   return listMatters({ source: "pipeline", source_id: String(pipelineItemId), limit: 1 });
 }
+
+
+// ── Context Notes ───────────────────────────────────────────────────────────
+
+export function listContextNotes({ search, category, posture, durability, sensitivity, matter_id, entity_type, entity_id, source_type, stale, sort_by, sort_dir, limit, offset } = {}) {
+  return fetchJSON(`${P}/context-notes${qs({ search, category, posture, durability, sensitivity, matter_id, entity_type, entity_id, source_type, stale, sort_by, sort_dir, limit, offset })}`);
+}
+
+export function createContextNote(data) {
+  return fetchJSON(`${P}/context-notes`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export function getContextNote(id) {
+  return fetchJSON(`${P}/context-notes/${id}`);
+}
+
+export function updateContextNote(id, data, etag) {
+  const headers = etag ? { "If-Match": etag } : {};
+  return fetchJSON(`${P}/context-notes/${id}`, { method: "PUT", headers, body: JSON.stringify(data) });
+}
+
+export function deleteContextNote(id) {
+  return fetchJSON(`${P}/context-notes/${id}`, { method: "DELETE" });
+}
+
+export function getContextNotesByEntity(entityType, entityId, { category, posture, limit, offset } = {}) {
+  return fetchJSON(`${P}/context-notes/by-entity/${entityType}/${entityId}${qs({ category, posture, limit, offset })}`);
+}
+
+export function addContextNoteLink(noteId, data) {
+  return fetchJSON(`${P}/context-notes/${noteId}/links`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export function removeContextNoteLink(noteId, linkId) {
+  return fetchJSON(`${P}/context-notes/${noteId}/links/${linkId}`, { method: "DELETE" });
+}
+
+// ── Person Profiles ─────────────────────────────────────────────────────────
+
+export function getPersonProfile(personId) {
+  return fetchJSON(`${P}/people/${personId}/profile`);
+}
+
+export function updatePersonProfile(personId, data) {
+  return fetchJSON(`${P}/people/${personId}/profile`, { method: "PUT", body: JSON.stringify(data) });
+}

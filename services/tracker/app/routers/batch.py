@@ -27,12 +27,13 @@ ALLOWED_TABLES = {
     "organizations", "people", "matters", "tasks", "meetings",
     "meeting_participants", "meeting_matters", "documents", "document_files",
     "decisions", "matter_people", "matter_organizations", "matter_updates",
+    "context_notes", "context_note_links", "person_profiles",
 }
 
 # Tables allowed for hard delete (junction/child tables)
 DELETE_ALLOWED_TABLES = {
     "matter_people", "matter_organizations", "meeting_participants",
-    "meeting_matters", "matter_updates",
+    "meeting_matters", "matter_updates", "context_note_links",
 }
 
 # Tables where delete is a soft-delete
@@ -44,6 +45,7 @@ SOFT_DELETE_TABLES = {
     "meetings": None,  # hard delete allowed
     "documents": ("status", "archived"),
     "decisions": ("status", "no longer needed"),
+    "context_notes": ("is_active", 0),
 }
 
 

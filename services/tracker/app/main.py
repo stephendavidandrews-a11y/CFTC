@@ -20,6 +20,7 @@ from app.seed import seed_all
 # Import routers
 from app.routers import (
     config,
+    context_notes,
     organizations,
     people,
     matters,
@@ -99,6 +100,7 @@ app.include_router(organizations.router, prefix=router_prefix, dependencies=[Dep
 app.include_router(meetings.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 app.include_router(documents.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 app.include_router(decisions.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
+app.include_router(context_notes.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 app.include_router(updates.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 app.include_router(lookups.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 app.include_router(tags.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])

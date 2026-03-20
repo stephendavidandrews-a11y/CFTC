@@ -215,6 +215,71 @@ TABLES = [
         updated_at TEXT DEFAULT (datetime('now'))
     )"""),
 
+
+    # ---- Context Layer tables ----
+    ("context_notes", """CREATE TABLE IF NOT EXISTS context_notes (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL,
+        category TEXT NOT NULL,
+        posture TEXT NOT NULL DEFAULT 'factual',
+        durability TEXT NOT NULL DEFAULT 'durable',
+        sensitivity TEXT NOT NULL DEFAULT 'low',
+        status TEXT NOT NULL DEFAULT 'active',
+        confidence REAL,
+        source_type TEXT,
+        source_id TEXT,
+        source_excerpt TEXT,
+        source_timestamp_start REAL,
+        source_timestamp_end REAL,
+        speaker_attribution TEXT,
+        created_by_type TEXT DEFAULT 'ai',
+        created_by_person_id TEXT REFERENCES people(id),
+        effective_date TEXT,
+        stale_after TEXT,
+        archived_at TEXT,
+        notes_visibility TEXT DEFAULT 'normal',
+        last_reviewed_at TEXT,
+        matter_id TEXT REFERENCES matters(id),
+        source_communication_id TEXT,
+        is_active INTEGER DEFAULT 1,
+        source TEXT DEFAULT 'manual',
+        ai_confidence REAL,
+        automation_hold INTEGER DEFAULT 0,
+        external_refs TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+    )"""),
+
+    ("context_note_links", """CREATE TABLE IF NOT EXISTS context_note_links (
+        id TEXT PRIMARY KEY,
+        context_note_id TEXT NOT NULL REFERENCES context_notes(id),
+        entity_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        relationship_role TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now'))
+    )"""),
+
+    ("person_profiles", """CREATE TABLE IF NOT EXISTS person_profiles (
+        id TEXT PRIMARY KEY,
+        person_id TEXT NOT NULL UNIQUE REFERENCES people(id),
+        birthday TEXT,
+        spouse_name TEXT,
+        children_count INTEGER,
+        children_names TEXT,
+        hometown TEXT,
+        current_city TEXT,
+        prior_roles_summary TEXT,
+        education_summary TEXT,
+        interests TEXT,
+        personal_notes_summary TEXT,
+        scheduling_notes TEXT,
+        relationship_preferences TEXT,
+        leadership_notes TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+    )"""),
+
     # ---- Junction tables ----
     ("matter_people", """CREATE TABLE IF NOT EXISTS matter_people (
         id TEXT PRIMARY KEY,
@@ -546,6 +611,24 @@ INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_rulemaking_comments_matter ON rulemaking_comment_periods(matter_id);",
     "CREATE INDEX IF NOT EXISTS idx_rulemaking_comments_closes ON rulemaking_comment_periods(closes_at);",
     "CREATE INDEX IF NOT EXISTS idx_rulemaking_cba_matter ON rulemaking_cba_tracking(matter_id);",
+
+
+    # -- context_notes --
+    "CREATE INDEX IF NOT EXISTS idx_ctx_notes_category ON context_notes(category);",
+    "CREATE INDEX IF NOT EXISTS idx_ctx_notes_matter ON context_notes(matter_id);",
+    "CREATE INDEX IF NOT EXISTS idx_ctx_notes_active ON context_notes(is_active);",
+    "CREATE INDEX IF NOT EXISTS idx_ctx_notes_posture ON context_notes(posture);",
+    "CREATE INDEX IF NOT EXISTS idx_ctx_notes_sensitivity ON context_notes(sensitivity);",
+    "CREATE INDEX IF NOT EXISTS idx_ctx_notes_created ON context_notes(created_at);",
+    "CREATE INDEX IF NOT EXISTS idx_ctx_notes_stale ON context_notes(stale_after);",
+    "CREATE INDEX IF NOT EXISTS idx_ctx_notes_source_comm ON context_notes(source_communication_id);",
+
+    # -- context_note_links --
+    "CREATE INDEX IF NOT EXISTS idx_ctx_note_links_note ON context_note_links(context_note_id);",
+    "CREATE INDEX IF NOT EXISTS idx_ctx_note_links_entity ON context_note_links(entity_type, entity_id);",
+
+    # -- person_profiles --
+    "CREATE INDEX IF NOT EXISTS idx_person_profiles_person ON person_profiles(person_id);",
 
     # -- decisions --
     "CREATE INDEX IF NOT EXISTS idx_decisions_matter ON decisions(matter_id);",

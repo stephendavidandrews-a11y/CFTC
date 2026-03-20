@@ -453,6 +453,126 @@ def convert_document(item: dict, bundle: dict, refs: dict) -> list[tuple[dict, s
     }, item["id"])]
 
 
+
+def convert_context_note(item: dict, bundle: dict, refs: dict) -> list[tuple[dict, str]]:
+    """Compound: 1 item → context_notes INSERT + context_note_links INSERTs."""
+    data = item["proposed_data"]
+    note_client_id = f"ctx-note-{item['id']}"
+    comm_id = bundle.get("_communication_id", "")
+
+    ops = []
+
+    # Compute stale_after from durability
+    stale_after = None
+    durability = data.get("durability", "durable")
+    if durability == "ephemeral":
+        stale_after = "+30 days"  # Will be resolved to actual date by tracker
+    elif durability == "medium_term":
+        stale_after = "+180 days"
+
+    # Op 1: INSERT context_notes
+    note_data = {
+        "title": data.get("title", ""),
+        "body": data.get("body", ""),
+        "category": data.get("category", "institutional_knowledge"),
+        "posture": data.get("posture", "factual"),
+        "durability": durability,
+        "sensitivity": data.get("sensitivity", "low"),
+        "status": "active",
+        "speaker_attribution": data.get("speaker_attribution"),
+        "matter_id": data.get("matter_id") or _resolve_matter_id(bundle, refs),
+        "source_communication_id": comm_id or None,
+        "source": "ai",
+        "source_type": "transcript",
+        "source_id": item["id"],
+        "ai_confidence": item.get("confidence"),
+        "automation_hold": data.get("automation_hold", 1),
+        "is_active": 1,
+        "effective_date": data.get("effective_date"),
+        "external_refs": _external_refs(comm_id, bundle["id"], item["id"]),
+    }
+
+    # Add source_excerpt and timestamps from evidence
+    evidence = item.get("source_evidence") or []
+    if evidence:
+        note_data["source_excerpt"] = evidence[0].get("excerpt", "")
+        first_range = evidence[0].get("time_range")
+        if first_range:
+            note_data["source_timestamp_start"] = first_range.get("start")
+            note_data["source_timestamp_end"] = first_range.get("end")
+
+    note_data = {k: v for k, v in note_data.items() if v is not None}
+
+    ops.append(({
+        "op": "insert",
+        "table": "context_notes",
+        "client_id": note_client_id,
+        "data": note_data,
+    }, item["id"]))
+
+    # Op 2+: INSERT context_note_links for each linked_entity
+    for le in data.get("linked_entities", []):
+        entity_type = le.get("entity_type")
+        entity_id = le.get("entity_id")
+        role = le.get("relationship_role", "relevant_to")
+        if entity_type and entity_id:
+            link_data = {
+                "context_note_id": f"$ref:{note_client_id}",
+                "entity_type": entity_type,
+                "entity_id": entity_id,
+                "relationship_role": role,
+            }
+            ops.append(({
+                "op": "insert",
+                "table": "context_note_links",
+                "data": link_data,
+            }, item["id"]))
+
+    return ops
+
+
+def convert_person_detail_update(item: dict, bundle: dict, refs: dict) -> list[tuple[dict, str]]:
+    """Upsert person_profiles with only the proposed fields."""
+    data = item["proposed_data"]
+    person_id = data.get("person_id")
+    fields = data.get("fields", {})
+    comm_id = bundle.get("_communication_id", "")
+
+    if not person_id or not fields:
+        logger.warning("person_detail_update item %s missing person_id or fields — skipping",
+                       item["id"][:8])
+        return []
+
+    # Build the profile update data
+    profile_data = dict(fields)
+    profile_data["person_id"] = person_id
+
+    # The batch endpoint does INSERT, but person_profiles needs UPSERT.
+    # We use insert with the person_id. The batch endpoint will handle
+    # the insert. If a profile already exists, the committer should
+    # use the CRUD PUT endpoint instead.
+    # For now, we generate an insert and the committer handles upsert logic.
+
+    op_data = dict(fields)
+    # Don't include person_id in the update fields — it's in the row already
+    # We'll use a special "_upsert_key" to signal the committer
+    op_data["_person_id"] = person_id
+    op_data["_upsert"] = True
+
+    return [({
+        "op": "insert",
+        "table": "person_profiles",
+        "data": {
+            "person_id": person_id,
+            **fields,
+        },
+        "_meta": {
+            "upsert_by": "person_id",
+            "external_refs": _external_refs(comm_id, bundle["id"], item["id"]),
+        },
+    }, item["id"])]
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Dispatcher
 # ═══════════════════════════════════════════════════════════════════════════
@@ -468,6 +588,8 @@ CONVERTERS = {
     "meeting_record": convert_meeting_record,
     "stakeholder_addition": convert_stakeholder_addition,
     "document": convert_document,
+    "context_note": convert_context_note,
+    "person_detail_update": convert_person_detail_update,
 }
 
 
