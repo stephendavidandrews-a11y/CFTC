@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 # Native worker endpoint — the intake service on the Mac Mini host
 # In Docker: host-services:8005; locally: localhost:8005
 NATIVE_WORKER_BASE = "http://host-services:8005"
-NATIVE_WORKER_TIMEOUT = 600  # 10 minutes max for long audio
+NATIVE_WORKER_TIMEOUT = 4800  # 80 minutes max for long audio
 
 # Fallback for local dev (not in Docker)
 import os
