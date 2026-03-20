@@ -414,3 +414,78 @@ class UpdateDocument(BaseModel):
             if values.get("is_sent") in (1, True) and not values.get("sent_at"):
                 values["sent_at"] = dt.now().isoformat()
         return values
+
+
+# ── Context Notes ────────────────────────────────────────────────────────────
+
+class CreateContextNote(BaseModel):
+    title: str = Field(..., min_length=1, description="Required note title")
+    body: str = Field(..., min_length=1, description="Required note body")
+    category: str = Field(..., min_length=1, description="Required category")
+    posture: str = "factual"
+    durability: str = "durable"
+    sensitivity: str = "low"
+    status: str = "active"
+    confidence: Optional[float] = None
+    source_type: Optional[str] = None
+    source_id: Optional[str] = None
+    source_excerpt: Optional[str] = None
+    source_timestamp_start: Optional[float] = None
+    source_timestamp_end: Optional[float] = None
+    speaker_attribution: Optional[str] = None
+    created_by_type: str = "ai"
+    created_by_person_id: Optional[str] = None
+    effective_date: Optional[str] = None
+    stale_after: Optional[str] = None
+    notes_visibility: str = "normal"
+    matter_id: Optional[str] = None
+    source_communication_id: Optional[str] = None
+    source: str = "manual"
+    ai_confidence: Optional[float] = None
+    automation_hold: int = 0
+    external_refs: Optional[str] = None
+
+
+class UpdateContextNote(BaseModel):
+    title: Optional[str] = None
+    body: Optional[str] = None
+    category: Optional[str] = None
+    posture: Optional[str] = None
+    durability: Optional[str] = None
+    sensitivity: Optional[str] = None
+    status: Optional[str] = None
+    confidence: Optional[float] = None
+    source_excerpt: Optional[str] = None
+    speaker_attribution: Optional[str] = None
+    effective_date: Optional[str] = None
+    stale_after: Optional[str] = None
+    notes_visibility: Optional[str] = None
+    matter_id: Optional[str] = None
+    last_reviewed_at: Optional[str] = None
+    ai_confidence: Optional[float] = None
+    automation_hold: Optional[int] = None
+    external_refs: Optional[str] = None
+
+
+class CreateContextNoteLink(BaseModel):
+    entity_type: str = Field(..., min_length=1, description="Required entity type")
+    entity_id: str = Field(..., min_length=1, description="Required entity ID")
+    relationship_role: str = Field(..., min_length=1, description="Required relationship role")
+
+
+# ── Person Profiles ──────────────────────────────────────────────────────────
+
+class UpdatePersonProfile(BaseModel):
+    birthday: Optional[str] = None
+    spouse_name: Optional[str] = None
+    children_count: Optional[int] = None
+    children_names: Optional[str] = None
+    hometown: Optional[str] = None
+    current_city: Optional[str] = None
+    prior_roles_summary: Optional[str] = None
+    education_summary: Optional[str] = None
+    interests: Optional[str] = None
+    personal_notes_summary: Optional[str] = None
+    scheduling_notes: Optional[str] = None
+    relationship_preferences: Optional[str] = None
+    leadership_notes: Optional[str] = None

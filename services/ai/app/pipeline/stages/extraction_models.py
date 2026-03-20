@@ -157,6 +157,7 @@ VALID_ITEM_TYPES = {
     "task", "follow_up", "decision", "matter_update",
     "meeting_record", "stakeholder_addition", "status_change",
     "document", "new_person", "new_organization",
+    "context_note", "person_detail_update",
 }
 
 # Maps extraction_policy toggle names to item_type values
@@ -171,4 +172,6 @@ POLICY_TOGGLE_MAP = {
     "propose_documents": "document",
     "propose_new_people": "new_person",
     "propose_new_organizations": "new_organization",
+    "propose_context_notes": "context_note",
+    "propose_person_detail_updates": "person_detail_update",
 }

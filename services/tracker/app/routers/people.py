@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.db import get_db
-from app.validators import CreatePerson, UpdatePerson
+from app.validators import CreatePerson, UpdatePerson, UpdatePersonProfile
 import json
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -234,6 +234,80 @@ async def update_person(person_id: str, body: UpdatePerson, request: Request, db
               source=write_source, old_record=old, new_data=data)
     db.commit()
     return {"id": person_id, "updated": True}
+
+
+
+# ── Person Profile ───────────────────────────────────────────────────────────
+
+@router.get("/{person_id}/profile")
+async def get_person_profile(person_id: str, db=Depends(get_db)):
+    """Get person profile. Returns empty object with nulls if no row exists."""
+    person = db.execute("SELECT id FROM people WHERE id = ?", (person_id,)).fetchone()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+
+    row = db.execute("SELECT * FROM person_profiles WHERE person_id = ?", (person_id,)).fetchone()
+    if row:
+        return dict(row)
+
+    # Return empty profile structure
+    return {
+        "id": None, "person_id": person_id,
+        "birthday": None, "spouse_name": None, "children_count": None,
+        "children_names": None, "hometown": None, "current_city": None,
+        "prior_roles_summary": None, "education_summary": None,
+        "interests": None, "personal_notes_summary": None,
+        "scheduling_notes": None, "relationship_preferences": None,
+        "leadership_notes": None,
+        "created_at": None, "updated_at": None,
+    }
+
+
+@router.put("/{person_id}/profile")
+async def update_person_profile(person_id: str, body: UpdatePersonProfile,
+                                 db=Depends(get_db), write_source: str = Depends(get_write_source)):
+    """Upsert person profile — create row if missing, update only provided fields."""
+    person = db.execute("SELECT id FROM people WHERE id = ?", (person_id,)).fetchone()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+
+    data = body.model_dump(exclude_unset=True)
+    if not data:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    now = datetime.now().isoformat()
+    existing = db.execute("SELECT * FROM person_profiles WHERE person_id = ?", (person_id,)).fetchone()
+
+    if existing:
+        # Update only provided fields
+        sets = [f"{k} = ?" for k in data]
+        params = list(data.values())
+        sets.append("updated_at = ?")
+        params.extend([now, existing["id"]])
+        db.execute(f"UPDATE person_profiles SET {', '.join(sets)} WHERE id = ?", params)
+        log_event(db, table_name="person_profiles", record_id=existing["id"],
+                  action="update", source=write_source, old_record=existing, new_data=data)
+        db.commit()
+        # Return current state
+        updated = db.execute("SELECT * FROM person_profiles WHERE person_id = ?", (person_id,)).fetchone()
+        return dict(updated)
+    else:
+        # Create new profile row
+        import uuid as _uuid
+        pid = str(_uuid.uuid4())
+        data["id"] = pid
+        data["person_id"] = person_id
+        data["created_at"] = now
+        data["updated_at"] = now
+        columns = ", ".join(data.keys())
+        placeholders = ", ".join(["?"] * len(data))
+        db.execute(f"INSERT INTO person_profiles ({columns}) VALUES ({placeholders})",
+                   list(data.values()))
+        log_event(db, table_name="person_profiles", record_id=pid,
+                  action="create", source=write_source, new_data=data)
+        db.commit()
+        created = db.execute("SELECT * FROM person_profiles WHERE person_id = ?", (person_id,)).fetchone()
+        return dict(created)
 
 
 @router.delete("/{person_id}")

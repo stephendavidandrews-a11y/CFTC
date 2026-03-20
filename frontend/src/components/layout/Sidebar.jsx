@@ -14,6 +14,7 @@ const SECTIONS = [
   { path: "/meetings", label: "Meetings", icon: "\u229e" },
   { path: "/decisions", label: "Decisions", icon: "\u2696" },
   { path: "/documents", label: "Documents", icon: "\u2b1a" },
+  { path: "/context-notes", label: "Context", icon: "\u2261" },
 
   // -- AI Review --
   { separator: true, label: "AI Review" },

@@ -17,6 +17,7 @@ import MeetingDetailPage from "./pages/tracker/MeetingDetailPage";
 import TeamWorkloadPage from "./pages/tracker/TeamWorkloadPage";
 import DecisionsPage from "./pages/tracker/DecisionsPage";
 import DocumentsPage from "./pages/tracker/DocumentsPage";
+import ContextNotesPage from "./pages/tracker/ContextNotesPage";
 
 // -- AI Review (Phase 3 + Phase 6) --
 import SpeakerReviewQueuePage from "./pages/review/SpeakerReviewQueuePage";
@@ -62,6 +63,7 @@ export default function App() {
           <Route path="/team-workload" element={<TeamWorkloadPage />} />
           <Route path="/decisions" element={<DecisionsPage />} />
           <Route path="/documents" element={<DocumentsPage />} />
+          <Route path="/context-notes" element={<ContextNotesPage />} />
 
           {/* -- AI Review (Phase 3 + Phase 6) -- */}
           <Route path="/review/speakers" element={<SpeakerReviewQueuePage />} />

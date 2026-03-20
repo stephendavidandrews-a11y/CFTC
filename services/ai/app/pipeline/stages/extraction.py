@@ -730,6 +730,81 @@ def _post_process(
             if cleaned_refs:
                 item.rationale += " [Note: some references were cleaned by post-processing.]"
 
+            # ── Step 2b: Context note linked_entities validation ──
+            if item.item_type == "context_note":
+                linked_entities = pd.get("linked_entities", [])
+                valid_linked = []
+                for le in linked_entities:
+                    etype = le.get("entity_type")
+                    eid = le.get("entity_id")
+                    valid = False
+                    if etype == "person" and eid in valid_person_ids:
+                        valid = True
+                    elif etype == "organization" and eid in valid_org_ids:
+                        valid = True
+                    elif etype == "matter" and eid in valid_matter_ids:
+                        valid = True
+                    elif etype in ("meeting", "task", "document", "decision"):
+                        valid = True  # Cannot validate these without extra queries
+                    if valid:
+                        valid_linked.append(le)
+                    else:
+                        log["invalid_references_cleaned"].append({
+                            "type": f"linked_entity.{etype}",
+                            "value": eid,
+                            "item_type": "context_note",
+                        })
+                pd["linked_entities"] = valid_linked
+                if not valid_linked and linked_entities:
+                    item.rationale += " [Note: all linked entities had invalid IDs — note is unlinked.]"
+
+                # Attribution enforcement
+                posture = pd.get("posture", "factual")
+                speaker = pd.get("speaker_attribution")
+                if posture == "attributed_view" and not speaker:
+                    item.rationale += " [WARNING: attributed_view without speaker_attribution — downgraded to tentative.]"
+                    pd["posture"] = "tentative"
+                if posture == "sensitive" and not speaker and not item.primary_excerpt:
+                    pd["automation_hold"] = 1
+                    item.rationale += " [Hold: sensitive note without speaker attribution or source excerpt.]"
+
+            # ── Step 2c: Person detail update validation ──
+            if item.item_type == "person_detail_update":
+                target_person_id = pd.get("person_id")
+                if target_person_id and target_person_id not in valid_person_ids:
+                    # Downgrade to unlinked context_note
+                    log["invalid_references_cleaned"].append({
+                        "type": "person_detail_update.person_id",
+                        "value": target_person_id,
+                        "item_type": "person_detail_update",
+                        "action": "downgraded_to_context_note",
+                    })
+                    item.item_type = "context_note"
+                    fields = pd.get("fields", {})
+                    person_name = pd.get("person_name", "unknown")
+                    field_desc = ", ".join(f"{k}={v}" for k, v in fields.items())
+                    pd.clear()
+                    pd["title"] = f"Profile info for {person_name} (unverified person)"
+                    pd["body"] = f"Extracted profile fields: {field_desc}. Person ID could not be verified."
+                    pd["category"] = "people_insight"
+                    pd["posture"] = "tentative"
+                    pd["durability"] = "durable"
+                    pd["sensitivity"] = "low"
+                    item.rationale += " [Downgraded from person_detail_update: invalid person_id.]"
+
+                # Confidence enforcement
+                elif item.confidence < 0.70:
+                    log["code_suppressed_items"].append({
+                        "item_type": "person_detail_update",
+                        "reason": f"confidence {item.confidence:.2f} < 0.70 threshold",
+                        "person_id": target_person_id,
+                        "fields": list(pd.get("fields", {}).keys()),
+                    })
+                    continue  # Skip this item
+                elif item.confidence < 0.85:
+                    pd["automation_hold"] = 1
+                    item.rationale += f" [Hold: confidence {item.confidence:.2f} is below 0.85 threshold.]"
+
             # ── Step 3: Apply extraction_policy suppression ──
             if item.item_type in disabled_types:
                 log["code_suppressed_items"].append({

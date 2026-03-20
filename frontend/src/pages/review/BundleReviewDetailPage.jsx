@@ -37,6 +37,8 @@ const ITEM_TYPE_COLORS = {
   status_change: { bg: "#422006", text: "#fbbf24" },
   document: { bg: "#1f2937", text: "#9ca3af" },
   follow_up: { bg: "#431407", text: "#fb923c" },
+  context_note: { bg: "#312e81", text: "#c4b5fd" },
+  person_detail_update: { bg: "#134e4a", text: "#5eead4" },
 };
 
 const BUNDLE_TYPE_COLORS = {
