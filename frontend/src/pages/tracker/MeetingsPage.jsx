@@ -2,7 +2,7 @@ import React, { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
 import useApi from "../../hooks/useApi";
-import { listMeetings, listMatters } from "../../api/tracker";
+import { listMeetings, listMatters, updateMeeting, deleteMeeting } from "../../api/tracker";
 import DataTable from "../../components/shared/DataTable";
 import EmptyState from "../../components/shared/EmptyState";
 import { useDrawer } from "../../contexts/DrawerContext";
@@ -39,6 +39,17 @@ const btnPrimary = {
   cursor: "pointer",
 };
 
+const actionBtnStyle = {
+  background: "transparent",
+  border: "none",
+  cursor: "pointer",
+  padding: "4px 6px",
+  borderRadius: 4,
+  fontSize: 14,
+  lineHeight: 1,
+  transition: "background 0.15s",
+};
+
 function formatDateTime(d) {
   if (!d) return "\u2014";
   return new Date(d).toLocaleString("en-US", {
@@ -51,6 +62,8 @@ export default function MeetingsPage() {
   const navigate = useNavigate();
   const { openDrawer } = useDrawer();
   const [filters, setFilters] = useState({ search: "", date_from: "", date_to: "", matter_id: "" });
+  const [confirmAction, setConfirmAction] = useState(null); // { id, action, title }
+  const [actionBusy, setActionBusy] = useState({});
 
   const { data: mattersData } = useApi(() => listMatters({ limit: 500 }), []);
   const { data, loading, error, refetch } = useApi(
@@ -61,6 +74,27 @@ export default function MeetingsPage() {
   const handleFilter = useCallback((key, val) => {
     setFilters((prev) => ({ ...prev, [key]: val }));
   }, []);
+
+  const handleMeetingAction = useCallback(
+    async (id, action) => {
+      setActionBusy((prev) => ({ ...prev, [id]: true }));
+      try {
+        if (action === "archive") {
+          await updateMeeting(id, { status: "archived" });
+        } else if (action === "delete") {
+          await deleteMeeting(id);
+        }
+        setConfirmAction(null);
+        refetch();
+      } catch (err) {
+        console.error(`Meeting ${action} failed:`, err);
+        alert(`Failed to ${action} meeting: ${err.message || err}`);
+      } finally {
+        setActionBusy((prev) => ({ ...prev, [id]: false }));
+      }
+    },
+    [refetch]
+  );
 
   const meetings = data?.items || data || [];
   const matters = mattersData?.items || mattersData || [];
@@ -84,6 +118,53 @@ export default function MeetingsPage() {
     },
     { key: "location_or_link", label: "Location", width: 150 },
     { key: "matter_title", label: "Matter", width: 180 },
+    {
+      key: "_actions",
+      label: "",
+      width: 70,
+      sortable: false,
+      render: (_val, row) => (
+        <div
+          style={{ display: "flex", gap: 2 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            title="Archive meeting"
+            style={{ ...actionBtnStyle, color: theme.text.muted }}
+            disabled={actionBusy[row.id]}
+            onClick={() =>
+              setConfirmAction({
+                id: row.id,
+                action: "archive",
+                title: row.title,
+              })
+            }
+            onMouseEnter={(e) => (e.target.style.background = theme.bg.input)}
+            onMouseLeave={(e) => (e.target.style.background = "transparent")}
+          >
+            ✓
+          </button>
+          <button
+            title="Delete meeting"
+            style={{ ...actionBtnStyle, color: theme.accent.red }}
+            disabled={actionBusy[row.id]}
+            onClick={() =>
+              setConfirmAction({
+                id: row.id,
+                action: "delete",
+                title: row.title,
+              })
+            }
+            onMouseEnter={(e) =>
+              (e.target.style.background = `${theme.accent.red}22`)
+            }
+            onMouseLeave={(e) => (e.target.style.background = "transparent")}
+          >
+            ✕
+          </button>
+        </div>
+      ),
+    },
   ];
 
   return (
@@ -149,6 +230,104 @@ export default function MeetingsPage() {
           />
         )}
       </div>
+
+      {/* Confirm dialog */}
+      {confirmAction && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+          }}
+          onClick={() => setConfirmAction(null)}
+        >
+          <div
+            style={{
+              background: theme.bg.card,
+              border: `1px solid ${theme.border.default}`,
+              borderRadius: 10,
+              padding: 24,
+              minWidth: 340,
+              maxWidth: 440,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                fontSize: 15,
+                fontWeight: 700,
+                color: theme.text.primary,
+                marginBottom: 12,
+              }}
+            >
+              {confirmAction.action === "archive"
+                ? "Archive Meeting?"
+                : "Delete Meeting?"}
+            </div>
+            <div
+              style={{
+                fontSize: 13,
+                color: theme.text.muted,
+                marginBottom: 20,
+                lineHeight: 1.5,
+              }}
+            >
+              {confirmAction.action === "archive" ? (
+                <>
+                  This will archive{" "}
+                  <strong style={{ color: theme.text.secondary }}>
+                    {confirmAction.title}
+                  </strong>
+                  . It will be hidden from the main list but can be restored later.
+                </>
+              ) : (
+                <>
+                  This will permanently delete{" "}
+                  <strong style={{ color: theme.text.secondary }}>
+                    {confirmAction.title}
+                  </strong>
+                  . This cannot be undone.
+                </>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button
+                style={{
+                  ...btnPrimary,
+                  background: theme.bg.input,
+                  color: theme.text.muted,
+                }}
+                onClick={() => setConfirmAction(null)}
+              >
+                Cancel
+              </button>
+              <button
+                style={{
+                  ...btnPrimary,
+                  background:
+                    confirmAction.action === "delete"
+                      ? theme.accent.red
+                      : theme.accent.blue,
+                }}
+                disabled={actionBusy[confirmAction.id]}
+                onClick={() =>
+                  handleMeetingAction(confirmAction.id, confirmAction.action)
+                }
+              >
+                {actionBusy[confirmAction.id]
+                  ? "..."
+                  : confirmAction.action === "archive"
+                    ? "Archive"
+                    : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

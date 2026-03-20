@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
 import useApi from "../../hooks/useApi";
-import { listTasks, listPeople, getEnums } from "../../api/tracker";
+import { listTasks, listPeople, getEnums, updateTask, deleteTask } from "../../api/tracker";
 import DataTable from "../../components/shared/DataTable";
 import EmptyState from "../../components/shared/EmptyState";
 import { useDrawer } from "../../contexts/DrawerContext";
@@ -128,6 +128,17 @@ function SmallBadge({ label, colorMap }) {
     </span>
   );
 }
+
+const actionBtnStyle = {
+  background: "transparent",
+  border: "none",
+  cursor: "pointer",
+  padding: "4px 6px",
+  borderRadius: 4,
+  fontSize: 14,
+  lineHeight: 1,
+  transition: "background 0.15s",
+};
 
 function safeDate(d) {
   if (!d) return null;
@@ -329,6 +340,8 @@ export default function TasksPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [modeFilter, setModeFilter] = useState("");
   const [activeView, setActiveView] = useState(0);
+  const [confirmAction, setConfirmAction] = useState(null); // { id, action, title }
+  const [actionBusy, setActionBusy] = useState({});
 
   const { data: enums } = useApi(() => getEnums(), []);
   const { data: taskData, loading: loadingTasks, error, refetch } = useApi(
@@ -356,6 +369,27 @@ export default function TasksPage() {
     setStatusFilter("");
     setModeFilter("");
   }, []);
+
+  const handleTaskAction = useCallback(
+    async (id, action) => {
+      setActionBusy((prev) => ({ ...prev, [id]: true }));
+      try {
+        if (action === "defer") {
+          await updateTask(id, { status: "deferred" });
+        } else if (action === "delete") {
+          await deleteTask(id);
+        }
+        setConfirmAction(null);
+        refetch();
+      } catch (err) {
+        console.error(`Task ${action} failed:`, err);
+        alert(`Failed to ${action} task: ${err.message || err}`);
+      } finally {
+        setActionBusy((prev) => ({ ...prev, [id]: false }));
+      }
+    },
+    [refetch]
+  );
 
   const rawTasks = taskData?.items || taskData || [];
   const summary = taskData?.summary || {};
@@ -591,6 +625,61 @@ export default function TasksPage() {
   const statusOpts = enums?.task_status || [];
   const modeOpts = enums?.task_mode || [];
 
+  // ── Action column ──
+  const actionsCol = {
+    key: "_actions",
+    label: "",
+    width: 70,
+    sortable: false,
+    render: (_val, row) => (
+      <div
+        style={{ display: "flex", gap: 2 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          title="Defer task"
+          style={{ ...actionBtnStyle, color: theme.text.muted }}
+          disabled={actionBusy[row.id]}
+          onClick={() =>
+            setConfirmAction({
+              id: row.id,
+              action: "defer",
+              title: row.title,
+            })
+          }
+          onMouseEnter={(e) =>
+            (e.target.style.background = theme.bg.input)
+          }
+          onMouseLeave={(e) =>
+            (e.target.style.background = "transparent")
+          }
+        >
+          ⏸
+        </button>
+        <button
+          title="Delete task"
+          style={{ ...actionBtnStyle, color: theme.accent.red }}
+          disabled={actionBusy[row.id]}
+          onClick={() =>
+            setConfirmAction({
+              id: row.id,
+              action: "delete",
+              title: row.title,
+            })
+          }
+          onMouseEnter={(e) =>
+            (e.target.style.background = `${theme.accent.red}22`)
+          }
+          onMouseLeave={(e) =>
+            (e.target.style.background = "transparent")
+          }
+        >
+          ✕
+        </button>
+      </div>
+    ),
+  };
+
   // ── Column definitions ──
 
   const myColumns = [
@@ -620,6 +709,7 @@ export default function TasksPage() {
         </span>
       ),
     },
+    actionsCol,
   ];
 
   const delegatedColumns = [
@@ -647,6 +737,7 @@ export default function TasksPage() {
         </span>
       ),
     },
+    actionsCol,
   ];
 
   const waitingColumns = [
@@ -687,6 +778,7 @@ export default function TasksPage() {
         </span>
       ),
     },
+    actionsCol,
   ];
 
   // Flat-mode columns (when a saved view is active)
@@ -730,6 +822,7 @@ export default function TasksPage() {
         </span>
       ),
     },
+    actionsCol,
   ];
 
   if (loading) {
@@ -1020,6 +1113,104 @@ export default function TasksPage() {
               emptyMessage="No tasks found."
             />
           )}
+        </div>
+      )}
+
+      {/* Confirm dialog */}
+      {confirmAction && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+          }}
+          onClick={() => setConfirmAction(null)}
+        >
+          <div
+            style={{
+              background: theme.bg.card,
+              border: `1px solid ${theme.border.default}`,
+              borderRadius: 10,
+              padding: 24,
+              minWidth: 340,
+              maxWidth: 440,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                fontSize: 15,
+                fontWeight: 700,
+                color: theme.text.primary,
+                marginBottom: 12,
+              }}
+            >
+              {confirmAction.action === "defer"
+                ? "Defer Task?"
+                : "Delete Task?"}
+            </div>
+            <div
+              style={{
+                fontSize: 13,
+                color: theme.text.muted,
+                marginBottom: 20,
+                lineHeight: 1.5,
+              }}
+            >
+              {confirmAction.action === "defer" ? (
+                <>
+                  This will mark{" "}
+                  <strong style={{ color: theme.text.secondary }}>
+                    {confirmAction.title}
+                  </strong>{" "}
+                  as deferred. You can reactivate it later.
+                </>
+              ) : (
+                <>
+                  This will permanently delete{" "}
+                  <strong style={{ color: theme.text.secondary }}>
+                    {confirmAction.title}
+                  </strong>
+                  . This cannot be undone.
+                </>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button
+                style={{
+                  ...btnPrimary,
+                  background: theme.bg.input,
+                  color: theme.text.muted,
+                }}
+                onClick={() => setConfirmAction(null)}
+              >
+                Cancel
+              </button>
+              <button
+                style={{
+                  ...btnPrimary,
+                  background:
+                    confirmAction.action === "delete"
+                      ? theme.accent.red
+                      : theme.accent.blue,
+                }}
+                disabled={actionBusy[confirmAction.id]}
+                onClick={() =>
+                  handleTaskAction(confirmAction.id, confirmAction.action)
+                }
+              >
+                {actionBusy[confirmAction.id]
+                  ? "..."
+                  : confirmAction.action === "defer"
+                    ? "Defer"
+                    : "Delete"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
