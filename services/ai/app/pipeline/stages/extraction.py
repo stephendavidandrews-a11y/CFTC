@@ -928,11 +928,14 @@ def _build_source_locator(db, item, communication_id: str) -> dict:
                     message_id = mr["id"]
                     break
 
+        evidence_list = item.get_evidence_list()
+
         return {
             "type": "email",
             "message_index": message_index,
             "message_id": message_id,
-            "excerpt": item.source_excerpt,
+            "excerpt": item.primary_excerpt,
+            "evidence": evidence_list,
             "entity_refs": entity_refs,
         }
 
@@ -973,16 +976,20 @@ def _build_source_locator(db, item, communication_id: str) -> dict:
         except (json.JSONDecodeError, TypeError):
             pass
 
+    # Build evidence array from all source_evidence pieces
+    evidence_list = item.get_evidence_list()
+
     return {
         "type": "transcript",
-        "segments": seg_ids,
+        "segments": item.primary_segments,
         "time_range": {
-            "start_seconds": time_range.start,
-            "end_seconds": time_range.end,
+            "start_seconds": item.primary_time_range.start if item.primary_time_range else (time_range.start if time_range else 0),
+            "end_seconds": item.primary_time_range.end if item.primary_time_range else (time_range.end if time_range else 0),
         },
         "speaker_label": speaker_label,
         "speaker_name": speaker_name,
-        "excerpt": item.source_excerpt,
+        "excerpt": item.primary_excerpt,
+        "evidence": evidence_list,
         "entity_refs": entity_refs,
         "enrichment_topic": enrichment_topic,
     }
@@ -1131,10 +1138,10 @@ def _persist_extraction(
                 item_id, bundle_id, item.item_type,
                 json.dumps(item.proposed_data, ensure_ascii=False, default=str),
                 item.confidence, item.rationale,
-                item.source_excerpt,
-                item.source_segments[0] if item.source_segments else None,
-                item.source_time_range.start,
-                item.source_time_range.end,
+                item.primary_excerpt,
+                item.primary_segments[0] if item.primary_segments else None,
+                item.primary_time_range.start if item.primary_time_range else None,
+                item.primary_time_range.end if item.primary_time_range else None,
                 json.dumps(source_locator, ensure_ascii=False, default=str),
                 item_idx,
             ))

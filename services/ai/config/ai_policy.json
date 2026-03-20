@@ -80,7 +80,7 @@
   },
   "model_config": {
     "primary_extraction_model": "claude-sonnet-4-20250514",
-    "escalation_model": "claude-opus-4-6",
+    "escalation_model": null,
     "haiku_model": "claude-haiku-4-5-20251001",
     "opus_retry_triggers": {
       "low_confidence": true,
