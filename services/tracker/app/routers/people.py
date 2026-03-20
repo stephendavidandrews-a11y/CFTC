@@ -174,6 +174,9 @@ async def create_person(body: CreatePerson, request: Request, db=Depends(get_db)
     pid = str(uuid.uuid4())
     now = datetime.now().isoformat()
     source_val = write_source if body.source == "manual" else body.source
+    # Auto-set include_in_team_workload for Direct reports
+    if body.relationship_category in ("Direct report", "Indirect report") and body.include_in_team_workload is None:
+        body.include_in_team_workload = 1
     db.execute("""
         INSERT INTO people (id, full_name, first_name, last_name, title, organization_id,
             email, phone, assistant_name, assistant_contact, working_style_notes,
@@ -217,6 +220,10 @@ async def update_person(person_id: str, body: UpdatePerson, request: Request, db
     data = body.model_dump(exclude_unset=True)
     if not data:
         raise HTTPException(status_code=400, detail="No fields to update")
+    # Auto-set include_in_team_workload for Direct reports (only if not explicitly set in payload or DB)
+    if data.get("relationship_category") in ("Direct report", "Indirect report"):
+        if "include_in_team_workload" not in data and not old["include_in_team_workload"]:
+            data["include_in_team_workload"] = 1
     sets = [f"{k} = ?" for k in data]
     params = list(data.values())
     now = datetime.now().isoformat()

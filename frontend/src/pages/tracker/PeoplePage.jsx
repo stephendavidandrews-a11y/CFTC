@@ -46,6 +46,7 @@ const CATEGORY_COLORS = {
   "Boss":                 { bg: "#3b1f6e", text: "#a78bfa" },
   "Leadership":           { bg: "#3b1f6e", text: "#a78bfa" },
   "Direct report":        { bg: "#1e3a5f", text: "#60a5fa" },
+  "Indirect report":      { bg: "#1e3a5f", text: "#93c5fd" },
   "OGC peer":             { bg: "#1a4731", text: "#34d399" },
   "Internal client":      { bg: "#1a4731", text: "#34d399" },
   "Commissioner office":  { bg: "#3b1f6e", text: "#a78bfa" },
@@ -68,7 +69,8 @@ const LANE_COLORS = {
 function timeAgo(d) {
   if (!d) return "\u2014";
   const now = new Date();
-  const then = new Date(d);
+  const val = typeof d === "string" && d.length === 10 ? d + "T12:00:00" : d;
+  const then = new Date(val);
   const diffDays = Math.floor((now - then) / (1000 * 60 * 60 * 24));
   if (diffDays === 0) return "Today";
   if (diffDays === 1) return "Yesterday";
@@ -80,13 +82,13 @@ function timeAgo(d) {
 function nextNeededLabel(d) {
   if (!d) return "\u2014";
   const now = new Date();
-  const then = new Date(d);
+  const val = typeof d === "string" && d.length === 10 ? d + "T12:00:00" : d;
+  const then = new Date(val);
   const diffDays = Math.floor((then - now) / (1000 * 60 * 60 * 24));
   if (diffDays < 0) return "Overdue";
   if (diffDays === 0) return "Today";
   if (diffDays === 1) return "Tomorrow";
   if (diffDays <= 7) return "This week";
-  const val = typeof d === "string" && d.length === 10 ? d + "T12:00:00" : d;
   return new Date(val).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
@@ -94,7 +96,7 @@ function nextNeededLabel(d) {
 
 const SAVED_VIEWS = [
   { label: "All People", filter: () => true },
-  { label: "Team", filter: (p) => p.include_in_team_workload === 1 || p.include_in_team_workload === true },
+  { label: "Team", filter: (p) => p.include_in_team_workload === 1 || p.include_in_team_workload === true || p.relationship_category === "Direct report" || p.relationship_category === "Indirect report" },
   { label: "Leadership", filter: (p) => p.relationship_category === "Boss" || p.relationship_category === "Leadership" },
   { label: "Internal Clients", filter: (p) => p.relationship_category === "Internal client" },
   { label: "Partner Agencies", filter: (p) => p.relationship_category === "Partner agency" },
@@ -103,7 +105,9 @@ const SAVED_VIEWS = [
   { label: "Active Work", filter: (p) => (p.active_matters || 0) > 0 || (p.open_tasks || 0) > 0 },
   { label: "Follow Up Needed", filter: (p) => {
     if (!p.next_interaction_needed_date) return false;
-    const diffDays = (new Date(p.next_interaction_needed_date) - Date.now()) / (1000 * 60 * 60 * 24);
+    const nd = p.next_interaction_needed_date;
+    const safeNd = typeof nd === "string" && nd.length === 10 ? nd + "T12:00:00" : nd;
+    const diffDays = (new Date(safeNd) - Date.now()) / (1000 * 60 * 60 * 24);
     return diffDays <= 7;
   }},
 ];

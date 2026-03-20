@@ -1013,7 +1013,7 @@ def _update_communication_title(db, communication_id: str, bundles: list):
         or cur_title == orig_name
         or cur_title.lower().startswith("test audio")
         or bool(re.match(r"^[0-9a-f]{8}-", cur_title))
-        or len(cur_title) < 5
+        or len(cur_title) < 3
     )
     if not is_generic:
         return

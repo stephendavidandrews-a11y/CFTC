@@ -350,18 +350,46 @@ export default function CommitQueuePage() {
           <p style={{ marginTop: 0 }}>
             Some fields have been modified since the commit. Forcing the undo may overwrite these changes.
           </p>
-          {conflictModal?.detail && (
-            <pre style={{
-              background: theme.bg.input, borderRadius: 6, padding: 12,
-              fontSize: 11, fontFamily: theme.font.mono, color: theme.text.secondary,
-              overflow: "auto", maxHeight: 200, margin: "12px 0",
-              border: `1px solid ${theme.border.subtle}`,
-            }}>
-              {typeof conflictModal.detail === "string"
-                ? conflictModal.detail
-                : JSON.stringify(conflictModal.detail, null, 2)}
-            </pre>
-          )}
+          {conflictModal?.detail && (() => {
+            const d = conflictModal.detail;
+            const conflicts = d.conflicts || [];
+            // Group by record
+            const grouped = {};
+            conflicts.forEach((c) => {
+              const key = c.target_record_id;
+              if (!grouped[key]) grouped[key] = { table: c.target_table, write_type: c.write_type, fields: [] };
+              grouped[key].fields.push(c);
+            });
+            return (
+              <div style={{ margin: "12px 0" }}>
+                <div style={{ fontSize: 13, color: theme.accent.yellow, fontWeight: 600, marginBottom: 8 }}>
+                  {d.conflict_count || conflicts.length} conflict{(d.conflict_count || conflicts.length) !== 1 ? "s" : ""} detected
+                </div>
+                <div style={{ maxHeight: 280, overflow: "auto" }}>
+                  {Object.entries(grouped).map(([recId, info]) => (
+                    <div key={recId} style={{
+                      background: theme.bg.input, borderRadius: 6, padding: 10,
+                      marginBottom: 8, border: `1px solid ${theme.border.subtle}`,
+                    }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: theme.text.secondary, marginBottom: 6 }}>
+                        {info.table} <span style={{ color: theme.text.dim, fontWeight: 400 }}>({info.write_type})</span>
+                      </div>
+                      {info.fields.map((f, i) => (
+                        <div key={i} style={{ display: "grid", gridTemplateColumns: "120px 1fr 1fr", gap: 6, fontSize: 11, marginBottom: 4 }}>
+                          <span style={{ color: theme.accent.blue, fontFamily: theme.font.mono }}>{f.field_name}</span>
+                          <span style={{ color: theme.accent.red }}>was: {String(f.written_value).substring(0, 40)}</span>
+                          <span style={{ color: theme.accent.green }}>now: {String(f.current_value).substring(0, 40)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 12, color: theme.text.dim, marginTop: 8 }}>
+                  These fields were modified after the AI commit. Force undo will delete/restore records regardless.
+                </div>
+              </div>
+            );
+          })()}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
             <button
               onClick={() => setConflictModal(null)}
