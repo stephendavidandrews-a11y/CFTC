@@ -2,6 +2,13 @@
 
 Uses pyannote/speaker-diarization-3.1 for speaker segmentation.
 Extracts speaker embeddings for voice print matching.
+
+Tuning notes:
+- clustering.threshold controls how aggressively speakers are merged.
+  Default pyannote value is ~0.7045. Lower = more speakers (less merging).
+  We use 0.55 to avoid collapsing multi-person conversations into one speaker.
+- min_speakers=2 is the default since single-person recordings are rare
+  in our use case (regulatory meetings, networking conversations).
 """
 
 import logging
@@ -17,10 +24,11 @@ _diarization_pipeline = None
 
 
 def _get_pipeline():
+    """Load and tune the pyannote diarization pipeline."""
     global _diarization_pipeline
     if _diarization_pipeline is None:
         from pyannote.audio import Pipeline
-        from config import PYANNOTE_PIPELINE
+        from config import PYANNOTE_PIPELINE, DIARIZATION_CLUSTERING_THRESHOLD
 
         logger.info(f"Loading pyannote pipeline: {PYANNOTE_PIPELINE}")
 
@@ -32,6 +40,20 @@ def _get_pipeline():
             # Models cached locally — load without auth (works offline)
             logger.info("HF_TOKEN not set — loading pyannote from local cache")
             _diarization_pipeline = Pipeline.from_pretrained(PYANNOTE_PIPELINE, token=False)
+
+        # Tune clustering threshold for better speaker separation
+        if DIARIZATION_CLUSTERING_THRESHOLD is not None:
+            try:
+                params = _diarization_pipeline.parameters(instantiated=True)
+                old_threshold = params["clustering"]["threshold"]
+                params["clustering"]["threshold"] = DIARIZATION_CLUSTERING_THRESHOLD
+                _diarization_pipeline.instantiate(params)
+                logger.info(
+                    f"Clustering threshold: {old_threshold:.4f} → "
+                    f"{DIARIZATION_CLUSTERING_THRESHOLD} (lower = more speakers)"
+                )
+            except Exception as e:
+                logger.warning(f"Could not set clustering threshold: {e} — using pipeline default")
 
         if torch.backends.mps.is_available():
             _diarization_pipeline.to(torch.device("mps"))
@@ -67,10 +89,30 @@ def diarize(
     min_speakers: int | None = None,
     max_speakers: int | None = None,
 ) -> DiarizationResult:
-    """Run speaker diarization on audio file."""
+    """Run speaker diarization on audio file.
+
+    Args:
+        audio_path: Path to preprocessed audio (16kHz mono WAV).
+        min_speakers: Minimum expected speakers. Defaults to
+            config.DIARIZATION_MIN_SPEAKERS (2).
+        max_speakers: Maximum expected speakers. Defaults to
+            config.DIARIZATION_MAX_SPEAKERS (None = auto-detect).
+    """
+    from config import DIARIZATION_MIN_SPEAKERS, DIARIZATION_MAX_SPEAKERS
+
     pipeline = _get_pipeline()
 
-    logger.info(f"Diarizing: {audio_path.name}")
+    # Apply defaults from config if not explicitly provided
+    if min_speakers is None:
+        min_speakers = DIARIZATION_MIN_SPEAKERS
+    if max_speakers is None:
+        max_speakers = DIARIZATION_MAX_SPEAKERS
+
+    logger.info(
+        f"Diarizing: {audio_path.name} "
+        f"(min_speakers={min_speakers}, max_speakers={max_speakers})"
+    )
+
     kwargs = {}
     if min_speakers is not None:
         kwargs["min_speakers"] = min_speakers
