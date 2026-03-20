@@ -13,6 +13,12 @@ export function getTrackerHealth() {
   return fetchJSON(`${P}/health`);
 }
 
+// ── System Config ───────────────────────────────────────────────────────────
+
+export function getSystemConfig() {
+  return fetchJSON(`${P}/config`);
+}
+
 // ── Dashboard ───────────────────────────────────────────────────────────────
 
 export function getDashboard() {
