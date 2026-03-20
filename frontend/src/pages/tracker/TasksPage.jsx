@@ -2,11 +2,11 @@ import React, { useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
 import useApi from "../../hooks/useApi";
-import { listTasks, getEnums } from "../../api/tracker";
-import Badge from "../../components/shared/Badge";
+import { listTasks, listPeople, getEnums } from "../../api/tracker";
 import DataTable from "../../components/shared/DataTable";
 import EmptyState from "../../components/shared/EmptyState";
 import { useDrawer } from "../../contexts/DrawerContext";
+import { useOwner } from "../../contexts/OwnerContext";
 
 /* ── Styles ──────────────────────────────────────────────────── */
 
@@ -15,10 +15,20 @@ const cardStyle = {
   borderRadius: 10,
   border: `1px solid ${theme.border.default}`,
   padding: 24,
+  marginBottom: 20,
 };
 
-const titleStyle = { fontSize: 22, fontWeight: 700, color: theme.text.primary, marginBottom: 4 };
-const subtitleStyle = { fontSize: 13, color: theme.text.dim, marginBottom: 20 };
+const titleStyle = {
+  fontSize: 22,
+  fontWeight: 700,
+  color: theme.text.primary,
+  marginBottom: 4,
+};
+const subtitleStyle = {
+  fontSize: 13,
+  color: theme.text.dim,
+  marginBottom: 20,
+};
 
 const inputStyle = {
   background: theme.bg.input,
@@ -42,59 +52,100 @@ const btnPrimary = {
   cursor: "pointer",
 };
 
+const sectionHeaderStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+  marginBottom: 12,
+};
+const sectionTitleStyle = {
+  fontSize: 16,
+  fontWeight: 700,
+  color: theme.text.primary,
+};
+const sectionBadgeStyle = {
+  fontSize: 11,
+  fontWeight: 600,
+  padding: "2px 8px",
+  borderRadius: 10,
+  background: theme.bg.input,
+  color: theme.text.secondary,
+};
+const overdueBadgeStyle = {
+  fontSize: 11,
+  fontWeight: 600,
+  padding: "2px 8px",
+  borderRadius: 10,
+  background: `${theme.accent.red}22`,
+  color: theme.accent.red,
+};
+
 /* ── Badge color maps ────────────────────────────────────────── */
 
 const STATUS_COLORS = {
-  "not started":        { bg: "#2a2a2a", text: "#9ca3af" },
-  "in progress":        { bg: "#1e3a5f", text: "#60a5fa" },
-  "needs review":       { bg: "#3b1f6e", text: "#a78bfa" },
-  "waiting on others":  { bg: "#4a3728", text: "#fbbf24" },
-  "blocked":            { bg: "#4a2020", text: "#f87171" },
-  "done":               { bg: "#1a4731", text: "#34d399" },
-  "completed":          { bg: "#1a4731", text: "#34d399" },
-  "deferred":           { bg: "#2a2a2a", text: "#6b7280" },
+  "not started": { bg: "#2a2a2a", text: "#9ca3af" },
+  "in progress": { bg: "#1e3a5f", text: "#60a5fa" },
+  "needs review": { bg: "#3b1f6e", text: "#a78bfa" },
+  "waiting on others": { bg: "#4a3728", text: "#fbbf24" },
+  "blocked": { bg: "#4a2020", text: "#f87171" },
+  "done": { bg: "#1a4731", text: "#34d399" },
+  "completed": { bg: "#1a4731", text: "#34d399" },
+  "deferred": { bg: "#2a2a2a", text: "#6b7280" },
 };
 
-const MODE_COLORS = {
-  "action":       { bg: "#1a4731", text: "#34d399" },
-  "reading":      { bg: "#1e1b4b", text: "#a78bfa" },
-  "waiting":      { bg: "#4a3728", text: "#fbbf24" },
-  "follow-up":    { bg: "#1a3a4a", text: "#38bdf8" },
-  "delegated":    { bg: "#1e3a5f", text: "#60a5fa" },
-  "quick task":   { bg: "#2a2a2a", text: "#9ca3af" },
+const PRIORITY_COLORS = {
+  critical: { bg: "#4a2020", text: "#f87171" },
+  high: { bg: "#4a3728", text: "#fbbf24" },
+  medium: { bg: "#1e3a5f", text: "#60a5fa" },
+  low: { bg: "#2a2a2a", text: "#9ca3af" },
 };
 
 const DEADLINE_COLORS = {
-  "hard":  { bg: "#4a2020", text: "#f87171" },
-  "soft":  { bg: "#2a2a2a", text: "#9ca3af" },
+  hard: { bg: "#4a2020", text: "#f87171" },
+  soft: { bg: "#2a2a2a", text: "#9ca3af" },
 };
 
 /* ── Helpers ─────────────────────────────────────────────────── */
 
 function SmallBadge({ label, colorMap }) {
-  if (!label) return <span style={{ color: theme.text.faint }}>{"\u2014"}</span>;
-  const c = colorMap?.[label.toLowerCase?.()] || colorMap?.[label] || { bg: theme.bg.input, text: theme.text.faint };
+  if (!label)
+    return <span style={{ color: theme.text.faint }}>{"\u2014"}</span>;
+  const c = colorMap?.[label.toLowerCase?.()] ||
+    colorMap?.[label] || { bg: theme.bg.input, text: theme.text.faint };
   return (
-    <span style={{
-      background: c.bg, color: c.text,
-      padding: "2px 8px", borderRadius: 10,
-      fontSize: 11, fontWeight: 500, whiteSpace: "nowrap",
-    }}>
+    <span
+      style={{
+        background: c.bg,
+        color: c.text,
+        padding: "2px 8px",
+        borderRadius: 10,
+        fontSize: 11,
+        fontWeight: 500,
+        whiteSpace: "nowrap",
+      }}
+    >
       {label}
     </span>
   );
 }
 
+function safeDate(d) {
+  if (!d) return null;
+  const val =
+    typeof d === "string" && d.length === 10 ? d + "T12:00:00" : d;
+  return new Date(val);
+}
+
 function formatDueDate(d) {
   if (!d) return "\u2014";
-  const val = typeof d === "string" && d.length === 10 ? d + "T12:00:00" : d;
-  const due = new Date(val);
+  const due = safeDate(d);
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   const dueDay = new Date(due);
   dueDay.setHours(0, 0, 0, 0);
   const diffDays = Math.floor((dueDay - now) / (1000 * 60 * 60 * 24));
-  if (diffDays < 0) return `Overdue (${due.toLocaleDateString("en-US", { month: "short", day: "numeric" })})`;
+  if (diffDays < 0)
+    return `Overdue (${due.toLocaleDateString("en-US", { month: "short", day: "numeric" })})`;
   if (diffDays === 0) return "Today";
   if (diffDays === 1) return "Tomorrow";
   return due.toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -102,83 +153,203 @@ function formatDueDate(d) {
 
 function isDueOverdue(d) {
   if (!d) return false;
-  const val = typeof d === "string" && d.length === 10 ? d + "T12:00:00" : d;
-  return new Date(val) < new Date(new Date().toDateString());
+  return safeDate(d) < new Date(new Date().toDateString());
 }
 
 function isDueSoon(d) {
   if (!d) return false;
-  const val = typeof d === "string" && d.length === 10 ? d + "T12:00:00" : d;
-  const due = new Date(val);
+  const due = safeDate(d);
   const now = new Date();
   const diffDays = (due - now) / (1000 * 60 * 60 * 24);
   return diffDays >= 0 && diffDays <= 2;
 }
 
-/* ── Saved views ─────────────────────────────────────────────── */
+function isActive(t) {
+  return (
+    t.status !== "done" &&
+    t.status !== "completed" &&
+    t.status !== "deferred"
+  );
+}
+
+function daysWaiting(t) {
+  if (!t.created_at) return "\u2014";
+  const created = safeDate(t.created_at);
+  if (!created) return "\u2014";
+  const days = Math.floor((new Date() - created) / (1000 * 60 * 60 * 24));
+  if (days === 0) return "Today";
+  if (days === 1) return "1 day";
+  return `${days} days`;
+}
+
+/* ── Saved views (flat-table mode) ───────────────────────────── */
 
 const SAVED_VIEWS = [
+  { label: "All Active", filter: null },
   {
     label: "Needs My Attention",
-    filter: (t) => {
-      if (t.status === "done" || t.status === "completed" || t.status === "deferred") return false;
+    filter: (t, ownerId) => {
+      if (!isActive(t)) return false;
       if (isDueOverdue(t.due_date)) return true;
       if (isDueSoon(t.due_date)) return true;
       if (t.status === "needs review") return true;
-      if (t.status === "waiting on others") return true;
       if (t.priority === "critical" || t.priority === "high") return true;
       return false;
     },
   },
-  { label: "My Tasks", filter: (t) => !t.delegated_by_person_id && t.status !== "done" && t.status !== "completed" && t.status !== "deferred" },
-  { label: "Delegated by Me", filter: (t) => !!t.delegated_by_person_id && t.status !== "done" && t.status !== "completed" && t.status !== "deferred" },
-  { label: "Waiting on Others", filter: (t) => t.status === "waiting on others" },
   {
     label: "Overdue",
-    filter: (t) => isDueOverdue(t.due_date) && t.status !== "done" && t.status !== "completed" && t.status !== "deferred",
+    filter: (t) => isActive(t) && isDueOverdue(t.due_date),
   },
   {
     label: "Due This Week",
     filter: (t) => {
-      if (!t.due_date || t.status === "done" || t.status === "completed" || t.status === "deferred") return false;
-      const dv = typeof t.due_date === "string" && t.due_date.length === 10 ? t.due_date + "T12:00:00" : t.due_date;
-      const due = new Date(dv);
-      const now = new Date();
-      const diffDays = (due - now) / (1000 * 60 * 60 * 24);
+      if (!t.due_date || !isActive(t)) return false;
+      const due = safeDate(t.due_date);
+      const diffDays = (due - new Date()) / (1000 * 60 * 60 * 24);
       return diffDays >= 0 && diffDays <= 7;
     },
   },
   { label: "Needs Review", filter: (t) => t.status === "needs review" },
   {
     label: "Quick Tasks",
-    filter: (t) => !t.matter_id && t.status !== "done" && t.status !== "completed" && t.status !== "deferred",
+    filter: (t) => !t.matter_id && isActive(t),
   },
 ];
+
+/* ── Shared column builders ──────────────────────────────────── */
+
+function dueDateColumn(navigate) {
+  return {
+    key: "due_date",
+    label: "Due Date",
+    width: 120,
+    render: (val) => {
+      const overdue = isDueOverdue(val);
+      const soon = isDueSoon(val);
+      return (
+        <span
+          style={{
+            fontSize: 12,
+            color: overdue
+              ? "#f87171"
+              : soon
+                ? theme.accent.yellowLight
+                : theme.text.muted,
+            fontWeight: overdue || soon ? 600 : 400,
+          }}
+        >
+          {formatDueDate(val)}
+        </span>
+      );
+    },
+  };
+}
+
+function matterColumn(navigate) {
+  return {
+    key: "matter_title",
+    label: "Matter",
+    width: 200,
+    render: (val, row) => {
+      if (!row.matter_id) {
+        return (
+          <span
+            style={{
+              color: theme.text.faint,
+              fontStyle: "italic",
+              fontSize: 12,
+            }}
+          >
+            Quick task
+          </span>
+        );
+      }
+      return (
+        <span
+          style={{
+            color: theme.accent.blueLight,
+            cursor: "pointer",
+            fontSize: 13,
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(`/matters/${row.matter_id}`);
+          }}
+        >
+          {val || "\u2014"}
+        </span>
+      );
+    },
+  };
+}
+
+function statusColumn() {
+  return {
+    key: "status",
+    label: "Status",
+    width: 120,
+    render: (val) => <SmallBadge label={val} colorMap={STATUS_COLORS} />,
+  };
+}
+
+function priorityColumn() {
+  return {
+    key: "priority",
+    label: "Priority",
+    width: 80,
+    render: (val) =>
+      val ? (
+        <SmallBadge label={val} colorMap={PRIORITY_COLORS} />
+      ) : (
+        <span style={{ color: theme.text.faint }}>{"\u2014"}</span>
+      ),
+  };
+}
+
+function taskTitleColumn() {
+  return {
+    key: "title",
+    label: "Task",
+    render: (val) => (
+      <span style={{ color: theme.text.primary, fontWeight: 500 }}>
+        {val || "\u2014"}
+      </span>
+    ),
+  };
+}
 
 /* ── Component ───────────────────────────────────────────────── */
 
 export default function TasksPage() {
   const navigate = useNavigate();
   const { openDrawer } = useDrawer();
+  const { ownerId } = useOwner();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [modeFilter, setModeFilter] = useState("");
-  const [sortBy, setSortBy] = useState("due_date");
   const [activeView, setActiveView] = useState(0);
 
   const { data: enums } = useApi(() => getEnums(), []);
-  const { data, loading, error, refetch } = useApi(
-    () => listTasks({
-      search,
-      status: statusFilter,
-      mode: modeFilter,
-      exclude_done: true,
-      sort_by: sortBy,
-      sort_dir: sortBy === "due_date" ? "asc" : "asc",
-      limit: 500,
-    }),
-    [search, statusFilter, modeFilter, sortBy]
+  const { data: taskData, loading: loadingTasks, error, refetch } = useApi(
+    () =>
+      listTasks({
+        search,
+        status: statusFilter,
+        mode: modeFilter,
+        exclude_done: true,
+        sort_by: "due_date",
+        sort_dir: "asc",
+        limit: 500,
+      }),
+    [search, statusFilter, modeFilter]
   );
+  const { data: peopleData, loading: loadingPeople } = useApi(
+    () => listPeople({ limit: 500 }),
+    []
+  );
+
+  const loading = loadingTasks || loadingPeople;
 
   const handleViewClick = useCallback((idx) => {
     setActiveView(idx);
@@ -186,144 +357,463 @@ export default function TasksPage() {
     setModeFilter("");
   }, []);
 
-  const rawTasks = data?.items || data || [];
-  const summary = data?.summary || {};
+  const rawTasks = taskData?.items || taskData || [];
+  const summary = taskData?.summary || {};
 
-  // Apply saved-view client-side filtering
-  const tasks = useMemo(() => {
+  // Build name lookup from people
+  const nameMap = useMemo(() => {
+    const people = peopleData?.items || peopleData || [];
+    const map = {};
+    for (const p of people) {
+      map[p.id] = p.full_name || `${p.first_name || ""} ${p.last_name || ""}`.trim();
+    }
+    return map;
+  }, [peopleData]);
+
+  // Build manager lookup
+  const managerMap = useMemo(() => {
+    const people = peopleData?.items || peopleData || [];
+    const map = {};
+    for (const p of people) {
+      map[p.id] = p.manager_person_id;
+    }
+    return map;
+  }, [peopleData]);
+
+  // ── Section grouping ──
+  const {
+    myTasks,
+    delegatedGroups,
+    waitingTasks,
+    myOverdue,
+    teamOverdue,
+    blockedCount,
+    dueToday,
+  } = useMemo(() => {
+    const activeTasks = rawTasks.filter(isActive);
+
+    // If no ownerId yet, put everything in "my tasks"
+    const me = ownerId;
+
+    // Section 1: My Action Items
+    // Tasks assigned to me (or unassigned) that are NOT delegated-to-someone-else
+    const _myTasks = activeTasks
+      .filter((t) => {
+        if (!me) return true; // fallback if no owner configured
+        // My task if: assigned to me, OR unassigned, AND not a task I delegated to someone else
+        const assignedToMe =
+          t.assigned_to_person_id === me || !t.assigned_to_person_id;
+        const delegatedAway =
+          t.task_mode === "delegated" &&
+          t.assigned_to_person_id &&
+          t.assigned_to_person_id !== me;
+        return assignedToMe && !delegatedAway;
+      })
+      .sort((a, b) => {
+        // Overdue first, then by due date
+        const aOver = isDueOverdue(a.due_date) ? 0 : 1;
+        const bOver = isDueOverdue(b.due_date) ? 0 : 1;
+        if (aOver !== bOver) return aOver - bOver;
+        const aD = safeDate(a.due_date)?.getTime() || Infinity;
+        const bD = safeDate(b.due_date)?.getTime() || Infinity;
+        return aD - bD;
+      });
+
+    // Section 2: Delegated Work
+    // Tasks where I delegated (delegated_by = me) or task_mode = delegated with assigned != me
+    const delegatedTasks = activeTasks.filter((t) => {
+      if (!me) return false;
+      return (
+        (t.delegated_by_person_id === me &&
+          t.assigned_to_person_id !== me) ||
+        (t.task_mode === "delegated" &&
+          t.assigned_to_person_id &&
+          t.assigned_to_person_id !== me)
+      );
+    });
+
+    // Group delegated tasks by assignee, then sub-group by manager chain
+    const byAssignee = {};
+    for (const t of delegatedTasks) {
+      const aid = t.assigned_to_person_id || "unassigned";
+      if (!byAssignee[aid]) byAssignee[aid] = [];
+      byAssignee[aid].push(t);
+    }
+
+    // Build groups: direct reports first, then sub-manager teams
+    const _delegatedGroups = [];
+    const processedAssignees = new Set();
+
+    // Find direct reports (manager = owner)
+    const directReportIds = Object.keys(byAssignee).filter(
+      (aid) => managerMap[aid] === me
+    );
+
+    // Find sub-managers among direct reports who also manage other assignees
+    const subManagerIds = new Set();
+    for (const aid of Object.keys(byAssignee)) {
+      const mgr = managerMap[aid];
+      if (mgr && mgr !== me && directReportIds.includes(mgr)) {
+        subManagerIds.add(mgr);
+      }
+    }
+
+    // Direct reports' own tasks (not sub-managers' reports)
+    for (const aid of directReportIds) {
+      const name = nameMap[aid] || "Unknown";
+      const tasks = byAssignee[aid] || [];
+      tasks.sort(
+        (a, b) =>
+          (safeDate(a.due_date)?.getTime() || Infinity) -
+          (safeDate(b.due_date)?.getTime() || Infinity)
+      );
+
+      // If this person is a sub-manager, include their reports' tasks in their group
+      if (subManagerIds.has(aid)) {
+        const subTasks = [];
+        for (const [subAid, subTaskList] of Object.entries(byAssignee)) {
+          if (managerMap[subAid] === aid) {
+            for (const st of subTaskList) {
+              subTasks.push({ ...st, _subAssignee: nameMap[subAid] || subAid });
+            }
+            processedAssignees.add(subAid);
+          }
+        }
+        subTasks.sort(
+          (a, b) =>
+            (safeDate(a.due_date)?.getTime() || Infinity) -
+            (safeDate(b.due_date)?.getTime() || Infinity)
+        );
+
+        _delegatedGroups.push({
+          key: aid,
+          title: `${name.split(" ")[0]}'s Group`,
+          rows: [...tasks, ...subTasks],
+          overdue: [...tasks, ...subTasks].filter((t) =>
+            isDueOverdue(t.due_date)
+          ).length,
+        });
+      } else {
+        _delegatedGroups.push({
+          key: aid,
+          title: name,
+          rows: tasks,
+          overdue: tasks.filter((t) => isDueOverdue(t.due_date)).length,
+        });
+      }
+      processedAssignees.add(aid);
+    }
+
+    // Remaining assignees not yet grouped
+    for (const [aid, tasks] of Object.entries(byAssignee)) {
+      if (processedAssignees.has(aid)) continue;
+      const name = aid === "unassigned" ? "Unassigned" : nameMap[aid] || "Unknown";
+      tasks.sort(
+        (a, b) =>
+          (safeDate(a.due_date)?.getTime() || Infinity) -
+          (safeDate(b.due_date)?.getTime() || Infinity)
+      );
+      _delegatedGroups.push({
+        key: aid,
+        title: name,
+        rows: tasks,
+        overdue: tasks.filter((t) => isDueOverdue(t.due_date)).length,
+      });
+      processedAssignees.add(aid);
+    }
+
+    // Sort groups: most overdue first
+    _delegatedGroups.sort(
+      (a, b) => b.overdue - a.overdue || a.title.localeCompare(b.title)
+    );
+
+    // Section 3: Waiting On
+    const _waitingTasks = activeTasks
+      .filter((t) => {
+        if (!me) return t.task_mode === "waiting";
+        return (
+          t.task_mode === "waiting" ||
+          (t.status === "waiting on others" &&
+            t.assigned_to_person_id === me)
+        );
+      })
+      // Don't double-count: remove tasks already in "my tasks" section
+      .filter(
+        (t) =>
+          !_myTasks.some((mt) => mt.id === t.id)
+      )
+      .sort(
+        (a, b) =>
+          (safeDate(a.due_date)?.getTime() || Infinity) -
+          (safeDate(b.due_date)?.getTime() || Infinity)
+      );
+
+    // Stats
+    const _myOverdue = _myTasks.filter((t) =>
+      isDueOverdue(t.due_date)
+    ).length;
+    const _teamOverdue = delegatedTasks.filter((t) =>
+      isDueOverdue(t.due_date)
+    ).length;
+    const _blockedCount = _waitingTasks.length;
+    const _dueToday = activeTasks.filter((t) => {
+      if (!t.due_date) return false;
+      const d = safeDate(t.due_date);
+      const now = new Date();
+      return (
+        d.getFullYear() === now.getFullYear() &&
+        d.getMonth() === now.getMonth() &&
+        d.getDate() === now.getDate()
+      );
+    }).length;
+
+    return {
+      myTasks: _myTasks,
+      delegatedGroups: _delegatedGroups,
+      waitingTasks: _waitingTasks,
+      myOverdue: _myOverdue,
+      teamOverdue: _teamOverdue,
+      blockedCount: _blockedCount,
+      dueToday: _dueToday,
+    };
+  }, [rawTasks, ownerId, nameMap, managerMap]);
+
+  // When a saved view is active (not "All Active"), show flat table
+  const isGroupedMode = activeView === 0;
+
+  const filteredTasks = useMemo(() => {
+    if (isGroupedMode) return null; // grouped mode, don't need flat list
     const view = SAVED_VIEWS[activeView];
-    return view ? rawTasks.filter(view.filter) : rawTasks;
-  }, [rawTasks, activeView]);
+    if (!view?.filter) return rawTasks.filter(isActive);
+    return rawTasks.filter((t) => view.filter(t, ownerId));
+  }, [rawTasks, activeView, ownerId, isGroupedMode]);
 
   const statusOpts = enums?.task_status || [];
   const modeOpts = enums?.task_mode || [];
 
-  const columns = [
+  // ── Column definitions ──
+
+  const myColumns = [
+    taskTitleColumn(),
+    matterColumn(navigate),
+    statusColumn(),
+    priorityColumn(),
+    dueDateColumn(navigate),
     {
-      key: "title", label: "Task",
-      render: (val) => (
-        <span style={{ color: theme.text.primary, fontWeight: 500 }}>
-          {val || "\u2014"}
-        </span>
-      ),
+      key: "deadline_type",
+      label: "Deadline",
+      width: 80,
+      render: (val) =>
+        val ? (
+          <SmallBadge label={val} colorMap={DEADLINE_COLORS} />
+        ) : (
+          <span style={{ color: theme.text.faint }}>{"\u2014"}</span>
+        ),
     },
     {
-      key: "matter_title", label: "Matter", width: 220,
-      render: (val, row) => {
-        if (!row.matter_id) {
-          return <span style={{ color: theme.text.faint, fontStyle: "italic", fontSize: 12 }}>Quick task</span>;
-        }
-        return (
-          <div>
-            <span
-              style={{ color: theme.accent.blueLight, cursor: "pointer", fontSize: 13 }}
-              onClick={(e) => { e.stopPropagation(); navigate(`/matters/${row.matter_id}`); }}
-            >
-              {val || "\u2014"}
-            </span>
-            {row.matter_number && (
-              <div style={{ fontSize: 11, color: theme.text.faint, marginTop: 2 }}>{row.matter_number}</div>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      key: "owner_name", label: "Assigned To", width: 120,
-      render: (val) => <span style={{ color: theme.text.muted }}>{val || "\u2014"}</span>,
-    },
-    {
-      key: "status", label: "Status", width: 120,
-      render: (val) => <SmallBadge label={val} colorMap={STATUS_COLORS} />,
-    },
-    {
-      key: "due_date", label: "Due Date", width: 120,
-      render: (val) => {
-        const overdue = isDueOverdue(val);
-        const soon = isDueSoon(val);
-        return (
-          <span style={{
-            fontSize: 12,
-            color: overdue ? "#f87171" : soon ? theme.accent.yellowLight : theme.text.muted,
-            fontWeight: overdue || soon ? 600 : 400,
-          }}>
-            {formatDueDate(val)}
-          </span>
-        );
-      },
-    },
-    {
-      key: "deadline_type", label: "Deadline", width: 80,
-      render: (val) => val ? <SmallBadge label={val} colorMap={DEADLINE_COLORS} /> : <span style={{ color: theme.text.faint }}>{"\u2014"}</span>,
-    },
-    {
-      key: "waiting_on_person_name", label: "Waiting On", width: 120,
-      render: (val, row) => {
-        const display = val || row.waiting_on_org_name || row.waiting_on_description;
-        if (!display) return <span style={{ color: theme.text.faint }}>{"\u2014"}</span>;
-        return <span style={{ color: "#a78bfa", fontSize: 12 }}>{display}</span>;
-      },
-    },
-    {
-      key: "expected_output", label: "Expected Output", width: 220,
+      key: "expected_output",
+      label: "Expected Output",
+      width: 200,
       render: (val) => (
         <span style={{ color: theme.text.muted, fontSize: 12 }}>
           {val || "\u2014"}
         </span>
       ),
     },
+  ];
+
+  const delegatedColumns = [
+    taskTitleColumn(),
     {
-      key: "task_type", label: "Type", width: 120,
-      render: (val) => <span style={{ color: theme.text.muted, fontSize: 12 }}>{val || "\u2014"}</span>,
+      key: "owner_name",
+      label: "Assignee",
+      width: 130,
+      render: (val, row) => (
+        <span style={{ color: theme.accent.blueLight, fontSize: 13 }}>
+          {row._subAssignee || val || "\u2014"}
+        </span>
+      ),
     },
+    matterColumn(navigate),
+    statusColumn(),
+    dueDateColumn(navigate),
     {
-      key: "task_mode", label: "Mode", width: 100,
-      render: (val) => <SmallBadge label={val} colorMap={MODE_COLORS} />,
+      key: "expected_output",
+      label: "Expected Output",
+      width: 200,
+      render: (val) => (
+        <span style={{ color: theme.text.muted, fontSize: 12 }}>
+          {val || "\u2014"}
+        </span>
+      ),
     },
   ];
 
-  const summaryCards = [
-    { label: "Due Today", value: summary.due_today ?? "\u2014" },
-    { label: "Overdue", value: summary.overdue ?? "\u2014", highlight: (summary.overdue || 0) > 0 },
-    { label: "Waiting on Others", value: summary.waiting_on_others ?? "\u2014" },
-    { label: "Needs Review", value: summary.needs_review ?? "\u2014" },
+  const waitingColumns = [
+    taskTitleColumn(),
+    {
+      key: "waiting_on_person_name",
+      label: "Waiting On",
+      width: 160,
+      render: (val, row) => {
+        const display =
+          val || row.waiting_on_org_name || row.waiting_on_description;
+        if (!display)
+          return <span style={{ color: theme.text.faint }}>{"\u2014"}</span>;
+        return (
+          <span style={{ color: "#a78bfa", fontSize: 13 }}>{display}</span>
+        );
+      },
+    },
+    matterColumn(navigate),
+    dueDateColumn(navigate),
+    {
+      key: "created_at",
+      label: "Days Waiting",
+      width: 100,
+      render: (_val, row) => (
+        <span style={{ color: theme.text.muted, fontSize: 12 }}>
+          {daysWaiting(row)}
+        </span>
+      ),
+    },
+    {
+      key: "expected_output",
+      label: "Expected Output",
+      width: 200,
+      render: (val) => (
+        <span style={{ color: theme.text.muted, fontSize: 12 }}>
+          {val || "\u2014"}
+        </span>
+      ),
+    },
   ];
+
+  // Flat-mode columns (when a saved view is active)
+  const flatColumns = [
+    taskTitleColumn(),
+    matterColumn(navigate),
+    {
+      key: "owner_name",
+      label: "Assigned To",
+      width: 120,
+      render: (val) => (
+        <span style={{ color: theme.text.muted }}>{val || "\u2014"}</span>
+      ),
+    },
+    statusColumn(),
+    dueDateColumn(navigate),
+    priorityColumn(),
+    {
+      key: "task_mode",
+      label: "Mode",
+      width: 90,
+      render: (val) => (
+        <SmallBadge
+          label={val}
+          colorMap={{
+            action: { bg: "#1a4731", text: "#34d399" },
+            waiting: { bg: "#4a3728", text: "#fbbf24" },
+            delegated: { bg: "#1e3a5f", text: "#60a5fa" },
+            monitoring: { bg: "#1a3a4a", text: "#38bdf8" },
+          }}
+        />
+      ),
+    },
+    {
+      key: "expected_output",
+      label: "Expected Output",
+      width: 200,
+      render: (val) => (
+        <span style={{ color: theme.text.muted, fontSize: 12 }}>
+          {val || "\u2014"}
+        </span>
+      ),
+    },
+  ];
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          padding: "60px 32px",
+          textAlign: "center",
+          color: theme.text.faint,
+        }}
+      >
+        Loading tasks&hellip;
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: "24px 32px", maxWidth: 1650 }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 4,
+        }}
+      >
         <div style={titleStyle}>Tasks</div>
         <div style={{ display: "flex", gap: 8 }}>
-          <select style={inputStyle} value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setActiveView(0); }}>
+          <select
+            style={inputStyle}
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setActiveView(0);
+            }}
+          >
             <option value="">All Statuses</option>
-            {statusOpts.map((v) => <option key={v} value={v}>{v}</option>)}
+            {statusOpts.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
           </select>
-          <select style={inputStyle} value={modeFilter} onChange={(e) => { setModeFilter(e.target.value); setActiveView(0); }}>
+          <select
+            style={inputStyle}
+            value={modeFilter}
+            onChange={(e) => {
+              setModeFilter(e.target.value);
+              setActiveView(0);
+            }}
+          >
             <option value="">All Modes</option>
-            {modeOpts.map((v) => <option key={v} value={v}>{v}</option>)}
+            {modeOpts.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
           </select>
-          <select style={inputStyle} value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-            <option value="due_date">Sort: Due Date</option>
-            <option value="title">Sort: Title</option>
-            <option value="status">Sort: Status</option>
-            <option value="priority">Sort: Priority</option>
-            <option value="owner_name">Sort: Assigned To</option>
-            <option value="task_mode">Sort: Mode</option>
-            <option value="task_type">Sort: Type</option>
-          </select>
-          <button style={btnPrimary} onClick={() => openDrawer("task", null, refetch)}>
+          <button
+            style={btnPrimary}
+            onClick={() => openDrawer("task", null, refetch)}
+          >
             + New Task
           </button>
         </div>
       </div>
-      <div style={subtitleStyle}>Execution control across your work, delegated work, and quick tasks</div>
+      <div style={subtitleStyle}>
+        Execution control across your work, delegated work, and dependencies
+      </div>
 
       {/* Search + Saved View Pills */}
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          flexWrap: "wrap",
+          marginBottom: 16,
+          alignItems: "center",
+        }}
+      >
         <input
           style={{ ...inputStyle, minWidth: 400 }}
-          placeholder="Search tasks by title, matter, assigned person, waiting on, or expected output..."
+          placeholder="Search tasks by title, matter, assigned person, or expected output..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -337,7 +827,10 @@ export default function TasksPage() {
               fontSize: 12,
               cursor: "pointer",
               background: i === activeView ? "#1e3a5f" : theme.bg.input,
-              color: i === activeView ? theme.accent.blueLight : theme.text.muted,
+              color:
+                i === activeView
+                  ? theme.accent.blueLight
+                  : theme.text.muted,
               border: `1px solid ${i === activeView ? theme.accent.blue : theme.border.default}`,
               fontWeight: i === activeView ? 600 : 400,
               transition: "all 0.15s",
@@ -351,49 +844,191 @@ export default function TasksPage() {
 
       {/* Summary Strip */}
       <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
-        {summaryCards.map((card) => (
-          <div key={card.label} style={{
-            flex: 1,
-            background: theme.bg.card,
-            borderRadius: 8,
-            padding: "12px 16px",
-            border: `1px solid ${theme.border.default}`,
-          }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: theme.text.dim, textTransform: "uppercase", letterSpacing: "0.05em" }}>{card.label}</div>
-            <div style={{
-              fontSize: 22, fontWeight: 700, marginTop: 4,
-              color: card.highlight ? "#f87171" : theme.text.primary,
-            }}>{card.value}</div>
+        {[
+          {
+            label: "My Overdue",
+            value: myOverdue,
+            highlight: myOverdue > 0,
+          },
+          {
+            label: "Team Overdue",
+            value: teamOverdue,
+            highlight: teamOverdue > 0,
+          },
+          { label: "Blocked / Waiting", value: blockedCount },
+          { label: "Due Today", value: dueToday },
+        ].map((card) => (
+          <div
+            key={card.label}
+            style={{
+              flex: 1,
+              background: theme.bg.card,
+              borderRadius: 8,
+              padding: "12px 16px",
+              border: `1px solid ${theme.border.default}`,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                color: theme.text.dim,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+              }}
+            >
+              {card.label}
+            </div>
+            <div
+              style={{
+                fontSize: 22,
+                fontWeight: 700,
+                marginTop: 4,
+                color: card.highlight ? "#f87171" : theme.text.primary,
+              }}
+            >
+              {card.value}
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Table */}
-      <div style={cardStyle}>
-        {loading ? (
-          <div style={{ textAlign: "center", padding: 40, color: theme.text.faint, fontSize: 13 }}>Loading...</div>
-        ) : error ? (
-          <div style={{ color: theme.accent.red, fontSize: 13 }}>Error: {error.message || String(error)}</div>
-        ) : tasks.length === 0 ? (
-          <EmptyState
-            title="No tasks found"
-            message="Adjust your filters or create a new task."
-            actionLabel="New Task"
-            onAction={() => openDrawer("task", null, refetch)}
-          />
-        ) : (
-          <DataTable
-            columns={columns}
-            data={tasks}
-            onRowClick={(row) => openDrawer("task", row, refetch)}
-          />
-        )}
-      </div>
+      {/* ── Grouped Mode (default) ── */}
+      {isGroupedMode && (
+        <>
+          {/* Section 1: My Action Items */}
+          {myTasks.length > 0 && (
+            <div style={cardStyle}>
+              <div style={sectionHeaderStyle}>
+                <div style={sectionTitleStyle}>My Action Items</div>
+                <div style={sectionBadgeStyle}>
+                  {myTasks.length} task{myTasks.length !== 1 ? "s" : ""}
+                </div>
+                {myOverdue > 0 && (
+                  <div style={overdueBadgeStyle}>
+                    {myOverdue} overdue
+                  </div>
+                )}
+              </div>
+              <DataTable
+                columns={myColumns}
+                data={myTasks}
+                onRowClick={(row) => openDrawer("task", row, refetch)}
+                pageSize={15}
+                emptyMessage="No action items."
+              />
+            </div>
+          )}
+
+          {/* Section 2: Delegated Work */}
+          {delegatedGroups.length > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              <div
+                style={{
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: theme.text.dim,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  marginBottom: 12,
+                }}
+              >
+                Delegated Work
+              </div>
+              {delegatedGroups.map((group) => (
+                <div key={group.key} style={cardStyle}>
+                  <div style={sectionHeaderStyle}>
+                    <div style={sectionTitleStyle}>{group.title}</div>
+                    <div style={sectionBadgeStyle}>
+                      {group.rows.length} task
+                      {group.rows.length !== 1 ? "s" : ""}
+                    </div>
+                    {group.overdue > 0 && (
+                      <div style={overdueBadgeStyle}>
+                        {group.overdue} overdue
+                      </div>
+                    )}
+                  </div>
+                  <DataTable
+                    columns={delegatedColumns}
+                    data={group.rows}
+                    onRowClick={(row) => openDrawer("task", row, refetch)}
+                    pageSize={10}
+                    emptyMessage="No delegated tasks."
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Section 3: Waiting On */}
+          {waitingTasks.length > 0 && (
+            <div style={cardStyle}>
+              <div style={sectionHeaderStyle}>
+                <div style={sectionTitleStyle}>Waiting On</div>
+                <div style={sectionBadgeStyle}>
+                  {waitingTasks.length} task
+                  {waitingTasks.length !== 1 ? "s" : ""}
+                </div>
+              </div>
+              <DataTable
+                columns={waitingColumns}
+                data={waitingTasks}
+                onRowClick={(row) => openDrawer("task", row, refetch)}
+                pageSize={10}
+                emptyMessage="Nothing pending."
+              />
+            </div>
+          )}
+
+          {/* Empty state if all sections empty */}
+          {myTasks.length === 0 &&
+            delegatedGroups.length === 0 &&
+            waitingTasks.length === 0 && (
+              <div style={cardStyle}>
+                <EmptyState
+                  title="No active tasks"
+                  message="All clear! Create a new task or upload a recording."
+                  actionLabel="New Task"
+                  onAction={() => openDrawer("task", null, refetch)}
+                />
+              </div>
+            )}
+        </>
+      )}
+
+      {/* ── Flat Table Mode (saved view active) ── */}
+      {!isGroupedMode && (
+        <div style={cardStyle}>
+          {error ? (
+            <div style={{ color: theme.accent.red, fontSize: 13 }}>
+              Error: {error.message || String(error)}
+            </div>
+          ) : filteredTasks && filteredTasks.length === 0 ? (
+            <EmptyState
+              title="No tasks found"
+              message="Adjust your filters or create a new task."
+              actionLabel="New Task"
+              onAction={() => openDrawer("task", null, refetch)}
+            />
+          ) : (
+            <DataTable
+              columns={flatColumns}
+              data={filteredTasks || []}
+              onRowClick={(row) => openDrawer("task", row, refetch)}
+              pageSize={25}
+              emptyMessage="No tasks found."
+            />
+          )}
+        </div>
+      )}
 
       {/* Footer count */}
-      {!loading && !error && tasks.length > 0 && (
+      {!loading && !error && (
         <div style={{ marginTop: 12, fontSize: 12, color: theme.text.dim }}>
-          Showing {tasks.length} {tasks.length !== 1 ? "tasks" : "task"}
+          {isGroupedMode
+            ? `${myTasks.length} personal + ${delegatedGroups.reduce((s, g) => s + g.rows.length, 0)} delegated + ${waitingTasks.length} waiting`
+            : `Showing ${(filteredTasks || []).length} task${(filteredTasks || []).length !== 1 ? "s" : ""}`}
         </div>
       )}
     </div>

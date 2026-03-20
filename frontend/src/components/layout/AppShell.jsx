@@ -4,6 +4,7 @@ import Sidebar from "./Sidebar";
 import theme from "../../styles/theme";
 import useMediaQuery from "../../hooks/useMediaQuery";
 import { DrawerProvider, useDrawer } from "../../contexts/DrawerContext";
+import { OwnerProvider } from "../../contexts/OwnerContext";
 import MatterDrawer from "../tracker/MatterDrawer";
 import TaskDrawer from "../tracker/TaskDrawer";
 import PersonDrawer from "../tracker/PersonDrawer";
@@ -87,6 +88,7 @@ export default function AppShell() {
   }, [location.pathname, isMobile]);
 
   return (
+    <OwnerProvider>
     <DrawerProvider>
       <div style={{
         display: "flex", height: "100vh", overflow: "hidden",
@@ -163,5 +165,6 @@ export default function AppShell() {
         <DrawerRenderer />
       </div>
     </DrawerProvider>
+    </OwnerProvider>
   );
 }

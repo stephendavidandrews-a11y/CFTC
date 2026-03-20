@@ -19,6 +19,7 @@ from app.seed import seed_all
 
 # Import routers
 from app.routers import (
+    config,
     organizations,
     people,
     matters,
@@ -104,6 +105,7 @@ app.include_router(tags.router, prefix=router_prefix, dependencies=[Depends(veri
 app.include_router(ai_context.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 app.include_router(batch.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 app.include_router(schema_version.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
+app.include_router(config.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 
 
 @app.get("/tracker/health")

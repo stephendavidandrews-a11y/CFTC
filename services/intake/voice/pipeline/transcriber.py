@@ -13,12 +13,16 @@ _whisper_model = None
 
 
 def _get_device():
-    """Select best available device for Whisper."""
+    """Select best available device for Whisper.
+
+    Note: MPS (Apple Silicon) is NOT supported by OpenAI Whisper due to
+    float64 operations. Use CPU instead. The diarizer uses MPS separately.
+    For GPU-accelerated transcription on Mac, consider mlx-whisper.
+    """
     import torch
     if torch.cuda.is_available():
         return "cuda"
-    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        return "mps"
+    # MPS intentionally excluded -- Whisper uses float64 which MPS does not support
     return "cpu"
 
 
