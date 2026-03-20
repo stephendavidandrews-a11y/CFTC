@@ -358,7 +358,7 @@ export default function TasksPage() {
     [search, statusFilter, modeFilter]
   );
   const { data: peopleData, loading: loadingPeople } = useApi(
-    () => listPeople({ limit: 500 }),
+    () => listPeople({ limit: 500, is_active: true }),
     []
   );
 
