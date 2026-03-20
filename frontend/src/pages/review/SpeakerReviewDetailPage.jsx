@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
 import useApi from "../../hooks/useApi";
@@ -13,6 +13,8 @@ import {
   editTranscriptSegment,
   findSimilarCorrections,
   applyCorrections,
+  unlinkSpeaker,
+  mergeSpeakers,
 } from "../../api/ai";
 import ConfidenceIndicator from "../../components/shared/ConfidenceIndicator";
 import PersonOrgResolver from "../../components/shared/PersonOrgResolver";
@@ -178,10 +180,11 @@ function AudioPlayer({ audioRef, communicationId }) {
 
 // ── Speaker Card ────────────────────────────────────────────────────────────
 
-function SpeakerCard({ speaker, color, communicationId, onUpdate, audioRef, segments }) {
+function SpeakerCard({ speaker, color, communicationId, onUpdate, audioRef, segments, allSpeakers }) {
   const toast = useToast();
   const [showNewPerson, setShowNewPerson] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [showMergeDropdown, setShowMergeDropdown] = useState(false);
 
   const handleLinkPerson = async (person) => {
     setBusy(true);
@@ -245,22 +248,75 @@ function SpeakerCard({ speaker, color, communicationId, onUpdate, audioRef, segm
     setBusy(false);
   };
 
-  // Play voice sample: find first segment for this speaker, play 10-15s
+  // Enhancement #4: Unlink a confirmed speaker
+  const handleUnlink = async () => {
+    setBusy(true);
+    try {
+      await unlinkSpeaker(communicationId, speaker.id);
+      toast.info(`Unlinked ${speaker.speaker_label}`);
+      onUpdate();
+    } catch (e) {
+      toast.error(`Unlink failed: ${e.message}`);
+    }
+    setBusy(false);
+  };
+
+  // Enhancement #5: Merge speakers
+  const handleMerge = async (targetLabel) => {
+    setBusy(true);
+    setShowMergeDropdown(false);
+    try {
+      await mergeSpeakers(communicationId, targetLabel, [speaker.speaker_label]);
+      toast.success(`Merged ${speaker.speaker_label} into ${targetLabel}`);
+      onUpdate();
+    } catch (e) {
+      toast.error(`Merge failed: ${e.message}`);
+    }
+    setBusy(false);
+  };
+
+  // Enhancement #2: Play voice sample — 7-10 seconds minimum
   const handlePlaySample = () => {
     const audio = audioRef?.current;
     if (!audio) return;
     const speakerSegs = segments.filter((s) => s.speaker_label === speaker.speaker_label);
     if (speakerSegs.length === 0) return;
-    const seg = speakerSegs[0];
-    audio.currentTime = seg.start_time || 0;
-    audio.play().catch(() => {});
-    // Auto-pause after 10-15s
-    const sampleDuration = Math.min(15, (seg.end_time || seg.start_time + 15) - seg.start_time);
-    setTimeout(() => {
-      if (audio.currentTime >= seg.start_time + sampleDuration - 0.5) {
-        audio.pause();
+
+    const firstSeg = speakerSegs[0];
+    const startTime = firstSeg.start_time || 0;
+    const firstSegDuration = (firstSeg.end_time || startTime) - startTime;
+
+    let sampleDuration;
+    if (firstSegDuration >= 7) {
+      // First segment alone is long enough
+      sampleDuration = Math.min(15, firstSegDuration);
+    } else {
+      // Span multiple segments to get at least 7s (cap at 10s)
+      sampleDuration = 10;
+      // Find actual contiguous run duration
+      let totalDur = 0;
+      for (const seg of speakerSegs) {
+        const segEnd = seg.end_time || (seg.start_time + 5);
+        const segDur = segEnd - (seg.start_time || 0);
+        totalDur += segDur;
+        if (totalDur >= 10) break;
       }
-    }, sampleDuration * 1000);
+      sampleDuration = Math.max(7, Math.min(10, totalDur));
+    }
+
+    audio.currentTime = startTime;
+    audio.play().catch(() => {});
+
+    // Auto-pause after the calculated duration
+    const pauseAt = startTime + sampleDuration;
+    const checkInterval = setInterval(() => {
+      if (audio.currentTime >= pauseAt - 0.3 || audio.paused) {
+        if (!audio.paused && audio.currentTime >= pauseAt - 0.3) {
+          audio.pause();
+        }
+        clearInterval(checkInterval);
+      }
+    }, 200);
   };
 
   const statusIcon = speaker.confirmed
@@ -272,6 +328,9 @@ function SpeakerCard({ speaker, color, communicationId, onUpdate, audioRef, segm
 
   const isResolved = speaker.confirmed;
   const candidates = speaker.voiceprint_candidates || [];
+
+  // Other speaker labels for merge dropdown (exclude self)
+  const otherSpeakers = allSpeakers.filter((s) => s.speaker_label !== speaker.speaker_label);
 
   return (
     <div style={{
@@ -291,7 +350,7 @@ function SpeakerCard({ speaker, color, communicationId, onUpdate, audioRef, segm
           {/* Play voice sample button */}
           <button
             onClick={handlePlaySample}
-            title="Play 10-15s voice sample"
+            title="Play 7-10s voice sample"
             style={{
               width: 22, height: 22, borderRadius: "50%",
               background: "rgba(96,165,250,0.12)", color: "#60a5fa",
@@ -331,29 +390,45 @@ function SpeakerCard({ speaker, color, communicationId, onUpdate, audioRef, segm
               ? "rgba(156,163,175,0.08)"
               : "rgba(74,222,128,0.08)",
           fontSize: 12,
+          display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          {speaker.match_source === "provisional" && (
-            <div>
-              <span style={{ color: "#fbbf24", fontWeight: 600 }}>Provisional: </span>
-              <span style={{ color: theme.text.primary }}>{speaker.proposed_name}</span>
-              {speaker.proposed_title && <span style={{ color: theme.text.faint }}> {"\u2014"} {speaker.proposed_title}</span>}
-              {speaker.proposed_org && <span style={{ color: theme.text.faint }}>, {speaker.proposed_org}</span>}
-            </div>
-          )}
-          {speaker.match_source === "skipped" && (
-            <span style={{ color: theme.text.faint }}>Skipped {"\u2014"} Sonnet will use raw speaker label</span>
-          )}
-          {speaker.match_source !== "provisional" && speaker.match_source !== "skipped" && speaker.tracker_person_id && (
-            <div>
-              <span style={{ color: "#4ade80", fontWeight: 600 }}>Linked: </span>
-              <span style={{ color: theme.text.primary }}>{speaker.proposed_name || speaker.tracker_person_id}</span>
-              {speaker.voiceprint_confidence != null && (
-                <span style={{ color: theme.text.faint, fontSize: 11 }}>
-                  {" "}(voiceprint {Math.round(speaker.voiceprint_confidence * 100)}%)
-                </span>
-              )}
-            </div>
-          )}
+          <div style={{ flex: 1 }}>
+            {speaker.match_source === "provisional" && (
+              <div>
+                <span style={{ color: "#fbbf24", fontWeight: 600 }}>Provisional: </span>
+                <span style={{ color: theme.text.primary }}>{speaker.proposed_name}</span>
+                {speaker.proposed_title && <span style={{ color: theme.text.faint }}> {"\u2014"} {speaker.proposed_title}</span>}
+                {speaker.proposed_org && <span style={{ color: theme.text.faint }}>, {speaker.proposed_org}</span>}
+              </div>
+            )}
+            {speaker.match_source === "skipped" && (
+              <span style={{ color: theme.text.faint }}>Skipped {"\u2014"} Sonnet will use raw speaker label</span>
+            )}
+            {speaker.match_source !== "provisional" && speaker.match_source !== "skipped" && speaker.tracker_person_id && (
+              <div>
+                <span style={{ color: "#4ade80", fontWeight: 600 }}>Linked: </span>
+                <span style={{ color: theme.text.primary }}>{speaker.proposed_name || speaker.tracker_person_id}</span>
+                {speaker.voiceprint_confidence != null && (
+                  <span style={{ color: theme.text.faint, fontSize: 11 }}>
+                    {" "}(voiceprint {Math.round(speaker.voiceprint_confidence * 100)}%)
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+          {/* Enhancement #4: Unlink button */}
+          <button
+            onClick={handleUnlink}
+            title="Unlink this speaker and reset to unconfirmed"
+            style={{
+              padding: "3px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600,
+              background: "rgba(239,68,68,0.1)", color: "#f87171",
+              border: "1px solid rgba(239,68,68,0.25)",
+              cursor: "pointer", marginLeft: 8,
+            }}
+          >
+            Unlink
+          </button>
         </div>
       )}
 
@@ -377,7 +452,7 @@ function SpeakerCard({ speaker, color, communicationId, onUpdate, audioRef, segm
                 }}>
                   <div style={{ flex: 1 }}>
                     <span style={{ color: theme.text.primary, fontSize: 12, fontWeight: 500 }}>
-                      {c.tracker_person_id.slice(0, 8)}\u2026
+                      {c.tracker_person_id.slice(0, 8)}{"\u2026"}
                     </span>
                     <div style={{ marginTop: 2 }}>
                       <ConfidenceIndicator
@@ -417,6 +492,68 @@ function SpeakerCard({ speaker, color, communicationId, onUpdate, audioRef, segm
               showSkip={true}
             />
           </div>
+
+          {/* Enhancement #5: Merge speakers button */}
+          {otherSpeakers.length > 0 && (
+            <div style={{ marginTop: 8, position: "relative" }}>
+              <button
+                onClick={() => setShowMergeDropdown(!showMergeDropdown)}
+                style={{
+                  padding: "4px 10px", borderRadius: 4, fontSize: 10, fontWeight: 600,
+                  background: "rgba(168,85,247,0.1)", color: "#a78bfa",
+                  border: "1px solid rgba(168,85,247,0.25)",
+                  cursor: "pointer",
+                }}
+              >
+                Merge into{"\u2026"}
+              </button>
+              {showMergeDropdown && (
+                <div style={{
+                  position: "absolute", top: "100%", left: 0, zIndex: 20,
+                  marginTop: 4, minWidth: 180,
+                  background: theme.bg.card,
+                  border: "1px solid " + theme.border.subtle,
+                  borderRadius: 6, overflow: "hidden",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+                }}>
+                  <div style={{
+                    padding: "6px 10px", fontSize: 10, color: theme.text.faint,
+                    fontWeight: 600, textTransform: "uppercase",
+                    borderBottom: "1px solid " + theme.border.subtle,
+                  }}>
+                    Merge {speaker.speaker_label} into:
+                  </div>
+                  {otherSpeakers.map((other) => (
+                    <button
+                      key={other.speaker_label}
+                      onClick={() => handleMerge(other.speaker_label)}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 8,
+                        width: "100%", padding: "8px 10px",
+                        background: "transparent", color: theme.text.primary,
+                        border: "none", borderBottom: "1px solid rgba(255,255,255,0.04)",
+                        cursor: "pointer", fontSize: 12, textAlign: "left",
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                    >
+                      <span style={{
+                        width: 8, height: 8, borderRadius: "50%",
+                        background: speakerColor(other.speaker_label, allSpeakers),
+                        flexShrink: 0,
+                      }} />
+                      <span style={{ fontWeight: 600 }}>{other.speaker_label}</span>
+                      {other.proposed_name && (
+                        <span style={{ color: theme.text.faint, fontSize: 11 }}>
+                          ({other.proposed_name})
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>
@@ -447,6 +584,17 @@ export default function SpeakerReviewDetailPage() {
   const confirmedCount = speakers.filter((s) => s.confirmed).length;
   const allDone = speakers.length > 0 && confirmedCount === speakers.length;
 
+  // Enhancement #3: Build speaker name map for transcript display
+  const speakerNameMap = useMemo(() => {
+    const map = {};
+    for (const s of speakers) {
+      if (s.confirmed && s.proposed_name) {
+        map[s.speaker_label] = s.proposed_name;
+      }
+    }
+    return map;
+  }, [speakers]);
+
   // Track which transcript segment is currently playing
   useEffect(() => {
     const audio = audioRef.current;
@@ -464,7 +612,7 @@ export default function SpeakerReviewDetailPage() {
     return () => audio.removeEventListener("timeupdate", onTimeUpdate);
   }, [segments]);
 
-  // Click transcript line → open inline edit
+  // Click transcript line -> open inline edit
   const handleSegmentClick = useCallback((seg) => {
     if (editingSegId === seg.id) return; // already editing this one
     setEditingSegId(seg.id);
@@ -625,6 +773,8 @@ export default function SpeakerReviewDetailPage() {
             const col = speakerColor(seg.speaker_label, speakers);
             const isActive = i === activeSegIdx;
             const isEditing = editingSegId === seg.id;
+            // Enhancement #3: Resolve speaker name from confirmed links
+            const displayName = speakerNameMap[seg.speaker_label] || seg.speaker_label;
             return (
               <div
                 key={seg.id || i}
@@ -640,8 +790,34 @@ export default function SpeakerReviewDetailPage() {
                     ? "1px solid rgba(250,204,21,0.25)"
                     : isActive ? "1px solid rgba(59,130,246,0.2)" : "1px solid transparent",
                   transition: "background 0.15s",
+                  alignItems: "flex-start",
                 }}
               >
+                {/* Enhancement #1: Play button per segment */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const a = audioRef.current;
+                    if (a) {
+                      a.currentTime = seg.start_time || 0;
+                      a.play().catch(() => {});
+                    }
+                  }}
+                  style={{
+                    width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
+                    background: "transparent", color: isActive ? "#60a5fa" : "rgba(255,255,255,0.2)",
+                    border: "1px solid " + (isActive ? "rgba(96,165,250,0.4)" : "rgba(255,255,255,0.1)"),
+                    cursor: "pointer", fontSize: 8, display: "flex",
+                    alignItems: "center", justifyContent: "center",
+                    marginTop: 2, padding: 0,
+                    transition: "color 0.15s, border-color 0.15s",
+                  }}
+                  title="Play from here"
+                  onMouseEnter={(e) => { e.currentTarget.style.color = "#60a5fa"; e.currentTarget.style.borderColor = "rgba(96,165,250,0.4)"; }}
+                  onMouseLeave={(e) => { if (i !== activeSegIdx) { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; } }}
+                >
+                  {"\u25B6"}
+                </button>
                 <div style={{
                   minWidth: 44, color: isActive ? "#60a5fa" : theme.text.faint,
                   fontFamily: theme.font.mono, fontSize: 10, paddingTop: 3,
@@ -652,7 +828,7 @@ export default function SpeakerReviewDetailPage() {
                 <div style={{
                   minWidth: 80, fontWeight: 600, color: col, fontSize: 11, paddingTop: 3,
                 }}>
-                  {seg.speaker_label}
+                  {displayName}
                 </div>
                 {isEditing ? (
                   <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
@@ -805,6 +981,7 @@ export default function SpeakerReviewDetailPage() {
               onUpdate={refetch}
               audioRef={audioRef}
               segments={segments}
+              allSpeakers={speakers}
             />
           ))}
         </div>

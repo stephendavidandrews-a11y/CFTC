@@ -366,4 +366,21 @@ export function getMeetingIntelligence(meetingId) {
   return fetchJSON(`/ai/api/meeting-intelligence/by-meeting/${meetingId}`);
 }
 
+
+// ── Speaker Review — Unlink & Merge ─────────────────────────────────────────
+
+export function unlinkSpeaker(communicationId, participantId) {
+  return fetchJSON(`/ai/api/speaker-review/${communicationId}/unlink-speaker`, {
+    method: "POST",
+    body: JSON.stringify({ participant_id: participantId }),
+  });
+}
+
+export function mergeSpeakers(communicationId, targetLabel, sourceLabels) {
+  return fetchJSON(`/ai/api/speaker-review/${communicationId}/merge-speakers`, {
+    method: "POST",
+    body: JSON.stringify({ target_label: targetLabel, source_labels: sourceLabels }),
+  });
+}
+
 export { ApiError };
