@@ -165,7 +165,7 @@ def _get_committed_items(db, communication_id: str) -> list[dict]:
         JOIN review_bundles rb ON rbi.bundle_id = rb.id
         WHERE rb.communication_id = ?
           AND rbi.status IN ('accepted', 'edited')
-        ORDER BY rb.display_order, rbi.display_order
+        ORDER BY rb.sort_order, rbi.sort_order
     """, (communication_id,)).fetchall()
 
     items = []
@@ -275,10 +275,10 @@ async def generate_meeting_intelligence(
     model_config = policy.get("model_config", {})
     if tier == "core":
         model = model_config.get("haiku_model", "claude-haiku-4-5-20251001")
-        max_tokens = 2048
+        max_tokens = 4096
     else:
         model = model_config.get("primary_extraction_model", "claude-sonnet-4-20250514")
-        max_tokens = 8192
+        max_tokens = 16384
 
     response: LLMResponse = await call_llm(
         db=db,
@@ -325,6 +325,16 @@ async def generate_meeting_intelligence(
     return intelligence
 
 
+
+def _safe_text(val, default=""):
+    """Ensure a value is a string suitable for SQLite TEXT column."""
+    if val is None:
+        return default if default else None
+    if isinstance(val, (dict, list)):
+        return json.dumps(val, default=str)
+    return str(val)
+
+
 def _store_intelligence(db, intel_id, meeting_id, communication_id,
                         tier, intel, response, prompt_version):
     layer1 = intel.get("layer_1_skim", {})
@@ -366,7 +376,7 @@ def _store_intelligence(db, intel_id, meeting_id, communication_id,
         )
     """, (
         intel_id, meeting_id, communication_id, tier,
-        layer1.get("executive_summary", ""),
+        _safe_text(layer1.get("executive_summary", "")),
         json.dumps(layer1.get("decisions_made", []), default=str),
         json.dumps(layer1.get("non_decisions", []), default=str),
         json.dumps(layer1.get("action_items_summary", []), default=str),
@@ -375,18 +385,18 @@ def _store_intelligence(db, intel_id, meeting_id, communication_id,
         json.dumps(layer2.get("key_issues_discussed", []), default=str) if layer2 else None,
         json.dumps(layer2.get("participant_positions", []), default=str) if layer2 else None,
         json.dumps(layer2.get("dependencies_surfaced", []), default=str) if layer2 else None,
-        layer2.get("what_changed_in_matter") if layer2 else None,
+        _safe_text(layer2.get("what_changed_in_matter")) if layer2 else None,
         json.dumps(layer2.get("commitments_made", []), default=str) if layer2 else None,
         json.dumps(layer2.get("recommended_next_move", {}), default=str) if layer2 else None,
-        layer3.get("purpose_and_context") if layer3 else None,
+        _safe_text(layer3.get("purpose_and_context")) if layer3 else None,
         json.dumps(layer3.get("materials_referenced", []), default=str) if layer3 else None,
-        layer3.get("detailed_notes") if layer3 else None,
+        _safe_text(layer3.get("detailed_notes")) if layer3 else None,
         json.dumps(layer3.get("tags", []), default=str) if layer3 else None,
-        closing.get("why_this_meeting_mattered", ""),
-        closing.get("what_changed", ""),
-        closing.get("what_i_need_to_do", ""),
-        closing.get("what_boss_needs_to_know", ""),
-        closing.get("what_can_wait", ""),
+        _safe_text(closing.get("why_this_meeting_mattered", "")),
+        _safe_text(closing.get("what_changed", "")),
+        _safe_text(closing.get("what_i_need_to_do", "")),
+        _safe_text(closing.get("what_boss_needs_to_know", "")),
+        _safe_text(closing.get("what_can_wait", "")),
         response.usage.model,
         prompt_version,
         response.usage.input_tokens,
