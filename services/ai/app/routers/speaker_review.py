@@ -106,6 +106,19 @@ class SpeakerReviewDetail(BaseModel):
 # Endpoints
 # ---------------------------------------------------------------------------
 
+
+
+class UnlinkRequest(BaseModel):
+    """Reset a confirmed speaker back to unconfirmed state."""
+    participant_id: str
+
+
+class MergeSpeakersRequest(BaseModel):
+    """Merge multiple speaker labels into one."""
+    target_label: str
+    source_labels: list[str]
+
+
 @router.get("/queue")
 async def get_speaker_review_queue(db=Depends(get_db)):
     """List all audio communications awaiting speaker review."""
@@ -470,6 +483,106 @@ async def reject_match(
 
     return {"status": "ok", "match_log_id": req.match_log_id, "rejected": True}
 
+
+
+
+@router.post("/{communication_id}/unlink-speaker")
+async def unlink_speaker(
+    communication_id: str,
+    req: UnlinkRequest,
+    db=Depends(get_db),
+):
+    """Reset a speaker back to unconfirmed state."""
+    _check_review_state(db, communication_id)
+    _ensure_in_progress(db, communication_id)
+
+    participant = db.execute(
+        "SELECT id, speaker_label, proposed_name FROM communication_participants WHERE id = ? AND communication_id = ?",
+        (req.participant_id, communication_id),
+    ).fetchone()
+    if not participant:
+        raise HTTPException(404, detail={"error_type": "not_found", "message": f"Participant {req.participant_id} not found"})
+
+    db.execute("""
+        UPDATE communication_participants
+        SET tracker_person_id = NULL, confirmed = 0, match_source = NULL,
+            proposed_name = NULL, proposed_title = NULL, proposed_org = NULL,
+            voiceprint_confidence = NULL, voiceprint_method = NULL,
+            updated_at = datetime('now')
+        WHERE id = ? AND communication_id = ?
+    """, (req.participant_id, communication_id))
+
+    import uuid as _uuid
+    db.execute("""
+        INSERT INTO review_action_log (id, actor, communication_id, action_type, details)
+        VALUES (?, 'user', ?, 'unlink_speaker', ?)
+    """, (
+        str(_uuid.uuid4()), communication_id,
+        json.dumps({
+            "participant_id": req.participant_id,
+            "speaker_label": participant["speaker_label"],
+            "previous_name": participant["proposed_name"],
+        }),
+    ))
+    db.commit()
+
+    return {"ok": True, "participant_id": req.participant_id}
+
+
+@router.post("/{communication_id}/merge-speakers")
+async def merge_speakers(
+    communication_id: str,
+    req: MergeSpeakersRequest,
+    db=Depends(get_db),
+):
+    """Merge multiple speaker labels into one. Keeps the target speaker,
+    reassigns all transcript segments from source speakers to target."""
+    _check_review_state(db, communication_id)
+    _ensure_in_progress(db, communication_id)
+
+    # Verify target exists
+    target = db.execute(
+        "SELECT id, speaker_label FROM communication_participants WHERE communication_id = ? AND speaker_label = ?",
+        (communication_id, req.target_label),
+    ).fetchone()
+    if not target:
+        raise HTTPException(404, detail={
+            "error_type": "not_found",
+            "message": f"Target speaker {req.target_label} not found",
+        })
+
+    merged = 0
+    for source_label in req.source_labels:
+        if source_label == req.target_label:
+            continue
+
+        db.execute("""
+            UPDATE transcripts SET speaker_label = ?
+            WHERE communication_id = ? AND speaker_label = ?
+        """, (req.target_label, communication_id, source_label))
+
+        db.execute("""
+            DELETE FROM communication_participants
+            WHERE communication_id = ? AND speaker_label = ?
+        """, (communication_id, source_label))
+
+        merged += 1
+
+    import uuid as _uuid
+    db.execute("""
+        INSERT INTO review_action_log (id, actor, communication_id, action_type, details)
+        VALUES (?, 'user', ?, 'merge_speakers', ?)
+    """, (
+        str(_uuid.uuid4()), communication_id,
+        json.dumps({
+            "target_label": req.target_label,
+            "source_labels": req.source_labels,
+            "merged_count": merged,
+        }),
+    ))
+    db.commit()
+
+    return {"ok": True, "merged": merged}
 
 @router.post("/{communication_id}/complete")
 async def complete_speaker_review(
