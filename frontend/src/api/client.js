@@ -13,7 +13,7 @@ export class ApiError extends Error {
       ? detail.map((d) => d.msg).join("; ")
       : typeof detail === "string"
         ? detail
-        : statusText || "Request failed";
+        : (detail && detail.message) || statusText || "Request failed";
     super(msg);
     this.name = "ApiError";
     this.status = status;

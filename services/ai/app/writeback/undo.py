@@ -209,6 +209,12 @@ def _detect_conflicts(
         if field_name in SYSTEM_FIELDS:
             continue
 
+        # Skip unresolved $ref: placeholders — these are batch client-id
+        # references that got resolved to real UUIDs during commit.
+        # They will never match and are not real conflicts.
+        if isinstance(written_value, str) and written_value.startswith("$ref:"):
+            continue
+
         current_value = current_record.get(field_name)
 
         # Normalize JSON strings for comparison

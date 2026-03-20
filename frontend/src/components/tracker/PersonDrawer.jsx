@@ -113,7 +113,17 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
     }
   }, [person, isOpen]);
 
-  const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+  const set = (field) => (e) => {
+    const val = e.target.value;
+    setForm((f) => {
+      const updated = { ...f, [field]: val };
+      // Auto-check team workload when Direct report is selected
+      if (field === "relationship_category" && (val === "Direct report" || val === "Indirect report")) {
+        updated.include_in_team_workload = true;
+      }
+      return updated;
+    });
+  };
   const setCheck = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.checked }));
 
   const handleSave = async () => {

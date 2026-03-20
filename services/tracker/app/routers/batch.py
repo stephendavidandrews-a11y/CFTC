@@ -179,6 +179,10 @@ async def batch_write(body: dict, db=Depends(get_db),
                 if "source" in valid_columns:
                     data.setdefault("source", source)
 
+                # Auto-set include_in_team_workload for Direct reports
+                if table == "people" and data.get("relationship_category") in ("Direct report", "Indirect report"):
+                    data.setdefault("include_in_team_workload", 1)
+
                 columns = ", ".join(data.keys())
                 placeholders = ", ".join(["?"] * len(data))
                 db.execute(
@@ -207,6 +211,12 @@ async def batch_write(body: dict, db=Depends(get_db),
                 previous_data = dict(old)
 
                 data["updated_at"] = now
+
+                # Auto-set include_in_team_workload for Direct reports (only if not explicitly set in payload or DB)
+                if table == "people" and data.get("relationship_category") in ("Direct report", "Indirect report"):
+                    if "include_in_team_workload" not in data and not previous_data.get("include_in_team_workload"):
+                        data["include_in_team_workload"] = 1
+
                 sets = [f"{k} = ?" for k in data]
                 params = list(data.values()) + [record_id]
                 db.execute(f"UPDATE {table} SET {', '.join(sets)} WHERE id = ?", params)
