@@ -40,7 +40,7 @@ function formatRelativeTime(dateStr) {
 
 const columns = [
   {
-    key: "original_filename",
+    key: "title",
     label: "Communication",
     width: "35%",
     render: (val, row) => (

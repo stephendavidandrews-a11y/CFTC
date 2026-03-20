@@ -423,7 +423,7 @@ export default function EntityReviewDetailPage() {
           {"\u2190"} Entity Review Queue
         </button>
         <h1 style={{ fontSize: 18, fontWeight: 700, color: theme.text.primary, margin: 0 }}>
-          {data?.original_filename || "Untitled"}
+          {data?.title || data?.original_filename || "Untitled"}
         </h1>
         <div style={{ fontSize: 12, color: theme.text.faint, marginTop: 2 }}>
           {entities.length} entities \u00b7

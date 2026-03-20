@@ -610,14 +610,12 @@ async def activate_voice_profile(tracker_person_id: str, db=Depends(get_db)):
 # ---------------------------------------------------------------------------
 
 @router.patch("/{communication_id}/transcripts/{transcript_id}")
-async def edit_transcript_segment(communication_id: str, transcript_id: str, request: Request):
+async def edit_transcript_segment(communication_id: str, transcript_id: str, request: Request, db=Depends(get_db)):
     """Save human-corrected text for a transcript segment."""
     body = await request.json()
     reviewed_text = body.get("reviewed_text", "").strip()
     if not reviewed_text:
         raise HTTPException(400, "reviewed_text is required")
-
-    db = get_db()
 
     # Get current text
     seg = db.execute(
@@ -678,7 +676,7 @@ async def edit_transcript_segment(communication_id: str, transcript_id: str, req
 
 
 @router.post("/{communication_id}/transcripts/find-similar")
-async def find_similar_corrections(communication_id: str, request: Request):
+async def find_similar_corrections(communication_id: str, request: Request, db=Depends(get_db)):
     """Find other segments with similar text that could receive the same correction."""
     body = await request.json()
     correction_id = body.get("correction_id")
@@ -686,7 +684,6 @@ async def find_similar_corrections(communication_id: str, request: Request):
     if not correction_id:
         raise HTTPException(400, "correction_id is required")
 
-    db = get_db()
 
     # Get the correction pattern
     corr = db.execute(
@@ -731,7 +728,7 @@ async def find_similar_corrections(communication_id: str, request: Request):
 
 
 @router.post("/{communication_id}/transcripts/apply-corrections")
-async def apply_corrections(communication_id: str, request: Request):
+async def apply_corrections(communication_id: str, request: Request, db=Depends(get_db)):
     """Bulk-apply reviewed_text corrections to selected segments."""
     body = await request.json()
     corrections = body.get("corrections", [])
@@ -740,7 +737,6 @@ async def apply_corrections(communication_id: str, request: Request):
     if not corrections:
         raise HTTPException(400, "corrections list is required")
 
-    db = get_db()
 
     # Get original correction pattern for logging
     pattern_from = None

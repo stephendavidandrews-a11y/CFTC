@@ -24,6 +24,7 @@ async def list_tasks(
     mode: str = Query(None),
     task_type: str = Query(None),
     deadline_type: str = Query(None),
+    source_id: str = Query(None),
     exclude_done: bool = Query(None),
     sort_by: str = Query("due_date"),
     sort_dir: str = Query("asc"),
@@ -57,6 +58,9 @@ async def list_tasks(
     if deadline_type:
         conditions.append("t.deadline_type = ?")
         params.append(deadline_type)
+    if source_id:
+        conditions.append("t.source_id = ?")
+        params.append(source_id)
     if exclude_done is True:
         conditions.append("t.status NOT IN ('done', 'completed', 'deferred')")
 

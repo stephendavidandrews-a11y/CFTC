@@ -51,12 +51,12 @@ function statusBadge(status) {
 
 const columns = [
   {
-    key: "original_filename",
-    label: "Filename",
+    key: "title",
+    label: "Communication",
     width: "25%",
-    render: (val) => (
+    render: (val, row) => (
       <span style={{ color: theme.text.primary, fontWeight: 600, fontSize: 13 }}>
-        {val || "Untitled"}
+        {val || row.original_filename || "Untitled"}
       </span>
     ),
   },

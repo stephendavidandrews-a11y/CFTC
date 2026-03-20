@@ -9,6 +9,7 @@ import {
   addItem, acceptBundle, rejectBundle, editBundle, acceptAllBundles,
   moveItem, createBundle, mergeBundles, completeBundleReview,
 } from "../../api/ai";
+import { listPeople, listOrganizations, listMatters, getEnums, getEnum } from "../../api/tracker";
 import Badge from "../../components/shared/Badge";
 import Modal from "../../components/shared/Modal";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
@@ -81,6 +82,30 @@ export default function BundleReviewDetailPage() {
   const { data, loading, error, refetch } = useApi(
     () => getBundleReviewDetail(id), [id]
   );
+
+  // Lookup maps for resolving UUIDs to names
+  const [nameLookup, setNameLookup] = useState({});
+  const [trackerData, setTrackerData] = useState({ people: [], orgs: [], matters: [] });
+  const [allEnums, setAllEnums] = useState({});
+  useEffect(() => {
+    Promise.all([
+      listPeople({ limit: 500 }).catch(() => ({ items: [] })),
+      listOrganizations({ limit: 500 }).catch(() => ({ items: [] })),
+      listMatters({ limit: 500 }).catch(() => ({ items: [] })),
+      getEnums().catch(() => ({})),
+    ]).then(([pRes, oRes, mRes, enumData]) => {
+      const ppl = pRes.items || [];
+      const orgList = oRes.items || [];
+      const matterList = mRes.items || [];
+      const map = {};
+      ppl.forEach((p) => { map[p.id] = p.full_name || ((p.first_name || "") + " " + (p.last_name || "")).trim() || p.id; });
+      orgList.forEach((o) => { map[o.id] = o.name || o.id; });
+      matterList.forEach((m) => { map[m.id] = m.title || m.id; });
+      setNameLookup(map);
+      setTrackerData({ people: ppl, orgs: orgList, matters: matterList });
+      setAllEnums(enumData || {});
+    });
+  }, []);
 
   useEffect(() => {
     const unsub = on("bundle_review_complete", (evt) => {
@@ -208,7 +233,7 @@ export default function BundleReviewDetailPage() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
           <div>
             <h1 style={{ fontSize: 18, fontWeight: 700, color: theme.text.primary, margin: 0 }}>
-              {data.original_filename || "Untitled Communication"}
+              {data.title || data.original_filename || "Untitled Communication"}
             </h1>
             <div style={{ fontSize: 12, color: theme.text.dim, marginTop: 4, display: "flex", gap: 16 }}>
               <span>{formatDuration(data.duration_seconds)}</span>
@@ -274,6 +299,7 @@ export default function BundleReviewDetailPage() {
           })}
           onMoveItem={handleMoveItem}
           onMerge={(sourceId) => setMergeModal({ sourceId })}
+          nameLookup={nameLookup}
         />
       ))}
 
@@ -436,6 +462,9 @@ export default function BundleReviewDetailPage() {
         item={editModal?.item}
         busy={busy[`ei-${editModal?.item?.id}`]}
         onSave={(proposedData) => handleEditItemSave(editModal.bundleId, editModal.item.id, proposedData)}
+        trackerData={trackerData}
+        allEnums={allEnums}
+        nameLookup={nameLookup}
       />
 
       {/* Add Item Modal */}
@@ -444,6 +473,9 @@ export default function BundleReviewDetailPage() {
         onClose={() => setAddModal(null)}
         busy={busy[`add-${addModal?.bundleId}`]}
         onSave={(itemType, proposedData) => handleAddItemSave(addModal.bundleId, itemType, proposedData)}
+        trackerData={trackerData}
+        allEnums={allEnums}
+        nameLookup={nameLookup}
       />
 
       {/* Create Bundle Modal */}
@@ -472,7 +504,7 @@ export default function BundleReviewDetailPage() {
 function BundleCard({
   bundle, allBundles, commId, busy,
   onAcceptItem, onRejectItem, onRestoreItem, onEditItem, onAddItem,
-  onAcceptBundle, onRejectBundle, onMoveItem, onMerge,
+  onAcceptBundle, onRejectBundle, onMoveItem, onMerge, nameLookup = {},
 }) {
   const isTerminal = bundle.status === "accepted" || bundle.status === "rejected";
   const bType = BUNDLE_TYPE_COLORS[bundle.bundle_type] || BUNDLE_TYPE_COLORS.standalone;
@@ -575,6 +607,7 @@ function BundleCard({
             onRestore={() => onRestoreItem(bundle.id, item.id)}
             onEdit={() => onEditItem(bundle.id, item)}
             onMove={(toBundleId) => onMoveItem(item.id, bundle.id, toBundleId)}
+            nameLookup={nameLookup}
           />
         ))}
 
@@ -600,7 +633,40 @@ function BundleCard({
 
 // ── Item Card ───────────────────────────────────────────────────────────────
 
-function ItemCard({ item, bundleId, bundleStatus, allBundles, busy, onAccept, onReject, onRestore, onEdit, onMove }) {
+function resolveDisplayValue(key, val, lookup) {
+  // Direct ID field — resolve to name
+  if (key.endsWith("_id") && typeof val === "string" && lookup[val]) {
+    return lookup[val];
+  }
+  // Array of objects (e.g. participants) — render each as a readable block
+  if (Array.isArray(val)) {
+    return val.map((item, i) => {
+      if (typeof item === "object" && item !== null) {
+        const parts = Object.entries(item)
+          .filter(([, v]) => v != null && v !== "" && v !== 0)
+          .map(([k, v]) => {
+            const resolved = (k.endsWith("_id") && typeof v === "string" && lookup[v]) ? lookup[v] : v;
+            return `${k.replace(/_/g, " ")}: ${resolved}`;
+          });
+        return parts.join(", ");
+      }
+      return String(item);
+    }).join(" | ");
+  }
+  // Plain object — resolve IDs inside
+  if (typeof val === "object" && val !== null) {
+    const parts = Object.entries(val)
+      .filter(([, v]) => v != null)
+      .map(([k, v]) => {
+        const resolved = (k.endsWith("_id") && typeof v === "string" && lookup[v]) ? lookup[v] : v;
+        return `${k.replace(/_/g, " ")}: ${resolved}`;
+      });
+    return parts.join(", ");
+  }
+  return String(val ?? "");
+}
+
+function ItemCard({ item, bundleId, bundleStatus, allBundles, busy, onAccept, onReject, onRestore, onEdit, onMove, nameLookup = {} }) {
   const [moveTarget, setMoveTarget] = useState("");
   const tColor = ITEM_TYPE_COLORS[item.item_type] || ITEM_TYPE_COLORS.task;
   const sColor = BUNDLE_STATUS[item.status] || BUNDLE_STATUS.proposed;
@@ -646,7 +712,7 @@ function ItemCard({ item, bundleId, bundleStatus, allBundles, busy, onAccept, on
                 {key.replace(/_/g, " ")}:
               </span>
               <span style={{ fontSize: 12, color: theme.text.secondary }}>
-                {typeof val === "object" ? JSON.stringify(val) : String(val ?? "")}
+                {resolveDisplayValue(key, val, nameLookup)}
               </span>
             </div>
           ))}
@@ -825,9 +891,200 @@ function ConfidenceIndicator({ value }) {
   );
 }
 
+// ── SmartField ─────────────────────────────────────────────────────────────────────────
+
+const ENUM_FIELD_MAP = {
+  task_mode: "task_mode",
+  task_type: "task_type",
+  deadline_type: "deadline_type",
+  decision_type: "decision_type",
+  meeting_type: "meeting_type",
+  document_type: "document_type",
+  matter_type: "matter_type",
+  sensitivity: "matter_sensitivity",
+  boss_involvement_level: "boss_involvement_level",
+  risk_level: "risk_level",
+  regulatory_stage: "regulatory_stage",
+  unified_agenda_priority: "unified_agenda_priority",
+  update_type: "matter_update_type",
+  relationship_category: "relationship_category",
+  relationship_lane: "relationship_lane",
+  next_interaction_type: "next_interaction_type",
+  organization_type: "organization_type",
+  engagement_level: "engagement_level",
+  matter_role: "matter_role",
+  entity_type: "entity_type",
+};
+
+const STATUS_ENUM_MAP = {
+  task: "task_status",
+  follow_up: "task_status",
+  decision: "decision_status",
+  meeting_record: "meeting_status",
+  new_matter: "matter_status",
+  matter_update: "matter_status",
+  document: "document_status",
+};
+
+const PRIORITY_ENUM_MAP = {
+  task: "task_priority",
+  follow_up: "task_priority",
+  new_matter: "matter_priority",
+  matter_update: "matter_priority",
+};
+
+const DATE_FIELDS = new Set(["due_date", "decision_date", "start_date", "end_date", "date_filed", "date_published", "target_date", "review_date", "next_interaction_date"]);
+const DATETIME_FIELDS = new Set(["date_time_start", "date_time_end", "datetime_start", "datetime_end"]);
+const TEXTAREA_FIELDS = new Set(["description", "notes", "rationale", "completion_notes", "expected_output", "summary", "context", "intelligence_notes", "personality", "background"]);
+
+const sfSelectStyle = {
+  width: "100%", background: "#0f1729", color: "#d1d5db",
+  border: "1px solid #1f2937", borderRadius: 6,
+  padding: "8px 10px", fontSize: 13,
+};
+
+const sfInputStyle = {
+  width: "100%", background: "#0f1729", color: "#d1d5db",
+  border: "1px solid #1f2937", borderRadius: 6,
+  padding: "8px 10px", fontSize: 13,
+};
+
+function SmartField({ fieldKey, value, onChange, trackerData = {}, allEnums = {}, nameLookup = {}, itemType = "" }) {
+  // Person select
+  if (fieldKey.endsWith("_person_id") || fieldKey === "person_id") {
+    const ppl = trackerData.people || [];
+    return (
+      <select value={value || ""} onChange={(e) => onChange(e.target.value)} style={sfSelectStyle}>
+        <option value="">-- Select Person --</option>
+        {ppl.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.full_name || (`${p.first_name || ""} ${p.last_name || ""}`.trim()) || `Person #${p.id}`}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  // Organization select
+  if (fieldKey.endsWith("_org_id") || fieldKey === "organization_id") {
+    const orgList = trackerData.orgs || [];
+    return (
+      <select value={value || ""} onChange={(e) => onChange(e.target.value)} style={sfSelectStyle}>
+        <option value="">-- Select Organization --</option>
+        {orgList.map((o) => (
+          <option key={o.id} value={o.id}>{o.name || `Org #${o.id}`}</option>
+        ))}
+      </select>
+    );
+  }
+
+  // Matter select
+  if (fieldKey === "matter_id") {
+    const matterList = trackerData.matters || [];
+    return (
+      <select value={value || ""} onChange={(e) => onChange(e.target.value)} style={sfSelectStyle}>
+        <option value="">-- Select Matter --</option>
+        {matterList.map((m) => (
+          <option key={m.id} value={m.id}>{m.title || `Matter #${m.id}`}</option>
+        ))}
+      </select>
+    );
+  }
+
+  // Status enum (context-dependent)
+  if (fieldKey === "status") {
+    const enumName = STATUS_ENUM_MAP[itemType] || "task_status";
+    const opts = allEnums[enumName] || [];
+    if (opts.length > 0) {
+      return (
+        <select value={value || ""} onChange={(e) => onChange(e.target.value)} style={sfSelectStyle}>
+          <option value="">-- Select Status --</option>
+          {opts.map((v) => <option key={v} value={v}>{formatLabel(v)}</option>)}
+        </select>
+      );
+    }
+  }
+
+  // Priority enum (context-dependent)
+  if (fieldKey === "priority") {
+    const enumName = PRIORITY_ENUM_MAP[itemType] || "task_priority";
+    const opts = allEnums[enumName] || [];
+    if (opts.length > 0) {
+      return (
+        <select value={value || ""} onChange={(e) => onChange(e.target.value)} style={sfSelectStyle}>
+          <option value="">-- Select Priority --</option>
+          {opts.map((v) => <option key={v} value={v}>{formatLabel(v)}</option>)}
+        </select>
+      );
+    }
+  }
+
+  // Generic enum fields
+  if (ENUM_FIELD_MAP[fieldKey]) {
+    const enumName = ENUM_FIELD_MAP[fieldKey];
+    const opts = allEnums[enumName] || [];
+    if (opts.length > 0) {
+      return (
+        <select value={value || ""} onChange={(e) => onChange(e.target.value)} style={sfSelectStyle}>
+          <option value="">-- Select {formatLabel(fieldKey)} --</option>
+          {opts.map((v) => <option key={v} value={v}>{formatLabel(v)}</option>)}
+        </select>
+      );
+    }
+  }
+
+  // Date fields
+  if (DATE_FIELDS.has(fieldKey) || (fieldKey.includes("date") && !DATETIME_FIELDS.has(fieldKey) && !fieldKey.endsWith("_id"))) {
+    const dateVal = typeof value === "string" ? value.slice(0, 10) : value || "";
+    return (
+      <input type="date" value={dateVal} onChange={(e) => onChange(e.target.value)} style={sfInputStyle} />
+    );
+  }
+
+  // Datetime fields
+  if (DATETIME_FIELDS.has(fieldKey)) {
+    const dtVal = typeof value === "string" ? value.slice(0, 16) : value || "";
+    return (
+      <input type="datetime-local" value={dtVal} onChange={(e) => onChange(e.target.value)} style={sfInputStyle} />
+    );
+  }
+
+  // Textarea fields
+  if (TEXTAREA_FIELDS.has(fieldKey)) {
+    return (
+      <textarea
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+        rows={3}
+        style={{ ...sfInputStyle, minHeight: 60, resize: "vertical", fontFamily: "inherit" }}
+      />
+    );
+  }
+
+  // Object/array fields - JSON textarea
+  if (typeof value === "object" && value !== null) {
+    return (
+      <textarea
+        value={JSON.stringify(value, null, 2)}
+        onChange={(e) => {
+          try { onChange(JSON.parse(e.target.value)); }
+          catch { onChange(e.target.value); }
+        }}
+        rows={4}
+        style={{ ...sfInputStyle, fontFamily: "monospace", resize: "vertical" }}
+      />
+    );
+  }
+
+  // Default text input
+  return (
+    <input type="text" value={value ?? ""} onChange={(e) => onChange(e.target.value)} style={sfInputStyle} />
+  );
+}
+
 // ── Edit Item Modal ─────────────────────────────────────────────────────────
 
-function EditItemModal({ isOpen, onClose, item, busy, onSave }) {
+function EditItemModal({ isOpen, onClose, item, busy, onSave, trackerData = {}, allEnums = {}, nameLookup = {} }) {
   const [fields, setFields] = useState({});
 
   useEffect(() => {
@@ -854,33 +1111,15 @@ function EditItemModal({ isOpen, onClose, item, busy, onSave }) {
             }}>
               {key.replace(/_/g, " ")}
             </label>
-            {typeof val === "object" && val !== null ? (
-              <textarea
-                value={JSON.stringify(val, null, 2)}
-                onChange={(e) => {
-                  try { handleFieldChange(key, JSON.parse(e.target.value)); }
-                  catch { handleFieldChange(key, e.target.value); }
-                }}
-                rows={4}
-                style={{
-                  width: "100%", background: theme.bg.input, color: theme.text.secondary,
-                  border: `1px solid ${theme.border.default}`, borderRadius: 6,
-                  padding: "8px 10px", fontSize: 12, fontFamily: theme.font.mono,
-                  resize: "vertical",
-                }}
-              />
-            ) : (
-              <input
-                type="text"
-                value={val ?? ""}
-                onChange={(e) => handleFieldChange(key, e.target.value)}
-                style={{
-                  width: "100%", background: theme.bg.input, color: theme.text.secondary,
-                  border: `1px solid ${theme.border.default}`, borderRadius: 6,
-                  padding: "8px 10px", fontSize: 13, fontFamily: theme.font.family,
-                }}
-              />
-            )}
+            <SmartField
+              fieldKey={key}
+              value={val}
+              onChange={(v) => handleFieldChange(key, v)}
+              trackerData={trackerData}
+              allEnums={allEnums}
+              nameLookup={nameLookup}
+              itemType={item.item_type}
+            />
           </div>
         ))}
 
@@ -910,20 +1149,20 @@ const ITEM_TYPES = [
 ];
 
 const DEFAULT_FIELDS = {
-  task: { title: "", owner: "", due_date: "", description: "" },
-  decision: { title: "", decided_by: "", description: "" },
-  meeting_record: { title: "", attendees: "", date: "", notes: "" },
-  matter_update: { title: "", description: "" },
-  new_matter: { title: "", description: "", priority: "" },
-  new_person: { name: "", role: "", organization: "" },
-  new_organization: { name: "", type: "" },
-  stakeholder_addition: { person: "", role: "", matter: "" },
-  status_change: { entity: "", from_status: "", to_status: "" },
-  document: { title: "", type: "", description: "" },
-  follow_up: { title: "", owner: "", due_date: "", description: "" },
+  task: { title: "", description: "", assigned_to_person_id: "", matter_id: "", status: "", task_mode: "", priority: "", due_date: "", task_type: "" },
+  decision: { title: "", description: "", decision_type: "", status: "", decided_by_person_id: "", decision_date: "", matter_id: "" },
+  meeting_record: { title: "", date_time_start: "", date_time_end: "", meeting_type: "", location: "", matter_id: "", notes: "" },
+  matter_update: { title: "", description: "", update_type: "", matter_id: "" },
+  new_matter: { title: "", description: "", matter_type: "", priority: "", sensitivity: "", status: "" },
+  new_person: { full_name: "", title: "", organization_id: "", email: "", phone: "" },
+  new_organization: { name: "", organization_type: "", website: "" },
+  stakeholder_addition: { person_id: "", matter_id: "", matter_role: "", engagement_level: "" },
+  status_change: { entity_type: "", entity_id: "", from_status: "", to_status: "" },
+  document: { title: "", document_type: "", status: "", matter_id: "", description: "" },
+  follow_up: { title: "", description: "", assigned_to_person_id: "", matter_id: "", due_date: "", priority: "", task_mode: "" },
 };
 
-function AddItemModal({ isOpen, onClose, busy, onSave }) {
+function AddItemModal({ isOpen, onClose, busy, onSave, trackerData = {}, allEnums = {}, nameLookup = {} }) {
   const [itemType, setItemType] = useState("task");
   const [fields, setFields] = useState(DEFAULT_FIELDS.task);
 
@@ -970,15 +1209,14 @@ function AddItemModal({ isOpen, onClose, busy, onSave }) {
             }}>
               {key.replace(/_/g, " ")}
             </label>
-            <input
-              type="text"
+            <SmartField
+              fieldKey={key}
               value={val}
-              onChange={(e) => handleFieldChange(key, e.target.value)}
-              style={{
-                width: "100%", background: theme.bg.input, color: theme.text.secondary,
-                border: `1px solid ${theme.border.default}`, borderRadius: 6,
-                padding: "8px 10px", fontSize: 13, fontFamily: theme.font.family,
-              }}
+              onChange={(v) => handleFieldChange(key, v)}
+              trackerData={trackerData}
+              allEnums={allEnums}
+              nameLookup={nameLookup}
+              itemType={itemType}
             />
           </div>
         ))}

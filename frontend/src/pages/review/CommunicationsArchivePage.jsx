@@ -76,7 +76,7 @@ const columns = [
     width: "22%",
     render: (val, row) => (
       <span style={{ color: theme.text.primary, fontWeight: 600, fontSize: 13 }}>
-        {val || row?.original_filename || "Untitled"}
+        {row?.title || val || row?.original_filename || "Untitled"}
       </span>
     ),
   },

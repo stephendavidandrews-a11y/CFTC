@@ -162,7 +162,7 @@ async def batch_write(body: dict, db=Depends(get_db),
             valid_columns = _column_cache[table]
 
             if data:
-                invalid = set(data.keys()) - valid_columns - {"id", "created_at", "updated_at"}
+                invalid = set(data.keys()) - valid_columns - {"id"}
                 if invalid:
                     raise _typed_error(400, "schema_mismatch", i,
                                        f"Invalid columns for {table}: {sorted(invalid)}")
@@ -172,7 +172,8 @@ async def batch_write(body: dict, db=Depends(get_db),
             if op_type == "insert":
                 record_id = str(uuid.uuid4())
                 data["id"] = record_id
-                data["created_at"] = now
+                if "created_at" in valid_columns:
+                    data["created_at"] = now
                 if "updated_at" in valid_columns:
                     data["updated_at"] = now
                 if "source" in valid_columns:

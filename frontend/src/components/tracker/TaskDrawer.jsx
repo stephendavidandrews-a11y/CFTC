@@ -192,7 +192,7 @@ export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved })
     </div>
   );
 
-  const personOpts = people.map((p) => ({ value: p.id, label: `${p.first_name || ""} ${p.last_name || ""}`.trim() || `Person #${p.id}` }));
+  const personOpts = people.map((p) => ({ value: p.id, label: p.full_name || (`${p.first_name || ""} ${p.last_name || ""}`.trim()) || `Person #${p.id}` }));
   const orgOpts = orgs.map((o) => ({ value: o.id, label: o.name || `Org #${o.id}` }));
   const matterOpts = matters.map((m) => ({ value: m.id, label: m.title || `Matter #${m.id}` }));
 

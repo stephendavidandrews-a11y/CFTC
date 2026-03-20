@@ -315,12 +315,39 @@ def _build_user_prompt(
         FROM communications WHERE id = ?
     """, (communication_id,)).fetchone()
 
+    # Get the best date for when this conversation actually occurred:
+    # 1. captured_at from audio file metadata (embedded by recording device)
+    # 2. Fall back to communications.created_at (DB insertion time)
+    # Then convert from UTC to local timezone for correct relative date resolution.
+    captured_row = db.execute("""
+        SELECT captured_at FROM audio_files
+        WHERE communication_id = ? AND format != 'wav_normalized'
+              AND captured_at IS NOT NULL
+        LIMIT 1
+    """, (communication_id,)).fetchone()
+    raw_date = (
+        (captured_row["captured_at"] if captured_row else None)
+        or comm["created_at"]
+    )
+    # Convert UTC timestamp to local date
+    from datetime import datetime as _dt, timezone as _tz
+    from zoneinfo import ZoneInfo
+    from app.config import LOCAL_TIMEZONE
+    try:
+        utc_dt = _dt.fromisoformat(raw_date.replace("Z", "+00:00"))
+        if utc_dt.tzinfo is None:
+            utc_dt = utc_dt.replace(tzinfo=_tz.utc)
+        local_dt = utc_dt.astimezone(ZoneInfo(LOCAL_TIMEZONE))
+        conversation_date = local_dt.strftime("%Y-%m-%d")
+    except Exception:
+        conversation_date = raw_date[:10] if raw_date else "unknown"
+
     sections.append("## Communication Data\n")
     source_type = comm["source_type"] or "audio_upload"
 
     sections.append(f"Communication ID: {communication_id}")
     sections.append(f"Source Type: {source_type}")
-    sections.append(f"Date: {comm['created_at']}")
+    sections.append(f"This conversation occurred on: {conversation_date}. Use this as the reference date for resolving all relative time expressions (e.g. 'tomorrow', 'next week', 'end of day').")
     if source_type != "email":
         sections.append(f"Duration: {comm['duration_seconds'] or 0} seconds")
     sections.append(f"Original Filename: {comm['original_filename'] or 'unknown'}")
@@ -961,6 +988,64 @@ def _build_source_locator(db, item, communication_id: str) -> dict:
     }
 
 
+def _update_communication_title(db, communication_id: str, bundles: list):
+    """Update the communication title from extracted meeting_record if the current
+    title is generic (e.g., 'Test audio 3', UUID-like, or just a filename).
+    
+    Priority: first meeting_record title found, falling back to first bundle
+    target_matter_title prefixed with 'Discussion: '.
+    """
+    current = db.execute(
+        "SELECT title, original_filename FROM communications WHERE id = ?",
+        (communication_id,),
+    ).fetchone()
+    if not current:
+        return
+
+    cur_title = (current["title"] or "").strip()
+    orig_name = (current["original_filename"] or "").strip()
+
+    # Heuristic: title is "generic" if it matches the filename, looks like a UUID,
+    # starts with "Test audio", or is very short / empty
+    import re
+    is_generic = (
+        not cur_title
+        or cur_title == orig_name
+        or cur_title.lower().startswith("test audio")
+        or bool(re.match(r"^[0-9a-f]{8}-", cur_title))
+        or len(cur_title) < 5
+    )
+    if not is_generic:
+        return
+
+    # Look for the best title from extraction results
+    new_title = None
+    for b in bundles:
+        for item in b.items:
+            if item.item_type == "meeting_record" and item.proposed_data.get("title"):
+                new_title = item.proposed_data["title"]
+                break
+        if new_title:
+            break
+
+    # Fallback: use matter title from first matter-linked bundle
+    if not new_title:
+        for b in bundles:
+            if b.target_matter_title:
+                new_title = f"Discussion: {b.target_matter_title}"
+                break
+
+    if new_title and new_title != cur_title:
+        db.execute(
+            "UPDATE communications SET title = ?, updated_at = datetime('now') WHERE id = ?",
+            (new_title, communication_id),
+        )
+        logger.info(
+            "[%s] Communication title updated: '%s' -> '%s'",
+            communication_id[:8], cur_title, new_title,
+        )
+
+
 def _persist_extraction(
     db,
     communication_id: str,
@@ -1053,6 +1138,9 @@ def _persist_extraction(
                 json.dumps(source_locator, ensure_ascii=False, default=str),
                 item_idx,
             ))
+
+    # Update communication title from meeting_record if current title is generic
+    _update_communication_title(db, communication_id, bundles)
 
     db.commit()
 

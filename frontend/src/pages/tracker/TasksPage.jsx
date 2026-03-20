@@ -87,7 +87,8 @@ function SmallBadge({ label, colorMap }) {
 
 function formatDueDate(d) {
   if (!d) return "\u2014";
-  const due = new Date(d);
+  const val = typeof d === "string" && d.length === 10 ? d + "T12:00:00" : d;
+  const due = new Date(val);
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   const dueDay = new Date(due);
@@ -101,12 +102,14 @@ function formatDueDate(d) {
 
 function isDueOverdue(d) {
   if (!d) return false;
-  return new Date(d) < new Date(new Date().toDateString());
+  const val = typeof d === "string" && d.length === 10 ? d + "T12:00:00" : d;
+  return new Date(val) < new Date(new Date().toDateString());
 }
 
 function isDueSoon(d) {
   if (!d) return false;
-  const due = new Date(d);
+  const val = typeof d === "string" && d.length === 10 ? d + "T12:00:00" : d;
+  const due = new Date(val);
   const now = new Date();
   const diffDays = (due - now) / (1000 * 60 * 60 * 24);
   return diffDays >= 0 && diffDays <= 2;
@@ -138,7 +141,8 @@ const SAVED_VIEWS = [
     label: "Due This Week",
     filter: (t) => {
       if (!t.due_date || t.status === "done" || t.status === "completed" || t.status === "deferred") return false;
-      const due = new Date(t.due_date);
+      const dv = typeof t.due_date === "string" && t.due_date.length === 10 ? t.due_date + "T12:00:00" : t.due_date;
+      const due = new Date(dv);
       const now = new Date();
       const diffDays = (due - now) / (1000 * 60 * 60 * 24);
       return diffDays >= 0 && diffDays <= 7;

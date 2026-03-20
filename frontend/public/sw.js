@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cftc-cmd-v1';
+const CACHE_NAME = 'cftc-cmd-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

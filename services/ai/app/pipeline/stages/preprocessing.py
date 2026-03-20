@@ -163,6 +163,18 @@ def get_audio_metadata(audio_path: Path) -> dict:
                 "channels": int(audio_stream.get("channels", 0)),
                 "bits_per_sample": int(audio_stream.get("bits_per_sample", 0)),
             })
+
+        # Extract creation_time from format tags (embedded by recording devices)
+        tags = fmt.get("tags", {})
+        creation_time = (
+            tags.get("creation_time")
+            or tags.get("date")
+            or tags.get("DATE")
+            or tags.get("CREATION_TIME")
+        )
+        if creation_time:
+            meta["creation_time"] = creation_time
+
         return meta
     except FileNotFoundError:
         # Neither wave module nor ffprobe worked — return basic file info
