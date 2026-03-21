@@ -1,3 +1,4 @@
+import re
 """Convert reviewed bundle items to tracker batch operations.
 
 Each converter function takes (item_dict, bundle_dict, refs_dict) and returns
@@ -38,13 +39,21 @@ def _resolve_matter_id(bundle: dict, refs: dict) -> str | None:
 
 
 def _resolve_ref(value: str | None, refs: dict, prefix: str) -> str | None:
-    """Resolve a value that might be a forward reference."""
+    """Resolve a value that might be a forward reference.
+
+    Returns $ref:client_id if found in refs, the original value if it looks
+    like a UUID (already resolved), or None if it cannot be resolved.
+    """
     if not value:
         return None
     key = f"{prefix}:{value}"
     if key in refs:
         return f"$ref:{refs[key]}"
-    return value
+    # Only return the value if it looks like a UUID (already resolved)
+    _UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+    if _UUID_RE.match(value):
+        return value
+    return None
 
 
 # ═══════════════════════════════════════════════════════════════════════════
