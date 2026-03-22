@@ -48,6 +48,58 @@ function fmtDuration(s) {
   return `${m}m ${sec}s`;
 }
 
+// ── Voice Quality Badge ──────────────────────────────────────────────────
+
+function VoiceQualityBadge({ quality }) {
+  if (!quality) return null;
+
+  const colors = {
+    good: { bg: "rgba(74,222,128,0.12)", border: "rgba(74,222,128,0.3)", text: "#4ade80", icon: "✓" },
+    fair: { bg: "rgba(250,204,21,0.12)", border: "rgba(250,204,21,0.3)", text: "#fbbf24", icon: "⚠" },
+    poor: { bg: "rgba(248,113,113,0.12)", border: "rgba(248,113,113,0.3)", text: "#f87171", icon: "✖" },
+  };
+  const c = colors[quality.verdict] || colors.fair;
+
+  return (
+    <div style={{
+      background: c.bg, border: `1px solid ${c.border}`, borderRadius: 6,
+      padding: "8px 10px", marginBottom: 8,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+        <span style={{ fontSize: 12, color: c.text }}>{c.icon}</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: c.text, textTransform: "uppercase" }}>
+          Voice Quality: {quality.verdict}
+        </span>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: 10, color: theme.text.faint }}>
+        {quality.hnr_db != null && (
+          <span>HNR: <b style={{ color: quality.hnr_db >= 10 ? "#4ade80" : "#f87171" }}>{quality.hnr_db.toFixed(1)}dB</b></span>
+        )}
+        {quality.jitter != null && (
+          <span>Jitter: <b style={{ color: quality.jitter <= 0.02 ? "#4ade80" : "#f87171" }}>{(quality.jitter * 100).toFixed(1)}%</b></span>
+        )}
+        {quality.shimmer != null && (
+          <span>Shimmer: <b style={{ color: quality.shimmer <= 0.05 ? "#4ade80" : "#f87171" }}>{(quality.shimmer * 100).toFixed(1)}%</b></span>
+        )}
+        {quality.pitch_mean != null && (
+          <span>Pitch: <b style={{ color: theme.text.muted }}>{Math.round(quality.pitch_mean)}Hz</b></span>
+        )}
+        {quality.f0_stddev_ratio != null && (
+          <span>F0 var: <b style={{ color: quality.f0_stddev_ratio <= 0.4 ? "#4ade80" : "#f87171" }}>{(quality.f0_stddev_ratio * 100).toFixed(0)}%</b></span>
+        )}
+        {quality.speaking_rate_wpm != null && (
+          <span>Rate: <b style={{ color: theme.text.muted }}>{Math.round(quality.speaking_rate_wpm)} wpm</b></span>
+        )}
+      </div>
+      {quality.issues && quality.issues.length > 0 && (
+        <div style={{ marginTop: 4, fontSize: 10, color: c.text }}>
+          {quality.issues.join(" • ")}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Audio Player Bar ────────────────────────────────────────────────────────
 // Spec 2B: play/pause, scrub bar, playback speed (1x, 1.5x, 2x)
 
@@ -189,6 +241,15 @@ function SpeakerCard({ speaker, color, communicationId, onUpdate, audioRef, segm
   const handleLinkPerson = async (person) => {
     setBusy(true);
     try {
+      // Warn on poor voice quality
+      if (speaker.vocal_quality?.verdict === "poor") {
+        const proceed = window.confirm(
+          "Warning: Voice quality for this speaker is POOR (" +
+          (speaker.vocal_quality.issues || []).join(", ") +
+          "). Creating a voiceprint from poor audio may cause misidentification. Proceed anyway?"
+        );
+        if (!proceed) { setBusy(false); return; }
+      }
       await linkSpeaker(communicationId, {
         participant_id: speaker.id,
         tracker_person_id: person.id,
@@ -207,6 +268,15 @@ function SpeakerCard({ speaker, color, communicationId, onUpdate, audioRef, segm
   const handleConfirmVoiceprint = async (candidate, matchLogId) => {
     setBusy(true);
     try {
+      // Warn on poor voice quality
+      if (speaker.vocal_quality?.verdict === "poor") {
+        const proceed = window.confirm(
+          "Warning: Voice quality for this speaker is POOR (" +
+          (speaker.vocal_quality.issues || []).join(", ") +
+          "). Creating a voiceprint from poor audio may cause misidentification. Proceed anyway?"
+        );
+        if (!proceed) { setBusy(false); return; }
+      }
       await linkSpeaker(communicationId, {
         participant_id: speaker.id,
         tracker_person_id: candidate.tracker_person_id,
@@ -379,6 +449,9 @@ function SpeakerCard({ speaker, color, communicationId, onUpdate, audioRef, segm
           ))}
         </div>
       )}
+
+      {/* Voice quality indicator */}
+      {speaker.vocal_quality && <VoiceQualityBadge quality={speaker.vocal_quality} />}
 
       {/* Resolved state */}
       {isResolved && (
@@ -570,6 +643,18 @@ export default function SpeakerReviewDetailPage() {
   const [completing, setCompleting] = useState(false);
   const [activeSegIdx, setActiveSegIdx] = useState(-1);
   const audioRef = useRef(null);
+  const transcriptPanelRef = useRef(null);
+  const speakerPanelRef = useRef(null);
+
+  const stableRefetch = useCallback(async () => {
+    const tScroll = transcriptPanelRef.current?.scrollTop || 0;
+    const sScroll = speakerPanelRef.current?.scrollTop || 0;
+    await refetch();
+    requestAnimationFrame(() => {
+      if (transcriptPanelRef.current) transcriptPanelRef.current.scrollTop = tScroll;
+      if (speakerPanelRef.current) speakerPanelRef.current.scrollTop = sScroll;
+    });
+  }, [refetch]);
   const [editingSegId, setEditingSegId] = useState(null);
   const [editText, setEditText] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
@@ -643,7 +728,7 @@ export default function SpeakerReviewDetailPage() {
         setEditingSegId(null);
         setPropagation(null);
       }
-      refetch();
+      stableRefetch();
     } catch (e) {
       toast.error(`Save failed: ${e.message}`);
     }
@@ -678,7 +763,7 @@ export default function SpeakerReviewDetailPage() {
       setEditingSegId(null);
       setPropagation(null);
       setSelectedCandidates(new Set());
-      refetch();
+      stableRefetch();
     } catch (e) {
       toast.error(`Apply failed: ${e.message}`);
     }
@@ -968,7 +1053,7 @@ export default function SpeakerReviewDetailPage() {
         </div>
 
         {/* Right: Speaker cards */}
-        <div style={{ width: "40%", overflowY: "auto", padding: "16px 16px" }}>
+        <div ref={speakerPanelRef} style={{ width: "40%", overflowY: "auto", padding: "16px 16px" }}>
           <div style={{ fontSize: 11, color: theme.text.faint, fontWeight: 600, marginBottom: 12, textTransform: "uppercase" }}>
             Speaker Mapping ({confirmedCount} / {speakers.length} confirmed)
           </div>
@@ -978,7 +1063,7 @@ export default function SpeakerReviewDetailPage() {
               speaker={s}
               color={speakerColor(s.speaker_label, speakers)}
               communicationId={id}
-              onUpdate={refetch}
+              onUpdate={stableRefetch}
               audioRef={audioRef}
               segments={segments}
               allSpeakers={speakers}
