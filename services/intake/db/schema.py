@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS transcripts (
     original_text TEXT,
     user_corrected BOOLEAN DEFAULT 0,
     confidence REAL,
+    is_overlap BOOLEAN DEFAULT 0,
     created_at DATETIME DEFAULT (datetime('now'))
 );
 
@@ -81,6 +82,7 @@ CREATE TABLE IF NOT EXISTS speaker_mappings (
     speaker_label TEXT NOT NULL,
     tracker_person_id TEXT NOT NULL,
     confidence REAL,
+    is_overlap BOOLEAN DEFAULT 0,
     method TEXT DEFAULT 'manual',
     confirmed BOOLEAN DEFAULT 0,
     created_at DATETIME DEFAULT (datetime('now')),
@@ -139,6 +141,7 @@ CREATE TABLE IF NOT EXISTS auto_advance_log (
     speaker_label TEXT,
     tracker_person_id TEXT,
     confidence REAL,
+    is_overlap BOOLEAN DEFAULT 0,
     method TEXT,
     created_at DATETIME DEFAULT (datetime('now'))
 );
