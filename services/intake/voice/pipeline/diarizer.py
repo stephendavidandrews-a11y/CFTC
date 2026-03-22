@@ -1,14 +1,7 @@
 """pyannote speaker diarization module.
 
 Uses pyannote/speaker-diarization-3.1 for speaker segmentation.
-Extracts speaker embeddings for voice print matching.
-
-Tuning notes:
-- clustering.threshold controls how aggressively speakers are merged.
-  Default pyannote value is ~0.7045. Lower = more speakers (less merging).
-  We use 0.55 to avoid collapsing multi-person conversations into one speaker.
-- min_speakers=2 is the default since single-person recordings are rare
-  in our use case (regulatory meetings, networking conversations).
+Extracts speaker embeddings for voiceprint matching.
 """
 
 import logging
@@ -37,11 +30,9 @@ def _get_pipeline():
         if hf_token:
             _diarization_pipeline = Pipeline.from_pretrained(PYANNOTE_PIPELINE, token=hf_token)
         else:
-            # Models cached locally — load without auth (works offline)
             logger.info("HF_TOKEN not set — loading pyannote from local cache")
             _diarization_pipeline = Pipeline.from_pretrained(PYANNOTE_PIPELINE, token=False)
 
-        # Tune clustering threshold for better speaker separation
         if DIARIZATION_CLUSTERING_THRESHOLD is not None:
             try:
                 params = _diarization_pipeline.parameters(instantiated=True)
@@ -49,7 +40,7 @@ def _get_pipeline():
                 params["clustering"]["threshold"] = DIARIZATION_CLUSTERING_THRESHOLD
                 _diarization_pipeline.instantiate(params)
                 logger.info(
-                    f"Clustering threshold: {old_threshold:.4f} → "
+                    f"Clustering threshold: {old_threshold:.4f} -> "
                     f"{DIARIZATION_CLUSTERING_THRESHOLD} (lower = more speakers)"
                 )
             except Exception as e:
@@ -83,26 +74,23 @@ class DiarizationResult:
     embeddings: dict[str, np.ndarray]
     num_speakers: int
 
+    def to_dataframe(self):
+        """Convert to pandas DataFrame for whisperx speaker assignment."""
+        import pandas as pd
+        rows = [{"start": s.start, "end": s.end, "speaker": s.speaker} for s in self.segments]
+        return pd.DataFrame(rows)
+
 
 def diarize(
     audio_path: Path,
     min_speakers: int | None = None,
     max_speakers: int | None = None,
 ) -> DiarizationResult:
-    """Run speaker diarization on audio file.
-
-    Args:
-        audio_path: Path to preprocessed audio (16kHz mono WAV).
-        min_speakers: Minimum expected speakers. Defaults to
-            config.DIARIZATION_MIN_SPEAKERS (2).
-        max_speakers: Maximum expected speakers. Defaults to
-            config.DIARIZATION_MAX_SPEAKERS (None = auto-detect).
-    """
+    """Run speaker diarization on audio file."""
     from config import DIARIZATION_MIN_SPEAKERS, DIARIZATION_MAX_SPEAKERS
 
     pipeline = _get_pipeline()
 
-    # Apply defaults from config if not explicitly provided
     if min_speakers is None:
         min_speakers = DIARIZATION_MIN_SPEAKERS
     if max_speakers is None:

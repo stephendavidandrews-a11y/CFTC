@@ -1,36 +1,24 @@
 """Stateless transcription endpoint for the AI service.
 
 Receives an audio file, runs the full audio pipeline
-(prep → transcribe → diarize → align), and returns the aligned
+(prep -> transcribe -> diarize -> align), and returns the aligned
 transcript as JSON. Does NOT create any intake DB records.
 
 This endpoint exists to let the containerized AI service (port 8006)
 delegate GPU-bound transcription to the native intake service (port 8005)
-which has access to Whisper + pyannote on the Mac Mini's GPU.
+which has access to faster-whisper + pyannote on the Mac Mini.
 
 Response shape:
 {
-    "segments": [
-        {
-            "speaker": "SPEAKER_00",
-            "start": 0.0,
-            "end": 5.2,
-            "text": "Hello everyone.",
-            "words": [
-                {"word": "Hello", "start": 0.0, "end": 0.3, "probability": 0.95},
-                ...
-            ]
-        },
-        ...
-    ],
+    "segments": [...],
     "speakers": ["SPEAKER_00", "SPEAKER_01"],
     "duration": 125.3,
     "language": "en",
     "num_speakers": 2,
-    "embeddings": {
-        "SPEAKER_00": "<base64-encoded float32 array>",
-        "SPEAKER_01": "<base64-encoded float32 array>"
-    }
+    "embeddings": {"SPEAKER_00": "<base64>", ...},
+    "timing": {...},
+    "vocal_features": {...},       # optional, if ENABLE_VOCAL_ANALYSIS
+    "baseline_deviations": {...}   # optional, if ENABLE_VOCAL_ANALYSIS
 }
 """
 import base64
@@ -59,26 +47,17 @@ async def transcribe_audio(
 
     Stateless: no intake DB records are created.
     The AI service calls this to delegate GPU-bound transcription.
-
-    Args:
-        audio: Audio file (wav, flac, mp3, m4a, ogg, opus).
-        communication_id: Optional correlation ID for logging.
-
-    Returns:
-        Aligned transcript with speaker labels, timestamps, words, embeddings.
     """
     correlation = (communication_id or "unknown")[:8]
     filename = audio.filename or "upload.wav"
     suffix = Path(filename).suffix.lower()
 
-    # Validate format
     if suffix not in SUPPORTED_FORMATS and suffix != ".wav":
         raise HTTPException(
             status_code=400,
             detail=f"Unsupported audio format: {suffix}. Accepted: {sorted(SUPPORTED_FORMATS)}",
         )
 
-    # Read file content
     content = await audio.read()
     if len(content) == 0:
         raise HTTPException(status_code=400, detail="Empty audio file")
@@ -87,36 +66,35 @@ async def transcribe_audio(
 
     logger.info("[%s] Transcribe request: %s (%.1f MB)", correlation, filename, len(content) / 1024 / 1024)
 
-    # Save to temp file
     work_dir = Path(tempfile.mkdtemp(prefix="ai_transcribe_"))
     input_path = work_dir / filename
 
     try:
         input_path.write_bytes(content)
 
-        # Stage 1: Audio preprocessing
+        # Stage 0: Audio preprocessing
         t0 = time.time()
         from voice.pipeline.audio_prep import prepare_audio
         try:
             prepared_path = prepare_audio(input_path, cache_dir=work_dir)
         except Exception as e:
-            logger.warning("[%s] Audio prep failed (%s) — using original", correlation, e)
+            logger.warning("[%s] Audio prep failed (%s) -- using original", correlation, e)
             prepared_path = input_path
         prep_time = time.time() - t0
 
-        # Stage 2: Transcription (Whisper)
+        # Stage 1: Transcription (faster-whisper + Silero VAD)
         t0 = time.time()
         from voice.pipeline.transcriber import transcribe
         transcription = transcribe(prepared_path)
         transcribe_time = time.time() - t0
 
-        # Stage 3: Diarization (pyannote)
+        # Stage 2: Diarization (pyannote 3.1 on MPS)
         t0 = time.time()
         from voice.pipeline.diarizer import diarize, DiarizationResult, SpeakerSegment
         try:
             diarization = diarize(prepared_path)
         except Exception as e:
-            logger.warning("[%s] Diarization failed — single-speaker fallback: %s", correlation, e)
+            logger.warning("[%s] Diarization failed -- single-speaker fallback: %s", correlation, e)
             duration = transcription.duration
             diarization = DiarizationResult(
                 segments=[SpeakerSegment(speaker="SPEAKER_00", start=0.0, end=duration)],
@@ -125,13 +103,13 @@ async def transcribe_audio(
             )
         diarize_time = time.time() - t0
 
-        # Stage 4: Alignment
+        # Stage 3: Forced alignment + speaker assignment (wav2vec2)
         t0 = time.time()
         from voice.pipeline.aligner import align
-        aligned = align(transcription, diarization)
+        aligned = align(transcription, diarization, prepared_path)
         align_time = time.time() - t0
 
-        # Build response
+        # Build response segments
         segments = []
         for seg in aligned.segments:
             words = []
@@ -157,14 +135,7 @@ async def transcribe_audio(
 
         total_time = prep_time + transcribe_time + diarize_time + align_time
 
-        logger.info(
-            "[%s] Transcription complete: %d segments, %d speakers, %.1fs duration "
-            "(prep=%.1fs, transcribe=%.1fs, diarize=%.1fs, align=%.1fs, total=%.1fs)",
-            correlation, len(segments), len(aligned.speakers), aligned.duration,
-            prep_time, transcribe_time, diarize_time, align_time, total_time,
-        )
-
-        return {
+        response = {
             "segments": segments,
             "speakers": aligned.speakers,
             "duration": round(aligned.duration, 2),
@@ -180,6 +151,28 @@ async def transcribe_audio(
             },
         }
 
+        # Optional: Vocal analysis
+        from config import ENABLE_VOCAL_ANALYSIS
+        if ENABLE_VOCAL_ANALYSIS:
+            t0 = time.time()
+            vocal_data = _run_vocal_analysis(aligned, prepared_path)
+            vocal_time = time.time() - t0
+            if vocal_data:
+                response["vocal_features"] = vocal_data["features"]
+                response["baseline_deviations"] = vocal_data["deviations"]
+                response["timing"]["vocal_seconds"] = round(vocal_time, 2)
+                response["timing"]["total_seconds"] = round(total_time + vocal_time, 2)
+
+        logger.info(
+            "[%s] Transcription complete: %d segments, %d speakers, %.1fs duration "
+            "(prep=%.1fs, transcribe=%.1fs, diarize=%.1fs, align=%.1fs, total=%.1fs)",
+            correlation, len(segments), len(aligned.speakers), aligned.duration,
+            prep_time, transcribe_time, diarize_time, align_time,
+            response["timing"]["total_seconds"],
+        )
+
+        return response
+
     except HTTPException:
         raise
     except Exception as e:
@@ -193,8 +186,37 @@ async def transcribe_audio(
             },
         )
     finally:
-        # Clean up temp files
         try:
             shutil.rmtree(work_dir, ignore_errors=True)
         except Exception:
             pass
+
+
+def _run_vocal_analysis(aligned, audio_path):
+    """Run vocal analysis for the stateless endpoint."""
+    try:
+        from config import VOCAL_MIN_SEGMENT_SECONDS
+        from voice.analysis.vocal_analyzer import aggregate_speaker_features
+
+        speaker_segments = {}
+        for seg in aligned.segments:
+            if seg.speaker not in speaker_segments:
+                speaker_segments[seg.speaker] = []
+            speaker_segments[seg.speaker].append({"start": seg.start, "end": seg.end})
+
+        features = {}
+        deviations = {}
+        for speaker_label, segs in speaker_segments.items():
+            feat = aggregate_speaker_features(audio_path, segs, VOCAL_MIN_SEGMENT_SECONDS)
+            if feat:
+                # Remove mfcc_means from response (large JSON blob)
+                feat_response = {k: v for k, v in feat.items() if k != "mfcc_means"}
+                features[speaker_label] = feat_response
+                deviations[speaker_label] = {}  # No baseline context in stateless mode
+
+        if features:
+            return {"features": features, "deviations": deviations}
+    except Exception as e:
+        logger.warning("Vocal analysis failed in stateless endpoint (non-fatal): %s", e)
+
+    return None

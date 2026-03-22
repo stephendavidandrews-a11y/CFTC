@@ -1,7 +1,14 @@
-"""Pipeline orchestrator — stages 0-4 only.
+"""Pipeline orchestrator — stages 0-6.
 
-audio prep -> transcribe -> diarize -> align -> store transcript + voice samples.
-Sets status to awaiting_speaker_review when done.
+Stage 0: Audio prep (ffmpeg -> 16kHz mono WAV)
+Stage 1: Transcription (faster-whisper + Silero VAD)
+Stage 2: Diarization (pyannote 3.1 on MPS)
+Stage 3: Forced alignment + speaker assignment (wav2vec2 via whisperx)
+Stage 4: Store transcript + voice samples
+Stage 5: Vocal analysis (Parselmouth + librosa, optional)
+Stage 6: Auto-advance check (confidence-gated, optional)
+
+Sets status to awaiting_speaker_review (or speakers_confirmed if auto-advance).
 """
 
 import json
@@ -20,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 def process_conversation(conversation_id: str) -> bool:
-    """Process a conversation through stages 0-4: audio to transcript."""
+    """Process a conversation through the full pipeline."""
     conn = get_connection()
     try:
         row = conn.execute(
@@ -45,7 +52,7 @@ def process_conversation(conversation_id: str) -> bool:
 
         _update_status(conn, conversation_id, "transcribing")
 
-        # Check for existing transcripts (skip stages 0-4 if reprocessing)
+        # Check for existing transcripts (skip if reprocessing)
         existing_count = conn.execute(
             "SELECT COUNT(*) as cnt FROM transcripts WHERE conversation_id = ?",
             (conversation_id,),
@@ -62,50 +69,71 @@ def process_conversation(conversation_id: str) -> bool:
             cache_dir = audio_path.parent / ".prepared"
             prepared_path = prepare_audio(audio_path, cache_dir=cache_dir)
         except Exception as e:
-            logger.warning(f"Audio prep failed ({type(e).__name__}: {e}) — using original")
+            logger.warning(f"Audio prep failed ({type(e).__name__}: {e}) -- using original")
             prepared_path = audio_path
 
-        # Stage 1: Transcription
-        logger.info(f"[{conversation_id[:8]}] Stage 1: Transcribing...")
-        transcription = transcribe(audio_path)
+        # Stage 1: Transcription (faster-whisper + Silero VAD)
+        logger.info(f"[{conversation_id[:8]}] Stage 1: Transcribing (faster-whisper)...")
+        transcription = transcribe(prepared_path)
 
         conn.execute(
             "UPDATE conversations SET duration_seconds = ? WHERE id = ?",
             (transcription.duration, conversation_id),
         )
 
-        # Stage 2: Diarization
-        logger.info(f"[{conversation_id[:8]}] Stage 2: Diarizing...")
+        # Stage 2: Diarization (pyannote 3.1 on MPS)
+        logger.info(f"[{conversation_id[:8]}] Stage 2: Diarizing (pyannote 3.1)...")
         try:
             diarization = diarize(prepared_path)
         except Exception as e:
-            logger.warning(f"[{conversation_id[:8]}] Diarization failed — single-speaker fallback")
+            logger.warning(f"[{conversation_id[:8]}] Diarization failed -- single-speaker fallback")
             diarization = _single_speaker_fallback(transcription.duration)
 
-        # Stage 3: Alignment
-        logger.info(f"[{conversation_id[:8]}] Stage 3: Aligning...")
-        aligned = align(transcription, diarization)
+        # Stage 3: Forced alignment + speaker assignment (wav2vec2)
+        logger.info(f"[{conversation_id[:8]}] Stage 3: Aligning (wav2vec2)...")
+        aligned = align(transcription, diarization, prepared_path)
 
         # Stage 4: Store transcript + voice samples
-        logger.info(f"[{conversation_id[:8]}] Storing {len(aligned.segments)} segments...")
+        logger.info(f"[{conversation_id[:8]}] Stage 4: Storing {len(aligned.segments)} segments...")
         _store_transcript(conn, conversation_id, aligned)
         _store_voice_samples(conn, conversation_id, diarization)
 
         # Run auto-suggest from voiceprints
+        suggestions = {}
         try:
             from voice.speakers.resolver import auto_suggest_speakers
-            auto_suggest_speakers(conn, conversation_id, diarization.embeddings)
+            suggestions = auto_suggest_speakers(conn, conversation_id, diarization.embeddings)
         except Exception as e:
             logger.warning(f"[{conversation_id[:8]}] Auto-suggest failed (non-fatal): {e}")
 
-        _update_status(conn, conversation_id, "awaiting_speaker_review")
+        # Stage 5: Vocal analysis (optional)
+        vocal_features = {}
+        from config import ENABLE_VOCAL_ANALYSIS
+        if ENABLE_VOCAL_ANALYSIS:
+            vocal_features = _run_vocal_analysis(
+                conn, conversation_id, aligned, diarization, prepared_path, suggestions
+            )
+
+        # Stage 6: Auto-advance check (optional)
+        from config import ENABLE_AUTO_ADVANCE
+        if ENABLE_AUTO_ADVANCE and _all_speakers_resolved(conn, conversation_id):
+            _update_status(conn, conversation_id, "speakers_confirmed")
+            conn.execute(
+                "UPDATE conversations SET speakers_confirmed = 1 WHERE id = ?",
+                (conversation_id,),
+            )
+            _log_auto_advance(conn, conversation_id)
+            logger.info(f"[{conversation_id[:8]}] Auto-advanced: all speakers resolved at >=0.85")
+        else:
+            _update_status(conn, conversation_id, "awaiting_speaker_review")
+
         conn.commit()
 
         logger.info(
             f"[{conversation_id[:8]}] Pipeline complete: "
             f"{len(aligned.speakers)} speakers, "
             f"{len(aligned.segments)} segments, "
-            f"{transcription.duration:.0f}s — awaiting speaker review"
+            f"{transcription.duration:.0f}s"
         )
         return True
 
@@ -141,6 +169,103 @@ def process_pending():
         process_conversation(row["id"])
 
 
+def _run_vocal_analysis(conn, conversation_id, aligned, diarization, audio_path, suggestions):
+    """Stage 5: Extract vocal features for each speaker."""
+    from config import VOCAL_MIN_SEGMENT_SECONDS
+
+    logger.info(f"[{conversation_id[:8]}] Stage 5: Vocal analysis...")
+    vocal_results = {}
+
+    try:
+        from voice.analysis.vocal_analyzer import aggregate_speaker_features
+        from voice.analysis.baseline_tracker import update_baseline, compare_to_baseline
+
+        # Group segments by speaker
+        speaker_segments = {}
+        for seg in aligned.segments:
+            if seg.speaker not in speaker_segments:
+                speaker_segments[seg.speaker] = []
+            speaker_segments[seg.speaker].append({"start": seg.start, "end": seg.end})
+
+        for speaker_label, segs in speaker_segments.items():
+            features = aggregate_speaker_features(audio_path, segs, VOCAL_MIN_SEGMENT_SECONDS)
+            if not features:
+                continue
+
+            _store_vocal_features(conn, conversation_id, speaker_label, features)
+
+            suggestion = suggestions.get(speaker_label)
+            deviations = {}
+            if suggestion and suggestion.get("method") == "auto":
+                person_id = suggestion["tracker_person_id"]
+                update_baseline(conn, person_id, features)
+                deviations = compare_to_baseline(conn, person_id, features)
+
+            vocal_results[speaker_label] = {
+                "features": features,
+                "deviations": deviations,
+            }
+
+        logger.info(f"[{conversation_id[:8]}] Vocal analysis complete: {len(vocal_results)} speakers")
+    except Exception as e:
+        logger.warning(f"[{conversation_id[:8]}] Vocal analysis failed (non-fatal): {e}")
+
+    return vocal_results
+
+
+def _all_speakers_resolved(conn, conversation_id: str) -> bool:
+    """Check if all speakers are auto-resolved at >=0.85."""
+    from config import VOICEPRINT_AUTO_THRESHOLD
+
+    speaker_rows = conn.execute(
+        "SELECT DISTINCT speaker_label FROM transcripts WHERE conversation_id = ?",
+        (conversation_id,),
+    ).fetchall()
+    speaker_labels = {r["speaker_label"] for r in speaker_rows}
+
+    if not speaker_labels:
+        return False
+
+    for label in speaker_labels:
+        mapping = conn.execute(
+            """SELECT confidence, method FROM speaker_mappings
+               WHERE conversation_id = ? AND speaker_label = ? AND confirmed = 1
+               ORDER BY confidence DESC LIMIT 1""",
+            (conversation_id, label),
+        ).fetchone()
+
+        if not mapping or mapping["confidence"] < VOICEPRINT_AUTO_THRESHOLD:
+            return False
+
+    return True
+
+
+def _log_auto_advance(conn, conversation_id: str):
+    """Log auto-advance decisions to audit table."""
+    try:
+        from .audit import log_auto_advance
+
+        mappings = conn.execute(
+            """SELECT speaker_label, tracker_person_id, confidence, method
+               FROM speaker_mappings
+               WHERE conversation_id = ? AND confirmed = 1""",
+            (conversation_id,),
+        ).fetchall()
+
+        decisions = [
+            {
+                "speaker_label": m["speaker_label"],
+                "tracker_person_id": m["tracker_person_id"],
+                "confidence": m["confidence"],
+                "method": m["method"],
+            }
+            for m in mappings
+        ]
+        log_auto_advance(conn, conversation_id, decisions)
+    except Exception as e:
+        logger.warning(f"[{conversation_id[:8]}] Audit log failed (non-fatal): {e}")
+
+
 def _update_status(conn, conversation_id: str, status: str):
     """Update conversation processing status."""
     now = datetime.now(timezone.utc).isoformat()
@@ -173,6 +298,31 @@ def _store_voice_samples(conn, conversation_id: str, diarization):
                VALUES (?, ?, ?, ?)""",
             (str(uuid.uuid4()), conversation_id, speaker_label, embedding.tobytes()),
         )
+
+
+def _store_vocal_features(conn, conversation_id: str, speaker_label: str, features: dict):
+    """Store aggregated vocal features for a speaker."""
+    conn.execute(
+        """INSERT INTO vocal_features (
+            id, conversation_id, speaker_label,
+            pitch_mean, pitch_std, pitch_min, pitch_max,
+            jitter, shimmer, hnr, intensity_mean,
+            f1_mean, f2_mean, f3_mean,
+            mfcc_means, rms_mean, spectral_centroid, zcr_mean, spectral_rolloff,
+            speaking_rate_wpm
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            str(uuid.uuid4()), conversation_id, speaker_label,
+            features.get("pitch_mean"), features.get("pitch_std"),
+            features.get("pitch_min"), features.get("pitch_max"),
+            features.get("jitter"), features.get("shimmer"),
+            features.get("hnr"), features.get("intensity_mean"),
+            features.get("f1_mean"), features.get("f2_mean"), features.get("f3_mean"),
+            features.get("mfcc_means"), features.get("rms_mean"),
+            features.get("spectral_centroid"), features.get("zcr_mean"),
+            features.get("spectral_rolloff"), features.get("speaking_rate_wpm"),
+        ),
+    )
 
 
 def _single_speaker_fallback(duration: float) -> DiarizationResult:
