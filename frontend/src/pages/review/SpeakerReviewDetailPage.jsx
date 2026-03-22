@@ -96,6 +96,31 @@ function VoiceQualityBadge({ quality }) {
           {quality.issues.join(" • ")}
         </div>
       )}
+      {quality.embedding_filtered != null && (
+        <div style={{
+          marginTop: 6, paddingTop: 6,
+          borderTop: "1px solid rgba(255,255,255,0.06)",
+          fontSize: 10, color: theme.text.faint,
+          display: "flex", gap: 12,
+        }}>
+          <span>
+            Voiceprint: {quality.embedding_filtered
+              ? <b style={{ color: "#4ade80" }}>Filtered</b>
+              : <b style={{ color: "#f87171" }}>Unfiltered (raw)</b>}
+          </span>
+          {quality.clean_duration != null && (
+            <span>Clean audio: <b style={{ color: theme.text.muted }}>{quality.clean_duration}s</b></span>
+          )}
+          {quality.segments_used != null && (
+            <span>Segments: <b style={{ color: theme.text.muted }}>{quality.segments_used}</b></span>
+          )}
+          {quality.embedding_quality_score != null && (
+            <span>Score: <b style={{ color: quality.embedding_quality_score >= 0.7 ? "#4ade80" : quality.embedding_quality_score >= 0.4 ? "#fbbf24" : "#f87171" }}>
+              {Math.round(quality.embedding_quality_score * 100)}%
+            </b></span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

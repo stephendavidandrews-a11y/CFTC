@@ -577,6 +577,15 @@ def _run_migrations(cursor):
             if col_name not in vs_cols:
                 cursor.execute(f"ALTER TABLE voice_samples ADD COLUMN {col}")
         logger.info("Migration: added vocal quality columns to voice_samples")
+    if "embedding_filtered" not in vs_cols:
+        for col in ["embedding_filtered INTEGER DEFAULT 0",
+                     "embedding_quality_score REAL",
+                     "embedding_clean_duration REAL",
+                     "embedding_segments_used INTEGER"]:
+            col_name = col.split()[0]
+            if col_name not in vs_cols:
+                cursor.execute(f"ALTER TABLE voice_samples ADD COLUMN {col}")
+        logger.info("Migration: added embedding quality columns to voice_samples")
 
     # Add overlap_regions_json to communications
     comm_cols = {row[1] for row in cursor.execute("PRAGMA table_info(communications)")}

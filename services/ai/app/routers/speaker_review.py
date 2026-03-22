@@ -240,6 +240,13 @@ async def get_speaker_review_detail(communication_id: str, db=Depends(get_db)):
             else:
                 verdict = "poor"
 
+            # Get embedding quality info
+            eq_row = db.execute(
+                "SELECT embedding_filtered, embedding_quality_score, embedding_clean_duration, embedding_segments_used "
+                "FROM voice_samples WHERE communication_id = ? AND speaker_label = ? LIMIT 1",
+                (communication_id, label),
+            ).fetchone()
+
             vocal_quality = {
                 "hnr_db": hnr,
                 "jitter": jitter_val,
@@ -250,6 +257,10 @@ async def get_speaker_review_detail(communication_id: str, db=Depends(get_db)):
                 "f0_stddev_ratio": vq.get("f0_stddev_ratio"),
                 "verdict": verdict,
                 "issues": issues,
+                "embedding_filtered": bool(eq_row["embedding_filtered"]) if eq_row and eq_row["embedding_filtered"] is not None else None,
+                "embedding_quality_score": eq_row["embedding_quality_score"] if eq_row else None,
+                "clean_duration": eq_row["embedding_clean_duration"] if eq_row else None,
+                "segments_used": eq_row["embedding_segments_used"] if eq_row else None,
             }
 
         speakers.append(SpeakerInfo(
