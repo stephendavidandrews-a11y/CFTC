@@ -226,14 +226,12 @@ async def transcribe_audio(
                     response["timing"]["total_seconds"] + filter_time, 2
                 )
 
-                logger.info(
-                    "[%s] Embedding filter: %s",
-                    correlation,
-                    ", ".join(
-                        f"{l}: {info[clean_duration]:.0f}s clean/{info[total_duration]:.0f}s total"
-                        for l, info in filtered.items()
-                    ),
-                )
+                parts = []
+                for l, info in filtered.items():
+                    cd = info.get('clean_duration', 0)
+                    td = info.get('total_duration', 0)
+                    parts.append(f"{l}: {cd:.0f}s clean/{td:.0f}s total")
+                logger.info("[%s] Embedding filter: %s", correlation, ", ".join(parts))
             except Exception as e:
                 logger.warning("[%s] Embedding filter failed (non-fatal): %s", correlation, e)
 
