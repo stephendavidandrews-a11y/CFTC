@@ -1,4 +1,4 @@
-"""Pipeline orchestrator — stages 0-6.
+"""Pipeline orchestrator -- stages 0-7.
 
 Stage 0: Audio prep (ffmpeg -> 16kHz mono WAV)
 Stage 1: Transcription (faster-whisper + Silero VAD)
@@ -6,7 +6,8 @@ Stage 2: Diarization (pyannote 3.1 on MPS)
 Stage 3: Forced alignment + speaker assignment (wav2vec2 via whisperx)
 Stage 4: Store transcript + voice samples
 Stage 5: Vocal analysis (Parselmouth + librosa, optional)
-Stage 6: Auto-advance check (confidence-gated, optional)
+Stage 6: Voiceprint quality gate (validates before commitment)
+Stage 7: Auto-advance check (confidence-gated, optional)
 
 Sets status to awaiting_speaker_review (or speakers_confirmed if auto-advance).
 """
@@ -98,7 +99,7 @@ def process_conversation(conversation_id: str) -> bool:
         _store_transcript(conn, conversation_id, aligned)
         _store_voice_samples(conn, conversation_id, diarization)
 
-        # Run auto-suggest from voiceprints
+        # Run auto-suggest from voiceprints (existing profiles only)
         suggestions = {}
         try:
             from voice.speakers.resolver import auto_suggest_speakers
@@ -107,14 +108,20 @@ def process_conversation(conversation_id: str) -> bool:
             logger.warning(f"[{conversation_id[:8]}] Auto-suggest failed (non-fatal): {e}")
 
         # Stage 5: Vocal analysis (optional)
-        vocal_features = {}
+        vocal_data = {}  # speaker_label -> {features, segments_with_features}
         from config import ENABLE_VOCAL_ANALYSIS
         if ENABLE_VOCAL_ANALYSIS:
-            vocal_features = _run_vocal_analysis(
+            vocal_data = _run_vocal_analysis(
                 conn, conversation_id, aligned, diarization, prepared_path, suggestions
             )
 
-        # Stage 6: Auto-advance check (optional)
+        # Stage 6: Voiceprint quality gate
+        # For speakers WITHOUT an existing voiceprint profile, run quality gate
+        _run_voiceprint_quality_gate(
+            conn, conversation_id, aligned, diarization, vocal_data, prepared_path, suggestions
+        )
+
+        # Stage 7: Auto-advance check (optional)
         from config import ENABLE_AUTO_ADVANCE
         if ENABLE_AUTO_ADVANCE and _all_speakers_resolved(conn, conversation_id):
             _update_status(conn, conversation_id, "speakers_confirmed")
@@ -170,14 +177,17 @@ def process_pending():
 
 
 def _run_vocal_analysis(conn, conversation_id, aligned, diarization, audio_path, suggestions):
-    """Stage 5: Extract vocal features for each speaker."""
+    """Stage 5: Extract vocal features for each speaker.
+
+    Returns dict of speaker_label -> {features: dict, segments: list[dict with features]}
+    """
     from config import VOCAL_MIN_SEGMENT_SECONDS
 
     logger.info(f"[{conversation_id[:8]}] Stage 5: Vocal analysis...")
-    vocal_results = {}
+    vocal_data = {}
 
     try:
-        from voice.analysis.vocal_analyzer import aggregate_speaker_features
+        from voice.analysis.vocal_analyzer import extract_vocal_features, aggregate_speaker_features
         from voice.analysis.baseline_tracker import update_baseline, compare_to_baseline
 
         # Group segments by speaker
@@ -188,29 +198,82 @@ def _run_vocal_analysis(conn, conversation_id, aligned, diarization, audio_path,
             speaker_segments[seg.speaker].append({"start": seg.start, "end": seg.end})
 
         for speaker_label, segs in speaker_segments.items():
-            features = aggregate_speaker_features(audio_path, segs, VOCAL_MIN_SEGMENT_SECONDS)
-            if not features:
-                continue
+            # Extract per-segment features (needed for quality gate)
+            segments_with_features = []
+            for seg in segs:
+                features = extract_vocal_features(audio_path, seg["start"], seg["end"])
+                segments_with_features.append({
+                    "start": seg["start"],
+                    "end": seg["end"],
+                    "features": features,
+                })
 
-            _store_vocal_features(conn, conversation_id, speaker_label, features)
+            # Aggregate for storage
+            agg_features = aggregate_speaker_features(audio_path, segs, VOCAL_MIN_SEGMENT_SECONDS)
+            if agg_features:
+                _store_vocal_features(conn, conversation_id, speaker_label, agg_features)
 
-            suggestion = suggestions.get(speaker_label)
-            deviations = {}
-            if suggestion and suggestion.get("method") == "auto":
-                person_id = suggestion["tracker_person_id"]
-                update_baseline(conn, person_id, features)
-                deviations = compare_to_baseline(conn, person_id, features)
+                # Baseline update for resolved speakers
+                suggestion = suggestions.get(speaker_label)
+                deviations = {}
+                if suggestion and suggestion.get("method") == "auto":
+                    person_id = suggestion["tracker_person_id"]
+                    update_baseline(conn, person_id, agg_features)
+                    deviations = compare_to_baseline(conn, person_id, agg_features)
 
-            vocal_results[speaker_label] = {
-                "features": features,
-                "deviations": deviations,
+            vocal_data[speaker_label] = {
+                "features": agg_features or {},
+                "segments": segments_with_features,
+                "deviations": {},
             }
 
-        logger.info(f"[{conversation_id[:8]}] Vocal analysis complete: {len(vocal_results)} speakers")
+        logger.info(f"[{conversation_id[:8]}] Vocal analysis complete: {len(vocal_data)} speakers")
     except Exception as e:
         logger.warning(f"[{conversation_id[:8]}] Vocal analysis failed (non-fatal): {e}")
 
-    return vocal_results
+    return vocal_data
+
+
+def _run_voiceprint_quality_gate(
+    conn, conversation_id, aligned, diarization, vocal_data, audio_path, suggestions
+):
+    """Stage 6: Run voiceprint quality gate for speakers without existing profiles."""
+    logger.info(f"[{conversation_id[:8]}] Stage 6: Voiceprint quality gate...")
+
+    try:
+        from voice.speakers.quality_gate import run_quality_gate
+
+        for speaker_label in aligned.speakers:
+            # Skip speakers that already have a voiceprint profile
+            suggestion = suggestions.get(speaker_label)
+            if suggestion and suggestion.get("method") == "auto":
+                continue  # Already has a profile, matched at >=0.85
+
+            # Get segments with vocal features for this speaker
+            speaker_vocal = vocal_data.get(speaker_label, {})
+            segments = speaker_vocal.get("segments", [])
+
+            if not segments:
+                # Fallback: build segment list from aligned transcript
+                segments = [
+                    {"start": seg.start, "end": seg.end, "features": {}}
+                    for seg in aligned.segments
+                    if seg.speaker == speaker_label
+                ]
+
+            result = run_quality_gate(
+                conn, conversation_id, speaker_label,
+                segments, audio_path, diarization.embeddings,
+            )
+
+            logger.info(
+                f"[{conversation_id[:8]}] Quality gate for {speaker_label}: "
+                f"status={result.status}, {result.total_clean_duration:.1f}s clean, "
+                f"{result.segments_passed}/{result.total_candidate_segments} segments"
+            )
+
+    except Exception as e:
+        logger.warning(f"[{conversation_id[:8]}] Voiceprint quality gate failed (non-fatal): {e}")
 
 
 def _all_speakers_resolved(conn, conversation_id: str) -> bool:
