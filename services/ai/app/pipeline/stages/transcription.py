@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 # Native worker endpoint — the intake service on the Mac Mini host
 # In Docker: host-services:8005; locally: localhost:8005
-NATIVE_WORKER_BASE = "http://host-services:8005"
+NATIVE_WORKER_BASE = "http://localhost:8005"
 NATIVE_WORKER_TIMEOUT = 4800  # 80 minutes max for long audio
 
 # Fallback for local dev (not in Docker)
@@ -80,6 +80,8 @@ class TranscriptionResult:
     language: str = "en"
     num_speakers: int = 0
     embeddings: dict[str, bytes] = field(default_factory=dict)
+    vocal_features: dict[str, dict] = field(default_factory=dict)
+    overlap_regions: list[dict] = field(default_factory=list)
 
 
 class TranscriptionError(Exception):
@@ -219,6 +221,10 @@ def _parse_worker_response(data: dict, communication_id: str) -> TranscriptionRe
         communication_id[:8], len(segments), len(speakers), duration,
     )
 
+    # Parse vocal features and overlap regions from intake service
+    vocal_features = data.get("vocal_features", {})
+    overlap_regions = data.get("overlap_regions", [])
+
     return TranscriptionResult(
         segments=segments,
         speakers=speakers,
@@ -226,6 +232,8 @@ def _parse_worker_response(data: dict, communication_id: str) -> TranscriptionRe
         language=data.get("language", "en"),
         num_speakers=len(speakers),
         embeddings=embeddings,
+        vocal_features=vocal_features,
+        overlap_regions=overlap_regions,
     )
 
 
@@ -278,13 +286,38 @@ def store_transcript(db, communication_id: str, result: TranscriptionResult):
             VALUES (?, ?, ?, ?)
         """, (str(uuid.uuid4()), communication_id, label, emb_bytes))
 
+    # Store vocal quality metrics on voice_samples
+    for label, features in result.vocal_features.items():
+        db.execute("""
+            UPDATE voice_samples
+            SET vocal_quality_json = ?,
+                hnr_db = ?, jitter = ?, shimmer = ?,
+                pitch_mean = ?, pitch_std = ?,
+                speaking_rate_wpm = ?
+            WHERE communication_id = ? AND speaker_label = ?
+        """, (
+            json.dumps(features),
+            features.get("hnr"), features.get("jitter"), features.get("shimmer"),
+            features.get("pitch_mean"), features.get("pitch_std"),
+            features.get("speaking_rate_wpm"),
+            communication_id, label,
+        ))
+
+    # Store overlap regions on communication
+    if result.overlap_regions:
+        db.execute(
+            "UPDATE communications SET overlap_regions_json = ? WHERE id = ?",
+            (json.dumps(result.overlap_regions), communication_id),
+        )
+
     db.commit()
     logger.info(
-        "[%s] Stored: %d transcript segments, %d participants, %d voice samples",
+        "[%s] Stored: %d transcript segments, %d participants, %d voice samples, %d vocal profiles",
         communication_id[:8],
         len(result.segments),
         len(result.speakers),
         len(result.embeddings),
+        len(result.vocal_features),
     )
 
 

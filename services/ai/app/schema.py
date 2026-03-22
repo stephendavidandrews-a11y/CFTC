@@ -565,6 +565,26 @@ def _run_migrations(cursor):
             "ALTER TABLE voice_samples ADD COLUMN speech_duration_seconds REAL"
         )
         logger.info("Migration: added voice_samples.speech_duration_seconds column")
+    if "vocal_quality_json" not in vs_cols:
+        cursor.execute(
+            "ALTER TABLE voice_samples ADD COLUMN vocal_quality_json TEXT"
+        )
+        logger.info("Migration: added voice_samples.vocal_quality_json column")
+    if "hnr_db" not in vs_cols:
+        for col in ["hnr_db REAL", "jitter REAL", "shimmer REAL",
+                     "pitch_mean REAL", "pitch_std REAL", "speaking_rate_wpm REAL"]:
+            col_name = col.split()[0]
+            if col_name not in vs_cols:
+                cursor.execute(f"ALTER TABLE voice_samples ADD COLUMN {col}")
+        logger.info("Migration: added vocal quality columns to voice_samples")
+
+    # Add overlap_regions_json to communications
+    comm_cols = {row[1] for row in cursor.execute("PRAGMA table_info(communications)")}
+    if "overlap_regions_json" not in comm_cols:
+        cursor.execute(
+            "ALTER TABLE communications ADD COLUMN overlap_regions_json TEXT"
+        )
+        logger.info("Migration: added communications.overlap_regions_json column")
 
     # Archive support: add archived_at to communications (2026-03-19)
     comm_cols = {row[1] for row in cursor.execute("PRAGMA table_info(communications)")}

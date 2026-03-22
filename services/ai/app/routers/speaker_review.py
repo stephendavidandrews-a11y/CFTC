@@ -89,6 +89,7 @@ class SpeakerInfo(BaseModel):
     speech_seconds: Optional[float] = None
     sample_utterances: Optional[list[str]] = None
     voiceprint_candidates: Optional[list[dict]] = None
+    vocal_quality: Optional[dict] = None  # SNR, HNR, jitter, shimmer, pitch, quality verdict
 
 
 class SpeakerReviewDetail(BaseModel):
@@ -203,6 +204,54 @@ async def get_speaker_review_detail(communication_id: str, db=Depends(get_db)):
         if candidates:
             matched_count += 1
 
+        # Load vocal quality metrics from voice_samples
+        vq_row = db.execute(
+            "SELECT vocal_quality_json, hnr_db, jitter, shimmer, pitch_mean, pitch_std, speaking_rate_wpm "
+            "FROM voice_samples WHERE communication_id = ? AND speaker_label = ? AND vocal_quality_json IS NOT NULL LIMIT 1",
+            (communication_id, label),
+        ).fetchone()
+        vocal_quality = None
+        if vq_row and vq_row["vocal_quality_json"]:
+            import json as _json
+            vq = _json.loads(vq_row["vocal_quality_json"])
+            # Compute quality verdict
+            issues = []
+            hnr = vq.get("hnr")
+            if hnr is not None and hnr < 10:
+                issues.append(f"Low HNR ({hnr:.1f}dB)")
+            jitter_val = vq.get("jitter")
+            if jitter_val is not None and jitter_val > 0.02:
+                issues.append(f"High jitter ({jitter_val:.3f})")
+            shimmer_val = vq.get("shimmer")
+            if shimmer_val is not None and shimmer_val > 0.05:
+                issues.append(f"High shimmer ({shimmer_val:.3f})")
+            pitch_std_val = vq.get("pitch_std")
+            pitch_mean_val = vq.get("pitch_mean")
+            if pitch_std_val and pitch_mean_val and pitch_mean_val > 0:
+                f0_ratio = pitch_std_val / pitch_mean_val
+                if f0_ratio > 0.40:
+                    issues.append(f"F0 variance high ({f0_ratio:.0%})")
+                vq["f0_stddev_ratio"] = round(f0_ratio, 3)
+
+            if not issues:
+                verdict = "good"
+            elif len(issues) <= 1:
+                verdict = "fair"
+            else:
+                verdict = "poor"
+
+            vocal_quality = {
+                "hnr_db": hnr,
+                "jitter": jitter_val,
+                "shimmer": shimmer_val,
+                "pitch_mean": pitch_mean_val,
+                "pitch_std": pitch_std_val,
+                "speaking_rate_wpm": vq.get("speaking_rate_wpm"),
+                "f0_stddev_ratio": vq.get("f0_stddev_ratio"),
+                "verdict": verdict,
+                "issues": issues,
+            }
+
         speakers.append(SpeakerInfo(
             id=p["id"],
             speaker_label=label,
@@ -218,6 +267,7 @@ async def get_speaker_review_detail(communication_id: str, db=Depends(get_db)):
             speech_seconds=speech_secs,
             sample_utterances=utterances,
             voiceprint_candidates=candidates if candidates else None,
+            vocal_quality=vocal_quality,
         ))
 
     vp_summary = {
