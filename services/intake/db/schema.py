@@ -1,4 +1,4 @@
-"""CFTC Intake Service — database schema.
+"""CFTC Intake Service -- database schema.
 
 Speaker identity is owned by the Tracker service (people table).
 This service only stores audio-domain data (voiceprints, mappings)
@@ -87,6 +87,62 @@ CREATE TABLE IF NOT EXISTS speaker_mappings (
     updated_at DATETIME DEFAULT (datetime('now'))
 );
 
+-- Vocal analysis tables
+
+CREATE TABLE IF NOT EXISTS vocal_features (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT REFERENCES conversations(id),
+    speaker_label TEXT,
+    pitch_mean REAL,
+    pitch_std REAL,
+    pitch_min REAL,
+    pitch_max REAL,
+    jitter REAL,
+    shimmer REAL,
+    hnr REAL,
+    intensity_mean REAL,
+    f1_mean REAL,
+    f2_mean REAL,
+    f3_mean REAL,
+    mfcc_means TEXT,
+    rms_mean REAL,
+    spectral_centroid REAL,
+    zcr_mean REAL,
+    spectral_rolloff REAL,
+    speaking_rate_wpm REAL,
+    created_at DATETIME DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS vocal_baselines (
+    id TEXT PRIMARY KEY,
+    tracker_person_id TEXT NOT NULL UNIQUE,
+    pitch_mean REAL,
+    pitch_std REAL,
+    jitter REAL,
+    shimmer REAL,
+    hnr REAL,
+    speaking_rate_wpm REAL,
+    spectral_centroid REAL,
+    rms_mean REAL,
+    f1_mean REAL,
+    f2_mean REAL,
+    f3_mean REAL,
+    sample_count INTEGER DEFAULT 0,
+    last_updated DATETIME DEFAULT (datetime('now'))
+);
+
+-- Auto-advance audit
+
+CREATE TABLE IF NOT EXISTS auto_advance_log (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT REFERENCES conversations(id),
+    speaker_label TEXT,
+    tracker_person_id TEXT,
+    confidence REAL,
+    method TEXT,
+    created_at DATETIME DEFAULT (datetime('now'))
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_transcripts_conversation ON transcripts(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_transcripts_speaker ON transcripts(conversation_id, speaker_label);
@@ -94,6 +150,9 @@ CREATE INDEX IF NOT EXISTS idx_audio_conversation ON audio_files(conversation_id
 CREATE INDEX IF NOT EXISTS idx_voice_samples_conversation ON voice_samples(source_conversation_id);
 CREATE INDEX IF NOT EXISTS idx_speaker_profiles_person ON speaker_voice_profiles(tracker_person_id);
 CREATE INDEX IF NOT EXISTS idx_speaker_mappings_conversation ON speaker_mappings(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_vocal_features_conversation ON vocal_features(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_vocal_baselines_person ON vocal_baselines(tracker_person_id);
+CREATE INDEX IF NOT EXISTS idx_auto_advance_conversation ON auto_advance_log(conversation_id);
 """
 
 

@@ -1,6 +1,7 @@
-"""Whisper transcription module.
+"""Transcription module — faster-whisper with int8 quantization + Silero VAD.
 
-Uses whisper medium.en with word-level timestamps for alignment with diarization.
+Uses faster-whisper (CTranslate2 backend) on CPU with int8 for ~2-4x speedup
+over openai-whisper. Silero VAD pre-segments audio to reduce hallucination.
 """
 
 import logging
@@ -12,31 +13,30 @@ logger = logging.getLogger(__name__)
 _whisper_model = None
 
 
-def _get_device():
-    """Select best available device for Whisper.
-
-    Note: MPS (Apple Silicon) is NOT supported by OpenAI Whisper due to
-    float64 operations. Use CPU instead. The diarizer uses MPS separately.
-    For GPU-accelerated transcription on Mac, consider mlx-whisper.
-    """
-    import torch
-    if torch.cuda.is_available():
-        return "cuda"
-    # MPS intentionally excluded -- Whisper uses float64 which MPS does not support
-    return "cpu"
-
-
 def _get_model():
     global _whisper_model
     if _whisper_model is None:
-        import whisper
-        from config import WHISPER_MODEL, MODELS_DIR
-        download_root = MODELS_DIR / "whisper"
+        from faster_whisper import WhisperModel
+        from config import (
+            WHISPER_MODEL, WHISPER_DEVICE, WHISPER_COMPUTE_TYPE,
+            WHISPER_CPU_THREADS, MODELS_DIR,
+        )
+
+        download_root = MODELS_DIR / "faster-whisper"
         download_root.mkdir(parents=True, exist_ok=True)
-        device = _get_device()
-        logger.info(f"Loading Whisper model: {WHISPER_MODEL} on {device} (cache: {download_root})")
-        _whisper_model = whisper.load_model(WHISPER_MODEL, device=device, download_root=str(download_root))
-        logger.info(f"Whisper model loaded on {device}")
+
+        logger.info(
+            f"Loading faster-whisper: {WHISPER_MODEL} on {WHISPER_DEVICE} "
+            f"(compute_type={WHISPER_COMPUTE_TYPE}, threads={WHISPER_CPU_THREADS})"
+        )
+        _whisper_model = WhisperModel(
+            WHISPER_MODEL,
+            device=WHISPER_DEVICE,
+            compute_type=WHISPER_COMPUTE_TYPE,
+            cpu_threads=WHISPER_CPU_THREADS,
+            download_root=str(download_root),
+        )
+        logger.info("faster-whisper model loaded")
     return _whisper_model
 
 
@@ -64,32 +64,42 @@ class TranscriptionResult:
 
 
 def transcribe(audio_path: Path) -> TranscriptionResult:
-    """Transcribe audio file using Whisper."""
+    """Transcribe audio file using faster-whisper with Silero VAD."""
+    from config import WHISPER_BEAM_SIZE, VAD_THRESHOLD, VAD_MIN_SPEECH_MS, VAD_MIN_SILENCE_MS
+
     model = _get_model()
 
     logger.info(f"Transcribing: {audio_path.name}")
-    result = model.transcribe(
+    segments_gen, info = model.transcribe(
         str(audio_path),
         language="en",
+        beam_size=WHISPER_BEAM_SIZE,
         word_timestamps=True,
-        condition_on_previous_text=True,
-        verbose=False,
+        condition_on_previous_text=False,  # reduces hallucination
+        vad_filter=True,
+        vad_parameters={
+            "threshold": VAD_THRESHOLD,
+            "min_speech_duration_ms": VAD_MIN_SPEECH_MS,
+            "min_silence_duration_ms": VAD_MIN_SILENCE_MS,
+        },
     )
 
+    # faster-whisper returns a generator — consume into list
     segments = []
-    for seg in result["segments"]:
+    for seg in segments_gen:
         words = []
-        for w in seg.get("words", []):
-            words.append(WordTimestamp(
-                word=w["word"].strip(),
-                start=w["start"],
-                end=w["end"],
-                probability=w.get("probability", 0.0),
-            ))
+        if seg.words:
+            for w in seg.words:
+                words.append(WordTimestamp(
+                    word=w.word.strip(),
+                    start=w.start,
+                    end=w.end,
+                    probability=w.probability,
+                ))
         segments.append(TranscriptSegment(
-            start=seg["start"],
-            end=seg["end"],
-            text=seg["text"].strip(),
+            start=seg.start,
+            end=seg.end,
+            text=seg.text.strip(),
             words=words,
         ))
 
@@ -98,6 +108,6 @@ def transcribe(audio_path: Path) -> TranscriptionResult:
     logger.info(f"Transcription complete: {len(segments)} segments, {duration:.1f}s")
     return TranscriptionResult(
         segments=segments,
-        language=result.get("language", "en"),
+        language=info.language,
         duration=duration,
     )

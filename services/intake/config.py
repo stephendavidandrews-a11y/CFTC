@@ -18,28 +18,28 @@ SERVICE_PORT = 8005
 # ── Audio Formats ──
 SUPPORTED_FORMATS = {".wav", ".flac", ".mp3", ".m4a", ".ogg", ".opus"}
 
-# ── Whisper ──
+# ── ASR Engine ──
+# faster-whisper with int8 quantization (replaces openai-whisper)
 WHISPER_MODEL = "medium.en"
+WHISPER_DEVICE = "cpu"
+WHISPER_COMPUTE_TYPE = "int8"
+WHISPER_CPU_THREADS = 8
+WHISPER_BEAM_SIZE = 5
+
+# ── VAD (Silero, built into faster-whisper) ──
+VAD_THRESHOLD = 0.5
+VAD_MIN_SPEECH_MS = 250
+VAD_MIN_SILENCE_MS = 2000
+
+# ── Forced Alignment (wav2vec2 via whisperx) ──
+ALIGNMENT_DEVICE = "cpu"
 
 # ── pyannote ──
 PYANNOTE_PIPELINE = "pyannote/speaker-diarization-3.1"
 
 # ── Diarization Tuning ──
-# min_speakers: Default minimum expected speakers. Set to 2 because
-# single-person recordings are rare (most are meetings/conversations).
-# Can be overridden per-call via diarize(min_speakers=N).
 DIARIZATION_MIN_SPEAKERS = 2
-
-# max_speakers: Default maximum expected speakers. None = auto-detect.
-# Set a cap if you know the typical meeting size (e.g., 6 for small meetings).
 DIARIZATION_MAX_SPEAKERS = None
-
-# clustering_threshold: Controls how aggressively pyannote merges speaker
-# clusters. pyannote default is ~0.7 (aggressive merging → fewer speakers).
-# Lower values = less merging = more speakers detected.
-# 0.55 is a good balance for close-proximity multi-person conversations
-# (e.g., Plaud Note Pro recordings at meetings/networking events).
-# Range: 0.0 (never merge) to 1.0 (merge everything into one speaker).
 DIARIZATION_CLUSTERING_THRESHOLD = 0.55
 
 # ── Conversation Boundaries ──
@@ -47,5 +47,15 @@ SILENCE_BOUNDARY_SECONDS = 30
 MAX_RECORDING_SECONDS = 14400  # 4 hours
 
 # ── Voiceprint Matching ──
-VOICEPRINT_AUTO_THRESHOLD = 0.85   # auto-assign above this
-VOICEPRINT_SUGGEST_THRESHOLD = 0.65  # suggest above this
+VOICEPRINT_AUTO_THRESHOLD = 0.85
+VOICEPRINT_SUGGEST_THRESHOLD = 0.65
+
+# ── Vocal Analysis ──
+ENABLE_VOCAL_ANALYSIS = True
+VOCAL_MIN_SEGMENT_SECONDS = 5.0
+BASELINE_EMA_ALPHA = 0.1
+BASELINE_WARN_THRESHOLD = 0.20
+BASELINE_ALERT_THRESHOLD = 0.50
+
+# ── Auto-Advance ──
+ENABLE_AUTO_ADVANCE = False
