@@ -143,6 +143,24 @@ CREATE TABLE IF NOT EXISTS auto_advance_log (
     created_at DATETIME DEFAULT (datetime('now'))
 );
 
+-- Voiceprint quality gate candidates
+
+CREATE TABLE IF NOT EXISTS voiceprint_candidates (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT REFERENCES conversations(id),
+    speaker_label TEXT NOT NULL,
+    embedding BLOB,
+    quality_score REAL DEFAULT 0.0,
+    total_duration REAL,
+    segment_count INTEGER,
+    segment_ranges TEXT,
+    metrics_summary TEXT,
+    status TEXT DEFAULT 'pending',
+    rejection_reason TEXT,
+    created_at DATETIME DEFAULT (datetime('now')),
+    reviewed_at DATETIME
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_transcripts_conversation ON transcripts(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_transcripts_speaker ON transcripts(conversation_id, speaker_label);
@@ -153,6 +171,8 @@ CREATE INDEX IF NOT EXISTS idx_speaker_mappings_conversation ON speaker_mappings
 CREATE INDEX IF NOT EXISTS idx_vocal_features_conversation ON vocal_features(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_vocal_baselines_person ON vocal_baselines(tracker_person_id);
 CREATE INDEX IF NOT EXISTS idx_auto_advance_conversation ON auto_advance_log(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_voiceprint_candidates_conversation ON voiceprint_candidates(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_voiceprint_candidates_status ON voiceprint_candidates(status);
 """
 
 
