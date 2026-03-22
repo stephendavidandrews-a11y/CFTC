@@ -168,6 +168,75 @@ async def transcribe_audio(
                 response["timing"]["vocal_seconds"] = round(vocal_time, 2)
                 response["timing"]["total_seconds"] = round(total_time + vocal_time, 2)
 
+        # Quality-filtered embeddings: replace raw pyannote embeddings with
+        # embeddings computed from only the highest-quality audio segments
+        from config import ENABLE_VOCAL_ANALYSIS
+        if ENABLE_VOCAL_ANALYSIS and vocal_data:
+            try:
+                t0 = time.time()
+                from voice.analysis.embedding_filter import compute_filtered_embeddings
+
+                # Build per-speaker segment lists
+                speaker_segments = {}
+                for seg in aligned.segments:
+                    if seg.speaker not in speaker_segments:
+                        speaker_segments[seg.speaker] = []
+                    speaker_segments[seg.speaker].append({"start": seg.start, "end": seg.end})
+
+                # Per-segment features from vocal analysis
+                speaker_features = {}
+                if vocal_data:
+                    speaker_features = vocal_data.get("per_segment", {})
+
+                # Raw pyannote embeddings (before filtering)
+                import numpy as np
+                raw_embs = {}
+                for label, emb_b64 in embeddings.items():
+                    raw_embs[label] = np.frombuffer(
+                        base64.b64decode(emb_b64) if isinstance(emb_b64, str) else emb_b64,
+                        dtype=np.float32,
+                    )
+
+                filtered = compute_filtered_embeddings(
+                    prepared_path, speaker_segments, speaker_features, raw_embs,
+                )
+
+                # Replace embeddings in response with filtered ones
+                for label, info in filtered.items():
+                    if info["filtered"] and info["embedding"] is not None:
+                        emb_bytes = info["embedding"].astype(np.float32).tobytes()
+                        response["embeddings"][label] = base64.b64encode(emb_bytes).decode("ascii")
+
+                # Add quality metadata to response
+                response["embedding_quality"] = {
+                    label: {
+                        "quality_score": info["quality_score"],
+                        "clean_duration": round(info["clean_duration"], 1),
+                        "total_duration": round(info["total_duration"], 1),
+                        "segments_used": info["segments_used"],
+                        "segments_total": info["segments_total"],
+                        "filtered": info["filtered"],
+                    }
+                    for label, info in filtered.items()
+                }
+
+                filter_time = time.time() - t0
+                response["timing"]["embedding_filter_seconds"] = round(filter_time, 2)
+                response["timing"]["total_seconds"] = round(
+                    response["timing"]["total_seconds"] + filter_time, 2
+                )
+
+                logger.info(
+                    "[%s] Embedding filter: %s",
+                    correlation,
+                    ", ".join(
+                        f"{l}: {info[clean_duration]:.0f}s clean/{info[total_duration]:.0f}s total"
+                        for l, info in filtered.items()
+                    ),
+                )
+            except Exception as e:
+                logger.warning("[%s] Embedding filter failed (non-fatal): %s", correlation, e)
+
         logger.info(
             "[%s] Transcription complete: %d segments, %d speakers, %.1fs duration "
             "(prep=%.1fs, transcribe=%.1fs, diarize=%.1fs, align=%.1fs, total=%.1fs)",
@@ -198,10 +267,14 @@ async def transcribe_audio(
 
 
 def _run_vocal_analysis(aligned, audio_path):
-    """Run vocal analysis for the stateless endpoint."""
+    """Run vocal analysis for the stateless endpoint.
+
+    Returns per-speaker aggregated features AND per-segment features
+    (the latter needed by the embedding quality filter).
+    """
     try:
         from config import VOCAL_MIN_SEGMENT_SECONDS
-        from voice.analysis.vocal_analyzer import aggregate_speaker_features
+        from voice.analysis.vocal_analyzer import extract_vocal_features, aggregate_speaker_features
 
         speaker_segments = {}
         for seg in aligned.segments:
@@ -211,16 +284,29 @@ def _run_vocal_analysis(aligned, audio_path):
 
         features = {}
         deviations = {}
-        for speaker_label, segs in speaker_segments.items():
-            feat = aggregate_speaker_features(audio_path, segs, VOCAL_MIN_SEGMENT_SECONDS)
-            if feat:
-                # Remove mfcc_means from response (large JSON blob)
-                feat_response = {k: v for k, v in feat.items() if k != "mfcc_means"}
-                features[speaker_label] = feat_response
-                deviations[speaker_label] = {}  # No baseline context in stateless mode
+        per_segment = {}  # {speaker_label: [{start, end, features}, ...]}
 
-        if features:
-            return {"features": features, "deviations": deviations}
+        for speaker_label, segs in speaker_segments.items():
+            # Per-segment features (for embedding filter)
+            seg_features = []
+            for seg in segs:
+                feat = extract_vocal_features(audio_path, seg["start"], seg["end"])
+                seg_features.append({
+                    "start": seg["start"],
+                    "end": seg["end"],
+                    "features": feat,
+                })
+            per_segment[speaker_label] = seg_features
+
+            # Aggregated features (for API response)
+            agg = aggregate_speaker_features(audio_path, segs, VOCAL_MIN_SEGMENT_SECONDS)
+            if agg:
+                feat_response = {k: v for k, v in agg.items() if k != "mfcc_means"}
+                features[speaker_label] = feat_response
+                deviations[speaker_label] = {}
+
+        if features or per_segment:
+            return {"features": features, "deviations": deviations, "per_segment": per_segment}
     except Exception as e:
         logger.warning("Vocal analysis failed in stateless endpoint (non-fatal): %s", e)
 

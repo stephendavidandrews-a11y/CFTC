@@ -82,6 +82,7 @@ class TranscriptionResult:
     embeddings: dict[str, bytes] = field(default_factory=dict)
     vocal_features: dict[str, dict] = field(default_factory=dict)
     overlap_regions: list[dict] = field(default_factory=list)
+    embedding_quality: dict[str, dict] = field(default_factory=dict)
 
 
 class TranscriptionError(Exception):
@@ -221,9 +222,10 @@ def _parse_worker_response(data: dict, communication_id: str) -> TranscriptionRe
         communication_id[:8], len(segments), len(speakers), duration,
     )
 
-    # Parse vocal features and overlap regions from intake service
+    # Parse vocal features, overlap regions, and embedding quality from intake service
     vocal_features = data.get("vocal_features", {})
     overlap_regions = data.get("overlap_regions", [])
+    embedding_quality = data.get("embedding_quality", {})
 
     return TranscriptionResult(
         segments=segments,
@@ -234,6 +236,7 @@ def _parse_worker_response(data: dict, communication_id: str) -> TranscriptionRe
         embeddings=embeddings,
         vocal_features=vocal_features,
         overlap_regions=overlap_regions,
+        embedding_quality=embedding_quality,
     )
 
 
@@ -285,6 +288,23 @@ def store_transcript(db, communication_id: str, result: TranscriptionResult):
             INSERT INTO voice_samples (id, communication_id, speaker_label, embedding)
             VALUES (?, ?, ?, ?)
         """, (str(uuid.uuid4()), communication_id, label, emb_bytes))
+
+    # Store embedding quality info on voice_samples
+    for label, eq in result.embedding_quality.items():
+        db.execute("""
+            UPDATE voice_samples
+            SET embedding_filtered = ?,
+                embedding_quality_score = ?,
+                embedding_clean_duration = ?,
+                embedding_segments_used = ?
+            WHERE communication_id = ? AND speaker_label = ?
+        """, (
+            1 if eq.get("filtered") else 0,
+            eq.get("quality_score", 0),
+            eq.get("clean_duration", 0),
+            eq.get("segments_used", 0),
+            communication_id, label,
+        ))
 
     # Store vocal quality metrics on voice_samples
     for label, features in result.vocal_features.items():
