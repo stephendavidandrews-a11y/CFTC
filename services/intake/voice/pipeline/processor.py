@@ -346,10 +346,10 @@ def _store_transcript(conn, conversation_id: str, aligned: AlignedTranscript):
             for w in seg.words
         ])
         conn.execute(
-            """INSERT INTO transcripts (id, conversation_id, speaker_label, start_time, end_time, text, word_timestamps)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO transcripts (id, conversation_id, speaker_label, start_time, end_time, text, word_timestamps, is_overlap)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
             (str(uuid.uuid4()), conversation_id, seg.speaker,
-             seg.start, seg.end, seg.text, word_timestamps),
+             seg.start, seg.end, seg.text, word_timestamps, seg.is_overlap),
         )
 
 

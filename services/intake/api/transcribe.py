@@ -122,6 +122,7 @@ async def transcribe_audio(
                 })
             segments.append({
                 "speaker": seg.speaker,
+                "is_overlap": seg.is_overlap,
                 "start": round(seg.start, 3),
                 "end": round(seg.end, 3),
                 "text": seg.text,
@@ -141,6 +142,10 @@ async def transcribe_audio(
             "duration": round(aligned.duration, 2),
             "language": transcription.language,
             "num_speakers": len(aligned.speakers),
+            "overlap_regions": [
+                {"start": round(o.start, 3), "end": round(o.end, 3), "speakers": o.speakers}
+                for o in getattr(aligned, 'overlap_regions', [])
+            ],
             "embeddings": embeddings,
             "timing": {
                 "prep_seconds": round(prep_time, 2),
