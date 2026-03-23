@@ -26,6 +26,7 @@ const TABS = [
 // ── Colors for services ──────────────────────────────────────────────
 const SVC = {
   tracker: { color: "#3b82f6", bg: "rgba(59,130,246,0.08)",  border: "rgba(59,130,246,0.25)", label: "Tracker" },
+  ai:      { color: "#a855f7", bg: "rgba(168,85,247,0.08)",  border: "rgba(168,85,247,0.25)", label: "AI" },
   intake:  { color: "#10b981", bg: "rgba(16,185,129,0.08)",  border: "rgba(16,185,129,0.25)", label: "Intake" },
 };
 
@@ -106,6 +107,82 @@ const API_ENDPOINTS = [
   { method: "POST",   path: "/intake/api/pipeline/process-pending",           desc: "Trigger processing of pending conversations" },
   { method: "POST",   path: "/intake/api/pipeline/process/:id",              desc: "Process a specific conversation" },
   { method: "GET",    path: "/intake/api/pipeline/status",                    desc: "Pipeline processing status" },
+  // ── AI: Communications ──
+  { method: "GET",    path: "/ai/api/communications",                        desc: "List communications (filters: status, source_type, search)" },
+  { method: "GET",    path: "/ai/api/communications/:id",                    desc: "Communication detail with transcript, participants, entities" },
+  { method: "GET",    path: "/ai/api/communications/:id/transcript",         desc: "Full transcript for communication" },
+  { method: "GET",    path: "/ai/api/communications/:id/audio",              desc: "Audio file(s) for communication" },
+  { method: "GET",    path: "/ai/api/communications/:id/messages",           desc: "Email messages for communication" },
+  { method: "GET",    path: "/ai/api/communications/:id/artifacts",          desc: "Attachments/artifacts for communication" },
+  { method: "POST",   path: "/ai/api/communications/audio-upload",           desc: "Ingest audio file for processing" },
+  { method: "POST",   path: "/ai/api/communications/email-upload",           desc: "Ingest email for processing" },
+  { method: "DELETE", path: "/ai/api/communications/:id",                    desc: "Delete communication and all related data" },
+  { method: "POST",   path: "/ai/api/communications/:id/archive",            desc: "Archive a completed communication" },
+  { method: "POST",   path: "/ai/api/communications/:id/unarchive",          desc: "Unarchive a communication" },
+  { method: "POST",   path: "/ai/api/communications/:id/complete",           desc: "Mark communication processing complete" },
+  { method: "POST",   path: "/ai/api/communications/:id/retry",              desc: "Retry failed processing" },
+  // ── AI: Bundle Review ──
+  { method: "POST",   path: "/ai/api/bundle-review/:id/create-bundle",       desc: "Create new review bundle for communication" },
+  { method: "POST",   path: "/ai/api/bundle-review/:id/edit-bundle",         desc: "Edit bundle routing (target matter, type)" },
+  { method: "POST",   path: "/ai/api/bundle-review/:id/merge-bundles",       desc: "Merge two bundles into one" },
+  { method: "POST",   path: "/ai/api/bundle-review/:id/accept-bundle",       desc: "Accept bundle for writeback" },
+  { method: "POST",   path: "/ai/api/bundle-review/:id/reject-bundle",       desc: "Reject bundle" },
+  { method: "POST",   path: "/ai/api/bundle-review/:id/accept-all",          desc: "Accept all proposed bundles" },
+  { method: "POST",   path: "/ai/api/bundle-review/:id/confirm-all",         desc: "Confirm all accepted bundles and commit" },
+  { method: "POST",   path: "/ai/api/bundle-review/:id/undo",                desc: "Undo committed writebacks" },
+  // ── AI: Item Review ──
+  { method: "POST",   path: "/ai/api/bundle-review/:id/add-item",            desc: "Add new item to a bundle" },
+  { method: "POST",   path: "/ai/api/bundle-review/:id/edit-item",           desc: "Edit item proposed data" },
+  { method: "POST",   path: "/ai/api/bundle-review/:id/move-item",           desc: "Move item between bundles" },
+  { method: "POST",   path: "/ai/api/bundle-review/:id/accept-item",         desc: "Accept individual item" },
+  { method: "POST",   path: "/ai/api/bundle-review/:id/reject-item",         desc: "Reject individual item" },
+  { method: "POST",   path: "/ai/api/bundle-review/:id/restore-item",        desc: "Restore rejected item to proposed" },
+  // ── AI: Entity Review ──
+  { method: "POST",   path: "/ai/api/entity-review/:id/confirm-entity",      desc: "Confirm person/org entity mention" },
+  { method: "POST",   path: "/ai/api/entity-review/:id/link-entity",         desc: "Link entity to tracker person/org" },
+  { method: "POST",   path: "/ai/api/entity-review/:id/edit-entity",         desc: "Edit entity proposed data" },
+  { method: "POST",   path: "/ai/api/entity-review/:id/merge-entities",      desc: "Merge duplicate entities" },
+  { method: "POST",   path: "/ai/api/entity-review/:id/reject-entity",       desc: "Reject entity mention" },
+  { method: "POST",   path: "/ai/api/entity-review/:id/new-person",          desc: "Create new tracker person from entity" },
+  // ── AI: Participant Review ──
+  { method: "POST",   path: "/ai/api/participant-review/:id/link-speaker",    desc: "Map speaker label to tracker person" },
+  { method: "POST",   path: "/ai/api/participant-review/:id/merge-speakers",  desc: "Merge two speaker labels" },
+  { method: "POST",   path: "/ai/api/participant-review/:id/unlink-speaker",  desc: "Unlink speaker from person" },
+  { method: "POST",   path: "/ai/api/participant-review/:id/skip-speaker",    desc: "Skip speaker mapping" },
+  { method: "POST",   path: "/ai/api/participant-review/:id/reject-match",    desc: "Reject voiceprint match suggestion" },
+  // ── AI: Speaker Review ──
+  { method: "GET",    path: "/ai/api/speaker-review/profiles/list",           desc: "List all voice profiles" },
+  { method: "GET",    path: "/ai/api/speaker-review/profiles/:person_id",     desc: "Voice profile for person" },
+  { method: "POST",   path: "/ai/api/speaker-review/profiles/:person_id/activate",   desc: "Activate voice profile" },
+  { method: "POST",   path: "/ai/api/speaker-review/profiles/:person_id/deactivate", desc: "Deactivate voice profile" },
+  // ── AI: Intelligence ──
+  { method: "POST",   path: "/ai/api/intelligence/generate",                 desc: "Generate intelligence brief (daily/weekly)" },
+  { method: "GET",    path: "/ai/api/intelligence/briefs",                    desc: "List intelligence briefs" },
+  { method: "GET",    path: "/ai/api/intelligence/briefs/:id",               desc: "Brief detail" },
+  { method: "GET",    path: "/ai/api/intelligence/briefs/by-date/:type/:date", desc: "Briefs by type and date" },
+  // ── AI: Meeting Intelligence ──
+  { method: "GET",    path: "/ai/api/meeting-intelligence/:meeting_id",       desc: "Meeting intelligence for a tracker meeting" },
+  { method: "POST",   path: "/ai/api/meeting-intelligence/generate",          desc: "Generate meeting intelligence from communication" },
+  // ── AI: Events, Config, Telemetry, Health ──
+  { method: "GET",    path: "/ai/api/events/stream",                          desc: "SSE stream for real-time pipeline events" },
+  { method: "PUT",    path: "/ai/api/config/:section",                        desc: "Update AI policy/config section" },
+  { method: "GET",    path: "/ai/api/telemetry/summary",                      desc: "LLM usage and cost summary" },
+  { method: "POST",   path: "/ai/api/telemetry/page-visit",                   desc: "Track page visit analytics" },
+  { method: "GET",    path: "/ai/api/health",                                 desc: "AI service health check" },
+  // ── Tracker: Context Notes (missing from original) ──
+  { method: "GET",    path: "/tracker/context-notes",                          desc: "List context notes (filters: entity, category, stale)" },
+  { method: "POST",   path: "/tracker/context-notes",                          desc: "Create context note" },
+  { method: "GET",    path: "/tracker/context-notes/:id",                      desc: "Context note detail with entity links" },
+  { method: "PUT",    path: "/tracker/context-notes/:id",                      desc: "Update context note" },
+  { method: "DELETE", path: "/tracker/context-notes/:id",                      desc: "Delete context note" },
+  { method: "POST",   path: "/tracker/context-notes/:id/links",               desc: "Add entity link to note" },
+  { method: "DELETE", path: "/tracker/context-notes/:id/links/:link_id",      desc: "Remove entity link from note" },
+  { method: "GET",    path: "/tracker/context-notes/by-entity/:type/:id",     desc: "Notes linked to a specific entity" },
+  // ── Tracker: Batch (missing from original) ──
+  { method: "POST",   path: "/tracker/batch",                                  desc: "Atomic batch write (insert/update/delete with idempotency)" },
+  // ── Tracker: Schema Version (missing from original) ──
+  { method: "GET",    path: "/tracker/schema-version/version",                 desc: "Current schema version" },
+  { method: "GET",    path: "/tracker/schema-version/tables/:name/columns",    desc: "Column metadata for a table (dynamic UI)" },
 ];
 
 
@@ -331,8 +408,8 @@ function SchemaTab() {
     const trackerCore = ["organizations", "people", "matters", "tasks", "meetings", "documents", "decisions"];
     const trackerJunction = ["matter_people", "matter_organizations", "meeting_participants", "meeting_matters", "matter_tags", "document_reviewers", "task_dependencies", "matter_dependencies"];
     const trackerRulemaking = ["rulemaking_publication_status", "rulemaking_comment_periods", "rulemaking_cba_tracking"];
-    const trackerSupport = ["matter_updates", "task_updates", "document_files", "tags"];
-    const trackerSystem = ["system_events", "sync_state"];
+    const trackerSupport = ["matter_updates", "task_updates", "document_files", "tags", "context_notes", "context_note_links", "person_profiles"];
+    const trackerSystem = ["system_events", "sync_state", "idempotency_keys"];
 
     const intakePipeline = ["conversations", "audio_files", "transcripts"];
     const intakeSpeakers = ["voice_samples", "speaker_voice_profiles", "speaker_mappings"];
@@ -349,6 +426,21 @@ function SchemaTab() {
       // Catch any tracker table not in the above
       const allTrackerKnown = new Set([...trackerCore, ...trackerJunction, ...trackerRulemaking, ...trackerSupport, ...trackerSystem]);
       addGroup("Tracker (Other)", filtered.filter(t => t.service === "tracker" && !allTrackerKnown.has(t.name)));
+    }
+    if (serviceFilter === "all" || serviceFilter === "ai") {
+      const aiPipeline = ["communications", "audio_files", "communication_participants", "transcripts", "communication_entities", "communication_messages", "communication_artifacts"];
+      const aiVoice = ["voice_samples", "speaker_voice_profiles", "voiceprint_match_log"];
+      const aiExtraction = ["ai_extractions", "review_bundles", "review_bundle_items", "tracker_writebacks"];
+      const aiIntelligence = ["digests", "intelligence_briefs", "meeting_intelligence"];
+      const aiSystem = ["config_audit_log", "alert_actions", "llm_usage", "commit_batches", "review_action_log"];
+
+      addGroup("AI — Pipeline & Comms", filtered.filter(t => t.service === "ai" && aiPipeline.includes(t.name)));
+      addGroup("AI — Voice Intelligence", filtered.filter(t => t.service === "ai" && aiVoice.includes(t.name)));
+      addGroup("AI — Extraction & Review", filtered.filter(t => t.service === "ai" && aiExtraction.includes(t.name)));
+      addGroup("AI — Intelligence & Reporting", filtered.filter(t => t.service === "ai" && aiIntelligence.includes(t.name)));
+      addGroup("AI — System & Audit", filtered.filter(t => t.service === "ai" && aiSystem.includes(t.name)));
+      const allAiKnown = new Set([...aiPipeline, ...aiVoice, ...aiExtraction, ...aiIntelligence, ...aiSystem]);
+      addGroup("AI (Other)", filtered.filter(t => t.service === "ai" && !allAiKnown.has(t.name)));
     }
     if (serviceFilter === "all" || serviceFilter === "intake") {
       addGroup("Intake — Pipeline & Transcripts", filtered.filter(t => t.service === "intake" && intakePipeline.includes(t.name)));
@@ -504,6 +596,7 @@ function ApiTab() {
     if (methodFilter !== "all" && e.method !== methodFilter) return false;
     if (serviceFilter !== "all") {
       if (serviceFilter === "tracker" && !e.path.startsWith("/tracker/")) return false;
+      if (serviceFilter === "ai" && !e.path.startsWith("/ai/")) return false;
       if (serviceFilter === "intake" && !e.path.startsWith("/intake/")) return false;
     }
     if (search) {
@@ -542,7 +635,7 @@ function ApiTab() {
       </div>
       <div style={{ background: theme.bg.card, border: `1px solid ${theme.border.default}`, borderRadius: 8, overflow: "hidden" }}>
         {filtered.map((e, i) => {
-          const svcKey = e.path.startsWith("/intake/") ? "intake" : "tracker";
+          const svcKey = e.path.startsWith("/ai/") ? "ai" : e.path.startsWith("/intake/") ? "intake" : "tracker";
           const svc = SVC[svcKey];
           return (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 16px", borderBottom: i < filtered.length - 1 ? `1px solid ${theme.border.subtle}` : "none" }}>
@@ -578,6 +671,7 @@ function ServicesTab() {
 \u2502  \u2502  nginx (port 80)  \u2014 SPA + reverse proxy                          \u2502  \u2502
 \u2502  \u2502                                                                   \u2502  \u2502
 \u2502  \u2502  /tracker/*     \u2192 Tracker API    :8004   (SQLite: tracker.db)    \u2502  \u2502
+\u2502  \u2502  /ai/*          \u2192 AI Layer       :8006   (SQLite: ai.db)         \u2502  \u2502
 \u2502  \u2502  /intake/api/*  \u2192 Intake API     :8005   (SQLite: intake.db)     \u2502  \u2502
 \u2502  \u2502  /*             \u2192 React SPA      (index.html fallback)           \u2502  \u2502
 \u2502  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518  \u2502
