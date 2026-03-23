@@ -259,10 +259,13 @@ def _detect_conflicts(
 # Undo must delete in reverse order to avoid FK constraint violations
 # e.g., delete meeting_participants before meetings, stakeholders before people
 UNDO_TABLE_ORDER = {
+    "context_note_links": 0,   # links before parent notes (FK dependency)
     "matter_updates": 0,
     "decisions": 0,
     "tasks": 0,
     "documents": 0,
+    "context_notes": 1,        # after links are deleted
+    "person_profiles": 1,      # standalone, safe at this tier
     "meeting_matters": 1,
     "meeting_participants": 1,
     "matter_people": 2,
@@ -487,11 +490,22 @@ async def undo_communication(
     failed_reversals = [r for r in result.reversals if not r.success and not r.skipped]
     result.success = len(failed_reversals) == 0
 
-    # ── Step 7: Update communication status ──
+    # ── Step 7: Clean up meeting intelligence (local ai.db data) ──
+    if result.success:
+        mi_deleted = db.execute(
+            "DELETE FROM meeting_intelligence WHERE communication_id = ?",
+            (communication_id,),
+        ).rowcount
+        if mi_deleted:
+            logger.info("[%s] Cleaned up %d meeting_intelligence record(s)",
+                        communication_id[:8], mi_deleted)
+        db.commit()
+
+    # ── Step 8: Update communication status ──
     if result.success:
         db.execute("""
             UPDATE communications
-            SET processing_status = 'reviewed',
+            SET processing_status = 'bundle_review_in_progress',
                 error_message = NULL,
                 error_stage = NULL,
                 updated_at = datetime('now')
@@ -507,7 +521,7 @@ async def undo_communication(
         db.commit()
 
         logger.info(
-            "[%s] Undo complete: %d reversed, %d skipped",
+            "[%s] Undo complete: %d reversed, %d skipped, status -> bundle_review_in_progress",
             communication_id[:8], result.reversed_count, result.skipped_count,
         )
     else:

@@ -266,14 +266,18 @@ function SpeakerCard({ speaker, color, communicationId, onUpdate, audioRef, segm
   const handleLinkPerson = async (person) => {
     setBusy(true);
     try {
-      // Warn on poor voice quality
+      // Handle poor voice quality -- offer link without voiceprint
+      let skipVoiceprint = false;
       if (speaker.vocal_quality?.verdict === "poor") {
-        const proceed = window.confirm(
-          "Warning: Voice quality for this speaker is POOR (" +
-          (speaker.vocal_quality.issues || []).join(", ") +
-          "). Creating a voiceprint from poor audio may cause misidentification. Proceed anyway?"
+        const choice = window.prompt(
+          "Voice quality is POOR. Choose an option:\n" +
+          "1 - Link person WITHOUT voiceprint (recommended)\n" +
+          "2 - Link person AND take voiceprint anyway\n" +
+          "Cancel - Do nothing",
+          "1"
         );
-        if (!proceed) { setBusy(false); return; }
+        if (!choice) { setBusy(false); return; }
+        if (choice.trim() === "1") skipVoiceprint = true;
       }
       await linkSpeaker(communicationId, {
         participant_id: speaker.id,
@@ -281,6 +285,7 @@ function SpeakerCard({ speaker, color, communicationId, onUpdate, audioRef, segm
         proposed_name: person.full_name,
         proposed_title: person.title,
         proposed_org: person.organization_name,
+        skip_voiceprint: skipVoiceprint,
       });
       toast.success(`Linked ${speaker.speaker_label} to ${person.full_name}`);
       onUpdate();
@@ -293,19 +298,24 @@ function SpeakerCard({ speaker, color, communicationId, onUpdate, audioRef, segm
   const handleConfirmVoiceprint = async (candidate, matchLogId) => {
     setBusy(true);
     try {
-      // Warn on poor voice quality
+      // Handle poor voice quality -- offer link without voiceprint
+      let skipVoiceprint = false;
       if (speaker.vocal_quality?.verdict === "poor") {
-        const proceed = window.confirm(
-          "Warning: Voice quality for this speaker is POOR (" +
-          (speaker.vocal_quality.issues || []).join(", ") +
-          "). Creating a voiceprint from poor audio may cause misidentification. Proceed anyway?"
+        const choice = window.prompt(
+          "Voice quality is POOR. Choose an option:\n" +
+          "1 - Link person WITHOUT voiceprint (recommended)\n" +
+          "2 - Link person AND take voiceprint anyway\n" +
+          "Cancel - Do nothing",
+          "1"
         );
-        if (!proceed) { setBusy(false); return; }
+        if (!choice) { setBusy(false); return; }
+        if (choice.trim() === "1") skipVoiceprint = true;
       }
       await linkSpeaker(communicationId, {
         participant_id: speaker.id,
         tracker_person_id: candidate.tracker_person_id,
         voiceprint_match_log_id: matchLogId,
+        skip_voiceprint: skipVoiceprint,
       });
       toast.success(`Confirmed voiceprint match for ${speaker.speaker_label}`);
       onUpdate();

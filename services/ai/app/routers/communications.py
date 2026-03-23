@@ -596,7 +596,7 @@ async def undo_communication_endpoint(
         "skipped_count": result.skipped_count,
         "total_writebacks": result.total_writebacks,
         "forced": result.forced,
-        "new_status": "reviewed",
+        "new_status": "bundle_review_in_progress",
     }
 
 

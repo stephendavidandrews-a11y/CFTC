@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
 import useApi from "../../hooks/useApi";
-import { getPerson, deletePerson } from "../../api/tracker";
+import { getPerson, deletePerson, getPersonProfile, getContextNotesByEntity } from "../../api/tracker";
 import Badge from "../../components/shared/Badge";
 import { useDrawer } from "../../contexts/DrawerContext";
 
@@ -148,6 +148,17 @@ export default function PersonDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const { data: person, loading, error, refetch } = useApi(() => getPerson(id), [id]);
+
+  const [profile, setProfile] = useState(null);
+  const [contextNotes, setContextNotes] = useState([]);
+
+  useEffect(() => {
+    if (!person?.id) return;
+    let cancelled = false;
+    getPersonProfile(person.id).then(d => { if (!cancelled) setProfile(d); }).catch(() => {});
+    getContextNotesByEntity("person", person.id).then(d => { if (!cancelled) setContextNotes(d?.items || []); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [person]);
 
   const handleDelete = async () => {
     setDeleting(true);
@@ -306,6 +317,36 @@ export default function PersonDetailPage() {
           )}
 
           {/* Interaction Timing cards */}
+          {/* Profile */}
+          {profile && (() => {
+            const pf = [
+              ["Birthday", profile.birthday],
+              ["Spouse", profile.spouse_name],
+              ["Children", profile.children_count != null ? String(profile.children_count) : null],
+              ["Children Names", (() => { try { const a = typeof profile.children_names === "string" ? JSON.parse(profile.children_names) : profile.children_names; return Array.isArray(a) && a.length ? a.join(", ") : null; } catch { return profile.children_names; } })()],
+              ["Hometown", profile.hometown],
+              ["Current City", profile.current_city],
+              ["Education", profile.education_summary],
+              ["Prior Roles", profile.prior_roles_summary],
+              ["Interests", (() => { try { const a = typeof profile.interests === "string" ? JSON.parse(profile.interests) : profile.interests; return Array.isArray(a) && a.length ? a.join(", ") : null; } catch { return profile.interests; } })()],
+              ["Scheduling", profile.scheduling_notes],
+              ["Relationship Prefs", profile.relationship_preferences],
+              ["Leadership", profile.leadership_notes],
+            ].filter(([, v]) => v != null && v !== "");
+            if (pf.length === 0) return null;
+            return (
+              <div style={sidebarCardStyle}>
+                <div style={sectionLabel}>Profile</div>
+                {pf.map(([label, val]) => (
+                  <div key={label} style={{ marginBottom: 6 }}>
+                    <div style={fieldLabel}>{label}</div>
+                    <div style={fieldValue}>{val}</div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div style={sidebarCardStyle}>
               <div style={{ fontSize: 10, fontWeight: 600, color: theme.text.faint, textTransform: "uppercase", letterSpacing: "0.05em" }}>
@@ -491,6 +532,57 @@ export default function PersonDetailPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+
+          {/* Context Notes */}
+          <div style={cardStyle}>
+            <div style={sectionLabel}>Context Notes ({contextNotes.length})</div>
+            {contextNotes.length === 0 ? (
+              <div style={{ fontSize: 13, color: theme.text.faint, padding: "12px 0" }}>
+                No context notes linked to this person.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {contextNotes.map((note) => {
+                  const CAT_C = { people_insight: { bg: "#312e81", text: "#c4b5fd" }, institutional_knowledge: { bg: "#1e3a5f", text: "#60a5fa" }, process_note: { bg: "#0c4a6e", text: "#67e8f9" }, policy_operating_rule: { bg: "#14532d", text: "#4ade80" }, strategic_context: { bg: "#422006", text: "#fbbf24" }, culture_climate: { bg: "#431407", text: "#fb923c" }, relationship_dynamic: { bg: "#1e1b4b", text: "#a78bfa" } };
+                  const POS_C = { factual: { bg: "#1e3a5f", text: "#60a5fa" }, attributed_view: { bg: "#78350f", text: "#fbbf24" }, tentative: { bg: "#1f2937", text: "#9ca3af" }, interpretive: { bg: "#1e1b4b", text: "#a78bfa" }, sensitive: { bg: "#7f1d1d", text: "#fca5a5" } };
+                  const cc = CAT_C[note.category] || { bg: "#1f2937", text: "#9ca3af" };
+                  const pc = POS_C[note.posture] || { bg: "#1f2937", text: "#9ca3af" };
+                  return (
+                    <div key={note.id} style={{ background: theme.bg.input, borderRadius: 8, border: `1px solid ${theme.border.subtle}`, padding: "12px 16px" }}>
+                      <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
+                        <span style={{ background: cc.bg, color: cc.text, fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 4, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                          {(note.category || "").replace(/_/g, " ")}
+                        </span>
+                        <span style={{ background: pc.bg, color: pc.text, fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 4, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                          {(note.posture || "").replace(/_/g, " ")}
+                        </span>
+                        <span style={{ flex: 1 }} />
+                        <span style={{ fontSize: 10, color: theme.text.faint }}>{note.created_at?.slice(0, 10)}</span>
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: theme.text.primary, marginBottom: 4 }}>{note.title}</div>
+                      <div style={{ fontSize: 12, color: theme.text.muted, lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                        {note.body}
+                      </div>
+                      {note.speaker_attribution && (
+                        <div style={{ fontSize: 11, color: theme.text.dim, marginTop: 6, fontStyle: "italic" }}>
+                          — {note.speaker_attribution}
+                        </div>
+                      )}
+                      {note.links && note.links.length > 0 && (
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
+                          {note.links.map((lnk, i) => (
+                            <span key={i} style={{ background: "rgba(59,130,246,0.1)", color: theme.accent.blueLight, fontSize: 10, padding: "2px 6px", borderRadius: 4, border: "1px solid rgba(59,130,246,0.2)" }}>
+                              {lnk.entity_name || lnk.entity_type} ({lnk.relationship_role})
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

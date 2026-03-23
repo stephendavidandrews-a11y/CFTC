@@ -84,7 +84,7 @@ ENUMS = {
         "Inspector General / auditor", "Other",
     ],
     "relationship_category": [
-        "Boss", "Leadership", "Direct report", "OGC peer", "Internal client",
+        "Boss", "Leadership", "Direct report", "Indirect report", "OGC peer", "Internal client",
         "Commissioner office", "Partner agency", "Hill", "Outside party",
     ],
     "relationship_lane": [

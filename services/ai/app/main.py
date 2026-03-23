@@ -16,6 +16,8 @@ from app.schema import init_schema
 
 from app.routers import events, config_api, health, communications, entity_review, bundle_review, participant_review, speaker_review
 from app.routers import meeting_intelligence as meeting_intelligence_api
+from app.routers import intelligence as intelligence_api
+from app.routers import telemetry as telemetry_api
 
 logging.basicConfig(
     level=logging.INFO,
@@ -66,12 +68,70 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Audio inbox watcher not started: %s", e)
 
+    # Start APScheduler for intelligence briefs
+    scheduler = None
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from apscheduler.triggers.cron import CronTrigger
+
+        def _run_daily_brief():
+            try:
+                from app.jobs.daily_brief import generate_daily_brief, store_brief
+                from app.jobs.html_renderer import render_daily_html
+                from app.jobs.docx_renderer import render_daily_docx
+                from app.jobs.email_sender import send_email
+                from app.db import get_connection
+                from datetime import date
+
+                db = get_connection()
+                try:
+                    llm_client = None
+                    try:
+                        from app.llm.client import get_llm_client
+                        llm_client = get_llm_client()
+                    except Exception:
+                        pass
+
+                    data = generate_daily_brief(db, llm_client=llm_client)
+                    today = date.today().isoformat()
+                    html = render_daily_html(data)
+                    docx_path = render_daily_docx(data)
+                    model = "haiku" if any(m.get("prep_narrative") for m in data.get("meetings", [])) else None
+                    store_brief(db, "daily", today, data, str(docx_path), model)
+                    send_email(
+                        subject="CFTC Daily Brief \u2014 " + data.get("date_display", today),
+                        html_body=html,
+                        docx_path=docx_path,
+                    )
+                    logger.info("Daily brief generated and sent for %s", today)
+                finally:
+                    db.close()
+            except Exception as e:
+                logger.error("Daily brief job failed: %s", e, exc_info=True)
+
+        scheduler = BackgroundScheduler(daemon=True)
+        scheduler.add_job(
+            _run_daily_brief,
+            CronTrigger(hour=5, minute=55),
+            id="daily_brief",
+            replace_existing=True,
+        )
+        scheduler.start()
+        logger.info("APScheduler started: daily_brief at 05:55")
+    except ImportError:
+        logger.warning("APScheduler not installed \u2014 intelligence briefs will not auto-generate")
+    except Exception as e:
+        logger.warning("Scheduler setup failed: %s", e)
+
     yield
 
     # Shutdown
     if watcher:
         watcher.stop()
         logger.info("Audio inbox watcher stopped.")
+    if scheduler:
+        scheduler.shutdown(wait=False)
+        logger.info("APScheduler stopped.")
     logger.info("Shutting down CFTC AI Layer.")
 
 
@@ -101,3 +161,5 @@ app.include_router(bundle_review.router, prefix=api_prefix)
 app.include_router(participant_review.router, prefix=api_prefix)
 app.include_router(speaker_review.router, prefix=api_prefix)
 app.include_router(meeting_intelligence_api.router, prefix=api_prefix)
+app.include_router(intelligence_api.router, prefix=api_prefix)
+app.include_router(telemetry_api.router, prefix=api_prefix)

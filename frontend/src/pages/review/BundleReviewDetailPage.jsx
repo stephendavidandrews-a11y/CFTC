@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
 import useApi from "../../hooks/useApi";
@@ -122,6 +122,7 @@ export default function BundleReviewDetailPage() {
   const [addModal, setAddModal] = useState(null);
   const [createBundleModal, setCreateBundleModal] = useState(false);
   const [mergeModal, setMergeModal] = useState(null);
+  const audioRef = useRef(null);
   const [suppressionOpen, setSuppressionOpen] = useState(false);
   const [metaOpen, setMetaOpen] = useState(false);
 
@@ -216,6 +217,7 @@ export default function BundleReviewDetailPage() {
 
   return (
     <div style={{ padding: "28px 32px", maxWidth: 1100 }}>
+      <audio ref={audioRef} src={`/ai/api/communications/${id}/audio`} preload="metadata" style={{ display: "none" }} />
       {/* ── Header ──────────────────────────────────────── */}
       <button
         onClick={() => navigate("/review/bundles")}
@@ -302,6 +304,7 @@ export default function BundleReviewDetailPage() {
           onMoveItem={handleMoveItem}
           onMerge={(sourceId) => setMergeModal({ sourceId })}
           nameLookup={nameLookup}
+          audioRef={audioRef}
         />
       ))}
 
@@ -503,10 +506,43 @@ export default function BundleReviewDetailPage() {
 
 // ── Bundle Card ─────────────────────────────────────────────────────────────
 
+
+function formatFieldValue(key, val) {
+  // Pretty-print linked_entities arrays
+  if (Array.isArray(val) && val.length > 0 && val[0]?.entity_type) {
+    return (
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 2 }}>
+        {val.map((ent, i) => {
+          const icon = ent.entity_type === "person" ? "\u{1F464}" : ent.entity_type === "organization" ? "\u{1F3E2}" : ent.entity_type === "matter" ? "\u{1F4C4}" : "\u{1F517}";
+          return (
+            <span key={i} style={{
+              display: "inline-flex", alignItems: "center", gap: 3,
+              padding: "2px 8px", borderRadius: 4, fontSize: 10,
+              background: "rgba(59,130,246,0.08)", color: "#93c5fd",
+              border: "1px solid rgba(59,130,246,0.15)",
+            }}>
+              <span>{icon}</span>
+              <span style={{ fontWeight: 500 }}>{ent.entity_name || ent.entity_id || "?"}</span>
+              {ent.relationship_role && ent.relationship_role !== "relevant_to" && (
+                <span style={{ color: "#6b7280", fontSize: 9 }}>({ent.relationship_role.replace(/_/g, " ")})</span>
+              )}
+            </span>
+          );
+        })}
+      </div>
+    );
+  }
+  // Pretty-print other arrays
+  if (Array.isArray(val)) {
+    return val.map((v, i) => typeof v === "object" ? JSON.stringify(v) : String(v)).join(", ");
+  }
+  return JSON.stringify(val);
+}
+
 function BundleCard({
   bundle, allBundles, commId, busy,
   onAcceptItem, onRejectItem, onRestoreItem, onEditItem, onAddItem,
-  onAcceptBundle, onRejectBundle, onMoveItem, onMerge, nameLookup = {},
+  onAcceptBundle, onRejectBundle, onMoveItem, onMerge, nameLookup = {}, audioRef,
 }) {
   const isTerminal = bundle.status === "accepted" || bundle.status === "rejected";
   const bType = BUNDLE_TYPE_COLORS[bundle.bundle_type] || BUNDLE_TYPE_COLORS.standalone;
@@ -594,24 +630,82 @@ function BundleCard({
         )}
       </div>
 
-      {/* Items */}
+      {/* Items — split into Actionable and Context sections */}
       <div style={{ padding: "0 20px" }}>
-        {(bundle.items || []).map((item) => (
-          <ItemCard
-            key={item.id}
-            item={item}
-            bundleId={bundle.id}
-            bundleStatus={bundle.status}
-            allBundles={allBundles}
-            busy={busy}
-            onAccept={() => onAcceptItem(bundle.id, item.id)}
-            onReject={() => onRejectItem(bundle.id, item.id)}
-            onRestore={() => onRestoreItem(bundle.id, item.id)}
-            onEdit={() => onEditItem(bundle.id, item)}
-            onMove={(toBundleId) => onMoveItem(item.id, bundle.id, toBundleId)}
-            nameLookup={nameLookup}
-          />
-        ))}
+        {(() => {
+          const CONTEXT_ITEM_TYPES = ["context_note", "person_detail_update"];
+          const allItems = bundle.items || [];
+          const actionableItems = allItems.filter(i => !CONTEXT_ITEM_TYPES.includes(i.item_type));
+          const contextItems = allItems.filter(i => CONTEXT_ITEM_TYPES.includes(i.item_type));
+          return (
+            <>
+              {/* Actionable section */}
+              {actionableItems.length > 0 && (
+                <div style={{ marginBottom: contextItems.length > 0 ? 16 : 0 }}>
+                  {contextItems.length > 0 && (
+                    <div style={{
+                      fontSize: 10, fontWeight: 700, color: theme.text.faint,
+                      textTransform: "uppercase", letterSpacing: "0.08em",
+                      padding: "8px 0 4px", marginBottom: 4,
+                      borderBottom: `1px solid ${theme.border.subtle}`,
+                    }}>
+                      Actionable ({actionableItems.length})
+                    </div>
+                  )}
+                  {actionableItems.map((item) => (
+                    <ItemCard
+                      key={item.id}
+                      item={item}
+                      bundleId={bundle.id}
+                      bundleStatus={bundle.status}
+                      allBundles={allBundles}
+                      busy={busy}
+                      onAccept={() => onAcceptItem(bundle.id, item.id)}
+                      onReject={() => onRejectItem(bundle.id, item.id)}
+                      onRestore={() => onRestoreItem(bundle.id, item.id)}
+                      onEdit={() => onEditItem(bundle.id, item)}
+                      onMove={(toBundleId) => onMoveItem(item.id, bundle.id, toBundleId)}
+                      nameLookup={nameLookup}
+              audioRef={audioRef}
+                    />
+                  ))}
+                </div>
+              )}
+              {/* Context section */}
+              {contextItems.length > 0 && (
+                <div>
+                  <div style={{
+                    fontSize: 10, fontWeight: 700, color: "#c4b5fd",
+                    textTransform: "uppercase", letterSpacing: "0.08em",
+                    padding: "8px 0 4px", marginBottom: 4,
+                    borderBottom: "1px solid rgba(196,181,253,0.15)",
+                    display: "flex", alignItems: "center", gap: 6,
+                  }}>
+                    <span style={{ fontSize: 12 }}>≡</span>
+                    Context ({contextItems.length})
+                  </div>
+                  {contextItems.map((item) => (
+                    <ItemCard
+                      key={item.id}
+                      item={item}
+                      bundleId={bundle.id}
+                      bundleStatus={bundle.status}
+                      allBundles={allBundles}
+                      busy={busy}
+                      onAccept={() => onAcceptItem(bundle.id, item.id)}
+                      onReject={() => onRejectItem(bundle.id, item.id)}
+                      onRestore={() => onRestoreItem(bundle.id, item.id)}
+                      onEdit={() => onEditItem(bundle.id, item)}
+                      onMove={(toBundleId) => onMoveItem(item.id, bundle.id, toBundleId)}
+                      nameLookup={nameLookup}
+                      audioRef={audioRef}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {/* Add item button */}
         {!isTerminal && (
@@ -668,7 +762,7 @@ function resolveDisplayValue(key, val, lookup) {
   return String(val ?? "");
 }
 
-function ItemCard({ item, bundleId, bundleStatus, allBundles, busy, onAccept, onReject, onRestore, onEdit, onMove, nameLookup = {} }) {
+function ItemCard({ item, bundleId, bundleStatus, allBundles, busy, onAccept, onReject, onRestore, onEdit, onMove, nameLookup = {}, audioRef }) {
   const [moveTarget, setMoveTarget] = useState("");
   const tColor = ITEM_TYPE_COLORS[item.item_type] || ITEM_TYPE_COLORS.task;
   const sColor = BUNDLE_STATUS[item.status] || BUNDLE_STATUS.proposed;
@@ -743,7 +837,7 @@ function ItemCard({ item, bundleId, bundleStatus, allBundles, busy, onAccept, on
                   color: changed ? theme.accent.red : theme.text.dim,
                   textDecoration: changed ? "line-through" : "none",
                 }}>
-                  {typeof val === "object" ? JSON.stringify(val) : String(val ?? "")}
+                  {typeof val === "object" ? formatFieldValue(key, val) : String(val ?? "")}
                 </span>
               </div>
             );
@@ -758,6 +852,7 @@ function ItemCard({ item, bundleId, bundleStatus, allBundles, busy, onAccept, on
           locator={item.source_locator_json}
           startTime={item.source_start_time}
           endTime={item.source_end_time}
+          audioRef={audioRef}
         />
       )}
 

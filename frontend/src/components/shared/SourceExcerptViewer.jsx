@@ -18,8 +18,14 @@ import theme from "../../styles/theme";
 export default function SourceExcerptViewer({ excerpt, locator, startTime, endTime, audioRef }) {
   const [expanded, setExpanded] = useState(false);
 
+  // Parse locator if it's a JSON string
+  let parsedLocator = locator;
+  if (typeof locator === "string") {
+    try { parsedLocator = JSON.parse(locator); } catch { parsedLocator = null; }
+  }
+
   // Build evidence list from new format or fall back to legacy
-  const evidenceList = buildEvidenceList(excerpt, locator, startTime, endTime);
+  const evidenceList = buildEvidenceList(excerpt, parsedLocator, startTime, endTime);
 
   if (!evidenceList.length) return null;
 
@@ -62,7 +68,7 @@ export default function SourceExcerptViewer({ excerpt, locator, startTime, endTi
               evidence={ev}
               index={idx}
               total={count}
-              locatorType={locator?.type}
+              locatorType={parsedLocator?.type}
               audioRef={audioRef}
             />
           ))}

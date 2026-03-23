@@ -1045,7 +1045,7 @@ def _build_source_locator(db, item, communication_id: str) -> dict:
             for t in td.get("topics", []):
                 t_start = t.get("start_time", 0)
                 t_end = t.get("end_time", 0)
-                if t_start < time_range.end and t_end > time_range.start:
+                if time_range and t_start < time_range.end and t_end > time_range.start:
                     enrichment_topic = t.get("topic")
                     break
         except (json.JSONDecodeError, TypeError):

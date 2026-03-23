@@ -15,8 +15,8 @@ services:
       TRACKER_USER: ${TRACKER_USER:?Set TRACKER_USER in .env}
       TRACKER_PASS: ${TRACKER_PASS:?Set TRACKER_PASS in .env}
     volumes:
-      - tracker_data:/app/data
-      - tracker_uploads:/app/uploads
+      - ./volumes/tracker/data:/app/data
+      - ./volumes/tracker/uploads:/app/uploads
     networks:
       - default
       - cftc-shared
@@ -40,9 +40,9 @@ services:
       TRACKER_USER: ${TRACKER_USER:?Set TRACKER_USER in .env}
       TRACKER_PASS: ${TRACKER_PASS:?Set TRACKER_PASS in .env}
     volumes:
-      - ai_data:/app/data
-      - ai_uploads:/app/uploads
-      - ai_audio_inbox:/app/audio-inbox
+      - ./volumes/ai/data:/app/data
+      - ./volumes/ai/uploads:/app/uploads
+      - ./volumes/ai/audio-inbox:/app/audio-inbox
     extra_hosts:
       - "host-services:host-gateway"
     depends_on:
@@ -84,11 +84,6 @@ services:
       - ../personal-site:/srv/personal-site:ro
 
 volumes:
-  tracker_data:
-  tracker_uploads:
-  ai_data:
-  ai_uploads:
-  ai_audio_inbox:
   caddy_data:
   caddy_config:
 
