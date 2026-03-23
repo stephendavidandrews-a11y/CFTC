@@ -11,3 +11,4 @@ python-dotenv
 python-multipart
 praat-parselmouth
 librosa
+structlog>=24.0

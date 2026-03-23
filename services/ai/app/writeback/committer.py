@@ -19,7 +19,6 @@ import logging
 import uuid as uuid_mod
 from dataclasses import dataclass, field
 
-from app.bundle_review.models import BUNDLE_TERMINAL, ITEM_TERMINAL
 from app.bundle_review.retrieval import _build_bundle_tree
 from app.bundle_review.audit import write_audit
 from app.writeback.ordering import order_items

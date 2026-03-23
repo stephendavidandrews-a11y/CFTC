@@ -15,10 +15,9 @@ summary, topic segmentation, and cross-reference detection.
 import json
 import logging
 import uuid
-from pathlib import Path
 
 from app.config import load_policy, PROMPT_BASE_DIR
-from app.llm.client import call_llm, BudgetExceededError, LLMError
+from app.llm.client import call_llm
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +128,8 @@ def _store_enrichment(db, communication_id: str, enrichment: dict, segments: lis
     - Entity mentions in communication_entities table
     - Enriched text annotation on transcript rows
     """
-    # 1. Store summary, topics, and quality on communication
+    # 1. Store summary, topics, quality, and title on communication
+    title = enrichment.get("title", "")
     summary = enrichment.get("summary", "")
     topics = enrichment.get("topics", [])
     quality = enrichment.get("quality_signals", {})
@@ -143,9 +143,13 @@ def _store_enrichment(db, communication_id: str, enrichment: dict, segments: lis
     db.execute("""
         UPDATE communications
         SET topic_segments_json = ?,
+            title = COALESCE(NULLIF(?, ''), title),
             updated_at = datetime('now')
         WHERE id = ?
-    """, (topic_data, communication_id))
+    """, (topic_data, title, communication_id))
+
+    if title:
+        logger.info("[%s] Title set: %s", communication_id[:8], title)
 
     # 2. Store sensitivity flags
     sensitivity = enrichment.get("sensitivity_flags", {})

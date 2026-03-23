@@ -5,7 +5,6 @@ import os
 import threading
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile, File, Form
 

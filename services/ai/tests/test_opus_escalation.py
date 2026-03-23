@@ -11,9 +11,8 @@ import json
 import sqlite3
 import sys
 import uuid
-from datetime import datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -21,7 +20,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from app.llm.client import BudgetExceededError, LLMError, LLMResponse, LLMUsage
+from app.llm.client import LLMResponse, LLMUsage
 from app.pipeline.stages.escalation import (
     EscalationTrigger,
     ExtractionAttemptResult,
@@ -932,7 +931,6 @@ class TestRegression:
     def test_extraction_models_unchanged(self):
         """ExtractionOutput model structure unchanged."""
         from app.pipeline.stages.extraction_models import (
-            ExtractionOutput, ExtractionBundle, ExtractionItem,
             VALID_BUNDLE_TYPES, VALID_ITEM_TYPES,
         )
         assert VALID_BUNDLE_TYPES == {"matter", "new_matter", "standalone"}
@@ -942,23 +940,21 @@ class TestRegression:
     def test_escalation_module_imports(self):
         """Escalation module imports cleanly."""
         from app.pipeline.stages.escalation import (
-            EscalationTrigger, ExtractionAttemptResult,
-            ExtractionFailureType, detect_triggers,
-            decide_escalation, build_opus_meta_instruction,
+            EscalationTrigger,
         )
         assert EscalationTrigger.LOW_CONFIDENCE.value == "low_confidence"
 
     def test_bundle_review_models_unchanged(self):
         """Bundle review models still work."""
         from app.bundle_review.models import (
-            BUNDLE_REVIEW_STATES, BUNDLE_TERMINAL, ITEM_TERMINAL,
+            BUNDLE_REVIEW_STATES, BUNDLE_TERMINAL,
         )
         assert "awaiting_bundle_review" in BUNDLE_REVIEW_STATES
         assert "accepted" in BUNDLE_TERMINAL
 
     def test_writeback_ordering_unchanged(self):
         """Writeback ordering unchanged."""
-        from app.writeback.ordering import ITEM_TYPE_ORDER, order_items
+        from app.writeback.ordering import ITEM_TYPE_ORDER
         assert ITEM_TYPE_ORDER["new_organization"] == 0
         assert ITEM_TYPE_ORDER["new_person"] == 1
 

@@ -1,9 +1,7 @@
 """HTTP client for POST /tracker/batch with retry, idempotency, and error handling."""
 
-import json
 import logging
 import asyncio
-from typing import Optional
 
 import httpx
 

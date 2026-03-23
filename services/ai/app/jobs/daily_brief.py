@@ -14,7 +14,6 @@ import logging
 import os
 import uuid
 from datetime import date, datetime, timedelta
-from pathlib import Path
 
 import httpx
 

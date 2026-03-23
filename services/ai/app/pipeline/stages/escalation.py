@@ -17,7 +17,6 @@ Conservative first implementation:
       transcript content (>= 60 seconds or >= 30 segments).
 """
 
-import json
 import logging
 from dataclasses import dataclass, field
 from enum import Enum

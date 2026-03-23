@@ -8,7 +8,7 @@ import logging
 
 from fastapi import HTTPException
 
-from app.bundle_review.models import BUNDLE_REVIEW_STATES, BUNDLE_TERMINAL, ITEM_TERMINAL
+from app.bundle_review.models import BUNDLE_REVIEW_STATES, BUNDLE_TERMINAL
 from app.bundle_review.audit import write_audit
 from app.pipeline.orchestrator import cas_transition
 

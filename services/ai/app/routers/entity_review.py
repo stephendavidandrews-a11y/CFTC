@@ -29,7 +29,7 @@ import logging
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 
 from app.db import get_db
@@ -103,6 +103,7 @@ class EntityInfo(BaseModel):
 class EntityReviewDetail(BaseModel):
     communication_id: str
     processing_status: str
+    title: Optional[str] = None
     original_filename: Optional[str] = None
     duration_seconds: Optional[float] = None
     summary: Optional[str] = None
@@ -117,7 +118,7 @@ class EntityReviewDetail(BaseModel):
 async def get_entity_review_queue(db=Depends(get_db)):
     """List all communications awaiting entity review."""
     rows = db.execute("""
-        SELECT c.id, c.original_filename, c.processing_status,
+        SELECT c.id, c.title, c.original_filename, c.processing_status,
                c.duration_seconds, c.created_at, c.updated_at,
                c.sensitivity_flags,
                (SELECT COUNT(*) FROM communication_entities ce
@@ -152,7 +153,7 @@ async def get_entity_review_queue(db=Depends(get_db)):
 async def get_entity_review_detail(communication_id: str, db=Depends(get_db)):
     """Get detailed entity information for review."""
     comm = db.execute(
-        """SELECT id, processing_status, original_filename, duration_seconds,
+        """SELECT id, processing_status, title, original_filename, duration_seconds,
                   topic_segments_json, sensitivity_flags
            FROM communications WHERE id = ?""",
         (communication_id,),
@@ -186,7 +187,15 @@ async def get_entity_review_detail(communication_id: str, db=Depends(get_db)):
                ce.context_snippet, ce.first_mention_transcript_id
         FROM communication_entities ce
         WHERE ce.communication_id = ?
-        ORDER BY ce.mention_count DESC, ce.mention_text
+        ORDER BY
+            CASE ce.entity_type
+                WHEN 'person' THEN 0
+                WHEN 'organization' THEN 1
+                ELSE 2
+            END,
+            ce.confirmed ASC,
+            ce.mention_count DESC,
+            ce.mention_text
     """, (communication_id,)).fetchall()
 
     entities = []
@@ -221,6 +230,7 @@ async def get_entity_review_detail(communication_id: str, db=Depends(get_db)):
     return EntityReviewDetail(
         communication_id=communication_id,
         processing_status=comm["processing_status"],
+        title=comm["title"],
         original_filename=comm["original_filename"],
         duration_seconds=comm["duration_seconds"],
         summary=summary,

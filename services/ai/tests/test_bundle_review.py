@@ -20,7 +20,6 @@ import uuid
 import sys
 import os
 from pathlib import Path
-from datetime import datetime
 
 # Ensure the service root is on sys.path
 SERVICE_ROOT = Path(__file__).parent.parent

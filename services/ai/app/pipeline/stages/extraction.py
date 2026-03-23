@@ -11,22 +11,17 @@ Design contract: Phase 4A.1 revision memo (sections A-H).
 
 import json
 import logging
-import time
 import uuid
-from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
 import httpx
 from pydantic import ValidationError
 
-from app.config import load_policy, TRACKER_BASE_URL, PROMPT_BASE_DIR
+from app.config import load_policy, TRACKER_BASE_URL, TRACKER_USER, TRACKER_PASS, PROMPT_BASE_DIR
 from app.llm.client import call_llm, BudgetExceededError, LLMError
 
 from app.pipeline.stages.extraction_models import (
     ExtractionOutput,
-    VALID_BUNDLE_TYPES,
-    VALID_ITEM_TYPES,
     POLICY_TOGGLE_MAP,
     TASK_UPDATE_ALLOWED_FIELDS,
     DECISION_UPDATE_ALLOWED_FIELDS,
@@ -67,8 +62,9 @@ async def _fetch_tracker_context() -> dict:
     """
     url = f"{TRACKER_BASE_URL}/ai-context"
     try:
+        auth = (TRACKER_USER, TRACKER_PASS) if TRACKER_USER else None
         async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.get(url)
+            resp = await client.get(url, auth=auth)
             resp.raise_for_status()
             return resp.json()
     except httpx.HTTPStatusError as e:
@@ -1641,7 +1637,6 @@ async def run_extraction_stage(db, communication_id: str) -> dict:
     Raises RuntimeError for unrecoverable failures.
     """
     from app.pipeline.stages.escalation import (
-        ExtractionFailureType,
         detect_triggers,
         decide_escalation,
     )

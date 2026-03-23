@@ -1,0 +1,11 @@
+[lint]
+ignore = [
+    "E402",   # module-level import not at top of file (common in FastAPI apps)
+    "E741",   # ambiguous variable name
+    "E712",   # comparison to True/False (common in test assertions)
+    "F821",   # undefined name (forward references in type hints)
+    "F841",   # local variable assigned but never used
+]
+
+[lint.per-file-ignores]
+"**/tests/**" = ["F811"]

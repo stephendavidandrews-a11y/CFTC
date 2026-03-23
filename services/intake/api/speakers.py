@@ -10,7 +10,6 @@ import uuid
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional
 
 from db.connection import get_connection
 from voice.speakers.resolver import promote_voice_sample, get_suggestions_for_conversation

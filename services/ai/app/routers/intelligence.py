@@ -4,7 +4,7 @@ Endpoints for listing, viewing, and manually generating daily/weekly briefs.
 """
 import json
 import logging
-from datetime import date, datetime
+from datetime import date
 
 from fastapi import APIRouter, Query
 

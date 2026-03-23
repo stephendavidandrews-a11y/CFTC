@@ -19,7 +19,6 @@ Pricing (as of 2026-03):
 
 import logging
 import time
-import uuid
 from dataclasses import dataclass
 from typing import Optional
 

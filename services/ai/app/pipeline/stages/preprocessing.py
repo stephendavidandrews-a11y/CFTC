@@ -12,7 +12,6 @@ import json
 import logging
 import shutil
 import subprocess
-import uuid
 from pathlib import Path
 
 from app.config import AI_UPLOAD_DIR

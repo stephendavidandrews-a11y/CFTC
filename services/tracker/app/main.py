@@ -4,13 +4,10 @@ CFTC Regulatory Ops Tracker — FastAPI Application
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Depends, HTTPException, status, Request
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from fastapi.staticfiles import StaticFiles
 import secrets
-from pathlib import Path
 
 from app.config import CORS_ORIGINS, AUTH_USER, AUTH_PASS, UPLOAD_DIR
 from app.db import get_connection

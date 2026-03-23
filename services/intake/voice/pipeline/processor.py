@@ -86,7 +86,7 @@ def process_conversation(conversation_id: str) -> bool:
         logger.info(f"[{conversation_id[:8]}] Stage 2: Diarizing (pyannote 3.1)...")
         try:
             diarization = diarize(prepared_path)
-        except Exception as e:
+        except Exception:
             logger.warning(f"[{conversation_id[:8]}] Diarization failed -- single-speaker fallback")
             diarization = _single_speaker_fallback(transcription.duration)
 

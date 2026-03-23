@@ -6,11 +6,9 @@ and page visit telemetry. Zero LLM cost — pure database queries.
 For months 1-2: verbose format with purpose + distribution + impact per field.
 After month 2: compact format (percentages and trends only).
 """
-import json
 import logging
 import os
-import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
 import httpx
 

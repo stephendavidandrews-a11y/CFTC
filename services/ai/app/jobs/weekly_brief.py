@@ -17,7 +17,7 @@ Cost: ~$0.15/week (one Sonnet call for executive summary).
 import json
 import logging
 import os
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
 import httpx
 

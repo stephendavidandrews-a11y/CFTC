@@ -12,12 +12,9 @@ import hashlib
 import json
 import logging
 import re
-import shutil
 import uuid
-from datetime import datetime
 from email.utils import parseaddr, parsedate_to_datetime, getaddresses
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 

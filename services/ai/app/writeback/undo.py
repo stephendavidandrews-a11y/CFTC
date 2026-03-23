@@ -27,11 +27,8 @@ Conflict detection:
 
 import json
 import logging
-import uuid as uuid_mod
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 import httpx
 

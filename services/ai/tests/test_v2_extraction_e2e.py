@@ -21,25 +21,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.pipeline.stages.extraction_models import (
     ExtractionOutput,
-    ExtractionItem,
-    ExtractionBundle,
-    SourceEvidence,
-    SourceTimeRange,
     VALID_ITEM_TYPES,
     POLICY_TOGGLE_MAP,
-    TASK_UPDATE_ALLOWED_FIELDS,
-    DECISION_UPDATE_ALLOWED_FIELDS,
 )
 from app.writeback.item_converters import (
     CONVERTERS,
     convert_item,
-    convert_task,
-    convert_task_update,
-    convert_decision,
-    convert_decision_update,
-    convert_context_note,
-    convert_person_detail_update,
-    convert_org_detail_update,
 )
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -517,7 +504,7 @@ def test_legacy_follow_up_conversion():
     print(f"  Conversion count:  {count}")
     assert item.item_type == "task", f"Expected task, got {item.item_type}"
     assert item.proposed_data.get("task_mode") == "follow_up", "Expected task_mode=follow_up"
-    print(f"  RESULT: PASS — follow_up -> task(task_mode=follow_up)")
+    print("  RESULT: PASS — follow_up -> task(task_mode=follow_up)")
 
 
 def test_name_resolution():
@@ -526,12 +513,12 @@ def test_name_resolution():
 
     output = ExtractionOutput(**SAMPLE_PAYLOAD)
 
-    from app.pipeline.stages.extraction import _resolve_entity_names, _fuzzy_title_match
+    from app.pipeline.stages.extraction import _resolve_entity_names
 
     # Before resolution
     name_bundle = output.bundles[2]  # The name-only bundle
     task_item = name_bundle.items[0]
-    print(f"  Before resolution:")
+    print("  Before resolution:")
     print(f"    bundle.target_matter_id: {name_bundle.target_matter_id}")
     print(f"    item.assigned_to_person_id: {task_item.proposed_data.get('assigned_to_person_id')}")
     print(f"    item.assigned_to_name (item-level): {task_item.assigned_to_name}")
@@ -545,7 +532,7 @@ def test_name_resolution():
 
     log = _resolve_entity_names(output, FULL_CONTEXT)
 
-    print(f"\n  After resolution:")
+    print("\n  After resolution:")
     print(f"    bundle.target_matter_id: {name_bundle.target_matter_id}")
     print(f"    item.assigned_to_person_id: {task_item.proposed_data.get('assigned_to_person_id')}")
 
@@ -564,7 +551,7 @@ def test_name_resolution():
     assert task_item.proposed_data["assigned_to_person_id"] == PERSON_PRIYA_ID, \
         f"Expected Priya's ID, got {task_item.proposed_data['assigned_to_person_id']}"
 
-    print(f"\n  RESULT: PASS — Names resolved to UUIDs")
+    print("\n  RESULT: PASS — Names resolved to UUIDs")
 
 
 def test_ref_validation():
@@ -588,7 +575,7 @@ def test_ref_validation():
     assert ref_after == "$ref:temp-tyler-sec-contacts", \
         f"Valid ref should be preserved, got {ref_after}"
     assert len(warnings) == 0, f"Expected no warnings, got {warnings}"
-    print(f"  RESULT: PASS — Valid $ref preserved, no warnings")
+    print("  RESULT: PASS — Valid $ref preserved, no warnings")
 
 
 def test_update_validation():
@@ -642,7 +629,7 @@ def test_update_validation():
         print(f"    - {w}")
     assert len(bad_warnings) >= 2, "Expected warnings for unknown task ID and disallowed field"
 
-    print(f"\n  RESULT: PASS — Valid updates clean, invalid updates warned")
+    print("\n  RESULT: PASS — Valid updates clean, invalid updates warned")
 
 
 def test_converters():
@@ -749,7 +736,7 @@ def test_converters():
     assert len(ctx_ops) == 1, f"Expected 1 context_notes INSERT, got {len(ctx_ops)}"
     assert len(follow_up_ops) >= 1, "Expected at least 1 task with tracks_task_id"
 
-    print(f"\n  RESULT: PASS — All converters produce correct op types")
+    print("\n  RESULT: PASS — All converters produce correct op types")
 
 
 def test_converter_coverage():
@@ -768,7 +755,7 @@ def test_converter_coverage():
     assert not missing, f"Missing converters: {missing}"
     assert "follow_up" not in converter_types, "follow_up should not be in CONVERTERS"
 
-    print(f"\n  RESULT: PASS — Full coverage, no follow_up")
+    print("\n  RESULT: PASS — Full coverage, no follow_up")
 
 
 def test_policy_toggle_map():
@@ -787,7 +774,7 @@ def test_policy_toggle_map():
         assert item_type in VALID_ITEM_TYPES, \
             f"Toggle target {item_type} not in VALID_ITEM_TYPES"
 
-    print(f"\n  RESULT: PASS — No follow_up toggle, all targets valid")
+    print("\n  RESULT: PASS — No follow_up toggle, all targets valid")
 
 
 def test_batch_op_format():
@@ -829,7 +816,7 @@ def test_batch_op_format():
             print(f"  {item.item_type}: {json.dumps(op, indent=4, default=str)[:500]}")
             print()
 
-    print(f"  RESULT: PASS — All ops have valid structure")
+    print("  RESULT: PASS — All ops have valid structure")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -870,8 +857,8 @@ if __name__ == "__main__":
     print(f"  Passed: {passed}/{len(tests)}")
     print(f"  Failed: {failed}/{len(tests)}")
     if errors:
-        print(f"\n  Failures:")
+        print("\n  Failures:")
         for name, err in errors:
             print(f"    {name}: {err}")
     else:
-        print(f"\n  ALL TESTS PASSED")
+        print("\n  ALL TESTS PASSED")
