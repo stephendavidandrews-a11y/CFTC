@@ -11,7 +11,7 @@ import threading
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import SERVICE_PORT
@@ -100,9 +100,95 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Request ID + metrics middleware
-from middleware import RequestIDMiddleware, metrics as request_metrics
-app.add_middleware(RequestIDMiddleware)
+# Request ID + metrics + rate limiting middleware
+from middleware import RequestIDMiddleware, RateLimiter, metrics as request_metrics
+_rate_limiter = RateLimiter(
+    max_requests=120,
+    window_seconds=60,
+    exclude_paths={"/health", "/metrics"},
+)
+app.add_middleware(RequestIDMiddleware, rate_limiter=_rate_limiter)
+
+
+# ── 8A: Standard error response format ──
+from fastapi.exceptions import RequestValidationError
+from starlette.responses import JSONResponse as _JSONResponse
+import logging as _logging
+_err_logger = _logging.getLogger("cftc-intake")
+
+
+@app.exception_handler(HTTPException)
+async def _http_exception_handler(request, exc):
+    """Map FastAPI HTTPException to standard error envelope.
+
+    If the endpoint already provides a structured ``detail`` dict,
+    it is preserved in ``details`` so existing consumers keep working.
+    """
+    code_map = {
+        400: "BAD_REQUEST",
+        401: "UNAUTHORIZED",
+        403: "FORBIDDEN",
+        404: "NOT_FOUND",
+        409: "CONFLICT",
+        422: "VALIDATION_ERROR",
+        429: "RATE_LIMITED",
+    }
+    # Preserve structured detail dicts (e.g. batch endpoint error_type payloads)
+    if isinstance(exc.detail, dict):
+        details = exc.detail
+        message = exc.detail.get("message", str(exc.detail))
+    else:
+        details = {}
+        message = str(exc.detail)
+
+    body: dict = {
+        "error": {
+            "code": code_map.get(exc.status_code, f"HTTP_{exc.status_code}"),
+            "message": message,
+            "details": details,
+        },
+    }
+    # Also include top-level "detail" key for backwards compatibility
+    # with clients that read resp.json()["detail"]
+    if isinstance(exc.detail, dict):
+        body["detail"] = exc.detail
+
+    return _JSONResponse(
+        status_code=exc.status_code,
+        content=body,
+        headers=getattr(exc, "headers", None) or {},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_exception_handler(request, exc):
+    """Map Pydantic / query-param validation errors to standard envelope."""
+    return _JSONResponse(
+        status_code=422,
+        content={
+            "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "Request validation failed",
+                "details": {"errors": exc.errors()},
+            }
+        },
+    )
+
+
+@app.exception_handler(Exception)
+async def _generic_exception_handler(request, exc):
+    """Catch-all for unhandled exceptions."""
+    _err_logger.error("unhandled_exception: %s", exc, exc_info=True)
+    return _JSONResponse(
+        status_code=500,
+        content={
+            "error": {
+                "code": "INTERNAL_ERROR",
+                "message": "An unexpected error occurred",
+                "details": {},
+            }
+        },
+    )
 
 # Register API routers
 from api.conversations import router as conversations_router
