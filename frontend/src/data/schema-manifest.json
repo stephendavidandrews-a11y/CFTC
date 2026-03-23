@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-22T20:30:29.168326+00:00",
+  "generated_at": "2026-03-23T14:31:38.549823+00:00",
   "services": {
     "tracker": {
       "tables": 28,
@@ -7,8 +7,14 @@
       "db": "tracker.db",
       "tech": "FastAPI + SQLite (WAL)"
     },
+    "ai": {
+      "tables": 22,
+      "port": 8006,
+      "db": "ai.db",
+      "tech": "FastAPI + SQLite (WAL)"
+    },
     "intake": {
-      "tables": 6,
+      "tables": 10,
       "port": 8005,
       "db": "intake.db",
       "tech": "FastAPI + SQLite (WAL) — native/GPU"
@@ -3358,8 +3364,2400 @@
         {
           "name": "config_json",
           "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "communications",
+      "service": "ai",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "source_type",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "source_path",
+          "type": "TEXT",
           "tags": [],
           "not_null": false
+        },
+        {
+          "name": "original_filename",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "processing_status",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 'pending'",
+          "default": "'pending'"
+        },
+        {
+          "name": "error_message",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "error_stage",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "duration_seconds",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "topic_segments_json",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "source_metadata",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "sensitivity_flags",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "processing_lock_token",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "locked_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "lock_expires_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "archived_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "overlap_regions_json",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "audio_files",
+      "service": "ai",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "communication_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES communications.id"
+        },
+        {
+          "name": "file_path",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "original_filename",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "format",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "duration_seconds",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "file_size_bytes",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "captured_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "communication_participants",
+      "service": "ai",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "communication_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES communications.id"
+        },
+        {
+          "name": "speaker_label",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "tracker_person_id",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "proposed_name",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "proposed_title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "proposed_org",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "proposed_org_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "participant_role",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "participant_email",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "header_role",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "match_source",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "confirmed",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "voiceprint_confidence",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "voiceprint_method",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "transcripts",
+      "service": "ai",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "communication_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES communications.id"
+        },
+        {
+          "name": "speaker_label",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "start_time",
+          "type": "REAL",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "end_time",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "raw_text",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "cleaned_text",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "enriched_text",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "word_timestamps",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "confidence",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "communication_entities",
+      "service": "ai",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "communication_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES communications.id"
+        },
+        {
+          "name": "mention_text",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "entity_type",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "tracker_person_id",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "tracker_org_id",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "proposed_name",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "proposed_title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "proposed_org",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "confidence",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "confirmed",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "mention_count",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 1",
+          "default": "1"
+        },
+        {
+          "name": "first_mention_transcript_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES transcripts.id"
+        },
+        {
+          "name": "context_snippet",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "communication_messages",
+      "service": "ai",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "communication_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES communications.id"
+        },
+        {
+          "name": "message_index",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "sender_email",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "sender_name",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "recipient_emails",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "cc_emails",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "timestamp",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "subject",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "body_text",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "enriched_text",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "message_hash",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "is_new",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 1",
+          "default": "1"
+        },
+        {
+          "name": "is_from_user",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "communication_artifacts",
+      "service": "ai",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "communication_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES communications.id"
+        },
+        {
+          "name": "message_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES communication_messages.id"
+        },
+        {
+          "name": "original_filename",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "mime_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "file_size_bytes",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "file_path",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "artifact_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 'attachment'",
+          "default": "'attachment'"
+        },
+        {
+          "name": "extracted_text",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "text_extraction_status",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 'pending'",
+          "default": "'pending'"
+        },
+        {
+          "name": "is_document_proposable",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "tracker_document_id",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "tracker_document_file_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "quarantine_reason",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "voice_samples",
+      "service": "ai",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "communication_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES communications.id"
+        },
+        {
+          "name": "speaker_label",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "embedding",
+          "type": "BLOB",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "promoted_to_profile",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "speech_duration_seconds",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "vocal_quality_json",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "speaker_voice_profiles",
+      "service": "ai",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "tracker_person_id",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "embedding",
+          "type": "BLOB",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "embedding_dimension",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 192",
+          "default": "192"
+        },
+        {
+          "name": "quality_score",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 0.0",
+          "default": "0.0"
+        },
+        {
+          "name": "sample_count",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 1",
+          "default": "1"
+        },
+        {
+          "name": "total_speech_seconds",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 0.0",
+          "default": "0.0"
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 'active'",
+          "default": "'active'"
+        },
+        {
+          "name": "source_communication_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES communications.id"
+        },
+        {
+          "name": "created_from",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 'manual'",
+          "default": "'manual'"
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "voiceprint_match_log",
+      "service": "ai",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "communication_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES communications.id"
+        },
+        {
+          "name": "speaker_label",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "sample_embedding_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES voice_samples.id"
+        },
+        {
+          "name": "profiles_compared",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "top_candidate_person_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "top_candidate_score",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "candidate_list",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "threshold_used",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "outcome",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "reviewer_action",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "confirmed_person_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "reviewed_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "ai_extractions",
+      "service": "ai",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "communication_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES communications.id"
+        },
+        {
+          "name": "attempt_number",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 1",
+          "default": "1"
+        },
+        {
+          "name": "model_used",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "prompt_version",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "system_prompt",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "user_prompt",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "raw_output",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "input_tokens",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "output_tokens",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "processing_seconds",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "tracker_context_snapshot",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "escalation_reason",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "success",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 1",
+          "default": "1"
+        },
+        {
+          "name": "extracted_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "review_bundles",
+      "service": "ai",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "communication_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES communications.id"
+        },
+        {
+          "name": "bundle_type",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "target_matter_id",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "target_matter_title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "proposed_matter_json",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 'proposed'",
+          "default": "'proposed'"
+        },
+        {
+          "name": "confidence",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "rationale",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "intelligence_notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "sort_order",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "reviewed_by",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "reviewed_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "review_bundle_items",
+      "service": "ai",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "bundle_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES review_bundles.id"
+        },
+        {
+          "name": "item_type",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 'proposed'",
+          "default": "'proposed'"
+        },
+        {
+          "name": "proposed_data",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "original_proposed_data",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "confidence",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "rationale",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "source_excerpt",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "source_transcript_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES transcripts.id"
+        },
+        {
+          "name": "source_start_time",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "source_end_time",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "source_locator_json",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "sort_order",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "moved_from_bundle_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES review_bundles.id"
+        },
+        {
+          "name": "reviewed_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "tracker_writebacks",
+      "service": "ai",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "communication_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES communications.id"
+        },
+        {
+          "name": "bundle_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES review_bundles.id"
+        },
+        {
+          "name": "bundle_item_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES review_bundle_items.id"
+        },
+        {
+          "name": "target_table",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "target_record_id",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "write_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "written_data",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "previous_data",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "auto_committed",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "reversed",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "reversed_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "written_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "config_audit_log",
+      "service": "ai",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "section",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "field",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "old_value",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "new_value",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "digests",
+      "service": "ai",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "digest_date",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "alert_data",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "narrative",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "communication_context",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "model_used",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "prompt_version",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "emailed",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "emailed_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "intelligence_briefs",
+      "service": "ai",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "brief_type",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "brief_date",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "content",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "input_context",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "model_used",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "prompt_version",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "is_auto_generated",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 1",
+          "default": "1"
+        },
+        {
+          "name": "docx_file_path",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "alert_actions",
+      "service": "ai",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "alert_fingerprint",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "action",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "snooze_until",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "llm_usage",
+      "service": "ai",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "communication_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES communications.id"
+        },
+        {
+          "name": "stage",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "model",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "input_tokens",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "output_tokens",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "cost_usd",
+          "type": "REAL",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "commit_batches",
+      "service": "ai",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "communication_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES communications.id"
+        },
+        {
+          "name": "idempotency_key",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "request_hash",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "response_hash",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 'pending'",
+          "default": "'pending'"
+        },
+        {
+          "name": "operation_count",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "started_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "completed_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "error_message",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "tracker_response",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "review_action_log",
+      "service": "ai",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "actor",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "communication_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES communications.id"
+        },
+        {
+          "name": "bundle_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES review_bundles.id"
+        },
+        {
+          "name": "item_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES review_bundle_items.id"
+        },
+        {
+          "name": "action_type",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "old_state",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "new_state",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "details",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "meeting_intelligence",
+      "service": "ai",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "meeting_id",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "communication_id",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 1",
+          "default": "1"
+        },
+        {
+          "name": "tier",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 'core'",
+          "default": "'core'"
+        },
+        {
+          "name": "executive_summary",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "decisions_made",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "non_decisions",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "action_items_summary",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "risks_surfaced",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "briefing_required",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "key_issues_discussed",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "participant_positions",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "dependencies_surfaced",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "what_changed_in_matter",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "commitments_made",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "recommended_next_move",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "purpose_and_context",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "materials_referenced",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "detailed_notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "tags",
+          "type": "TEXT",
+          "tags": [
+            "JSON"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "why_this_meeting_mattered",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "what_changed",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "what_i_need_to_do",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "what_boss_needs_to_know",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "what_can_wait",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "generated_by",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "prompt_version",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "input_tokens",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "output_tokens",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "cost_usd",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
         }
       ]
     },
@@ -3611,6 +6009,16 @@
           "not_null": false
         },
         {
+          "name": "is_overlap",
+          "type": "BOOLEAN",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
           "name": "created_at",
           "type": "DATETIME",
           "tags": [
@@ -3771,6 +6179,16 @@
           "not_null": false
         },
         {
+          "name": "is_overlap",
+          "type": "BOOLEAN",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
           "name": "method",
           "type": "TEXT",
           "tags": [],
@@ -3807,6 +6225,430 @@
           "not_null": false,
           "note": "DEFAULT datetime('now')",
           "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "vocal_features",
+      "service": "intake",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "conversation_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES conversations.id"
+        },
+        {
+          "name": "speaker_label",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "pitch_mean",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "pitch_std",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "pitch_min",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "pitch_max",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "jitter",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "shimmer",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "hnr",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "intensity_mean",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "f1_mean",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "f2_mean",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "f3_mean",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "mfcc_means",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "rms_mean",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "spectral_centroid",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "zcr_mean",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "spectral_rolloff",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "speaking_rate_wpm",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "vocal_baselines",
+      "service": "intake",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "tracker_person_id",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; UNIQUE"
+        },
+        {
+          "name": "pitch_mean",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "pitch_std",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "jitter",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "shimmer",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "hnr",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "speaking_rate_wpm",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "spectral_centroid",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "rms_mean",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "f1_mean",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "f2_mean",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "f3_mean",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "sample_count",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "last_updated",
+          "type": "DATETIME",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "auto_advance_log",
+      "service": "intake",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "conversation_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES conversations.id"
+        },
+        {
+          "name": "speaker_label",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "tracker_person_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "confidence",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "is_overlap",
+          "type": "BOOLEAN",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "method",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "voiceprint_candidates",
+      "service": "intake",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "conversation_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES conversations.id"
+        },
+        {
+          "name": "speaker_label",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "embedding",
+          "type": "BLOB",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "quality_score",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 0.0",
+          "default": "0.0"
+        },
+        {
+          "name": "total_duration",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "segment_count",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "segment_ranges",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "metrics_summary",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 'pending'",
+          "default": "'pending'"
+        },
+        {
+          "name": "rejection_reason",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "reviewed_at",
+          "type": "DATETIME",
+          "tags": [],
+          "not_null": false
         }
       ]
     }
@@ -4192,6 +7034,181 @@
     },
     {
       "from": "audio_files",
+      "fromField": "communication_id",
+      "to": "communications",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "communication_participants",
+      "fromField": "communication_id",
+      "to": "communications",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "transcripts",
+      "fromField": "communication_id",
+      "to": "communications",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "communication_entities",
+      "fromField": "communication_id",
+      "to": "communications",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "communication_entities",
+      "fromField": "first_mention_transcript_id",
+      "to": "transcripts",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "communication_messages",
+      "fromField": "communication_id",
+      "to": "communications",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "communication_artifacts",
+      "fromField": "communication_id",
+      "to": "communications",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "communication_artifacts",
+      "fromField": "message_id",
+      "to": "communication_messages",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "voice_samples",
+      "fromField": "communication_id",
+      "to": "communications",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "speaker_voice_profiles",
+      "fromField": "source_communication_id",
+      "to": "communications",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "voiceprint_match_log",
+      "fromField": "communication_id",
+      "to": "communications",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "voiceprint_match_log",
+      "fromField": "sample_embedding_id",
+      "to": "voice_samples",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "ai_extractions",
+      "fromField": "communication_id",
+      "to": "communications",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "review_bundles",
+      "fromField": "communication_id",
+      "to": "communications",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "review_bundle_items",
+      "fromField": "bundle_id",
+      "to": "review_bundles",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "review_bundle_items",
+      "fromField": "source_transcript_id",
+      "to": "transcripts",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "review_bundle_items",
+      "fromField": "moved_from_bundle_id",
+      "to": "review_bundles",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "tracker_writebacks",
+      "fromField": "communication_id",
+      "to": "communications",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "tracker_writebacks",
+      "fromField": "bundle_id",
+      "to": "review_bundles",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "tracker_writebacks",
+      "fromField": "bundle_item_id",
+      "to": "review_bundle_items",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "llm_usage",
+      "fromField": "communication_id",
+      "to": "communications",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "commit_batches",
+      "fromField": "communication_id",
+      "to": "communications",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "review_action_log",
+      "fromField": "communication_id",
+      "to": "communications",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "review_action_log",
+      "fromField": "bundle_id",
+      "to": "review_bundles",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "review_action_log",
+      "fromField": "item_id",
+      "to": "review_bundle_items",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "audio_files",
       "fromField": "conversation_id",
       "to": "conversations",
       "toField": "id",
@@ -4220,6 +7237,27 @@
     },
     {
       "from": "speaker_mappings",
+      "fromField": "conversation_id",
+      "to": "conversations",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "vocal_features",
+      "fromField": "conversation_id",
+      "to": "conversations",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "auto_advance_log",
+      "fromField": "conversation_id",
+      "to": "conversations",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "voiceprint_candidates",
       "fromField": "conversation_id",
       "to": "conversations",
       "toField": "id",
@@ -4316,11 +7354,10 @@
     ],
     "task_mode": [
       "action",
+      "delegated",
       "waiting",
-      "decision",
-      "follow-up",
-      "reading",
-      "delegated"
+      "monitoring",
+      "follow_up"
     ],
     "task_type": [
       "research issue",
@@ -4344,7 +7381,8 @@
     ],
     "deadline_type": [
       "hard",
-      "soft"
+      "soft",
+      "internal"
     ],
     "meeting_type": [
       "internal working meeting",

@@ -26,6 +26,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 SCHEMA_SOURCES = {
     "tracker": REPO_ROOT / "services" / "tracker" / "app" / "schema.py",
+    "ai": REPO_ROOT / "services" / "ai" / "app" / "schema.py",
     "intake": REPO_ROOT / "services" / "intake" / "db" / "schema.py",
 }
 
@@ -34,6 +35,7 @@ OUTPUT_PATH = REPO_ROOT / "frontend" / "src" / "data" / "schema-manifest.json"
 
 SERVICE_META = {
     "tracker": {"port": 8004, "db": "tracker.db", "tech": "FastAPI + SQLite (WAL)"},
+    "ai": {"port": 8006, "db": "ai.db", "tech": "FastAPI + SQLite (WAL)"},
     "intake": {"port": 8005, "db": "intake.db", "tech": "FastAPI + SQLite (WAL) — native/GPU"},
 }
 
@@ -355,6 +357,12 @@ def build_field(
             "strengths", "growth_areas", "recent_wins",
             "name_variations", "tags", "changed_fields",
             "old_values", "new_values", "word_timestamps",
+            "topic_segments_json", "source_metadata", "sensitivity_flags",
+            "source_locator_json", "proposed_matter_json", "proposed_data",
+            "original_proposed_data", "written_data", "previous_data",
+            "vocal_quality_json", "candidate_list", "alert_data",
+            "overlap_regions_json", "tracker_response", "details",
+            "tracker_context_snapshot", "config_json",
         )
     ):
         tags.append("JSON")
