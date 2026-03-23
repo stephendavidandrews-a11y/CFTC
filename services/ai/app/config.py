@@ -248,3 +248,22 @@ def _default_policy() -> dict:
             "snooze_options_days": [3, 7, 14, 30]
         }
     }
+
+
+def validate_config():
+    """Validate required AI service configuration at startup."""
+    errors = []
+    if not ANTHROPIC_API_KEY:
+        errors.append("ANTHROPIC_API_KEY env var is empty or not set")
+    if not AI_DB_PATH.parent.exists():
+        errors.append(f"AI DB parent directory does not exist: {AI_DB_PATH.parent}")
+    if not AI_UPLOAD_DIR.parent.exists():
+        errors.append(f"Upload directory parent does not exist: {AI_UPLOAD_DIR.parent}")
+    if errors:
+        import sys
+        for err in errors:
+            print(f"CONFIG ERROR: {err}", file=sys.stderr)
+        if os.environ.get("APP_ENV") == "production":
+            sys.exit(1)
+        else:
+            print("WARNING: Running with config errors (non-production mode)", file=sys.stderr)

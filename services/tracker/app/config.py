@@ -42,3 +42,22 @@ CORS_ORIGINS = [
     "http://localhost:5173",
     "https://cftc.stephenandrews.org",
 ]
+
+
+def validate_config():
+    """Validate required configuration at startup. Raises on missing required values."""
+    errors = []
+    if not TRACKER_DB_PATH.parent.exists():
+        errors.append(f"DB parent directory does not exist: {TRACKER_DB_PATH.parent}")
+    if not AUTH_USER:
+        errors.append("TRACKER_USER env var is empty or not set")
+    if not AUTH_PASS:
+        errors.append("TRACKER_PASS env var is empty or not set")
+    if errors:
+        import sys
+        for err in errors:
+            print(f"CONFIG ERROR: {err}", file=sys.stderr)
+        if os.environ.get("APP_ENV") == "production":
+            sys.exit(1)
+        else:
+            print("WARNING: Running with config errors (non-production mode)", file=sys.stderr)

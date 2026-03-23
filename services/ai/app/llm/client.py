@@ -17,6 +17,7 @@ Pricing (as of 2026-03):
 - Opus 4.6:   $15.00/MTok input, $75.00/MTok output
 """
 
+import asyncio
 import logging
 import time
 from dataclasses import dataclass
@@ -44,6 +45,10 @@ MODEL_PRICING = {
     "gpt-5.4": (2.50, 10.00),
     "gpt-5.4-mini": (0.40, 1.60),
 }
+
+# Retry config
+MAX_LLM_RETRIES = 3
+RETRY_BASE_DELAY = 1.0  # seconds, doubles each attempt
 
 # Singleton clients
 _client: Optional[anthropic.Anthropic] = None
@@ -180,7 +185,26 @@ def record_usage(
     db.commit()
 
 
-async def call_llm(
+async def _call_with_retry(func, *args, **kwargs):
+    """Retry an async function on recoverable LLMError with exponential backoff."""
+    last_error = None
+    for attempt in range(MAX_LLM_RETRIES):
+        try:
+            return await func(*args, **kwargs)
+        except LLMError as e:
+            last_error = e
+            if not e.recoverable or attempt == MAX_LLM_RETRIES - 1:
+                raise
+            delay = RETRY_BASE_DELAY * (2 ** attempt)
+            logger.warning(
+                "LLM call failed (attempt %d/%d, retrying in %.1fs): %s",
+                attempt + 1, MAX_LLM_RETRIES, delay, e,
+            )
+            await asyncio.sleep(delay)
+    raise last_error  # should not reach here
+
+
+async def _call_llm_once(
     db,
     communication_id: str,
     stage: str,
@@ -190,7 +214,10 @@ async def call_llm(
     max_tokens: int = 4096,
     temperature: float = 0.0,
 ) -> LLMResponse:
-    """Call the Anthropic Messages API with budget enforcement and usage tracking.
+    """Call the Anthropic Messages API with budget enforcement, retry, and usage tracking.
+
+    Retries up to MAX_RETRIES times on recoverable errors (rate limits,
+    connection errors, server 5xx) with exponential backoff.
 
     Args:
         db: Database connection for budget check and usage recording.
@@ -336,4 +363,22 @@ async def call_llm(
         text=text,
         usage=usage,
         stop_reason=stop_reason,
+    )
+
+
+async def call_llm(
+    db,
+    communication_id: str,
+    stage: str,
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+    max_tokens: int = 4096,
+    temperature: float = 0.0,
+) -> LLMResponse:
+    """Call LLM with automatic retry on recoverable errors."""
+    return await _call_with_retry(
+        _call_llm_once,
+        db, communication_id, stage, model,
+        system_prompt, user_prompt, max_tokens, temperature,
     )
