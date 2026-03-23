@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 import secrets
 
-from app.config import CORS_ORIGINS, AUTH_USER, AUTH_PASS, UPLOAD_DIR
+from app.config import CORS_ORIGINS, AUTH_USER, AUTH_PASS, UPLOAD_DIR, validate_config
 from app.db import get_connection
 from app.schema import init_schema, migrate_schema
 from app.seed import seed_all
@@ -56,7 +56,9 @@ def verify_auth(credentials: HTTPBasicCredentials = Depends(security)):
 async def lifespan(app: FastAPI):
     """Initialize database on startup."""
     setup_logging("tracker")
+    validate_config()
     setup_logging("tracker")
+    validate_config()
     logger.info("Starting CFTC Tracker...")
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     # ── Startup banner: resolve DB ambiguity ──

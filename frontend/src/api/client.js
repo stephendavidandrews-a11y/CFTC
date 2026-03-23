@@ -40,27 +40,58 @@ export class ApiError extends Error {
   }
 }
 
+const DEFAULT_TIMEOUT_MS = 30000;
+const MAX_RETRIES = 1;
+const RETRY_DELAY_MS = 1000;
+const RETRYABLE_STATUSES = new Set([502, 503, 504]);
+
 export async function fetchJSON(url, options = {}) {
-  const { headers: customHeaders, ...restOptions } = options;
-  const response = await fetch(`${BASE}${url}`, {
-    headers: { "Content-Type": "application/json", "X-Write-Source": "human", "X-Request-ID": generateRequestId(), ...customHeaders },
-    ...restOptions,
-  });
+  const { headers: customHeaders, timeout = DEFAULT_TIMEOUT_MS, ...restOptions } = options;
 
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    let detail = body || response.statusText;
-    try { const parsed = JSON.parse(body); detail = parsed.detail ?? parsed; } catch {}
-    throw new ApiError(response.status, detail, response.statusText);
-  }
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-  if (response.status === 204) return null;
-  const data = await response.json();
-  const etag = response.headers.get("etag");
-  if (etag && data && typeof data === "object" && !Array.isArray(data)) {
-    data._etag = etag;
+    try {
+      const response = await fetch(`${BASE}${url}`, {
+        headers: { "Content-Type": "application/json", "X-Write-Source": "human", "X-Request-ID": generateRequestId(), ...customHeaders },
+        signal: controller.signal,
+        ...restOptions,
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        if (RETRYABLE_STATUSES.has(response.status) && attempt < MAX_RETRIES) {
+          await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+          continue;
+        }
+        const body = await response.text().catch(() => "");
+        let detail = body || response.statusText;
+        try { const parsed = JSON.parse(body); detail = parsed.detail ?? parsed; } catch {}
+        throw new ApiError(response.status, detail, response.statusText);
+      }
+
+      if (response.status === 204) return null;
+      const data = await response.json();
+      const etag = response.headers.get("etag");
+      if (etag && data && typeof data === "object" && !Array.isArray(data)) {
+        data._etag = etag;
+      }
+      return data;
+
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err instanceof ApiError) throw err;
+      if (err.name === "AbortError") {
+        throw new ApiError(0, "Request timed out", "Timeout");
+      }
+      if (attempt < MAX_RETRIES) {
+        await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+        continue;
+      }
+      throw new ApiError(0, err.message || "Network error", "NetworkError");
+    }
   }
-  return data;
 }
 
 export async function uploadFile(url, formData) {
