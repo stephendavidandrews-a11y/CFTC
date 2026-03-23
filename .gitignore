@@ -42,3 +42,6 @@ services/work/data/*.db*
 # gitnexus
 .gitnexus/
 services/intake/data/models/
+
+# Runtime data volumes
+volumes/
