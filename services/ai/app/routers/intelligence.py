@@ -136,7 +136,45 @@ def generate_brief(brief_type: str = Query("daily", description="daily, weekly, 
             }
 
         elif brief_type == "weekly":
-            return {"status": "not_implemented", "message": "Weekly brief coming in Phase B"}
+            from app.jobs.weekly_brief import generate_weekly_brief, add_executive_summary
+            from app.jobs.daily_brief import store_brief
+            from app.jobs.html_renderer import render_weekly_html
+            from app.jobs.docx_renderer import render_weekly_docx
+            from app.jobs.email_sender import send_email
+
+            data = generate_weekly_brief(db)
+
+            # Try Sonnet exec summary
+            try:
+                data = add_executive_summary(data, True)
+            except Exception as e:
+                logger.warning("Sonnet exec summary failed: %s", e)
+
+            today = date.today().isoformat()
+            html = render_weekly_html(data)
+            docx_path = render_weekly_docx(data)
+            model = "sonnet" if data.get("executive_summary") else None
+            brief_id = store_brief(db, "weekly", today, data, str(docx_path), model)
+
+            send_email(
+                subject=f"CFTC Weekly Brief \u2014 {data.get('date_display', today)}",
+                html_body=html,
+                docx_path=docx_path,
+            )
+
+            return {
+                "status": "generated",
+                "brief_id": brief_id,
+                "brief_type": "weekly",
+                "date": today,
+                "sections": {
+                    "portfolio_total": data.get("portfolio", {}).get("total_active", 0),
+                    "decisions": len(data.get("decisions", [])),
+                    "hygiene_score": data.get("hygiene", {}).get("score", 0),
+                    "has_exec_summary": data.get("executive_summary") is not None,
+                },
+                "email_sent": True,
+            }
 
         elif brief_type == "dev-report":
             return {"status": "not_implemented", "message": "Dev report coming in Phase C"}

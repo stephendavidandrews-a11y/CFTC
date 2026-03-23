@@ -195,3 +195,139 @@ def render_daily_docx(data: dict, path: str | Path | None = None) -> Path:
     doc.save(str(path))
     logger.info("DOCX saved: %s", path)
     return path
+
+
+
+def render_weekly_docx(data, path=None):
+    """Render weekly brief as .docx file."""
+    _ensure_dir()
+    brief_date = data.get("date", date.today().isoformat())
+    if path is None:
+        path = BRIEFS_DIR / f"weekly_{brief_date}.docx"
+    path = Path(path)
+
+    doc = Document()
+
+    # Title
+    title = doc.add_heading("CFTC Weekly Brief", level=0)
+    for run in title.runs:
+        run.font.name = "Arial"
+    _add_para(doc, data.get("date_display", brief_date), size=12, color=(100, 116, 139))
+
+    # Calibration
+    cal = data.get("calibration", {})
+    _add_heading(doc, "What I Got Wrong", level=1)
+    if cal.get("has_data"):
+        score = cal.get("score", 0)
+        _add_para(doc, f"Signal Quality: {score}%", bold=True, size=14)
+        _add_para(doc, f"Materialized: {cal.get('materialized', 0)}, Resolved: {cal.get('resolved', 0)}, Still open: {cal.get('still_open', 0)}, Wrong: {cal.get('wrong', 0)}")
+    else:
+        _add_para(doc, cal.get("message", "No calibration data."), color=(148, 163, 184))
+
+    # Executive Summary
+    _add_heading(doc, "Executive Summary", level=1)
+    summary = data.get("executive_summary")
+    if summary:
+        p = doc.add_paragraph()
+        run = p.add_run(summary)
+        run.font.name = "Arial"
+        run.font.size = Pt(10)
+    else:
+        _add_para(doc, "Not generated.", color=(148, 163, 184))
+
+    # Portfolio Health
+    _add_heading(doc, "Portfolio Health", level=1)
+    portfolio = data.get("portfolio", {})
+    for posture, label in [("critical", "Critical"), ("important", "Important"), ("strategic", "Strategic"), ("monitoring", "Monitoring")]:
+        items = portfolio.get(posture, [])
+        if items:
+            _add_para(doc, f"{label} ({len(items)})", bold=True, size=11)
+            table = doc.add_table(rows=1, cols=4)
+            table.style = "Table Grid"
+            for i, h in enumerate(["Matter", "Status", "Deadline", "Owner"]):
+                table.rows[0].cells[i].text = h
+                for p in table.rows[0].cells[i].paragraphs:
+                    for run in p.runs:
+                        run.bold = True
+                        run.font.name = "Arial"
+                        run.font.size = Pt(9)
+            for m in items:
+                _add_table_row(table, [m.get("title", ""), m.get("status", ""), m.get("nearest_deadline", ""), m.get("next_step_owner", "")])
+
+    # Decision Docket
+    _add_heading(doc, "Decision Docket", level=1)
+    decisions = data.get("decisions", [])
+    if decisions:
+        table = doc.add_table(rows=1, cols=4)
+        table.style = "Table Grid"
+        for i, h in enumerate(["Decision", "Matter", "Owner", "Due"]):
+            table.rows[0].cells[i].text = h
+            for p in table.rows[0].cells[i].paragraphs:
+                for run in p.runs:
+                    run.bold = True
+                    run.font.name = "Arial"
+                    run.font.size = Pt(9)
+        for d in decisions:
+            _add_table_row(table, [d.get("title", ""), d.get("matter_title", ""), d.get("decision_owner", ""), d.get("due_date", "")])
+    else:
+        _add_para(doc, "No open decisions.", color=(148, 163, 184))
+
+    # Team View
+    _add_heading(doc, "Team Management", level=1)
+    team = data.get("team", {})
+    workload = team.get("workload", [])
+    if workload:
+        table = doc.add_table(rows=1, cols=4)
+        table.style = "Table Grid"
+        for i, h in enumerate(["Person", "Tasks", "Matters", "Overdue"]):
+            table.rows[0].cells[i].text = h
+            for p in table.rows[0].cells[i].paragraphs:
+                for run in p.runs:
+                    run.bold = True
+                    run.font.name = "Arial"
+                    run.font.size = Pt(9)
+        for w in workload:
+            _add_table_row(table, [w.get("name", ""), str(w.get("open_tasks", 0)), str(w.get("open_matters", 0)), str(w.get("overdue", 0))])
+    drifting = team.get("drifting_matters", [])
+    if drifting:
+        _add_para(doc, "Drifting Matters:", bold=True)
+        for dm in drifting:
+            _add_para(doc, f"  {dm.get('title', '')} - {dm.get('days_stale', 0)} days stale - {dm.get('owner', '')}", size=9)
+
+    # Stakeholders
+    _add_heading(doc, "Stakeholders & Relationships", level=1)
+    stak = data.get("stakeholders", {})
+    touchpoints = stak.get("touchpoints_due", [])
+    if touchpoints:
+        _add_para(doc, "Touchpoints Due:", bold=True)
+        for tp in touchpoints:
+            _add_para(doc, f"  {tp.get('name', '')} ({tp.get('organization', '')}) - {tp.get('next_date', '')} - {tp.get('purpose', '')}", size=9)
+    neglected = stak.get("neglected", [])
+    if neglected:
+        _add_para(doc, "Neglected Relationships:", bold=True)
+        for n in neglected:
+            _add_para(doc, f"  {n.get('name', '')} ({n.get('category', '')}) - {n.get('days_since', 0)} days", size=9)
+    if not touchpoints and not neglected:
+        _add_para(doc, "No stakeholder actions needed.", color=(148, 163, 184))
+
+    # Deadlines
+    _add_heading(doc, "Deadlines & Horizon Scan", level=1)
+    dl_data = data.get("deadlines", {})
+    for period, label in [("two_weeks", "Next 2 Weeks"), ("thirty_days", "Next 30 Days"), ("ninety_days", "Next 90 Days")]:
+        items = dl_data.get(period, [])
+        if items:
+            _add_para(doc, f"{label} ({len(items)}):", bold=True)
+            for item in items:
+                _add_para(doc, f"  {item.get('date', '')} - {item.get('deadline_type', '')} - {item.get('matter_title', '')} - {item.get('owner', '')}", size=9)
+
+    # Data Hygiene
+    _add_heading(doc, "Data Hygiene", level=1)
+    hygiene = data.get("hygiene", {})
+    _add_para(doc, f"Tracker Health Score: {hygiene.get('score', 0)}%", bold=True, size=14)
+    for c in hygiene.get("checks", []):
+        field = c.get("field", "")
+        _add_para(doc, f"  {field}: {c['count']}/{c['total']} ({c['pct']}%)", size=9)
+
+    doc.save(str(path))
+    logger.info("Weekly DOCX saved: %s", path)
+    return path

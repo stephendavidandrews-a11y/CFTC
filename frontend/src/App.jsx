@@ -38,6 +38,7 @@ import AISettingsPage from "./pages/settings/AISettingsPage";
 
 // -- Intelligence --
 import DailyBriefPage from "./pages/intelligence/DailyBriefPage";
+import WeeklyBriefPage from "./pages/intelligence/WeeklyBriefPage";
 
 // -- Intelligence / Settings stubs --
 const AIPlaceholder = ({ title }) => (
@@ -80,7 +81,7 @@ export default function App() {
 
           {/* -- Intelligence (Phase 9+ — stubs) -- */}
           <Route path="/intelligence/daily" element={<DailyBriefPage />} />
-          <Route path="/intelligence/digests" element={<AIPlaceholder title="Intelligence Digests" />} />
+          <Route path="/intelligence/weekly" element={<WeeklyBriefPage />} />
           <Route path="/intelligence/briefs" element={<DailyBriefPage />} />
 
           {/* -- AI Settings (Phase 8) -- */}
