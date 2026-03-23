@@ -1,5 +1,5 @@
 import React from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
 import { ToastProvider } from "./contexts/ToastContext";
 import AppShell from "./components/layout/AppShell";
 
@@ -35,6 +35,9 @@ import NotFoundPage from "./pages/NotFoundPage";
 
 // -- Settings (Phase 8) --
 import AISettingsPage from "./pages/settings/AISettingsPage";
+
+// -- Intelligence --
+import DailyBriefPage from "./pages/intelligence/DailyBriefPage";
 
 // -- Intelligence / Settings stubs --
 const AIPlaceholder = ({ title }) => (
@@ -76,8 +79,9 @@ export default function App() {
           <Route path="/review/communications" element={<CommunicationsArchivePage />} />
 
           {/* -- Intelligence (Phase 9+ — stubs) -- */}
+          <Route path="/intelligence/daily" element={<DailyBriefPage />} />
           <Route path="/intelligence/digests" element={<AIPlaceholder title="Intelligence Digests" />} />
-          <Route path="/intelligence/briefs" element={<AIPlaceholder title="Intelligence Briefs" />} />
+          <Route path="/intelligence/briefs" element={<DailyBriefPage />} />
 
           {/* -- AI Settings (Phase 8) -- */}
           <Route path="/settings/ai" element={<AISettingsPage />} />

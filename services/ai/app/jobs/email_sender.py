@@ -6,6 +6,13 @@ Uses same SMTP config pattern as Sauron morning email.
 import logging
 import os
 import smtplib
+
+# Load .env file if present
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env'))
+except ImportError:
+    pass
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
