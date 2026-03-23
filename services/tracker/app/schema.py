@@ -500,6 +500,12 @@ TABLES = [
         created_at TEXT DEFAULT (datetime('now'))
     )"""),
 
+    ("schema_versions", """CREATE TABLE IF NOT EXISTS schema_versions (
+        version INTEGER PRIMARY KEY,
+        description TEXT NOT NULL,
+        applied_at TEXT DEFAULT (datetime('now'))
+    )"""),
+
     ("sync_state", """CREATE TABLE IF NOT EXISTS sync_state (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         sync_type TEXT NOT NULL UNIQUE,
@@ -672,51 +678,86 @@ def init_schema(conn: sqlite3.Connection) -> list[str]:
     return created
 
 
+# ---------------------------------------------------------------------------
+# Versioned migrations
+# ---------------------------------------------------------------------------
+
+# Each migration: (version, description, sql_statements_list)
+# Existing ad-hoc migrations are version 1 (the baseline).
+MIGRATIONS = [
+    # Version 1: baseline (all prior ad-hoc migrations consolidated)
+    # No SQL — represents the state before versioned migrations.
+
+    # Version 2: add missing indexes
+    (2, "add_missing_indexes", [
+        "CREATE INDEX IF NOT EXISTS idx_tasks_task_mode ON tasks(task_mode)",
+        "CREATE INDEX IF NOT EXISTS idx_meetings_meeting_type ON meetings(meeting_type)",
+        "CREATE INDEX IF NOT EXISTS idx_documents_document_type ON documents(document_type)",
+    ]),
+]
+
+
+def _get_current_version(conn: sqlite3.Connection) -> int:
+    """Get the latest applied migration version, or 0 if none."""
+    try:
+        row = conn.execute(
+            "SELECT MAX(version) as v FROM schema_versions"
+        ).fetchone()
+        return row["v"] if row and row["v"] is not None else 0
+    except Exception:
+        return 0
+
+
 def migrate_schema(conn: sqlite3.Connection):
-    """Run forward-only schema migrations. Idempotent."""
+    """Run forward-only versioned migrations. Idempotent."""
     cursor = conn.cursor()
+
+    # ── Legacy migrations (pre-versioned, still idempotent) ──
     cols = {row[1] for row in cursor.execute('PRAGMA table_info(people)')}
-    dropped = []
     for col in ('relationship_lane', 'working_style_notes', 'personality'):
         if col in cols:
             cursor.execute(f'ALTER TABLE people DROP COLUMN {col}')
-            dropped.append(col)
-    if dropped:
-        conn.commit()
-        logger.info('Migrated people: dropped columns %s', ', '.join(dropped))
+            logger.info('Legacy migration: dropped people.%s', col)
+            conn.commit()
 
-    # --- tasks: add tracks_task_id + migrate delegated/waiting modes ---
     task_cols = {row[1] for row in cursor.execute('PRAGMA table_info(tasks)')}
-    task_migrated = False
     if 'tracks_task_id' not in task_cols:
         cursor.execute('ALTER TABLE tasks ADD COLUMN tracks_task_id TEXT REFERENCES tasks(id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_tasks_tracks_task_id ON tasks(tracks_task_id)')
-        logger.info('Migrated tasks: added tracks_task_id column')
-        task_migrated = True
-
-    # Migrate old task_mode values to new three-mode system
-    updated = cursor.execute(
-        "UPDATE tasks SET task_mode = 'action' WHERE task_mode LIKE 'delegated%'"
-    ).rowcount
-    updated += cursor.execute(
-        "UPDATE tasks SET task_mode = 'follow_up' WHERE task_mode LIKE 'waiting%'"
-    ).rowcount
-    # Specific mapping: decision -> follow_up (spec requirement)
-    updated += cursor.execute(
-        "UPDATE tasks SET task_mode = 'follow_up' WHERE task_mode = 'decision'"
-    ).rowcount
-    # Catch-all: any remaining non-standard mode values -> action
-    updated += cursor.execute(
-        "UPDATE tasks SET task_mode = 'action' WHERE task_mode NOT IN ('action', 'follow_up', 'monitoring')"
-    ).rowcount
-    if updated:
-        logger.info('Migrated %d tasks to standard task_mode values', updated)
-        task_migrated = True
-    if task_migrated:
+        logger.info('Legacy migration: added tasks.tracks_task_id')
         conn.commit()
 
-    # --- tasks: add trigger_description ---
     if 'trigger_description' not in task_cols:
         cursor.execute('ALTER TABLE tasks ADD COLUMN trigger_description TEXT')
-        logger.info('Migrated tasks: added trigger_description column')
+        logger.info('Legacy migration: added tasks.trigger_description')
         conn.commit()
+
+    # Normalize task_mode values (idempotent — only touches non-standard values)
+    cursor.execute("UPDATE tasks SET task_mode = 'action' WHERE task_mode LIKE 'delegated%'")
+    cursor.execute("UPDATE tasks SET task_mode = 'follow_up' WHERE task_mode LIKE 'waiting%'")
+    cursor.execute("UPDATE tasks SET task_mode = 'follow_up' WHERE task_mode = 'decision'")
+    cursor.execute("UPDATE tasks SET task_mode = 'action' WHERE task_mode NOT IN ('action', 'follow_up', 'monitoring')")
+    conn.commit()
+
+    # Seed version 1 if schema_versions is empty (represents baseline)
+    current = _get_current_version(conn)
+    if current == 0:
+        cursor.execute(
+            "INSERT OR IGNORE INTO schema_versions (version, description) VALUES (1, 'baseline')"
+        )
+        conn.commit()
+        current = 1
+
+    # ── Versioned migrations ──
+    for version, description, statements in MIGRATIONS:
+        if version <= current:
+            continue
+        logger.info("Applying migration v%d: %s", version, description)
+        for sql in statements:
+            cursor.execute(sql)
+        cursor.execute(
+            "INSERT INTO schema_versions (version, description) VALUES (?, ?)",
+            (version, description),
+        )
+        conn.commit()
+        logger.info("Migration v%d applied successfully", version)
