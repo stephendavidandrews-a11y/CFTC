@@ -1,7 +1,7 @@
 #!/bin/bash
 # Daily backup of CFTC tracker and AI databases
 BACKUP_DIR="/Users/stephen/Documents/Website/backups/cftc/$(date +%Y%m%d_%H%M%S)"
-SRC_DIR="/Users/stephen/Documents/Website/cftc/volumes"
+SRC_DIR="/Users/stephen/Documents/Website/cftc/services"
 
 mkdir -p "$BACKUP_DIR"
 

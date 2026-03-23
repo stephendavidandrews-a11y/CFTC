@@ -8,7 +8,7 @@ set -euo pipefail
 export PATH=/usr/local/bin:/opt/homebrew/bin:$PATH
 
 BACKUP_DIR="$HOME/Documents/Website/backups/cftc"
-SRC_DIR="$HOME/Documents/Website/cftc/volumes"
+SRC_DIR="$HOME/Documents/Website/cftc/services"
 EXT_RETAIN_DAYS=14
 LOCAL_RETAIN_DAYS=3
 DATE=$(date +%Y%m%d_%H%M%S)
