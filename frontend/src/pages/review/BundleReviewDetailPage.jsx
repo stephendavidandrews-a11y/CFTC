@@ -212,7 +212,7 @@ export default function BundleReviewDetailPage() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
           <div>
             <h1 style={{ fontSize: 18, fontWeight: 700, color: theme.text.primary, margin: 0 }}>
-              {data.original_filename || "Untitled Communication"}
+              {data.title || data.original_filename || "Untitled Communication"}
             </h1>
             <div style={{ fontSize: 12, color: theme.text.dim, marginTop: 4, display: "flex", gap: 16 }}>
               <span>{formatDuration(data.duration_seconds)}</span>
