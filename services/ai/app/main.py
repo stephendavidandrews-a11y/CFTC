@@ -156,7 +156,38 @@ async def lifespan(app: FastAPI):
             id="weekly_brief",
             replace_existing=True,
         )
-        logger.info("APScheduler started: daily_brief at 05:55, weekly_brief Sun 20:00")
+        def _run_dev_report():
+            try:
+                from app.jobs.dev_report import generate_dev_report
+                from app.jobs.daily_brief import store_brief
+                from app.jobs.html_renderer import render_dev_report_html
+                from app.jobs.email_sender import send_email
+                from app.db import get_connection
+                from datetime import date
+
+                db = get_connection()
+                try:
+                    data = generate_dev_report(db)
+                    today = date.today().isoformat()
+                    html = render_dev_report_html(data)
+                    store_brief(db, "dev-report", today, data, None, None)
+                    send_email(
+                        subject="CFTC App Health — " + data.get("date_display", today),
+                        html_body=html,
+                    )
+                    logger.info("Dev report generated and sent for %s", today)
+                finally:
+                    db.close()
+            except Exception as e:
+                logger.error("Dev report job failed: %s", e, exc_info=True)
+
+        scheduler.add_job(
+            _run_dev_report,
+            CronTrigger(day_of_week="sun", hour=20, minute=30),
+            id="dev_report",
+            replace_existing=True,
+        )
+        logger.info("APScheduler started: daily 05:55, weekly Sun 20:00, dev_report Sun 20:30")
     except ImportError:
         logger.warning("APScheduler not installed \u2014 intelligence briefs will not auto-generate")
     except Exception as e:

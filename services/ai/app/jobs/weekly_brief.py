@@ -21,6 +21,13 @@ from datetime import date, datetime, timedelta
 
 import httpx
 
+try:
+    from dotenv import load_dotenv
+    import os as _os
+    load_dotenv(_os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))), ".env"))
+except ImportError:
+    pass
+
 logger = logging.getLogger(__name__)
 
 TRACKER_BASE_URL = os.environ.get("TRACKER_BASE_URL", "http://localhost:8004/tracker")
