@@ -191,22 +191,29 @@ def _assemble_meetings() -> list[dict]:
 def _assemble_followups() -> list[dict]:
     """Section 4: people needing follow-up + uncommitted action items."""
     cutoff = (date.today() + timedelta(days=3)).isoformat()
-    people = _tracker_get("/people", {"next_interaction_before": cutoff, "sort": "next_interaction_needed_date"})
+    # Get all active people and filter client-side for next_interaction
+    people = _tracker_get("/people")
     if isinstance(people, dict):
         people = people.get("items", [])
 
     followups = []
     for p in people:
+        next_date = p.get("next_interaction_needed_date")
+        if not next_date:
+            continue
+        if next_date > cutoff:
+            continue
         followups.append({
             "person_id": p.get("id"),
             "name": p.get("full_name", ""),
             "organization": p.get("org_name", ""),
             "category": p.get("relationship_category", ""),
             "lane": p.get("relationship_lane", ""),
-            "next_date": p.get("next_interaction_needed_date", ""),
+            "next_date": next_date,
             "interaction_type": p.get("next_interaction_type", ""),
             "purpose": p.get("next_interaction_purpose", ""),
         })
+    followups.sort(key=lambda x: x["next_date"])
     return followups
 
 
