@@ -338,7 +338,10 @@ export default function BundleReviewDetailPage() {
           onToggle={() => setSuppressionOpen(!suppressionOpen)}
         >
           {data.suppressed_observations?.length > 0 && (
-            <SuppressionSection title="Suppressed Observations" items={data.suppressed_observations} />
+            <SuppressionSection title="Suppressed Observations" items={data.suppressed_observations.map((obs) =>
+              typeof obs === "string" ? obs :
+              `${obs.item_type || "unknown"}: ${obs.description || obs.reason_noted || JSON.stringify(obs)}`
+            )} />
           )}
           {data.code_suppressions?.length > 0 && (
             <SuppressionSection
@@ -734,7 +737,47 @@ function resolveDisplayValue(key, val, lookup) {
   if (key.endsWith("_id") && typeof val === "string" && lookup[val]) {
     return lookup[val];
   }
-  // Array of objects (e.g. participants) — render each as a readable block
+  // Linked entities — render as styled chips with icons
+  if (Array.isArray(val) && val.length > 0 && val[0]?.entity_type) {
+    return formatFieldValue(key, val);
+  }
+  // Participants — render as structured cards
+  if (Array.isArray(val) && val.length > 0 && val[0]?.meeting_role != null) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
+        {val.map((p, i) => {
+          const name = (p.person_id && lookup[p.person_id]) || p.person_id || "Unknown";
+          const attended = p.attended ? "\u2705" : "\u274C";
+          return (
+            <div key={i} style={{
+              background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.12)",
+              borderRadius: 6, padding: "8px 10px",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                <span style={{ fontSize: 12 }}>{attended}</span>
+                <span style={{ fontWeight: 600, fontSize: 12, color: "#e2e8f0" }}>{name}</span>
+                <span style={{
+                  fontSize: 10, padding: "1px 6px", borderRadius: 3,
+                  background: "rgba(139,92,246,0.15)", color: "#a78bfa",
+                }}>{(p.meeting_role || "").replace(/_/g, " ")}</span>
+              </div>
+              {p.key_contribution_summary && (
+                <div style={{ fontSize: 11, color: "#94a3b8", marginLeft: 22, marginBottom: 2 }}>
+                  {p.key_contribution_summary}
+                </div>
+              )}
+              {p.stance_summary && (
+                <div style={{ fontSize: 10, color: "#64748b", marginLeft: 22, fontStyle: "italic" }}>
+                  {p.stance_summary}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+  // Array of objects — render each as a readable block
   if (Array.isArray(val)) {
     return val.map((item, i) => {
       if (typeof item === "object" && item !== null) {
@@ -1246,7 +1289,7 @@ const ITEM_TYPES = [
 ];
 
 const DEFAULT_FIELDS = {
-  task: { title: "", description: "", assigned_to_person_id: "", matter_id: "", status: "", task_mode: "", priority: "", due_date: "", task_type: "" },
+  task: { title: "", description: "", assigned_to_person_id: "", matter_id: "", status: "", task_mode: "", priority: "", due_date: "", task_type: "", waiting_on_person_id: "", waiting_on_org_id: "", waiting_on_description: "", delegated_by_person_id: "", supervising_person_id: "", deadline_type: "", expected_output: "" },
   decision: { title: "", description: "", decision_type: "", status: "", decided_by_person_id: "", decision_date: "", matter_id: "" },
   meeting_record: { title: "", date_time_start: "", date_time_end: "", meeting_type: "", location: "", matter_id: "", notes: "" },
   matter_update: { title: "", description: "", update_type: "", matter_id: "" },
@@ -1256,7 +1299,7 @@ const DEFAULT_FIELDS = {
   stakeholder_addition: { person_id: "", matter_id: "", matter_role: "", engagement_level: "" },
   status_change: { entity_type: "", entity_id: "", from_status: "", to_status: "" },
   document: { title: "", document_type: "", status: "", matter_id: "", description: "" },
-  follow_up: { title: "", description: "", assigned_to_person_id: "", matter_id: "", due_date: "", priority: "", task_mode: "" },
+  follow_up: { title: "", description: "", assigned_to_person_id: "", matter_id: "", due_date: "", priority: "", task_mode: "", waiting_on_person_id: "", waiting_on_org_id: "", waiting_on_description: "" },
 };
 
 function AddItemModal({ isOpen, onClose, busy, onSave, trackerData = {}, allEnums = {}, nameLookup = {} }) {

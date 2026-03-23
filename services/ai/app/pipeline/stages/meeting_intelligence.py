@@ -24,7 +24,7 @@ PROMPT_DIR = PROMPT_BASE_DIR / "meeting_intelligence"
 # --- Tier gating ---
 
 FULL_TIER_MEETING_TYPES = {
-    "congressional", "interagency", "external", "briefing", "working_group",
+    "leadership meeting", "interagency meeting", "Hill meeting", "briefing", "industry meeting", "commissioner office",
 }
 
 

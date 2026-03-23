@@ -25,6 +25,11 @@ from typing import Optional
 
 import anthropic
 
+try:
+    from openai import OpenAI as _OpenAI
+except ImportError:
+    _OpenAI = None
+
 from app.config import ANTHROPIC_API_KEY, load_policy
 
 logger = logging.getLogger(__name__)
@@ -34,10 +39,15 @@ MODEL_PRICING = {
     "claude-haiku-4-5-20251001": (0.80, 4.00),
     "claude-sonnet-4-20250514": (3.00, 15.00),
     "claude-opus-4-6": (15.00, 75.00),
+    # OpenAI models
+    "gpt-4o": (2.50, 10.00),
+    "gpt-5.4": (2.50, 10.00),
+    "gpt-5.4-mini": (0.40, 1.60),
 }
 
-# Singleton client
+# Singleton clients
 _client: Optional[anthropic.Anthropic] = None
+_openai_client = None
 
 
 class BudgetExceededError(Exception):
@@ -90,6 +100,33 @@ def _get_client() -> anthropic.Anthropic:
             )
         _client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     return _client
+
+
+def _is_openai_model(model: str) -> bool:
+    """Check if a model ID is an OpenAI model."""
+    return model.startswith("gpt-") or model.startswith("o3") or model.startswith("o4")
+
+
+def _get_openai_client():
+    """Get or create the singleton OpenAI client."""
+    global _openai_client
+    if _openai_client is None:
+        if _OpenAI is None:
+            raise LLMError(
+                "openai package not installed. Run: pip install openai",
+                error_type="configuration_error",
+                recoverable=False,
+            )
+        import os
+        api_key = os.environ.get("OPENAI_API_KEY", "")
+        if not api_key:
+            raise LLMError(
+                "OPENAI_API_KEY not set",
+                error_type="configuration_error",
+                recoverable=False,
+            )
+        _openai_client = _OpenAI(api_key=api_key)
+    return _openai_client
 
 
 def compute_cost(model: str, input_tokens: int, output_tokens: int) -> float:
@@ -177,59 +214,105 @@ async def call_llm(
     if is_over:
         raise BudgetExceededError(today_spend, daily_budget)
 
-    client = _get_client()
-
     t0 = time.time()
-    try:
-        import asyncio
-        import functools
-        loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(
-            None,
-            functools.partial(
-                client.messages.create,
-                model=model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_prompt}],
-            ),
-        )
-    except anthropic.RateLimitError as e:
-        raise LLMError(
-            f"Rate limited: {e}",
-            error_type="rate_limit",
-            recoverable=True,
-        )
-    except anthropic.APIConnectionError as e:
-        raise LLMError(
-            f"API connection error: {e}",
-            error_type="connection_error",
-            recoverable=True,
-        )
-    except anthropic.AuthenticationError as e:
-        raise LLMError(
-            f"Authentication failed: {e}",
-            error_type="auth_error",
-            recoverable=False,
-        )
-    except anthropic.APIError as e:
-        raise LLMError(
-            f"API error: {e}",
-            error_type="api_error",
-            recoverable=getattr(e, "status_code", 500) >= 500,
-        )
 
-    elapsed = time.time() - t0
+    if _is_openai_model(model):
+        # ── OpenAI path ──
+        oai_client = _get_openai_client()
+        try:
+            import asyncio
+            import functools
+            loop = asyncio.get_event_loop()
+            # Build kwargs - reasoning models don't allow temperature
+            oai_kwargs = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "max_completion_tokens": 128000,
+                "extra_body": {"reasoning_effort": "high"},
+            }
+            # GPT-5.4 with reasoning_effort rejects temperature != 1
+            # Only set temperature when not using reasoning
+            if not oai_kwargs["extra_body"].get("reasoning_effort"):
+                oai_kwargs["temperature"] = temperature
 
-    # Extract response
-    text = ""
-    for block in response.content:
-        if block.type == "text":
-            text += block.text
+            response = await loop.run_in_executor(
+                None,
+                functools.partial(
+                    oai_client.chat.completions.create,
+                    **oai_kwargs,
+                ),
+            )
+        except Exception as e:
+            err_name = type(e).__name__
+            raise LLMError(
+                f"OpenAI API error ({err_name}): {e}",
+                error_type="api_error",
+                recoverable=True,
+            )
 
-    input_tokens = response.usage.input_tokens
-    output_tokens = response.usage.output_tokens
+        elapsed = time.time() - t0
+        text = response.choices[0].message.content or ""
+        input_tokens = response.usage.prompt_tokens
+        output_tokens = response.usage.completion_tokens
+        stop_reason = response.choices[0].finish_reason or "stop"
+
+    else:
+        # ── Anthropic path ──
+        client = _get_client()
+        try:
+            import asyncio
+            import functools
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                functools.partial(
+                    client.messages.create,
+                    model=model,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": user_prompt}],
+                ),
+            )
+        except anthropic.RateLimitError as e:
+            raise LLMError(
+                f"Rate limited: {e}",
+                error_type="rate_limit",
+                recoverable=True,
+            )
+        except anthropic.APIConnectionError as e:
+            raise LLMError(
+                f"API connection error: {e}",
+                error_type="connection_error",
+                recoverable=True,
+            )
+        except anthropic.AuthenticationError as e:
+            raise LLMError(
+                f"Authentication failed: {e}",
+                error_type="auth_error",
+                recoverable=False,
+            )
+        except anthropic.APIError as e:
+            raise LLMError(
+                f"API error: {e}",
+                error_type="api_error",
+                recoverable=getattr(e, "status_code", 500) >= 500,
+            )
+
+        elapsed = time.time() - t0
+        text = ""
+        for block in response.content:
+            if block.type == "text":
+                text += block.text
+
+        input_tokens = response.usage.input_tokens
+        output_tokens = response.usage.output_tokens
+        stop_reason = response.stop_reason
+
     cost = compute_cost(model, input_tokens, output_tokens)
 
     # Record usage
@@ -252,5 +335,5 @@ async def call_llm(
     return LLMResponse(
         text=text,
         usage=usage,
-        stop_reason=response.stop_reason,
+        stop_reason=stop_reason,
     )
