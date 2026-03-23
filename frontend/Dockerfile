@@ -33,7 +33,6 @@ FROM nginx:alpine
 
 COPY --from=build /repo/frontend/build /usr/share/nginx/html
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
-COPY frontend/.htpasswd /etc/nginx/.htpasswd
 
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

@@ -13,8 +13,12 @@ _subscribers: list[asyncio.Queue] = []
 
 
 async def publish_event(event_type: str, data: dict):
-    """Publish an event to all connected SSE clients."""
-    message = json.dumps({"type": event_type, **data})
+    """Publish an event to all connected SSE clients.
+
+    Stores both the event_type (for SSE named events) and the JSON payload.
+    """
+    payload = json.dumps({"type": event_type, **data})
+    message = (event_type, payload)  # tuple: (name, data)
     dead = []
     for q in _subscribers:
         try:
@@ -39,7 +43,8 @@ async def event_stream(request: Request):
                     break
                 try:
                     message = await asyncio.wait_for(queue.get(), timeout=30)
-                    yield f"data: {message}\n\n"
+                    event_name, payload = message
+                    yield f"event: {event_name}\ndata: {payload}\n\n"
                 except asyncio.TimeoutError:
                     yield ": keepalive\n\n"
         except asyncio.CancelledError:

@@ -27,6 +27,10 @@ AI_AUDIO_WATCH_DIR = Path(os.environ.get("AI_AUDIO_WATCH_DIR", str(BASE_DIR / "a
 TRACKER_BASE_URL = os.environ.get("TRACKER_BASE_URL", "http://tracker:8004/tracker")
 TRACKER_USER = os.environ.get("TRACKER_USER", "")
 TRACKER_PASS = os.environ.get("TRACKER_PASS", "")
+
+# Optional Basic auth for AI service endpoints
+AI_AUTH_USER = os.environ.get("AI_AUTH_USER", "")
+AI_AUTH_PASS = os.environ.get("AI_AUTH_PASS", "")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 
 PORT = int(os.environ.get("AI_PORT", "8006"))

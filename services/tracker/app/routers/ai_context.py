@@ -210,14 +210,14 @@ def _get_matters_with_nested(db):
         """, (mid,))]
 
         matter["stakeholders"] = [dict(row) for row in db.execute("""
-            SELECT p.full_name, mp.matter_role, mp.engagement_level
+            SELECT mp.person_id, p.full_name, mp.matter_role, mp.engagement_level
             FROM matter_people mp
             JOIN people p ON mp.person_id = p.id
             WHERE mp.matter_id = ?
         """, (mid,))]
 
         matter["organizations"] = [dict(row) for row in db.execute("""
-            SELECT o.name, mo.organization_role
+            SELECT mo.organization_id, o.name, mo.organization_role
             FROM matter_organizations mo
             JOIN organizations o ON mo.organization_id = o.id
             WHERE mo.matter_id = ?

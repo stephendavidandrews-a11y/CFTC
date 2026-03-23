@@ -7,8 +7,10 @@ Reads from tracker via /tracker/ai-context, writes via /tracker/batch.
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+import secrets
 
 from app.config import CORS_ORIGINS, AI_UPLOAD_DIR, AI_AUDIO_WATCH_DIR, load_policy
 from app.db import get_connection
@@ -110,12 +112,19 @@ async def lifespan(app: FastAPI):
                 logger.error("Daily brief job failed: %s", e, exc_info=True)
 
         scheduler = BackgroundScheduler(daemon=True)
-        scheduler.add_job(
-            _run_daily_brief,
-            CronTrigger(hour=5, minute=55),
-            id="daily_brief",
-            replace_existing=True,
-        )
+        reports_policy = policy.get("scheduled_reports", {})
+
+        if reports_policy.get("daily_digest", {}).get("enabled", False):
+            scheduler.add_job(
+                _run_daily_brief,
+                CronTrigger(hour=5, minute=55),
+                id="daily_brief",
+                replace_existing=True,
+            )
+            logger.info("Daily brief job scheduled (05:55)")
+        else:
+            logger.info("Daily brief job DISABLED by policy")
+
         scheduler.start()
         def _run_weekly_brief():
             try:
@@ -150,12 +159,16 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 logger.error("Weekly brief job failed: %s", e, exc_info=True)
 
-        scheduler.add_job(
-            _run_weekly_brief,
-            CronTrigger(day_of_week="sun", hour=20, minute=0),
-            id="weekly_brief",
-            replace_existing=True,
-        )
+        if reports_policy.get("weekly_brief", {}).get("enabled", False):
+            scheduler.add_job(
+                _run_weekly_brief,
+                CronTrigger(day_of_week="sun", hour=20, minute=0),
+                id="weekly_brief",
+                replace_existing=True,
+            )
+            logger.info("Weekly brief job scheduled (Sun 20:00)")
+        else:
+            logger.info("Weekly brief job DISABLED by policy")
         def _run_dev_report():
             try:
                 from app.jobs.dev_report import generate_dev_report
@@ -181,13 +194,18 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 logger.error("Dev report job failed: %s", e, exc_info=True)
 
-        scheduler.add_job(
-            _run_dev_report,
-            CronTrigger(day_of_week="sun", hour=20, minute=30),
-            id="dev_report",
-            replace_existing=True,
-        )
-        logger.info("APScheduler started: daily 05:55, weekly Sun 20:00, dev_report Sun 20:30")
+        if reports_policy.get("dev_report", {}).get("enabled", False):
+            scheduler.add_job(
+                _run_dev_report,
+                CronTrigger(day_of_week="sun", hour=20, minute=30),
+                id="dev_report",
+                replace_existing=True,
+            )
+            logger.info("Dev report job scheduled (Sun 20:30)")
+        else:
+            logger.info("Dev report job DISABLED by policy")
+
+        logger.info("APScheduler started. Check above for enabled jobs.")
     except ImportError:
         logger.warning("APScheduler not installed \u2014 intelligence briefs will not auto-generate")
     except Exception as e:
@@ -220,16 +238,45 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Optional auth dependency — enabled when AI_AUTH_USER and AI_AUTH_PASS are set
+from app.config import AI_AUTH_USER, AI_AUTH_PASS
+
+_ai_security = HTTPBasic(auto_error=False)
+_auth_deps = []
+
+if AI_AUTH_USER and AI_AUTH_PASS:
+    def _verify_ai_auth(credentials: HTTPBasicCredentials = Depends(_ai_security)):
+        if credentials is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required",
+                headers={"WWW-Authenticate": "Basic"},
+            )
+        ok_user = secrets.compare_digest(credentials.username.encode(), AI_AUTH_USER.encode())
+        ok_pass = secrets.compare_digest(credentials.password.encode(), AI_AUTH_PASS.encode())
+        if not (ok_user and ok_pass):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials",
+                headers={"WWW-Authenticate": "Basic"},
+            )
+        return credentials.username
+
+    _auth_deps = [Depends(_verify_ai_auth)]
+    logger.info("AI auth ENABLED (AI_AUTH_USER is set)")
+else:
+    logger.warning("AI auth DISABLED — set AI_AUTH_USER and AI_AUTH_PASS to enable")
+
 # Mount routers under /ai/api/ prefix
 api_prefix = "/ai/api"
 app.include_router(health.router, prefix=api_prefix)
-app.include_router(config_api.router, prefix=api_prefix)
-app.include_router(events.router, prefix=api_prefix)
-app.include_router(communications.router, prefix=api_prefix)
-app.include_router(entity_review.router, prefix=api_prefix)
-app.include_router(bundle_review.router, prefix=api_prefix)
-app.include_router(participant_review.router, prefix=api_prefix)
-app.include_router(speaker_review.router, prefix=api_prefix)
-app.include_router(meeting_intelligence_api.router, prefix=api_prefix)
-app.include_router(intelligence_api.router, prefix=api_prefix)
-app.include_router(telemetry_api.router, prefix=api_prefix)
+app.include_router(config_api.router, prefix=api_prefix, dependencies=_auth_deps)
+app.include_router(events.router, prefix=api_prefix, dependencies=_auth_deps)
+app.include_router(communications.router, prefix=api_prefix, dependencies=_auth_deps)
+app.include_router(entity_review.router, prefix=api_prefix, dependencies=_auth_deps)
+app.include_router(bundle_review.router, prefix=api_prefix, dependencies=_auth_deps)
+app.include_router(participant_review.router, prefix=api_prefix, dependencies=_auth_deps)
+app.include_router(speaker_review.router, prefix=api_prefix, dependencies=_auth_deps)
+app.include_router(meeting_intelligence_api.router, prefix=api_prefix, dependencies=_auth_deps)
+app.include_router(intelligence_api.router, prefix=api_prefix, dependencies=_auth_deps)
+app.include_router(telemetry_api.router, prefix=api_prefix, dependencies=_auth_deps)
