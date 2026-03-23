@@ -316,9 +316,31 @@ def _build_user_prompt(
     """, (communication_id,)).fetchone()
 
     # Get the best date for when this conversation actually occurred:
-    # 1. captured_at from audio file metadata (embedded by recording device)
-    # 2. Fall back to communications.created_at (DB insertion time)
+    # 1. Try to parse a date from the title/filename (e.g. "03-20 Meeting_..." or "2026-03-20...")
+    # 2. captured_at from audio file metadata (embedded by recording device)
+    # 3. Fall back to communications.created_at (DB insertion time)
     # Then convert from UTC to local timezone for correct relative date resolution.
+    import re as _re
+    title_date = None
+    title_or_fn = comm["original_filename"] or ""
+    # Also check the communication title
+    title_row = db.execute("SELECT title FROM communications WHERE id = ?", (communication_id,)).fetchone()
+    if title_row and title_row["title"]:
+        title_or_fn = title_row["title"] + " " + title_or_fn
+    # Try ISO date: 2026-03-20
+    iso_match = _re.search(r"(20\d{2})-(\d{2})-(\d{2})", title_or_fn)
+    if iso_match:
+        title_date = f"{iso_match.group(1)}-{iso_match.group(2)}-{iso_match.group(3)}"
+    else:
+        # Try MM-DD pattern at start of title: "03-20 Meeting..."
+        mmdd_match = _re.search(r"\b(\d{2})-(\d{2})\b", title_or_fn)
+        if mmdd_match:
+            from datetime import datetime as _dt2
+            mm, dd = int(mmdd_match.group(1)), int(mmdd_match.group(2))
+            if 1 <= mm <= 12 and 1 <= dd <= 31:
+                year = _dt2.now().year
+                title_date = f"{year}-{mm:02d}-{dd:02d}"
+
     captured_row = db.execute("""
         SELECT captured_at FROM audio_files
         WHERE communication_id = ? AND format != 'wav_normalized'
@@ -326,7 +348,8 @@ def _build_user_prompt(
         LIMIT 1
     """, (communication_id,)).fetchone()
     raw_date = (
-        (captured_row["captured_at"] if captured_row else None)
+        title_date
+        or (captured_row["captured_at"] if captured_row else None)
         or comm["created_at"]
     )
     # Convert UTC timestamp to local date
@@ -595,7 +618,9 @@ def _build_user_prompt(
 # ═══════════════════════════════════════════════════════════════════════════
 
 def _parse_extraction_response(text: str) -> dict:
-    """Parse Sonnet's extraction response, tolerating markdown fencing."""
+    """Parse extraction response, tolerating markdown fencing."""
+    import logging as _log
+    _log.getLogger(__name__).info("Raw LLM response (first 500 chars): %s", repr(text[:500]))
     cleaned = text.strip()
     if cleaned.startswith("```"):
         lines = cleaned.split("\n")

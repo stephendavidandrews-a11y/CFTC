@@ -2,8 +2,8 @@
   "user_config": {
     "tracker_person_id": null,
     "email_addresses": [],
-    "name": "",
-    "title": ""
+    "name": "Stephen",
+    "title": "Andrews"
   },
   "routing_policy": {
     "new_matter_threshold": "medium",
@@ -14,15 +14,15 @@
   },
   "extraction_policy": {
     "propose_tasks": true,
-    "propose_decisions": false,
+    "propose_decisions": true,
     "propose_matter_updates": true,
     "propose_meeting_records": true,
-    "propose_new_matters": false,
+    "propose_new_matters": true,
     "propose_stakeholders": true,
     "propose_follow_ups": true,
     "propose_new_people": true,
     "propose_new_organizations": true,
-    "propose_status_changes": false,
+    "propose_status_changes": true,
     "propose_documents": true,
     "capture_stance_data": true,
     "capture_intelligence_notes": true,
@@ -89,7 +89,7 @@
     }
   },
   "model_config": {
-    "primary_extraction_model": "claude-sonnet-4-20250514",
+    "primary_extraction_model": "claude-sonnet-4-6",
     "escalation_model": null,
     "haiku_model": "claude-haiku-4-5-20251001",
     "opus_retry_triggers": {
@@ -99,7 +99,7 @@
       "validation_failure": true
     },
     "active_prompt_versions": {
-      "extraction": "v1.0.0",
+      "extraction": "v1.3.0",
       "haiku_cleanup": "v1.0.0",
       "haiku_enrichment": "v1.0.0"
     },

@@ -183,6 +183,15 @@ def convert_task(item: dict, bundle: dict, refs: dict) -> list[tuple[dict, str]]
         "expected_output": data.get("expected_output"),
         "due_date": data.get("due_date"),
         "deadline_type": data.get("deadline_type"),
+        "waiting_on_person_id": _resolve_ref(
+            data.get("waiting_on_person"), refs, "person") or data.get("waiting_on_person_id"),
+        "waiting_on_org_id": _resolve_ref(
+            data.get("waiting_on_org"), refs, "organization") or data.get("waiting_on_org_id"),
+        "waiting_on_description": data.get("waiting_on_description"),
+        "delegated_by_person_id": _resolve_ref(
+            data.get("delegated_by"), refs, "person") or data.get("delegated_by_person_id"),
+        "supervising_person_id": _resolve_ref(
+            data.get("supervising_person"), refs, "person") or data.get("supervising_person_id"),
         "source": "ai",
         "source_id": item["id"],
         "ai_confidence": item.get("confidence"),
@@ -206,12 +215,17 @@ def convert_follow_up(item: dict, bundle: dict, refs: dict) -> list[tuple[dict, 
     op_data = {
         "title": data.get("title", "Follow up"),
         "matter_id": matter_id,
-        "task_mode": "monitoring",
+        "task_mode": "follow_up",
         "status": "not started",
         "priority": data.get("priority"),
         "assigned_to_person_id": _resolve_ref(
             data.get("assigned_to"), refs, "person") or data.get("assigned_to_person_id"),
         "due_date": data.get("due_date"),
+        "waiting_on_person_id": _resolve_ref(
+            data.get("waiting_on_person"), refs, "person") or data.get("waiting_on_person_id"),
+        "waiting_on_org_id": _resolve_ref(
+            data.get("waiting_on_org"), refs, "organization") or data.get("waiting_on_org_id"),
+        "waiting_on_description": data.get("waiting_on_description"),
         "source": "ai",
         "source_id": item["id"],
         "ai_confidence": item.get("confidence"),

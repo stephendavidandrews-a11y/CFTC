@@ -36,14 +36,14 @@ ENUMS = {
         "economically_significant", "significant", "substantive_nonsignificant", "routine", "info_only",
     ],
     "task_status": ["not started", "in progress", "waiting on others", "needs review", "done", "deferred"],
-    "task_mode": ["action", "waiting", "decision", "follow-up", "reading", "delegated"],
+    "task_mode": ["action", "delegated", "waiting", "monitoring", "follow_up"],
     "task_type": [
         "research issue", "draft memo", "review markup", "prepare talking points",
         "schedule meeting", "get clearance", "follow up with client", "redline document",
         "produce options memo", "send readout", "coordinate with agency partner", "other",
     ],
     "task_priority": ["critical", "high", "normal", "low"],
-    "deadline_type": ["hard", "soft"],
+    "deadline_type": ["hard", "soft", "internal"],
     "meeting_type": [
         "internal working meeting", "leadership meeting", "client meeting", "interagency meeting",
         "industry meeting", "Hill meeting", "briefing", "check-in", "commissioner office", "other",
