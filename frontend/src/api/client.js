@@ -7,6 +7,11 @@
 
 const BASE = process.env.REACT_APP_API_URL || "";
 
+/** Generate a short unique request ID for tracing. */
+function generateRequestId() {
+  return "fe-" + Math.random().toString(36).substring(2, 10) + "-" + Date.now().toString(36);
+};
+
 export class ApiError extends Error {
   constructor(status, detail, statusText) {
     const msg = Array.isArray(detail)
@@ -38,7 +43,7 @@ export class ApiError extends Error {
 export async function fetchJSON(url, options = {}) {
   const { headers: customHeaders, ...restOptions } = options;
   const response = await fetch(`${BASE}${url}`, {
-    headers: { "Content-Type": "application/json", "X-Write-Source": "human", ...customHeaders },
+    headers: { "Content-Type": "application/json", "X-Write-Source": "human", "X-Request-ID": generateRequestId(), ...customHeaders },
     ...restOptions,
   });
 
@@ -61,6 +66,7 @@ export async function fetchJSON(url, options = {}) {
 export async function uploadFile(url, formData) {
   const response = await fetch(`${BASE}${url}`, {
     method: "POST",
+    headers: { "X-Request-ID": generateRequestId() },
     body: formData,
   });
 

@@ -2,6 +2,7 @@
 CFTC Regulatory Ops Tracker — FastAPI Application
 """
 import logging
+from app.logging_config import setup_logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends, HTTPException, status
@@ -54,6 +55,8 @@ def verify_auth(credentials: HTTPBasicCredentials = Depends(security)):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize database on startup."""
+    setup_logging("tracker")
+    setup_logging("tracker")
     logger.info("Starting CFTC Tracker...")
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     # ── Startup banner: resolve DB ambiguity ──
@@ -109,6 +112,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Request ID + metrics middleware
+from app.middleware import RequestIDMiddleware, metrics
+app.add_middleware(RequestIDMiddleware)
+
 # Mount routers — all under /tracker/ prefix, all require auth
 router_prefix = "/tracker"
 app.include_router(dashboard.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
@@ -127,6 +134,12 @@ app.include_router(ai_context.router, prefix=router_prefix, dependencies=[Depend
 app.include_router(batch.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 app.include_router(schema_version.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 app.include_router(config.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
+
+
+@app.get("/tracker/metrics")
+async def get_metrics():
+    """Request metrics snapshot."""
+    return metrics.snapshot()
 
 
 @app.get("/tracker/health")

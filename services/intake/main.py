@@ -19,11 +19,8 @@ from db.schema import init_db
 from voice.pipeline.watcher import InboxWatcher
 from voice.pipeline.processor import process_conversation
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-    handlers=[logging.StreamHandler()],
-)
+from logging_config import setup_logging
+setup_logging("intake")
 logger = logging.getLogger("cftc-intake")
 
 # Frontend served by Command Center - this service is API-only
@@ -103,6 +100,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Request ID + metrics middleware
+from middleware import RequestIDMiddleware, metrics as request_metrics
+app.add_middleware(RequestIDMiddleware)
+
 # Register API routers
 from api.conversations import router as conversations_router
 from api.speakers import router as speakers_router
@@ -138,6 +139,12 @@ def health_check():
         "voice_profiles": voice_profiles,
     }
 
+
+
+@app.get("/intake/api/metrics")
+async def get_metrics():
+    """Request metrics snapshot."""
+    return request_metrics.snapshot()
 
 
 if __name__ == "__main__":

@@ -21,10 +21,8 @@ from app.routers import meeting_intelligence as meeting_intelligence_api
 from app.routers import intelligence as intelligence_api
 from app.routers import telemetry as telemetry_api
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-)
+from app.logging_config import setup_logging
+setup_logging("ai")
 logger = logging.getLogger(__name__)
 
 
@@ -238,6 +236,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Request ID + metrics middleware
+from app.middleware import RequestIDMiddleware, metrics as request_metrics
+app.add_middleware(RequestIDMiddleware)
+
 # Optional auth dependency — enabled when AI_AUTH_USER and AI_AUTH_PASS are set
 from app.config import AI_AUTH_USER, AI_AUTH_PASS
 
@@ -266,6 +268,12 @@ if AI_AUTH_USER and AI_AUTH_PASS:
     logger.info("AI auth ENABLED (AI_AUTH_USER is set)")
 else:
     logger.warning("AI auth DISABLED — set AI_AUTH_USER and AI_AUTH_PASS to enable")
+
+@app.get("/ai/api/metrics")
+async def get_metrics():
+    """Request metrics snapshot."""
+    return request_metrics.snapshot()
+
 
 # Mount routers under /ai/api/ prefix
 api_prefix = "/ai/api"
