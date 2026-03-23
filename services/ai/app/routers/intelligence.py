@@ -177,7 +177,31 @@ def generate_brief(brief_type: str = Query("daily", description="daily, weekly, 
             }
 
         elif brief_type == "dev-report":
-            return {"status": "not_implemented", "message": "Dev report coming in Phase C"}
+            from app.jobs.dev_report import generate_dev_report
+            from app.jobs.daily_brief import store_brief
+            from app.jobs.html_renderer import render_dev_report_html
+            from app.jobs.email_sender import send_email
+
+            data = generate_dev_report(db)
+            today = date.today().isoformat()
+            html = render_dev_report_html(data)
+            brief_id = store_brief(db, "dev-report", today, data, None, None)
+
+            send_email(
+                subject="CFTC App Health — " + data.get("date_display", today),
+                html_body=html,
+            )
+
+            return {
+                "status": "generated",
+                "brief_id": brief_id,
+                "brief_type": "dev-report",
+                "date": today,
+                "overall_score": data.get("overall_score", 0),
+                "underused_fields": len(data.get("underused", [])),
+                "suggestions": len(data.get("suggestions", [])),
+                "email_sent": True,
+            }
 
         else:
             return {"error": f"Unknown brief type: {brief_type}"}
