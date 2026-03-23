@@ -1,4 +1,3 @@
-import re
 """Convert reviewed bundle items to tracker batch operations.
 
 Each converter function takes (item_dict, bundle_dict, refs_dict) and returns
@@ -12,12 +11,24 @@ Convention:
 - refs["$matter"] = client_id for the bundle's target matter (new_matter bundles)
 - refs["person:<full_name>"] = client_id for newly created people
 - refs["org:<name>"] = client_id for newly created organizations
+
+v2 additions: task_update, decision_update, org_detail_update, context_note,
+person_detail_update converters. convert_task handles tracks_task_ref and
+trigger_description. convert_follow_up removed (follow_ups are now tasks
+with task_mode: "follow_up").
 """
 
 import json
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+# Fields on the people table that person_detail_update can write
+PEOPLE_TABLE_FIELDS = {
+    "relationship_category", "email", "phone", "assistant_name",
+    "assistant_contact", "substantive_areas", "manager_person_id",
+}
 
 
 def _external_refs(communication_id: str, bundle_id: str, item_id: str) -> str:
@@ -39,21 +50,13 @@ def _resolve_matter_id(bundle: dict, refs: dict) -> str | None:
 
 
 def _resolve_ref(value: str | None, refs: dict, prefix: str) -> str | None:
-    """Resolve a value that might be a forward reference.
-
-    Returns $ref:client_id if found in refs, the original value if it looks
-    like a UUID (already resolved), or None if it cannot be resolved.
-    """
+    """Resolve a value that might be a forward reference."""
     if not value:
         return None
     key = f"{prefix}:{value}"
     if key in refs:
         return f"$ref:{refs[key]}"
-    # Only return the value if it looks like a UUID (already resolved)
-    _UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
-    if _UUID_RE.match(value):
-        return value
-    return None
+    return value
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -153,6 +156,8 @@ def convert_new_person(item: dict, bundle: dict, refs: dict) -> list[tuple[dict,
         "is_active": 1,
         "source": "ai",
         "source_id": item["id"],
+        "ai_confidence": item.get("confidence"),
+        "automation_hold": 1,
         "external_refs": _external_refs(
             bundle.get("_communication_id", ""), bundle["id"], item["id"]),
     }
@@ -176,22 +181,20 @@ def convert_task(item: dict, bundle: dict, refs: dict) -> list[tuple[dict, str]]
         "description": data.get("description"),
         "task_type": data.get("task_type"),
         "status": data.get("status", "not started"),
-        "task_mode": data.get("task_mode", "action"),
+        "task_mode": data.get("task_mode"),
         "priority": data.get("priority"),
         "assigned_to_person_id": _resolve_ref(
             data.get("assigned_to"), refs, "person") or data.get("assigned_to_person_id"),
+        "delegated_by_person_id": data.get("delegated_by_person_id"),
+        "supervising_person_id": data.get("supervising_person_id"),
+        "waiting_on_person_id": data.get("waiting_on_person_id"),
+        "waiting_on_org_id": data.get("waiting_on_org_id"),
+        "waiting_on_description": data.get("waiting_on_description"),
+        "trigger_description": data.get("trigger_description"),
         "expected_output": data.get("expected_output"),
         "due_date": data.get("due_date"),
         "deadline_type": data.get("deadline_type"),
-        "waiting_on_person_id": _resolve_ref(
-            data.get("waiting_on_person"), refs, "person") or data.get("waiting_on_person_id"),
-        "waiting_on_org_id": _resolve_ref(
-            data.get("waiting_on_org"), refs, "organization") or data.get("waiting_on_org_id"),
-        "waiting_on_description": data.get("waiting_on_description"),
-        "delegated_by_person_id": _resolve_ref(
-            data.get("delegated_by"), refs, "person") or data.get("delegated_by_person_id"),
-        "supervising_person_id": _resolve_ref(
-            data.get("supervising_person"), refs, "person") or data.get("supervising_person_id"),
+        "next_follow_up_date": data.get("next_follow_up_date"),
         "source": "ai",
         "source_id": item["id"],
         "ai_confidence": item.get("confidence"),
@@ -199,6 +202,12 @@ def convert_task(item: dict, bundle: dict, refs: dict) -> list[tuple[dict, str]]
         "external_refs": _external_refs(
             bundle.get("_communication_id", ""), bundle["id"], item["id"]),
     }
+
+    # Handle tracks_task_ref ($ref: syntax — batch endpoint resolves)
+    tracks_ref = data.get("tracks_task_ref")
+    if tracks_ref and isinstance(tracks_ref, str) and tracks_ref.startswith("$ref:"):
+        op_data["tracks_task_id"] = tracks_ref
+
     op_data = {k: v for k, v in op_data.items() if v is not None}
 
     return [({
@@ -208,37 +217,35 @@ def convert_task(item: dict, bundle: dict, refs: dict) -> list[tuple[dict, str]]
     }, item["id"])]
 
 
-def convert_follow_up(item: dict, bundle: dict, refs: dict) -> list[tuple[dict, str]]:
+def convert_task_update(item: dict, bundle: dict, refs: dict) -> list[tuple[dict, str]]:
+    """Produce a batch update operation for an existing task."""
     data = item["proposed_data"]
-    matter_id = data.get("matter_id") or _resolve_matter_id(bundle, refs)
+    task_id = data.get("existing_task_id")
+    changes = data.get("changes", {})
 
-    op_data = {
-        "title": data.get("title", "Follow up"),
-        "matter_id": matter_id,
-        "task_mode": "follow_up",
-        "status": "not started",
-        "priority": data.get("priority"),
-        "assigned_to_person_id": _resolve_ref(
-            data.get("assigned_to"), refs, "person") or data.get("assigned_to_person_id"),
-        "due_date": data.get("due_date"),
-        "waiting_on_person_id": _resolve_ref(
-            data.get("waiting_on_person"), refs, "person") or data.get("waiting_on_person_id"),
-        "waiting_on_org_id": _resolve_ref(
-            data.get("waiting_on_org"), refs, "organization") or data.get("waiting_on_org_id"),
-        "waiting_on_description": data.get("waiting_on_description"),
-        "source": "ai",
-        "source_id": item["id"],
-        "ai_confidence": item.get("confidence"),
-        "automation_hold": 1,
-        "external_refs": _external_refs(
-            bundle.get("_communication_id", ""), bundle["id"], item["id"]),
-    }
-    op_data = {k: v for k, v in op_data.items() if v is not None}
+    if not changes or not task_id:
+        return []
+
+    # Resolve any person/org references in changes
+    for field in ("assigned_to_person_id", "waiting_on_person_id"):
+        val = changes.get(field)
+        if val:
+            resolved = _resolve_ref(val, refs, "person")
+            if resolved:
+                changes[field] = resolved
+
+    for field in ("waiting_on_org_id",):
+        val = changes.get(field)
+        if val:
+            resolved = _resolve_ref(val, refs, "org")
+            if resolved:
+                changes[field] = resolved
 
     return [({
-        "op": "insert",
+        "op": "update",
         "table": "tasks",
-        "data": op_data,
+        "record_id": task_id,
+        "data": changes,
     }, item["id"])]
 
 
@@ -251,6 +258,10 @@ def convert_decision(item: dict, bundle: dict, refs: dict) -> list[tuple[dict, s
         "matter_id": matter_id,
         "decision_type": data.get("decision_type"),
         "status": data.get("status"),
+        "decision_assigned_to_person_id": data.get("decision_assigned_to_person_id"),
+        "decision_due_date": data.get("decision_due_date"),
+        "options_summary": data.get("options_summary"),
+        "recommended_option": data.get("recommended_option"),
         "decision_result": data.get("decision_result"),
         "made_at": data.get("made_at"),
         "notes": data.get("notes"),
@@ -267,6 +278,30 @@ def convert_decision(item: dict, bundle: dict, refs: dict) -> list[tuple[dict, s
         "op": "insert",
         "table": "decisions",
         "data": op_data,
+    }, item["id"])]
+
+
+def convert_decision_update(item: dict, bundle: dict, refs: dict) -> list[tuple[dict, str]]:
+    """Produce a batch update operation for an existing decision."""
+    data = item["proposed_data"]
+    decision_id = data.get("existing_decision_id")
+    changes = data.get("changes", {})
+
+    if not changes or not decision_id:
+        return []
+
+    for field in ("decision_assigned_to_person_id",):
+        val = changes.get(field)
+        if val:
+            resolved = _resolve_ref(val, refs, "person")
+            if resolved:
+                changes[field] = resolved
+
+    return [({
+        "op": "update",
+        "table": "decisions",
+        "record_id": decision_id,
+        "data": changes,
     }, item["id"])]
 
 
@@ -330,7 +365,6 @@ def convert_meeting_record(item: dict, bundle: dict, refs: dict) -> list[tuple[d
         "purpose": data.get("purpose"),
         "readout_summary": data.get("readout_summary"),
         "boss_attends": 1 if data.get("boss_attends") else 0,
-        "external_parties_attend": 1 if data.get("external_parties_attend") or data.get("external_parties") else 0,
         "source": "ai",
         "source_id": item["id"],
         "external_refs": _external_refs(comm_id, bundle["id"], item["id"]),
@@ -366,12 +400,8 @@ def convert_meeting_record(item: dict, bundle: dict, refs: dict) -> list[tuple[d
                 "person_id": person_id,
                 "meeting_role": p.get("meeting_role"),
                 "attended": 1 if p.get("attended", True) else 0,
-                "stance_summary": p.get("stance_summary"),
-                "stance_confidence": p.get("stance_confidence"),
-                "position_strength": p.get("position_strength"),
-                "moved_position": 1 if p.get("moved_position") else (0 if p.get("moved_position") is not None else None),
-                "movement_summary": p.get("movement_summary"),
                 "key_contribution_summary": p.get("key_contribution_summary"),
+                "stance_summary": p.get("stance_summary"),
             }
 
         part_data = {k: v for k, v in part_data.items() if v is not None}
@@ -429,7 +459,8 @@ def convert_stakeholder_addition(item: dict, bundle: dict, refs: dict) -> list[t
             "matter_id": matter_id,
             "organization_id": org_id,
             "organization_role": data.get("role") or data.get("matter_role"),
-            "notes": data.get("notes"),
+            "engagement_level": data.get("engagement_level"),
+            "notes": data.get("rationale_detail") or data.get("notes"),
         }
         op_data = {k: v for k, v in op_data.items() if v is not None}
         return [({
@@ -444,7 +475,7 @@ def convert_stakeholder_addition(item: dict, bundle: dict, refs: dict) -> list[t
             "person_id": person_id,
             "matter_role": data.get("role") or data.get("matter_role"),
             "engagement_level": data.get("engagement_level") or data.get("stance"),
-            "notes": data.get("notes"),
+            "notes": data.get("rationale_detail") or data.get("notes"),
         }
         op_data = {k: v for k, v in op_data.items() if v is not None}
         return [({
@@ -466,6 +497,8 @@ def convert_document(item: dict, bundle: dict, refs: dict) -> list[tuple[dict, s
         "matter_id": matter_id,
         "document_type": data.get("document_type"),
         "status": data.get("status", "draft"),
+        "assigned_to_person_id": data.get("assigned_to_person_id"),
+        "due_date": data.get("due_date"),
         "summary": data.get("summary"),
         "notes": data.get("notes"),
         "source": "ai",
@@ -482,126 +515,116 @@ def convert_document(item: dict, bundle: dict, refs: dict) -> list[tuple[dict, s
     }, item["id"])]
 
 
-
 def convert_context_note(item: dict, bundle: dict, refs: dict) -> list[tuple[dict, str]]:
-    """Compound: 1 item → context_notes INSERT + context_note_links INSERTs."""
+    """Compound: 1 item -> context_note INSERT + context_note_links INSERTs."""
     data = item["proposed_data"]
+    matter_id = data.get("matter_id") or _resolve_matter_id(bundle, refs)
     note_client_id = f"ctx-note-{item['id']}"
-    comm_id = bundle.get("_communication_id", "")
 
-    ops = []
-
-    # Compute stale_after from durability — use absolute ISO timestamps
-    stale_after = None
-    durability = data.get("durability", "durable")
-    if durability == "ephemeral":
-        from datetime import datetime, timedelta
-        stale_after = (datetime.utcnow() + timedelta(days=30)).isoformat() + "Z"
-    elif durability == "medium_term":
-        from datetime import datetime, timedelta
-        stale_after = (datetime.utcnow() + timedelta(days=180)).isoformat() + "Z"
-
-    # Op 1: INSERT context_notes
-    note_data = {
-        "title": data.get("title", ""),
-        "body": data.get("body", ""),
-        "category": data.get("category", "institutional_knowledge"),
-        "posture": data.get("posture", "factual"),
-        "durability": durability,
-        "sensitivity": data.get("sensitivity", "low"),
-        "status": "active",
+    op_data = {
+        "title": data.get("title"),
+        "matter_id": matter_id,
+        "category": data.get("category"),
+        "body": data.get("body"),
+        "posture": data.get("posture"),
         "speaker_attribution": data.get("speaker_attribution"),
-        "matter_id": data.get("matter_id") or _resolve_matter_id(bundle, refs),
-        "source_communication_id": comm_id or None,
+        "durability": data.get("durability", "durable"),
+        "sensitivity": data.get("sensitivity", "low"),
+        "effective_date": data.get("effective_date"),
+        "stale_after": data.get("stale_after"),
         "source": "ai",
-        "source_type": "transcript",
         "source_id": item["id"],
         "ai_confidence": item.get("confidence"),
-        "automation_hold": data.get("automation_hold", 1),
-        "is_active": 1,
-        "stale_after": stale_after,
-        "effective_date": data.get("effective_date"),
-        "external_refs": _external_refs(comm_id, bundle["id"], item["id"]),
+        "external_refs": _external_refs(
+            bundle.get("_communication_id", ""), bundle["id"], item["id"]),
     }
+    op_data = {k: v for k, v in op_data.items() if v is not None}
 
-    # Add source_excerpt and timestamps from evidence
-    evidence = item.get("source_evidence") or []
-    if evidence:
-        note_data["source_excerpt"] = evidence[0].get("excerpt", "")
-        first_range = evidence[0].get("time_range")
-        if first_range:
-            note_data["source_timestamp_start"] = first_range.get("start")
-            note_data["source_timestamp_end"] = first_range.get("end")
-
-    note_data = {k: v for k, v in note_data.items() if v is not None}
-
-    ops.append(({
+    ops = [({
         "op": "insert",
         "table": "context_notes",
         "client_id": note_client_id,
-        "data": note_data,
-    }, item["id"]))
+        "data": op_data,
+    }, item["id"])]
 
-    # Op 2+: INSERT context_note_links for each linked_entity
+    # Insert linked entities into context_note_links join table
     for le in data.get("linked_entities", []):
-        entity_type = le.get("entity_type")
         entity_id = le.get("entity_id")
-        role = le.get("relationship_role", "relevant_to")
-        if entity_type and entity_id:
-            link_data = {
-                "context_note_id": f"$ref:{note_client_id}",
-                "entity_type": entity_type,
-                "entity_id": entity_id,
-                "relationship_role": role,
-            }
-            ops.append(({
-                "op": "insert",
-                "table": "context_note_links",
-                "data": link_data,
-            }, item["id"]))
+        if not entity_id:
+            continue
+        link_data = {
+            "context_note_id": f"$ref:{note_client_id}",
+            "entity_type": le.get("entity_type"),
+            "entity_id": entity_id,
+            "relationship_role": le.get("relationship_role"),
+        }
+        link_data = {k: v for k, v in link_data.items() if v is not None}
+        ops.append(({
+            "op": "insert",
+            "table": "context_note_links",
+            "data": link_data,
+        }, item["id"]))
 
     return ops
 
 
 def convert_person_detail_update(item: dict, bundle: dict, refs: dict) -> list[tuple[dict, str]]:
-    """Upsert person_profiles with only the proposed fields."""
+    """Split fields into person_profiles (biographical) and people table updates."""
     data = item["proposed_data"]
     person_id = data.get("person_id")
-    fields = data.get("fields", {})
-    comm_id = bundle.get("_communication_id", "")
 
-    if not person_id or not fields:
-        logger.warning("person_detail_update item %s missing person_id or fields — skipping",
-                       item["id"][:8])
+    if not person_id:
+        logger.warning("person_detail_update item %s has no person_id — skipping", item["id"][:8])
         return []
 
-    # Build the profile update data
-    profile_data = dict(fields)
-    profile_data["person_id"] = person_id
+    fields = data.get("fields", {})
+    profile_fields = {k: v for k, v in fields.items() if k not in PEOPLE_TABLE_FIELDS}
+    people_fields = {k: v for k, v in fields.items() if k in PEOPLE_TABLE_FIELDS}
 
-    # The batch endpoint does INSERT, but person_profiles needs UPSERT.
-    # We use insert with the person_id. The batch endpoint will handle
-    # the insert. If a profile already exists, the committer should
-    # use the CRUD PUT endpoint instead.
-    # For now, we generate an insert and the committer handles upsert logic.
+    ops = []
 
-    op_data = dict(fields)
-    # Don't include person_id in the update fields — it's in the row already
-    # We'll use a special "_upsert_key" to signal the committer
-    op_data["_person_id"] = person_id
-    op_data["_upsert"] = True
+    # Profile update (person_profiles table, upsert by person_id)
+    if profile_fields:
+        ops.append(({
+            "op": "insert",
+            "table": "person_profiles",
+            "data": {
+                "person_id": person_id,
+                **profile_fields,
+            },
+            "_meta": {
+                "upsert_by": "person_id",
+                "source": "ai",
+                "source_id": item["id"],
+            },
+        }, item["id"]))
+
+    # People table update (only for fields currently unset)
+    if people_fields:
+        ops.append(({
+            "op": "update",
+            "table": "people",
+            "record_id": person_id,
+            "data": people_fields,
+        }, item["id"]))
+
+    return ops
+
+
+def convert_org_detail_update(item: dict, bundle: dict, refs: dict) -> list[tuple[dict, str]]:
+    """Produce a batch update operation for an existing organization."""
+    data = item["proposed_data"]
+    org_id = data.get("existing_org_id")
+    changes = data.get("changes", {})
+
+    if not changes or not org_id:
+        return []
 
     return [({
-        "op": "insert",
-        "table": "person_profiles",
-        "data": {
-            "person_id": person_id,
-            **fields,
-        },
-        "_meta": {
-            "upsert_by": "person_id",
-            "external_refs": _external_refs(comm_id, bundle["id"], item["id"]),
-        },
+        "op": "update",
+        "table": "organizations",
+        "record_id": org_id,
+        "data": changes,
     }, item["id"])]
 
 
@@ -613,8 +636,9 @@ CONVERTERS = {
     "new_organization": convert_new_organization,
     "new_person": convert_new_person,
     "task": convert_task,
-    "follow_up": convert_follow_up,
+    "task_update": convert_task_update,
     "decision": convert_decision,
+    "decision_update": convert_decision_update,
     "matter_update": convert_matter_update,
     "status_change": convert_status_change,
     "meeting_record": convert_meeting_record,
@@ -622,6 +646,7 @@ CONVERTERS = {
     "document": convert_document,
     "context_note": convert_context_note,
     "person_detail_update": convert_person_detail_update,
+    "org_detail_update": convert_org_detail_update,
 }
 
 

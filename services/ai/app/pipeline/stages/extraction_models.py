@@ -1,12 +1,17 @@
-"""Pydantic models for validating Sonnet extraction output.
+"""Pydantic models for validating extraction output (v1 + v2).
 
-These models validate the raw JSON output from Sonnet before
+These models validate the raw JSON output from the extraction model before
 post-processing. They enforce structural correctness but allow
 flexible proposed_data (validated at commit time against tracker schema).
+
+v2 changes:
+- source_evidence replaces source_excerpt/source_segments/source_time_range
+- client_id for forward references between items ($ref: syntax)
+- Name fallback fields for entity resolution when UUID is uncertain
 """
 
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 # ── Source provenance ──
@@ -17,9 +22,9 @@ class SourceTimeRange(BaseModel):
 
 
 class SourceEvidence(BaseModel):
-    """A single piece of supporting evidence from the source material."""
-    excerpt: str = Field(..., min_length=1, description="Exact or close quote")
-    segments: list[str] = Field(default_factory=list, description="Transcript segment IDs")
+    """A single piece of source evidence (v2 format)."""
+    excerpt: str = Field(..., min_length=1)
+    segments: list[str] = Field(default_factory=list)
     time_range: Optional[SourceTimeRange] = None
     speaker: Optional[str] = None
 
@@ -30,72 +35,69 @@ class ExtractionItem(BaseModel):
     """A single proposed tracker write."""
     item_type: str = Field(
         ...,
-        description="One of: task, follow_up, decision, matter_update, "
-                    "meeting_record, stakeholder_addition, status_change, "
-                    "document, new_person, new_organization",
+        description="One of: task, task_update, decision, decision_update, "
+                    "matter_update, meeting_record, stakeholder_addition, "
+                    "status_change, document, context_note, "
+                    "person_detail_update, new_person, new_organization, "
+                    "org_detail_update",
     )
     proposed_data: dict = Field(..., description="Item-type-specific fields")
     confidence: float = Field(..., ge=0.0, le=1.0)
     rationale: str = Field(..., min_length=1)
 
-    # New multi-evidence format (preferred)
+    # v2 source evidence (array of evidence objects)
     source_evidence: Optional[list[SourceEvidence]] = None
 
-    # Legacy single-evidence fields (still accepted for backward compat)
+    # v1 source fields (kept for backward compatibility)
     source_excerpt: Optional[str] = None
-    source_segments: list[str] = Field(default_factory=list)
+    source_segments: Optional[list[str]] = None
     source_time_range: Optional[SourceTimeRange] = None
 
-    def get_evidence_list(self) -> list[dict]:
-        """Return normalized evidence list regardless of format used."""
-        if self.source_evidence:
-            return [
-                {
-                    "excerpt": e.excerpt,
-                    "segments": e.segments,
-                    "time_range": {"start": e.time_range.start, "end": e.time_range.end} if e.time_range else None,
-                    "speaker": e.speaker,
-                }
-                for e in self.source_evidence
-            ]
-        # Fall back to legacy single evidence
-        if self.source_excerpt:
-            return [{
-                "excerpt": self.source_excerpt,
-                "segments": self.source_segments,
-                "time_range": {"start": self.source_time_range.start, "end": self.source_time_range.end} if self.source_time_range else None,
-                "speaker": None,
-            }]
-        return []
+    # v2 forward reference ID for paired records ($ref: syntax)
+    client_id: Optional[str] = Field(
+        default=None,
+        description="Temporary reference ID for forward references between items",
+    )
 
-    @property
-    def primary_excerpt(self) -> str:
-        """Return the first evidence excerpt (for backward compat DB column)."""
-        evidence = self.get_evidence_list()
-        return evidence[0]["excerpt"] if evidence else ""
+    # Entity reference name fallbacks (v2 — used when model can't resolve to UUID)
+    assigned_to_name: Optional[str] = None
+    waiting_on_name: Optional[str] = None
+    decision_assigned_to_name: Optional[str] = None
+    organization_name_ref: Optional[str] = None
 
-    @property
-    def primary_segments(self) -> list[str]:
-        """Return all unique segment IDs across all evidence."""
-        evidence = self.get_evidence_list()
-        seen = set()
-        result = []
-        for e in evidence:
-            for s in e.get("segments", []):
-                if s not in seen:
-                    seen.add(s)
-                    result.append(s)
-        return result
+    @model_validator(mode="after")
+    def normalize_source_fields(self):
+        """Ensure both v1 and v2 source formats are normalized.
 
-    @property
-    def primary_time_range(self):
-        """Return the widest time range spanning all evidence."""
-        evidence = self.get_evidence_list()
-        starts = [e["time_range"]["start"] for e in evidence if e.get("time_range")]
-        ends = [e["time_range"]["end"] for e in evidence if e.get("time_range")]
-        if starts and ends:
-            return SourceTimeRange(start=min(starts), end=max(ends))
-        return self.source_time_range
+        If v2 source_evidence is present, populate v1 fields from the first
+        entry for backward compatibility with post-processing and persistence.
+        If only v1 fields are present, build a single-entry source_evidence.
+        """
+        if self.source_evidence and len(self.source_evidence) > 0:
+            first = self.source_evidence[0]
+            if not self.source_excerpt:
+                self.source_excerpt = first.excerpt
+            if not self.source_segments:
+                self.source_segments = first.segments or []
+            if not self.source_time_range and first.time_range:
+                self.source_time_range = first.time_range
+        elif self.source_excerpt:
+            # v1 only — build source_evidence for uniformity
+            self.source_evidence = [SourceEvidence(
+                excerpt=self.source_excerpt,
+                segments=self.source_segments or [],
+                time_range=self.source_time_range,
+            )]
+
+        # Ensure v1 fields have defaults for post-processing
+        if not self.source_excerpt:
+            self.source_excerpt = ""
+        if not self.source_segments:
+            self.source_segments = []
+        if not self.source_time_range:
+            self.source_time_range = SourceTimeRange(start=0.0, end=0.0)
+
+        return self
 
 
 # ── Bundles ──
@@ -140,7 +142,7 @@ class SuppressedObservation(BaseModel):
 
 class ExtractionOutput(BaseModel):
     """Full validated extraction response from Sonnet."""
-    extraction_version: str = "1.0.0"
+    extraction_version: str = "2.0.0"
     communication_id: str
     extraction_summary: str
     matter_associations: list[MatterAssociation] = Field(default_factory=list)
@@ -154,16 +156,17 @@ class ExtractionOutput(BaseModel):
 VALID_BUNDLE_TYPES = {"matter", "new_matter", "standalone"}
 
 VALID_ITEM_TYPES = {
-    "task", "follow_up", "decision", "matter_update",
-    "meeting_record", "stakeholder_addition", "status_change",
-    "document", "new_person", "new_organization",
-    "context_note", "person_detail_update",
+    "task", "task_update", "decision", "decision_update",
+    "matter_update", "meeting_record", "stakeholder_addition",
+    "status_change", "document", "context_note",
+    "person_detail_update", "new_person", "new_organization",
+    "org_detail_update",
 }
 
-# Maps extraction_policy toggle names to item_type values
+# Maps extraction_policy toggle names to item_type values.
+# follow_ups are now tasks with task_mode: "follow_up", controlled by "propose_tasks".
 POLICY_TOGGLE_MAP = {
     "propose_tasks": "task",
-    "propose_follow_ups": "follow_up",
     "propose_decisions": "decision",
     "propose_matter_updates": "matter_update",
     "propose_meeting_records": "meeting_record",
@@ -173,5 +176,22 @@ POLICY_TOGGLE_MAP = {
     "propose_new_people": "new_person",
     "propose_new_organizations": "new_organization",
     "propose_context_notes": "context_note",
-    "propose_person_detail_updates": "person_detail_update",
+    "propose_person_details": "person_detail_update",
+}
+# Note: task_update, decision_update, org_detail_update are always-on by design.
+# Disabling them would cause the model to create duplicate records instead of updates.
+
+# Allowed fields for task_update changes
+TASK_UPDATE_ALLOWED_FIELDS = {
+    "status", "priority", "due_date", "deadline_type",
+    "assigned_to_person_id", "waiting_on_person_id",
+    "waiting_on_org_id", "waiting_on_description",
+    "next_follow_up_date", "description", "expected_output",
+}
+
+# Allowed fields for decision_update changes
+DECISION_UPDATE_ALLOWED_FIELDS = {
+    "status", "decision_assigned_to_person_id", "decision_due_date",
+    "options_summary", "recommended_option", "decision_result",
+    "made_at", "notes",
 }
