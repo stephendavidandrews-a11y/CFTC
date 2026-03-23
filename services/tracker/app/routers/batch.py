@@ -49,6 +49,26 @@ SOFT_DELETE_TABLES = {
 }
 
 
+# Enum constraints enforced on batch writes (mirrors Pydantic validators)
+COLUMN_ENUM_CONSTRAINTS = {
+    "tasks": {
+        "task_mode": {"action", "follow_up", "monitoring"},
+    },
+}
+
+
+def _validate_enum_constraints(table, data, operation_index):
+    """Reject batch writes that violate enum constraints."""
+    constraints = COLUMN_ENUM_CONSTRAINTS.get(table, {})
+    for col, allowed in constraints.items():
+        if col in data and data[col] is not None and data[col] not in allowed:
+            raise _typed_error(
+                400, "validation_failure", operation_index,
+                "Invalid value '%s' for %s.%s. Allowed: %s"
+                % (data[col], table, col, sorted(allowed))
+            )
+
+
 def _get_table_columns(db, table):
     """Get column names for a table."""
     rows = db.execute(f"PRAGMA table_info({table})").fetchall()
@@ -169,6 +189,10 @@ async def batch_write(body: dict, db=Depends(get_db),
                 if invalid:
                     raise _typed_error(400, "schema_mismatch", i,
                                        f"Invalid columns for {table}: {sorted(invalid)}")
+
+            # Enforce enum constraints
+            if data and op_type in ("insert", "update"):
+                _validate_enum_constraints(table, data, i)
 
             now = datetime.now().isoformat()
 

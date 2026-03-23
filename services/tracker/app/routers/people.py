@@ -20,7 +20,6 @@ async def list_people(
     search: str = Query(None),
     organization_id: str = Query(None),
     relationship_category: str = Query(None),
-    relationship_lane: str = Query(None),
     include_in_team: bool = Query(None),
     is_active: bool = Query(None),
     sort_by: str = Query("full_name"),
@@ -42,9 +41,6 @@ async def list_people(
     if relationship_category:
         conditions.append("p.relationship_category = ?")
         params.append(relationship_category)
-    if relationship_lane:
-        conditions.append("p.relationship_lane = ?")
-        params.append(relationship_lane)
     if include_in_team is not None:
         conditions.append("p.include_in_team_workload = ?")
         params.append(1 if include_in_team else 0)
@@ -179,20 +175,19 @@ async def create_person(body: CreatePerson, request: Request, db=Depends(get_db)
         body.include_in_team_workload = 1
     db.execute("""
         INSERT INTO people (id, full_name, first_name, last_name, title, organization_id,
-            email, phone, assistant_name, assistant_contact, working_style_notes,
-            substantive_areas, relationship_category, relationship_lane, personality,
+            email, phone, assistant_name, assistant_contact,
+            substantive_areas, relationship_category,
             last_interaction_date, next_interaction_needed_date, next_interaction_type,
             next_interaction_purpose, manager_person_id, include_in_team_workload,
             relationship_assigned_to_person_id, is_active,
             source, source_id, external_refs, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         pid, body.full_name, body.first_name, body.last_name,
         body.title, body.organization_id,
         body.email, body.phone, body.assistant_name,
-        body.assistant_contact, body.working_style_notes,
+        body.assistant_contact,
         body.substantive_areas, body.relationship_category,
-        body.relationship_lane, body.personality,
         body.last_interaction_date, body.next_interaction_needed_date,
         body.next_interaction_type, body.next_interaction_purpose,
         body.manager_person_id, body.include_in_team_workload,

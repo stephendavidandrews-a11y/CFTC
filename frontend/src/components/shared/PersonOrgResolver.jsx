@@ -109,22 +109,20 @@ function NewPersonForm({ onSave, onCancel }) {
     email: "",
     phone: "",
     relationship_category: "",
-    relationship_lane: "",
     include_in_team_workload: false,
     manager_person_id: "",
   });
-  const [enums, setEnums] = useState({ relationship_category: [], relationship_lane: [] });
+  const [enums, setEnums] = useState({ relationship_category: [] });
   const [orgs, setOrgs] = useState([]);
   const [people, setPeople] = useState([]);
 
   useEffect(() => {
     Promise.all([
       getEnum("relationship_category").catch(() => []),
-      getEnum("relationship_lane").catch(() => []),
       listOrganizations({ limit: 200 }).catch(() => ({ items: [] })),
       listPeople({ limit: 200, is_active: true }).catch(() => ({ items: [] })),
-    ]).then(([relCat, relLane, orgData, pplData]) => {
-      setEnums({ relationship_category: relCat, relationship_lane: relLane });
+    ]).then(([relCat, orgData, pplData]) => {
+      setEnums({ relationship_category: relCat });
       setOrgs(orgData.items || orgData || []);
       setPeople(pplData.items || pplData || []);
     });
@@ -156,7 +154,6 @@ function NewPersonForm({ onSave, onCancel }) {
       email: form.email.trim() || null,
       phone: form.phone.trim() || null,
       relationship_category: form.relationship_category || null,
-      relationship_lane: form.relationship_lane || null,
       include_in_team_workload: form.include_in_team_workload ? 1 : 0,
       manager_person_id: form.manager_person_id || null,
     });
@@ -272,19 +269,6 @@ function NewPersonForm({ onSave, onCancel }) {
       >
         <option value="">Select category...</option>
         {enums.relationship_category.map((v) => (
-          <option key={v} value={v}>{v}</option>
-        ))}
-      </select>
-
-      {/* Relationship lane dropdown */}
-      <div style={labelStyle}>Relationship Lane</div>
-      <select
-        value={form.relationship_lane}
-        onChange={(e) => handleChange("relationship_lane", e.target.value)}
-        style={selectStyle}
-      >
-        <option value="">Select lane...</option>
-        {enums.relationship_lane.map((v) => (
           <option key={v} value={v}>{v}</option>
         ))}
       </select>

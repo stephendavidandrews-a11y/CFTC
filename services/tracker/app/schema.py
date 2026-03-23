@@ -43,11 +43,8 @@ TABLES = [
         phone TEXT,
         assistant_name TEXT,
         assistant_contact TEXT,
-        working_style_notes TEXT,
         substantive_areas TEXT,
         relationship_category TEXT,
-        relationship_lane TEXT,
-        personality TEXT,
         last_interaction_date TEXT,
         next_interaction_needed_date TEXT,
         next_interaction_type TEXT,
@@ -127,6 +124,8 @@ TABLES = [
         waiting_on_person_id TEXT REFERENCES people(id),
         waiting_on_org_id TEXT REFERENCES organizations(id),
         waiting_on_description TEXT,
+        tracks_task_id TEXT REFERENCES tasks(id),
+        trigger_description TEXT,
         expected_output TEXT,
         due_date TEXT,
         deadline_type TEXT,
@@ -546,6 +545,7 @@ INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_tasks_waiting_on_org ON tasks(waiting_on_org_id);",
     "CREATE INDEX IF NOT EXISTS idx_tasks_task_type ON tasks(task_type);",
     "CREATE INDEX IF NOT EXISTS idx_tasks_deadline_type ON tasks(deadline_type);",
+    "CREATE INDEX IF NOT EXISTS idx_tasks_tracks_task_id ON tasks(tracks_task_id);",
 
     # -- documents --
     "CREATE INDEX IF NOT EXISTS idx_documents_matter ON documents(matter_id);",
@@ -670,3 +670,53 @@ def init_schema(conn: sqlite3.Connection) -> list[str]:
         logger.debug("Schema up to date — no new tables created.")
 
     return created
+
+
+def migrate_schema(conn: sqlite3.Connection):
+    """Run forward-only schema migrations. Idempotent."""
+    cursor = conn.cursor()
+    cols = {row[1] for row in cursor.execute('PRAGMA table_info(people)')}
+    dropped = []
+    for col in ('relationship_lane', 'working_style_notes', 'personality'):
+        if col in cols:
+            cursor.execute(f'ALTER TABLE people DROP COLUMN {col}')
+            dropped.append(col)
+    if dropped:
+        conn.commit()
+        logger.info('Migrated people: dropped columns %s', ', '.join(dropped))
+
+    # --- tasks: add tracks_task_id + migrate delegated/waiting modes ---
+    task_cols = {row[1] for row in cursor.execute('PRAGMA table_info(tasks)')}
+    task_migrated = False
+    if 'tracks_task_id' not in task_cols:
+        cursor.execute('ALTER TABLE tasks ADD COLUMN tracks_task_id TEXT REFERENCES tasks(id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_tasks_tracks_task_id ON tasks(tracks_task_id)')
+        logger.info('Migrated tasks: added tracks_task_id column')
+        task_migrated = True
+
+    # Migrate old task_mode values to new three-mode system
+    updated = cursor.execute(
+        "UPDATE tasks SET task_mode = 'action' WHERE task_mode LIKE 'delegated%'"
+    ).rowcount
+    updated += cursor.execute(
+        "UPDATE tasks SET task_mode = 'follow_up' WHERE task_mode LIKE 'waiting%'"
+    ).rowcount
+    # Specific mapping: decision -> follow_up (spec requirement)
+    updated += cursor.execute(
+        "UPDATE tasks SET task_mode = 'follow_up' WHERE task_mode = 'decision'"
+    ).rowcount
+    # Catch-all: any remaining non-standard mode values -> action
+    updated += cursor.execute(
+        "UPDATE tasks SET task_mode = 'action' WHERE task_mode NOT IN ('action', 'follow_up', 'monitoring')"
+    ).rowcount
+    if updated:
+        logger.info('Migrated %d tasks to standard task_mode values', updated)
+        task_migrated = True
+    if task_migrated:
+        conn.commit()
+
+    # --- tasks: add trigger_description ---
+    if 'trigger_description' not in task_cols:
+        cursor.execute('ALTER TABLE tasks ADD COLUMN trigger_description TEXT')
+        logger.info('Migrated tasks: added trigger_description column')
+        conn.commit()

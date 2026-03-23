@@ -66,8 +66,8 @@ MATTER_FIELDS = [
 ]
 
 TASK_FIELDS = [
-    {"field": "task_mode", "purpose": "action/waiting/delegated/deferred", "source": "manual", "impact": "All tasks look alike; no supervisory signal", "weight": 2, "is_enum": True,
-     "enum_values": ["action", "waiting", "decision", "follow-up", "reading", "delegated", "delegated - awaiting"]},
+    {"field": "task_mode", "purpose": "action/follow_up/monitoring", "source": "manual", "impact": "All tasks look alike; no supervisory signal", "weight": 2, "is_enum": True,
+     "enum_values": ["action", "follow_up", "monitoring"]},
     {"field": "expected_output", "purpose": "What done looks like", "source": "ai", "impact": "Completion is ambiguous", "weight": 2},
     {"field": "waiting_on_person_id", "purpose": "Who is blocking this task", "source": "ai", "impact": "Blocked work invisible", "weight": 1},
     {"field": "due_date", "purpose": "When the task is due", "source": "manual", "impact": "No overdue detection; deadline section incomplete", "weight": 3},

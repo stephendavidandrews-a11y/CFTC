@@ -42,15 +42,6 @@ const CATEGORY_COLORS = {
   "External stakeholder":{ bg: "#4a3728", text: "#fbbf24" },
 };
 
-const LANE_COLORS = {
-  "Decision-maker": { bg: "#4a2020", text: "#f87171" },
-  "Recommender":    { bg: "#4a3728", text: "#fbbf24" },
-  "Drafter":        { bg: "#1a4731", text: "#34d399" },
-  "Influencer":     { bg: "#3b1f6e", text: "#a78bfa" },
-  "Gatekeeper":     { bg: "#1a3a4a", text: "#38bdf8" },
-  "Coordinator":    { bg: "#3a3a1a", text: "#facc15" },
-};
-
 const ROLE_COLORS = {
   "client office":     { bg: "#1e3a5f", text: "#60a5fa" },
   "requesting office": { bg: "#3b1f6e", text: "#a78bfa" },
@@ -226,7 +217,7 @@ export default function OrgDetailPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                 <thead>
                   <tr>
-                    {["Name", "Title", "Category", "Lane", "Last Contact", "Next Needed"].map((col) => (
+                    {["Name", "Title", "Category", "Last Contact", "Next Needed"].map((col) => (
                       <th key={col} style={thStyle}>{col}</th>
                     ))}
                   </tr>
@@ -242,9 +233,6 @@ export default function OrgDetailPage() {
                       <td style={{ ...tdStyle, color: theme.text.muted }}>{p.title || "\u2014"}</td>
                       <td style={tdStyle}>
                         <SmallBadge label={p.relationship_category} colors={CATEGORY_COLORS[p.relationship_category]} />
-                      </td>
-                      <td style={tdStyle}>
-                        <SmallBadge label={p.relationship_lane} colors={LANE_COLORS[p.relationship_lane]} />
                       </td>
                       <td style={{ ...tdStyle, color: theme.text.muted }}>{formatDate(p.last_interaction_date)}</td>
                       <td style={{ ...tdStyle, color: p.next_interaction_needed_date ? theme.accent.yellowLight : theme.text.dim }}>

@@ -122,8 +122,8 @@ export function deleteTask(id) {
 
 // ── People ──────────────────────────────────────────────────────────────────
 
-export function listPeople({ organization_id, is_active, search, relationship_category, relationship_lane, include_in_team, sort_by, sort_dir, limit, offset } = {}) {
-  return fetchJSON(`${P}/people${qs({ organization_id, is_active, search, relationship_category, relationship_lane, include_in_team, sort_by, sort_dir, limit, offset })}`);
+export function listPeople({ organization_id, is_active, search, relationship_category, include_in_team, sort_by, sort_dir, limit, offset } = {}) {
+  return fetchJSON(`${P}/people${qs({ organization_id, is_active, search, relationship_category, include_in_team, sort_by, sort_dir, limit, offset })}`);
 }
 
 export function createPerson(data) {

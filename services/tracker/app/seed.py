@@ -81,128 +81,128 @@ def seed_all(conn: sqlite3.Connection) -> None:
     people = {}
 
     def _person(key, full_name, first, last, title, org_key,
-                phone=None, rel_cat=None, rel_lane=None,
+                phone=None, rel_cat=None,
                 team_workload=0, manager_key=None):
         people[key] = _uid()
         cursor.execute(
             """INSERT INTO people
                (id, full_name, first_name, last_name, title, organization_id,
-                phone, relationship_category, relationship_lane,
+                phone, relationship_category,
                 include_in_team_workload, manager_person_id,
                 is_active, source, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'import', ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'import', ?, ?)""",
             (people[key], full_name, first, last, title, orgs[org_key][0],
-             phone, rel_cat, rel_lane,
+             phone, rel_cat,
              team_workload, people.get(manager_key),
              now, now),
         )
 
     # --- Chairman's Office ---
     _person("selig", "Michael S. Selig", "Michael", "Selig",
-            "Chairman", "chairman", "202-418-5128", "Boss", "Decision-maker")
+            "Chairman", "chairman", "202-418-5128", "Boss")
     _person("zaidi", "Amir Zaidi", "Amir", "Zaidi",
-            "Chief of Staff", "chairman", "202-418-5128", "Boss", "Decision-maker")
+            "Chief of Staff", "chairman", "202-418-5128", "Boss")
     _person("titus", "Alex Titus", "Alex", "Titus",
-            "Chief Advisor", "chairman", "202-418-5128", "Leadership", "Recommender")
+            "Chief Advisor", "chairman", "202-418-5128", "Leadership")
     _person("tente", "Meghan Tente", "Meghan", "Tente",
-            "Senior Advisor", "chairman", "202-418-5128", "Leadership", "Recommender")
+            "Senior Advisor", "chairman", "202-418-5128", "Leadership")
     _person("passalacqua", "Michael Passalacqua", "Michael", "Passalacqua",
-            "Senior Advisor", "chairman", "202-418-5128", "Leadership", "Recommender")
+            "Senior Advisor", "chairman", "202-418-5128", "Leadership")
     _person("mitchell", "Cal Mitchell", "Cal", "Mitchell",
-            "Senior Advisor", "chairman", "202-418-5128", "Leadership", "Recommender")
+            "Senior Advisor", "chairman", "202-418-5128", "Leadership")
     _person("weyls", "Brigitte Weyls", "Brigitte", "Weyls",
-            "Senior Advisor", "chairman", "202-418-5128", "Leadership", "Recommender")
+            "Senior Advisor", "chairman", "202-418-5128", "Leadership")
     _person("mastrogiacomo", "Elizabeth Mastrogiacomo", "Elizabeth", "Mastrogiacomo",
-            "Senior Advisor", "chairman", "202-418-5128", "Leadership", "Recommender")
+            "Senior Advisor", "chairman", "202-418-5128", "Leadership")
     _person("johnston_e", "Emma Johnston", "Emma", "Johnston",
-            "Senior Agriculture Advisor", "chairman", "202-418-5128", "Leadership", "Recommender")
+            "Senior Agriculture Advisor", "chairman", "202-418-5128", "Leadership")
     _person("gunewardena", "Mel Gunewardena", "Mel", "Gunewardena",
-            "Senior Markets Advisor / Director OIA", "oia", "202-418-5645", "Leadership", "Recommender")
+            "Senior Markets Advisor / Director OIA", "oia", "202-418-5645", "Leadership")
 
     # --- Office of the General Counsel ---
     _person("badgley", "Tyler S. Badgley", "Tyler", "Badgley",
-            "General Counsel", "ogc", "202-418-5000", "Boss", "Decision-maker")
+            "General Counsel", "ogc", "202-418-5000", "Boss")
     _person("einstman", "John Einstman", "John", "Einstman",
-            "Deputy General Counsel, General Law", "ogc", None, "Leadership", "Recommender",
+            "Deputy General Counsel, General Law", "ogc", None, "Leadership",
             team_workload=1, manager_key="badgley")
     _person("stukes", "Anne Stukes", "Anne", "Stukes",
             "Acting Deputy General Counsel (Litigation, Enforcement & Adjudication)", "ogc", None,
-            "Leadership", "Recommender", team_workload=1, manager_key="badgley")
+            "Leadership", team_workload=1, manager_key="badgley")
     _person("robinson", "Natasha Robinson", "Natasha", "Robinson",
             "Deputy General Counsel, Legislative & Intergovernmental Affairs", "ogc", None,
-            "Leadership", "Recommender", team_workload=1, manager_key="badgley")
+            "Leadership", team_workload=1, manager_key="badgley")
     _person("jurgens", "Melissa Jurgens", "Melissa", "Jurgens",
             "Deputy General Counsel, Secretariat and Information Management", "ogc", None,
-            "Leadership", "Recommender", team_workload=1, manager_key="badgley")
+            "Leadership", team_workload=1, manager_key="badgley")
     _person("kirkpatrick", "Christopher J. Kirkpatrick", "Christopher", "Kirkpatrick",
-            "Secretary of the Commission", "ogc", "202-418-5000", "OGC peer", "Drafter")
+            "Secretary of the Commission", "ogc", "202-418-5000", "OGC peer")
     _person("smith_e", "Eugene Smith", "Eugene", "Smith",
-            "Director, Office of Proceedings", "ogc", "202-418-5000", "OGC peer", "Drafter")
+            "Director, Office of Proceedings", "ogc", "202-418-5000", "OGC peer")
 
     # --- Division of Clearing and Risk ---
     _person("haynes", "Richard Haynes", "Richard", "Haynes",
-            "Acting Director", "dcr", "202-418-5430", "Internal client", "Recommender")
+            "Acting Director", "dcr", "202-418-5430", "Internal client")
     _person("josephson", "Sarah Josephson", "Sarah", "Josephson",
             "Deputy Director, International & Domestic Clearing Initiatives", "dcr", None,
-            "Internal client", "Recommender")
+            "Internal client")
     _person("donovan", "Eileen Donovan", "Eileen", "Donovan",
-            "Deputy Director, Clearing Policy", "dcr", None, "Internal client", "Recommender")
+            "Deputy Director, Clearing Policy", "dcr", None, "Internal client")
 
     # --- Division of Enforcement ---
     _person("miller", "David I. Miller", "David", "Miller",
-            "Director", "doe", "202-418-5000", "Internal client", "Decision-maker")
+            "Director", "doe", "202-418-5000", "Internal client")
     _person("hayeck", "Paul Hayeck", "Paul", "Hayeck",
-            "Deputy Director", "doe", None, "Internal client", "Recommender")
+            "Deputy Director", "doe", None, "Internal client")
 
     # --- Division of Market Oversight ---
     _person("fisanich", "Frank Fisanich", "Frank", "Fisanich",
-            "Acting Director", "dmo", "202-418-5000", "Internal client", "Recommender")
+            "Acting Director", "dmo", "202-418-5000", "Internal client")
     _person("varma", "Rahul Varma", "Rahul", "Varma",
             "Deputy Director, Products and Market Analytics Branch", "dmo", None,
-            "Internal client", "Recommender")
+            "Internal client")
 
     # --- Market Participants Division ---
     _person("smith_t", "Thomas Smith", "Thomas", "Smith",
-            "Acting Director", "mpd", "202-418-5000", "Internal client", "Recommender")
+            "Acting Director", "mpd", "202-418-5000", "Internal client")
 
     # --- Division of Data ---
     _person("wehner", "Ed Wehner", "Ed", "Wehner",
-            "Chief Data Officer and Director", "dod", "202-418-5000", "Internal client", "Recommender")
+            "Chief Data Officer and Director", "dod", "202-418-5000", "Internal client")
 
     # --- Division of Administration ---
     _person("sielski", "Marc H. Sielski", "Marc", "Sielski",
-            "Executive Director", "doa", "202-418-5000", "Internal client", "Recommender")
+            "Executive Director", "doa", "202-418-5000", "Internal client")
     _person("perera", "Janaka Perera", "Janaka", "Perera",
-            "Chief Information Officer", "doa", None, "Internal client", "Recommender")
+            "Chief Information Officer", "doa", None, "Internal client")
 
     # --- Office of International Affairs ---
     _person("melara", "Mauricio Melara", "Mauricio", "Melara",
-            "Deputy Director", "oia", None, "OGC peer", "Recommender")
+            "Deputy Director", "oia", None, "OGC peer")
 
     # --- Office of Public Affairs ---
     _person("nethercott", "Brooke Nethercott", "Brooke", "Nethercott",
-            "Director", "opa", "202-418-5080", "OGC peer", "Recommender")
+            "Director", "opa", "202-418-5080", "OGC peer")
 
     # --- Office of Legislative Affairs ---
     _person("brubaker", "Alan Brubaker", "Alan", "Brubaker",
-            "Director", "olia", "202-418-5764", "OGC peer", "Recommender")
+            "Director", "olia", "202-418-5764", "OGC peer")
 
     # --- Office of Inspector General ---
     _person("skinner", "Christopher Skinner", "Christopher", "Skinner",
-            "Inspector General", "oig", "202-418-5510", "Internal client", "Decision-maker")
+            "Inspector General", "oig", "202-418-5510", "Internal client")
 
     # --- External (for stakeholder demos) ---
     # These are fictional — external contacts for demo matters
     _person("sec_contact", "Jennifer Walsh", "Jennifer", "Walsh",
             "Deputy Director, Division of Trading and Markets", "sec", None,
-            "Partner agency", "Recommender")
+            "Partner agency")
     _person("treasury_contact", "Robert Chen", "Robert", "Chen",
             "Deputy Assistant Secretary, Financial Markets", "treasury", None,
-            "Partner agency", "Recommender")
+            "Partner agency")
     _person("cme_contact", "Margaret Liu", "Margaret", "Liu",
-            "SVP, Regulatory Affairs", "cme", None, "Outside party", "Influencer")
+            "SVP, Regulatory Affairs", "cme", None, "Outside party")
     _person("fia_contact", "James Henderson", "James", "Henderson",
-            "VP, Regulatory Policy", "fia", None, "Outside party", "Influencer")
+            "VP, Regulatory Policy", "fia", None, "Outside party")
 
     conn.commit()
     logger.info(

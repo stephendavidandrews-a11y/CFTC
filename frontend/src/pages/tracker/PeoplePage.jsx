@@ -55,15 +55,6 @@ const CATEGORY_COLORS = {
   "Outside party":        { bg: "#3a2a3a", text: "#c084fc" },
 };
 
-const LANE_COLORS = {
-  "Decision-maker": { bg: "#4a2020", text: "#f87171" },
-  "Recommender":    { bg: "#4a3728", text: "#fbbf24" },
-  "Drafter":        { bg: "#1e3a5f", text: "#60a5fa" },
-  "Blocker":        { bg: "#4a2020", text: "#f87171" },
-  "Influencer":     { bg: "#3b1f6e", text: "#a78bfa" },
-  "FYI only":       { bg: "#2a2a2a", text: "#9ca3af" },
-};
-
 /* ── Helpers ─────────────────────────────────────────────────── */
 
 function timeAgo(d) {
@@ -119,7 +110,6 @@ export default function PeoplePage() {
   const { openDrawer } = useDrawer();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
-  const [laneFilter, setLaneFilter] = useState("");
   const [sortBy, setSortBy] = useState("full_name");
   const [activeView, setActiveView] = useState(0);
 
@@ -128,19 +118,17 @@ export default function PeoplePage() {
     () => listPeople({
       search,
       relationship_category: categoryFilter,
-      relationship_lane: laneFilter,
       is_active: true,
       sort_by: sortBy,
       sort_dir: sortBy === "last_interaction_date" || sortBy === "active_matters" || sortBy === "open_tasks" ? "desc" : "asc",
       limit: 500,
     }),
-    [search, categoryFilter, laneFilter, sortBy]
+    [search, categoryFilter, sortBy]
   );
 
   const handleViewClick = useCallback((idx) => {
     setActiveView(idx);
     setCategoryFilter("");
-    setLaneFilter("");
   }, []);
 
   const rawPeople = data?.items || data || [];
@@ -153,7 +141,6 @@ export default function PeoplePage() {
   }, [rawPeople, activeView]);
 
   const categoryOpts = enums?.relationship_category || [];
-  const laneOpts = enums?.relationship_lane || [];
 
   const columns = [
     {
@@ -224,20 +211,6 @@ export default function PeoplePage() {
         );
       },
     },
-    {
-      key: "relationship_lane", label: "Lane", width: 110,
-      render: (val) => {
-        const c = LANE_COLORS[val] || { bg: theme.bg.input, text: theme.text.faint };
-        return (
-          <span style={{
-            background: c.bg, color: c.text,
-            padding: "2px 8px", borderRadius: 10, fontSize: 11, fontWeight: 500, whiteSpace: "nowrap",
-          }}>
-            {val || "\u2014"}
-          </span>
-        );
-      },
-    },
   ];
 
   const summaryCards = [
@@ -256,10 +229,6 @@ export default function PeoplePage() {
           <select style={inputStyle} value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setActiveView(0); }}>
             <option value="">All Categories</option>
             {categoryOpts.map((v) => <option key={v} value={v}>{v}</option>)}
-          </select>
-          <select style={inputStyle} value={laneFilter} onChange={(e) => { setLaneFilter(e.target.value); setActiveView(0); }}>
-            <option value="">All Lanes</option>
-            {laneOpts.map((v) => <option key={v} value={v}>{v}</option>)}
           </select>
           <select style={inputStyle} value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
             <option value="full_name">Sort: Name</option>

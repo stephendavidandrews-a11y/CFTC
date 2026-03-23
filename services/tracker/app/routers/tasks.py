@@ -86,7 +86,9 @@ async def list_tasks(
     rows = db.execute(f"""
         SELECT t.*, p.full_name as owner_name, m.title as matter_title, m.matter_number,
                wp.full_name as waiting_on_person_name, wo.name as waiting_on_org_name,
-               db_person.full_name as delegated_by_name
+               db_person.full_name as delegated_by_name,
+               t.tracks_task_id,
+               t.trigger_description
         FROM tasks t
         LEFT JOIN people p ON t.assigned_to_person_id = p.id
         LEFT JOIN matters m ON t.matter_id = m.id
@@ -136,7 +138,22 @@ async def get_task(task_id: str, db=Depends(get_db)):
     """, (task_id,)).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Task not found")
-    return JSONResponse(content=dict(row), headers={"ETag": get_etag(row)})
+    result = dict(row)
+
+    # Reverse lookup: tasks that track this task via tracks_task_id
+    tracked_by = db.execute(
+        "SELECT id, title FROM tasks WHERE tracks_task_id = ?", (task_id,)
+    ).fetchall()
+    result["tracked_by_tasks"] = [{"id": r["id"], "title": r["title"]} for r in tracked_by]
+
+    # Forward lookup: if this task tracks another, include tracked task title
+    if result.get("tracks_task_id"):
+        tracked = db.execute(
+            "SELECT title FROM tasks WHERE id = ?", (result["tracks_task_id"],)
+        ).fetchone()
+        result["tracks_task_title"] = tracked["title"] if tracked else None
+
+    return JSONResponse(content=result, headers={"ETag": get_etag(row)})
 
 
 @router.post("")
@@ -160,8 +177,9 @@ async def create_task(body: CreateTask, request: Request, db=Depends(get_db),
             waiting_on_description, expected_output, due_date, deadline_type, sort_order,
             next_follow_up_date, completion_notes, started_at, completed_at,
             source, source_id, ai_confidence, automation_hold, external_refs,
+            tracks_task_id, trigger_description,
             created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         task_id, body.matter_id, body.title, body.description,
         body.task_type, body.status, body.task_mode,
@@ -175,6 +193,7 @@ async def create_task(body: CreateTask, request: Request, db=Depends(get_db),
         body.started_at, body.completed_at,
         source_val, body.source_id,
         body.ai_confidence, body.automation_hold, body.external_refs,
+        body.tracks_task_id, body.trigger_description,
         now, now,
     ))
     new_data = body.model_dump()
@@ -207,6 +226,38 @@ async def update_task(task_id: str, body: UpdateTask, request: Request, db=Depen
     db.execute(f"UPDATE tasks SET {', '.join(sets)} WHERE id = ?", params)
     log_event(db, table_name="tasks", record_id=task_id, action="update",
               source=write_source, old_record=old, new_data=data)
+
+    # Completion hook: when a task is marked done, transition tracking follow_ups
+    if data.get("status") == "done" and old["status"] != "done":
+        # Find assignee name for summary
+        assignee_name = None
+        if old["assigned_to_person_id"]:
+            assignee_row = db.execute(
+                "SELECT full_name FROM people WHERE id = ?",
+                (old["assigned_to_person_id"],)
+            ).fetchone()
+            if assignee_row:
+                assignee_name = assignee_row["full_name"]
+
+        tracking_tasks = db.execute(
+            "SELECT id, status FROM tasks WHERE tracks_task_id = ? AND status NOT IN ('done', 'deferred')",
+            (task_id,)
+        ).fetchall()
+        for tt in tracking_tasks:
+            now_ts = datetime.now().isoformat()
+            db.execute(
+                "UPDATE tasks SET status = 'needs review', updated_at = ? WHERE id = ?",
+                (now_ts, tt["id"])
+            )
+            summary_text = "Tracked action completed. Ready to close."
+            if assignee_name:
+                summary_text = f"Tracked action completed by {assignee_name}. Ready to close."
+            update_id = str(uuid.uuid4())
+            db.execute(
+                "INSERT INTO task_updates (id, task_id, update_type, summary, old_status, new_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (update_id, tt["id"], "status update", summary_text, tt["status"], "needs review", now_ts)
+            )
+
     db.commit()
     return {"id": task_id, "updated": True}
 
