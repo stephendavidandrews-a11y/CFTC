@@ -27,7 +27,7 @@ const SECTIONS = [
   // -- Intelligence --
   { separator: true, label: "Intelligence" },
   { path: "/intelligence/daily", label: "Daily Brief", icon: "\u25cb" },
-  { path: "/intelligence/digests", label: "Weekly Brief", icon: "\u25eb" },
+  { path: "/intelligence/weekly", label: "Weekly Brief", icon: "\u25eb" },
 
   // -- Settings --
   { separator: true, label: "Settings" },

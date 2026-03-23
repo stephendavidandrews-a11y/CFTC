@@ -117,7 +117,46 @@ async def lifespan(app: FastAPI):
             replace_existing=True,
         )
         scheduler.start()
-        logger.info("APScheduler started: daily_brief at 05:55")
+        def _run_weekly_brief():
+            try:
+                from app.jobs.weekly_brief import generate_weekly_brief, add_executive_summary
+                from app.jobs.daily_brief import store_brief
+                from app.jobs.html_renderer import render_weekly_html
+                from app.jobs.docx_renderer import render_weekly_docx
+                from app.jobs.email_sender import send_email
+                from app.db import get_connection
+                from datetime import date
+
+                db = get_connection()
+                try:
+                    data = generate_weekly_brief(db)
+                    try:
+                        data = add_executive_summary(data, True)
+                    except Exception:
+                        pass
+                    today = date.today().isoformat()
+                    html = render_weekly_html(data)
+                    docx_path = render_weekly_docx(data)
+                    model = "sonnet" if data.get("executive_summary") else None
+                    store_brief(db, "weekly", today, data, str(docx_path), model)
+                    send_email(
+                        subject="CFTC Weekly Brief \u2014 " + data.get("date_display", today),
+                        html_body=html,
+                        docx_path=docx_path,
+                    )
+                    logger.info("Weekly brief generated and sent for %s", today)
+                finally:
+                    db.close()
+            except Exception as e:
+                logger.error("Weekly brief job failed: %s", e, exc_info=True)
+
+        scheduler.add_job(
+            _run_weekly_brief,
+            CronTrigger(day_of_week="sun", hour=20, minute=0),
+            id="weekly_brief",
+            replace_existing=True,
+        )
+        logger.info("APScheduler started: daily_brief at 05:55, weekly_brief Sun 20:00")
     except ImportError:
         logger.warning("APScheduler not installed \u2014 intelligence briefs will not auto-generate")
     except Exception as e:
