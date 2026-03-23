@@ -419,6 +419,7 @@ export default function TasksPage() {
     myTasks,
     delegatedGroups,
     waitingTasks,
+    teamGroups,
     myOverdue,
     teamOverdue,
     blockedCount,
@@ -454,13 +455,13 @@ export default function TasksPage() {
       });
 
     // Section 2: Delegated Work
-    // Tasks where I delegated (delegated_by = me) or task_mode = delegated with assigned != me
+    // Tasks where I delegated (delegated_by = me) or task_mode starts with "delegated"
     const delegatedTasks = activeTasks.filter((t) => {
       if (!me) return false;
       return (
         (t.delegated_by_person_id === me &&
           t.assigned_to_person_id !== me) ||
-        (t.task_mode === "delegated" &&
+        ((t.task_mode || "").startsWith("delegated") &&
           t.assigned_to_person_id &&
           t.assigned_to_person_id !== me)
       );
@@ -582,11 +583,49 @@ export default function TasksPage() {
           (safeDate(b.due_date)?.getTime() || Infinity)
       );
 
+    // Section 4: Team Tasks (catch-all for tasks not in any other section)
+    const claimedIds = new Set([
+      ..._myTasks.map((t) => t.id),
+      ...delegatedTasks.map((t) => t.id),
+      ..._waitingTasks.map((t) => t.id),
+    ]);
+    const _teamTasks = activeTasks
+      .filter((t) => !claimedIds.has(t.id))
+      .sort((a, b) => {
+        const aOver = isDueOverdue(a.due_date) ? 0 : 1;
+        const bOver = isDueOverdue(b.due_date) ? 0 : 1;
+        if (aOver !== bOver) return aOver - bOver;
+        const aD = safeDate(a.due_date)?.getTime() || Infinity;
+        const bD = safeDate(b.due_date)?.getTime() || Infinity;
+        return aD - bD;
+      });
+
+    // Group team tasks by assignee
+    const _teamGroups = [];
+    const teamByAssignee = {};
+    for (const t of _teamTasks) {
+      const aid = t.assigned_to_person_id || "unassigned";
+      if (!teamByAssignee[aid]) teamByAssignee[aid] = [];
+      teamByAssignee[aid].push(t);
+    }
+    for (const [aid, tasks] of Object.entries(teamByAssignee)) {
+      const name = aid === "unassigned" ? "Unassigned" : nameMap[aid] || "Unknown";
+      _teamGroups.push({
+        key: aid,
+        title: name,
+        rows: tasks,
+        overdue: tasks.filter((t) => isDueOverdue(t.due_date)).length,
+      });
+    }
+    _teamGroups.sort(
+      (a, b) => b.overdue - a.overdue || a.title.localeCompare(b.title)
+    );
+
     // Stats
     const _myOverdue = _myTasks.filter((t) =>
       isDueOverdue(t.due_date)
     ).length;
-    const _teamOverdue = delegatedTasks.filter((t) =>
+    const _teamOverdue = [...delegatedTasks, ..._teamTasks].filter((t) =>
       isDueOverdue(t.due_date)
     ).length;
     const _blockedCount = _waitingTasks.length;
@@ -605,6 +644,7 @@ export default function TasksPage() {
       myTasks: _myTasks,
       delegatedGroups: _delegatedGroups,
       waitingTasks: _waitingTasks,
+      teamGroups: _teamGroups,
       myOverdue: _myOverdue,
       teamOverdue: _teamOverdue,
       blockedCount: _blockedCount,
@@ -1075,9 +1115,53 @@ export default function TasksPage() {
           )}
 
           {/* Empty state if all sections empty */}
+          {/* Section 4: Team Tasks */}
+          {teamGroups.length > 0 && (
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 12 }}>
+                <div style={sectionTitleStyle}>Team Tasks</div>
+                <span style={{ fontSize: 13, color: theme.text.faint }}>
+                  {teamGroups.reduce((s, g) => s + g.rows.length, 0)} task
+                  {teamGroups.reduce((s, g) => s + g.rows.length, 0) !== 1 ? "s" : ""}
+                </span>
+              </div>
+              {teamGroups.map((group) => (
+                <div key={group.key} style={{ marginBottom: 16 }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: theme.text.muted,
+                      marginBottom: 6,
+                      display: "flex",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <span>{group.title}</span>
+                    <span style={{ fontWeight: 400, fontSize: 12 }}>
+                      {group.rows.length} task{group.rows.length !== 1 ? "s" : ""}
+                      {group.overdue > 0 && (
+                        <span style={{ color: "#f87171", marginLeft: 8 }}>
+                          {group.overdue} overdue
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <DataTable
+                    data={group.rows}
+                    columns={delegatedColumns}
+                    onRowClick={(row) => openDrawer("task", row, refetch)}
+                    compact
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
           {myTasks.length === 0 &&
             delegatedGroups.length === 0 &&
-            waitingTasks.length === 0 && (
+            waitingTasks.length === 0 &&
+            teamGroups.length === 0 && (
               <div style={cardStyle}>
                 <EmptyState
                   title="No active tasks"
@@ -1218,7 +1302,7 @@ export default function TasksPage() {
       {!loading && !error && (
         <div style={{ marginTop: 12, fontSize: 12, color: theme.text.dim }}>
           {isGroupedMode
-            ? `${myTasks.length} personal + ${delegatedGroups.reduce((s, g) => s + g.rows.length, 0)} delegated + ${waitingTasks.length} waiting`
+            ? `${myTasks.length} personal + ${delegatedGroups.reduce((s, g) => s + g.rows.length, 0)} delegated + ${teamGroups.reduce((s, g) => s + g.rows.length, 0)} team + ${waitingTasks.length} waiting`
             : `Showing ${(filteredTasks || []).length} task${(filteredTasks || []).length !== 1 ? "s" : ""}`}
         </div>
       )}
