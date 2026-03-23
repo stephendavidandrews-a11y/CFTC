@@ -34,6 +34,14 @@ dst.close()
     fi
 done
 
+# VACUUM backup copies to reclaim space
+echo ""
+echo "Running VACUUM on backup copies..."
+for f in "$BACKUP_PATH"/*.db; do
+    [ -f "$f" ] || continue
+    python3 -c "import sqlite3; c = sqlite3.connect('$f'); c.execute('VACUUM'); c.close()" 2>/dev/null && echo "  VACUUM: $(basename $f)" || echo "  VACUUM failed: $(basename $f)"
+done
+
 # Verify
 echo ""
 echo "Backup verification:"

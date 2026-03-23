@@ -164,8 +164,13 @@ async def get_intelligence_data(
 # ---------------------------------------------------------------------------
 
 def _get_matters_with_nested(db):
-    """All open matters with stakeholders, recent updates, open tasks, open decisions."""
-    matters = []
+    """All open matters with stakeholders, updates, tasks, decisions.
+
+    Uses batch queries (7 total) instead of per-matter sub-queries
+    to avoid N+1 performance issues.
+    """
+    from collections import defaultdict
+
     rows = db.execute("""
         SELECT m.id, m.matter_number, m.title, m.matter_type, m.description,
                m.problem_statement, m.why_it_matters, m.status, m.priority,
@@ -193,61 +198,91 @@ def _get_matters_with_nested(db):
         ORDER BY m.priority, m.title
     """).fetchall()
 
+    matter_ids = [row["id"] for row in rows]
+    if not matter_ids:
+        return []
+
+    placeholders = ",".join("?" * len(matter_ids))
+
+    # Batch query: tags
+    tags_by_matter = defaultdict(list)
+    for row in db.execute(f"""
+        SELECT mt.matter_id, t.name
+        FROM matter_tags mt JOIN tags t ON t.id = mt.tag_id
+        WHERE mt.matter_id IN ({placeholders})
+        ORDER BY t.name
+    """, matter_ids):
+        tags_by_matter[row["matter_id"]].append(row["name"])
+
+    # Batch query: stakeholders
+    stakeholders_by_matter = defaultdict(list)
+    for row in db.execute(f"""
+        SELECT mp.matter_id, mp.person_id, p.full_name, mp.matter_role, mp.engagement_level
+        FROM matter_people mp JOIN people p ON mp.person_id = p.id
+        WHERE mp.matter_id IN ({placeholders})
+    """, matter_ids):
+        stakeholders_by_matter[row["matter_id"]].append(dict(row))
+
+    # Batch query: organizations
+    orgs_by_matter = defaultdict(list)
+    for row in db.execute(f"""
+        SELECT mo.matter_id, mo.organization_id, o.name, mo.organization_role
+        FROM matter_organizations mo JOIN organizations o ON mo.organization_id = o.id
+        WHERE mo.matter_id IN ({placeholders})
+    """, matter_ids):
+        orgs_by_matter[row["matter_id"]].append(dict(row))
+
+    # Batch query: recent updates (top 3 per matter via window function)
+    updates_by_matter = defaultdict(list)
+    for row in db.execute(f"""
+        SELECT matter_id, update_type, summary, created_at
+        FROM (
+            SELECT *, ROW_NUMBER() OVER (PARTITION BY matter_id ORDER BY created_at DESC) as rn
+            FROM matter_updates
+            WHERE matter_id IN ({placeholders})
+        ) WHERE rn <= 3
+    """, matter_ids):
+        updates_by_matter[row["matter_id"]].append(dict(row))
+
+    # Batch query: open tasks
+    tasks_by_matter = defaultdict(list)
+    for row in db.execute(f"""
+        SELECT t.matter_id, t.id, t.title, t.description, t.status, t.task_mode,
+               t.priority, t.assigned_to_person_id, p.full_name as assigned_to_name,
+               t.due_date, t.deadline_type,
+               t.waiting_on_person_id, t.waiting_on_org_id, t.waiting_on_description,
+               t.trigger_description, t.expected_output, t.tracks_task_id,
+               t.next_follow_up_date
+        FROM tasks t
+        LEFT JOIN people p ON t.assigned_to_person_id = p.id
+        WHERE t.matter_id IN ({placeholders}) AND t.status NOT IN ('done', 'deferred')
+        ORDER BY t.due_date
+    """, matter_ids):
+        tasks_by_matter[row["matter_id"]].append(dict(row))
+
+    # Batch query: open decisions
+    decisions_by_matter = defaultdict(list)
+    for row in db.execute(f"""
+        SELECT d.matter_id, d.id, d.title, d.decision_type, d.status,
+               d.decision_assigned_to_person_id, p.full_name as decision_owner_name,
+               d.decision_due_date, d.options_summary, d.recommended_option
+        FROM decisions d
+        LEFT JOIN people p ON d.decision_assigned_to_person_id = p.id
+        WHERE d.matter_id IN ({placeholders}) AND d.status IN ('pending', 'under consideration')
+    """, matter_ids):
+        decisions_by_matter[row["matter_id"]].append(dict(row))
+
+    # Assemble
+    matters = []
     for matter_row in rows:
         matter = dict(matter_row)
         mid = matter["id"]
-
-        matter["tags"] = [row["name"] for row in db.execute("""
-            SELECT t.name FROM tags t
-            JOIN matter_tags mt ON t.id = mt.tag_id
-            WHERE mt.matter_id = ?
-            ORDER BY t.name
-        """, (mid,))]
-
-        matter["stakeholders"] = [dict(row) for row in db.execute("""
-            SELECT mp.person_id, p.full_name, mp.matter_role, mp.engagement_level
-            FROM matter_people mp
-            JOIN people p ON mp.person_id = p.id
-            WHERE mp.matter_id = ?
-        """, (mid,))]
-
-        matter["organizations"] = [dict(row) for row in db.execute("""
-            SELECT mo.organization_id, o.name, mo.organization_role
-            FROM matter_organizations mo
-            JOIN organizations o ON mo.organization_id = o.id
-            WHERE mo.matter_id = ?
-        """, (mid,))]
-
-        matter["recent_updates"] = [dict(row) for row in db.execute("""
-            SELECT update_type, summary, created_at
-            FROM matter_updates
-            WHERE matter_id = ?
-            ORDER BY created_at DESC
-            LIMIT 3
-        """, (mid,))]
-
-        matter["open_tasks"] = [dict(row) for row in db.execute("""
-            SELECT t.id, t.title, t.description, t.status, t.task_mode,
-                   t.priority, t.assigned_to_person_id, p.full_name as assigned_to_name,
-                   t.due_date, t.deadline_type,
-                   t.waiting_on_person_id, t.waiting_on_org_id, t.waiting_on_description,
-                   t.trigger_description, t.expected_output, t.tracks_task_id,
-                   t.next_follow_up_date
-            FROM tasks t
-            LEFT JOIN people p ON t.assigned_to_person_id = p.id
-            WHERE t.matter_id = ? AND t.status NOT IN ('done', 'deferred')
-            ORDER BY t.due_date
-        """, (mid,))]
-
-        matter["open_decisions"] = [dict(row) for row in db.execute("""
-            SELECT d.id, d.title, d.decision_type, d.status,
-                   d.decision_assigned_to_person_id, p.full_name as decision_owner_name,
-                   d.decision_due_date, d.options_summary, d.recommended_option
-            FROM decisions d
-            LEFT JOIN people p ON d.decision_assigned_to_person_id = p.id
-            WHERE d.matter_id = ? AND d.status IN ('pending', 'under consideration')
-        """, (mid,))]
-
+        matter["tags"] = tags_by_matter.get(mid, [])
+        matter["stakeholders"] = stakeholders_by_matter.get(mid, [])
+        matter["organizations"] = orgs_by_matter.get(mid, [])
+        matter["recent_updates"] = updates_by_matter.get(mid, [])
+        matter["open_tasks"] = tasks_by_matter.get(mid, [])
+        matter["open_decisions"] = decisions_by_matter.get(mid, [])
         matters.append(matter)
 
     return matters
@@ -275,33 +310,44 @@ def _get_active_organizations(db):
 
 
 def _get_recent_meetings(db, days):
+    """Recent meetings with matter links and participants (batch queries)."""
+    from collections import defaultdict
+
     cutoff = (datetime.now() - timedelta(days=days)).isoformat()
-    meetings = []
     rows = db.execute("""
         SELECT id, title, meeting_type, date_time_start
-        FROM meetings
-        WHERE date_time_start >= ?
+        FROM meetings WHERE date_time_start >= ?
         ORDER BY date_time_start DESC
     """, (cutoff,)).fetchall()
 
+    meeting_ids = [row["id"] for row in rows]
+    if not meeting_ids:
+        return []
+
+    placeholders = ",".join("?" * len(meeting_ids))
+
+    matter_links_by_meeting = defaultdict(list)
+    for row in db.execute(f"""
+        SELECT mm.meeting_id, mm.matter_id, m.title as matter_title, mm.relationship_type
+        FROM meeting_matters mm JOIN matters m ON mm.matter_id = m.id
+        WHERE mm.meeting_id IN ({placeholders})
+    """, meeting_ids):
+        matter_links_by_meeting[row["meeting_id"]].append(dict(row))
+
+    participants_by_meeting = defaultdict(list)
+    for row in db.execute(f"""
+        SELECT mp.meeting_id, p.full_name, mp.meeting_role
+        FROM meeting_participants mp JOIN people p ON mp.person_id = p.id
+        WHERE mp.meeting_id IN ({placeholders})
+    """, meeting_ids):
+        participants_by_meeting[row["meeting_id"]].append(dict(row))
+
+    meetings = []
     for meeting_row in rows:
         meeting = dict(meeting_row)
         mid = meeting["id"]
-
-        meeting["matter_links"] = [dict(row) for row in db.execute("""
-            SELECT mm.matter_id, m.title as matter_title, mm.relationship_type
-            FROM meeting_matters mm
-            JOIN matters m ON mm.matter_id = m.id
-            WHERE mm.meeting_id = ?
-        """, (mid,))]
-
-        meeting["participants"] = [dict(row) for row in db.execute("""
-            SELECT p.full_name, mp.meeting_role
-            FROM meeting_participants mp
-            JOIN people p ON mp.person_id = p.id
-            WHERE mp.meeting_id = ?
-        """, (mid,))]
-
+        meeting["matter_links"] = matter_links_by_meeting.get(mid, [])
+        meeting["participants"] = participants_by_meeting.get(mid, [])
         meetings.append(meeting)
 
     return meetings
