@@ -2,36 +2,64 @@
  * SSE hook for real-time AI pipeline events.
  *
  * Connects to /ai/api/events/stream and dispatches typed events
- * to registered listeners. Auto-reconnects on disconnect.
+ * to registered listeners. Auto-reconnects on disconnect with
+ * exponential backoff (5s -> 10s -> 20s -> 60s max).
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
 
 const SSE_URL = "/ai/api/events/stream";
-const RECONNECT_DELAY = 5000;
+const RECONNECT_BASE = 5000;    // 5 seconds initial
+const RECONNECT_MAX  = 60000;   // 60 seconds cap
+
+// Connection states: "connecting" | "connected" | "disconnected" | "error"
 
 export default function useAIEvents(eventTypes = []) {
-  const [connected, setConnected] = useState(false);
+  const [connectionState, setConnectionState] = useState("disconnected");
   const [lastEvent, setLastEvent] = useState(null);
   const listenersRef = useRef({});
   const sourceRef = useRef(null);
   const reconnectTimer = useRef(null);
+  const attemptRef = useRef(0);
 
   const connect = useCallback(() => {
     if (sourceRef.current) {
       sourceRef.current.close();
     }
 
+    setConnectionState("connecting");
+    const attempt = attemptRef.current;
+    console.log(
+      `[useAIEvents] Connecting to SSE (attempt ${attempt + 1})...`
+    );
+
     const es = new EventSource(SSE_URL);
     sourceRef.current = es;
 
-    es.onopen = () => setConnected(true);
+    es.onopen = () => {
+      attemptRef.current = 0;          // reset backoff on success
+      setConnectionState("connected");
+      console.log("[useAIEvents] SSE connected");
+    };
 
     es.onerror = () => {
-      setConnected(false);
+      setConnectionState("error");
       es.close();
-      // Auto-reconnect
-      reconnectTimer.current = setTimeout(connect, RECONNECT_DELAY);
+
+      // Exponential backoff: 5s, 10s, 20s, 40s, capped at 60s
+      const delay = Math.min(
+        RECONNECT_BASE * Math.pow(2, attemptRef.current),
+        RECONNECT_MAX
+      );
+      attemptRef.current += 1;
+
+      console.warn(
+        `[useAIEvents] SSE disconnected — reconnecting in ${delay / 1000}s ` +
+        `(attempt ${attemptRef.current})`
+      );
+
+      setConnectionState("disconnected");
+      reconnectTimer.current = setTimeout(connect, delay);
     };
 
     // Listen for specific event types
@@ -90,5 +118,7 @@ export default function useAIEvents(eventTypes = []) {
     };
   }, []);
 
-  return { connected, lastEvent, on };
+  // Expose connectionState (connecting/connected/disconnected/error)
+  // and `connected` boolean for backwards compatibility
+  return { connected: connectionState === "connected", connectionState, lastEvent, on };
 }
