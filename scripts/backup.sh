@@ -18,7 +18,8 @@ echo "[$DATE] Starting CFTC database backup..."
 mkdir -p "$BACKUP_PATH"
 
 # Use sqlite3 .backup for safe copy (handles WAL mode)
-for db_file in "$SRC_DIR"/tracker/data/tracker.db "$SRC_DIR"/ai/data/ai.db; do
+INTAKE_DB="$HOME/Documents/Website/cftc/services/intake/data/cftc_voice.db"
+for db_file in "$SRC_DIR"/tracker/data/tracker.db "$SRC_DIR"/ai/data/ai.db "$INTAKE_DB"; do
     if [ -f "$db_file" ]; then
         name=$(basename "$db_file")
         echo "  Backing up $name..."

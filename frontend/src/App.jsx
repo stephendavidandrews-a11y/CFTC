@@ -1,3 +1,4 @@
+import ErrorBoundary from "./components/shared/ErrorBoundary";
 import React from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import { ToastProvider } from "./contexts/ToastContext";
@@ -50,6 +51,7 @@ const AIPlaceholder = ({ title }) => (
 
 export default function App() {
   return (
+    <ErrorBoundary>
     <ToastProvider>
       <Routes>
         <Route element={<AppShell />}>
@@ -94,5 +96,6 @@ export default function App() {
         </Route>
       </Routes>
     </ToastProvider>
+    </ErrorBoundary>
   );
 }
