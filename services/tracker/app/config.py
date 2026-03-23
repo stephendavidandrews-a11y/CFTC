@@ -9,10 +9,12 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent.parent
 
 # Database
-TRACKER_DB_PATH = Path(os.environ.get(
-    "TRACKER_DB_PATH",
-    str(BASE_DIR / "data" / "tracker.db")
-))
+# In production the TRACKER_DB_PATH env var MUST be set via LaunchAgent/docker-compose.
+# The fallback default exists only for local development.
+_db_path_raw = os.environ.get("TRACKER_DB_PATH", "")
+_db_path_source = "env" if _db_path_raw else "default"
+TRACKER_DB_PATH = Path(_db_path_raw) if _db_path_raw else (BASE_DIR / "data" / "tracker.db")
+TRACKER_DB_PATH_SOURCE = _db_path_source  # "env" or "default" — exposed for startup logging
 
 # File uploads
 UPLOAD_DIR = Path(os.environ.get(

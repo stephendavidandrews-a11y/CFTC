@@ -17,7 +17,7 @@
       "tables": 10,
       "port": 8005,
       "db": "intake.db",
-      "tech": "FastAPI + SQLite (WAL) — native/GPU"
+      "tech": "FastAPI + SQLite (WAL) \u2014 native/GPU"
     }
   },
   "tables": [
@@ -208,12 +208,6 @@
           "not_null": false
         },
         {
-          "name": "working_style_notes",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
           "name": "substantive_areas",
           "type": "TEXT",
           "tags": [],
@@ -225,20 +219,6 @@
           "tags": [
             "ENUM"
           ],
-          "not_null": false
-        },
-        {
-          "name": "relationship_lane",
-          "type": "TEXT",
-          "tags": [
-            "ENUM"
-          ],
-          "not_null": false
-        },
-        {
-          "name": "personality",
-          "type": "TEXT",
-          "tags": [],
           "not_null": false
         },
         {
@@ -785,7 +765,7 @@
             "ENUM"
           ],
           "not_null": true,
-          "note": "NOT NULL"
+          "note": "NOT NULL; enum: action, follow_up, monitoring"
         },
         {
           "name": "priority",
@@ -855,6 +835,23 @@
           "type": "TEXT",
           "tags": [],
           "not_null": false
+        },
+        {
+          "name": "tracks_task_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES tasks.id \u2014 links follow_up to its tracked action"
+        },
+        {
+          "name": "trigger_description",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false,
+          "note": "What event or condition should trigger this task"
         },
         {
           "name": "expected_output",
@@ -7354,10 +7351,8 @@
     ],
     "task_mode": [
       "action",
-      "delegated",
-      "waiting",
-      "monitoring",
-      "follow_up"
+      "follow_up",
+      "monitoring"
     ],
     "task_type": [
       "research issue",
@@ -7423,27 +7418,26 @@
       "coordination"
     ],
     "document_type": [
-      "memo",
-      "briefing paper",
-      "talking points",
-      "redline",
-      "regulatory text",
-      "comment summary",
-      "clearance memo",
-      "email draft",
-      "hearing prep",
-      "FAQ / Q&A",
-      "interagency paper",
+      "rulemaking_text",
+      "legal_memo",
+      "options_memo",
+      "comment_letter",
+      "testimony",
+      "talking_points",
+      "briefing_paper",
+      "correspondence",
+      "report",
       "other"
     ],
     "document_status": [
       "not started",
       "drafting",
-      "under review",
-      "awaiting comments",
-      "finalized",
+      "internal_review",
+      "client_review",
+      "leadership_review",
+      "clearance",
+      "final",
       "sent",
-      "superseded",
       "archived"
     ],
     "review_role": [
@@ -7464,12 +7458,12 @@
       "declined"
     ],
     "decision_type": [
-      "boss decision",
-      "leadership decision",
-      "client decision",
-      "interagency decision",
-      "legal interpretation",
-      "process decision"
+      "policy",
+      "legal",
+      "resource",
+      "timing",
+      "personnel",
+      "procedural"
     ],
     "decision_status": [
       "pending",
@@ -7504,14 +7498,6 @@
       "Partner agency",
       "Hill",
       "Outside party"
-    ],
-    "relationship_lane": [
-      "Decision-maker",
-      "Recommender",
-      "Drafter",
-      "Blocker",
-      "Influencer",
-      "FYI only"
     ],
     "next_interaction_type": [
       "briefing",

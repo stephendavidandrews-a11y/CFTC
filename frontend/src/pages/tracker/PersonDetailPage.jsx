@@ -237,9 +237,6 @@ export default function PersonDetailPage() {
             {person.relationship_category && (
               <SmallBadge label={person.relationship_category} colorMap={CATEGORY_COLORS} />
             )}
-            {person.relationship_lane && (
-              <SmallBadge label={person.relationship_lane} colorMap={LANE_COLORS} />
-            )}
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
@@ -286,32 +283,12 @@ export default function PersonDetailPage() {
             </div>
           </div>
 
-          {/* Working Style */}
-          {person.working_style_notes && (
-            <div style={sidebarCardStyle}>
-              <div style={sectionLabel}>Working Style / Notes</div>
-              <div style={{ fontSize: 13, color: theme.text.muted, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
-                {person.working_style_notes}
-              </div>
-            </div>
-          )}
-
           {/* Substantive Areas */}
           {person.substantive_areas && (
             <div style={sidebarCardStyle}>
               <div style={sectionLabel}>Substantive Areas</div>
               <div style={{ fontSize: 13, color: theme.text.muted, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
                 {person.substantive_areas}
-              </div>
-            </div>
-          )}
-
-          {/* Personality */}
-          {person.personality && (
-            <div style={sidebarCardStyle}>
-              <div style={sectionLabel}>Personality</div>
-              <div style={{ fontSize: 13, color: theme.text.muted, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
-                {person.personality}
               </div>
             </div>
           )}

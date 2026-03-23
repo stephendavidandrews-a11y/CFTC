@@ -4,12 +4,7 @@ AI context snapshot endpoint — provides extraction context to the AI service.
 Read-only, purpose-built endpoint. Consumed by services/ai/ before each
 Sonnet extraction call. Response is stored in ai_extractions.tracker_context_snapshot.
 
-Excluded by design (privacy/security):
-- people.email, phone, assistant_name, assistant_contact
-- people.working_style_notes, personality (NEVER sent to AI)
-- people.last_interaction_date, next_interaction_* fields
-- people.manager_person_id, include_in_team_workload
-- All source/source_id/external_refs fields
+All active people fields are included.
 """
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Query
@@ -232,8 +227,12 @@ def _get_matters_with_nested(db):
         """, (mid,))]
 
         matter["open_tasks"] = [dict(row) for row in db.execute("""
-            SELECT t.title, p.full_name as assigned_to_name, t.status,
-                   t.task_mode, t.due_date, t.expected_output
+            SELECT t.id, t.title, t.description, t.status, t.task_mode,
+                   t.priority, t.assigned_to_person_id, p.full_name as assigned_to_name,
+                   t.due_date, t.deadline_type,
+                   t.waiting_on_person_id, t.waiting_on_org_id, t.waiting_on_description,
+                   t.trigger_description, t.expected_output, t.tracks_task_id,
+                   t.next_follow_up_date
             FROM tasks t
             LEFT JOIN people p ON t.assigned_to_person_id = p.id
             WHERE t.matter_id = ? AND t.status NOT IN ('done', 'deferred')
@@ -241,8 +240,9 @@ def _get_matters_with_nested(db):
         """, (mid,))]
 
         matter["open_decisions"] = [dict(row) for row in db.execute("""
-            SELECT d.title, d.decision_type, p.full_name as decision_owner_name,
-                   d.decision_due_date
+            SELECT d.id, d.title, d.decision_type, d.status,
+                   d.decision_assigned_to_person_id, p.full_name as decision_owner_name,
+                   d.decision_due_date, d.options_summary, d.recommended_option
             FROM decisions d
             LEFT JOIN people p ON d.decision_assigned_to_person_id = p.id
             WHERE d.matter_id = ? AND d.status IN ('pending', 'under consideration')
@@ -255,9 +255,7 @@ def _get_matters_with_nested(db):
 
 def _get_active_people(db):
     return [dict(row) for row in db.execute("""
-        SELECT p.id, p.full_name, p.first_name, p.last_name, p.title,
-               p.organization_id, o.name as org_name,
-               p.relationship_category, p.relationship_lane, p.substantive_areas
+        SELECT p.*, o.name as org_name
         FROM people p
         LEFT JOIN organizations o ON p.organization_id = o.id
         WHERE p.is_active = 1
@@ -311,9 +309,12 @@ def _get_recent_meetings(db, days):
 
 def _get_standalone_tasks(db):
     return [dict(row) for row in db.execute("""
-        SELECT t.id, t.title, t.status, t.task_mode,
-               t.assigned_to_person_id, p.full_name as assigned_to_name,
-               t.due_date, t.expected_output
+        SELECT t.id, t.title, t.description, t.status, t.task_mode,
+               t.priority, t.assigned_to_person_id, p.full_name as assigned_to_name,
+               t.due_date, t.deadline_type,
+               t.waiting_on_person_id, t.waiting_on_org_id, t.waiting_on_description,
+               t.trigger_description, t.expected_output, t.tracks_task_id,
+               t.next_follow_up_date
         FROM tasks t
         LEFT JOIN people p ON t.assigned_to_person_id = p.id
         WHERE t.matter_id IS NULL

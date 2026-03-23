@@ -65,7 +65,7 @@ export default function DocumentsPage() {
 
   const documents = data?.items || data || [];
   const matters = mattersData?.items || mattersData || [];
-  const statusOpts = enums?.document_status || ["not started", "drafting", "under review", "awaiting comments", "finalized", "sent", "superseded", "archived"];
+  const statusOpts = enums?.document_status || ["not started", "drafting", "internal_review", "client_review", "leadership_review", "clearance", "final", "sent", "archived"];
   const typeOpts = enums?.document_type || [];
 
   const columns = [

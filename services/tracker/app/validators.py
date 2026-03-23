@@ -4,7 +4,7 @@ CFTC Tracker — Pydantic request models for all write endpoints.
 FastAPI auto-returns 422 with structured errors when validation fails.
 All Optional fields default to None. Required fields raise 422 if missing.
 """
-from typing import Optional, List
+from typing import Optional, List, Literal
 from datetime import datetime as dt
 from pydantic import BaseModel, Field, model_validator
 
@@ -21,11 +21,8 @@ class CreatePerson(BaseModel):
     phone: Optional[str] = None
     assistant_name: Optional[str] = None
     assistant_contact: Optional[str] = None
-    working_style_notes: Optional[str] = None
     substantive_areas: Optional[str] = None
     relationship_category: Optional[str] = None
-    relationship_lane: Optional[str] = None
-    personality: Optional[str] = None
     last_interaction_date: Optional[str] = None
     next_interaction_needed_date: Optional[str] = None
     next_interaction_type: Optional[str] = None
@@ -54,11 +51,8 @@ class UpdatePerson(BaseModel):
     phone: Optional[str] = None
     assistant_name: Optional[str] = None
     assistant_contact: Optional[str] = None
-    working_style_notes: Optional[str] = None
     substantive_areas: Optional[str] = None
     relationship_category: Optional[str] = None
-    relationship_lane: Optional[str] = None
-    personality: Optional[str] = None
     last_interaction_date: Optional[str] = None
     next_interaction_needed_date: Optional[str] = None
     next_interaction_type: Optional[str] = None
@@ -160,7 +154,7 @@ class CreateTask(BaseModel):
     description: Optional[str] = None
     task_type: Optional[str] = None
     status: str = "not started"
-    task_mode: str = "action"
+    task_mode: Literal["action", "follow_up", "monitoring"] = "action"
     priority: str = "normal"
     assigned_to_person_id: Optional[str] = None
     created_by_person_id: Optional[str] = None
@@ -182,6 +176,8 @@ class CreateTask(BaseModel):
     ai_confidence: Optional[float] = None
     automation_hold: int = 0
     external_refs: Optional[str] = None
+    tracks_task_id: Optional[str] = None
+    trigger_description: Optional[str] = None
 
 
 class UpdateTask(BaseModel):
@@ -190,7 +186,7 @@ class UpdateTask(BaseModel):
     description: Optional[str] = None
     task_type: Optional[str] = None
     status: Optional[str] = None
-    task_mode: Optional[str] = None
+    task_mode: Optional[Literal["action", "follow_up", "monitoring"]] = None
     priority: Optional[str] = None
     assigned_to_person_id: Optional[str] = None
     delegated_by_person_id: Optional[str] = None
@@ -206,6 +202,8 @@ class UpdateTask(BaseModel):
     next_follow_up_date: Optional[str] = None
     completion_notes: Optional[str] = None
     sort_order: Optional[int] = None
+    tracks_task_id: Optional[str] = None
+    trigger_description: Optional[str] = None
 
     @model_validator(mode="before")
     @classmethod
@@ -342,6 +340,8 @@ class CreateDecision(BaseModel):
     decision_due_date: Optional[str] = None
     options_summary: Optional[str] = None
     recommended_option: Optional[str] = None
+    decision_result: Optional[str] = None
+    made_at: Optional[str] = None
     notes: Optional[str] = None
     source: str = "manual"
     source_id: Optional[str] = None

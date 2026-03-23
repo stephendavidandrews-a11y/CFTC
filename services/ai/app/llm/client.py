@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 MODEL_PRICING = {
     "claude-haiku-4-5-20251001": (0.80, 4.00),
     "claude-sonnet-4-20250514": (3.00, 15.00),
+    "claude-sonnet-4-6-20250415": (3.00, 15.00),
     "claude-opus-4-6": (15.00, 75.00),
     # OpenAI models
     "gpt-4o": (2.50, 10.00),

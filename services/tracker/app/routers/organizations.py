@@ -98,7 +98,7 @@ async def get_organization(org_id: str, db=Depends(get_db)):
     # Key people (expanded fields for detail page)
     result["people"] = [dict(r) for r in db.execute("""
         SELECT id, full_name, title, email, relationship_category,
-               relationship_lane, last_interaction_date, next_interaction_needed_date
+               last_interaction_date, next_interaction_needed_date
         FROM people WHERE organization_id = ? AND is_active = 1
         ORDER BY full_name
     """, (org_id,))]

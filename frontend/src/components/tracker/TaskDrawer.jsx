@@ -43,6 +43,8 @@ const EMPTY = {
   next_follow_up_date: "",
   delegated_by_person_id: "",
   supervising_person_id: "",
+  tracks_task_id: "",
+  trigger_description: "",
 };
 
 export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved }) {
@@ -95,6 +97,8 @@ export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved })
         next_follow_up_date: task.next_follow_up_date || "",
         delegated_by_person_id: task.delegated_by_person_id || "",
         supervising_person_id: task.supervising_person_id || "",
+        tracks_task_id: task.tracks_task_id || "",
+        trigger_description: task.trigger_description || "",
       });
     } else {
       setEtag(null);
@@ -127,6 +131,8 @@ export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved })
           next_follow_up_date: (d.next_follow_up_date || "").slice(0, 10),
           delegated_by_person_id: d.delegated_by_person_id || "",
           supervising_person_id: d.supervising_person_id || "",
+          tracks_task_id: d.tracks_task_id || "",
+          trigger_description: d.trigger_description || "",
         });
       }).catch(() => {});
     }
@@ -226,6 +232,32 @@ export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved })
       {renderSelect("Waiting On Org", "waiting_on_org_id", orgOpts)}
       {renderSelect("Delegated By", "delegated_by_person_id", personOpts)}
       {renderSelect("Supervising Person", "supervising_person_id", personOpts)}
+
+      <div style={{ marginBottom: 14 }}>
+        <label style={LABEL_STYLE}>Trigger / Condition</label>
+        <input style={INPUT_STYLE} type="text" value={form.trigger_description} onChange={set("trigger_description")} placeholder="What event or condition triggers this task?" />
+      </div>
+
+      {/* Tracks / Tracked-by relationship */}
+      <div style={{ marginBottom: 14 }}>
+        <label style={LABEL_STYLE}>Tracks Task (action this follows up on)</label>
+        <input style={INPUT_STYLE} type="text" value={form.tracks_task_id} onChange={set("tracks_task_id")} placeholder="Task ID of tracked action" />
+      </div>
+      {task?.tracks_task_title && (
+        <div style={{ marginBottom: 14, fontSize: 12, color: "#94a3b8" }}>
+          Tracking: <span style={{ color: "#60a5fa" }}>{task.tracks_task_title}</span>
+        </div>
+      )}
+      {task?.tracked_by_tasks?.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <label style={LABEL_STYLE}>Tracked By</label>
+          {task.tracked_by_tasks.map(tb => (
+            <div key={tb.id} style={{ fontSize: 12, color: "#60a5fa", marginBottom: 2 }}>
+              {tb.title}
+            </div>
+          ))}
+        </div>
+      )}
 
       {error && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 10 }}>{error}</div>}
 

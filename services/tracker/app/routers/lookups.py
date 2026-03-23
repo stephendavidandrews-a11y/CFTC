@@ -36,7 +36,7 @@ ENUMS = {
         "economically_significant", "significant", "substantive_nonsignificant", "routine", "info_only",
     ],
     "task_status": ["not started", "in progress", "waiting on others", "needs review", "done", "deferred"],
-    "task_mode": ["action", "delegated", "waiting", "monitoring", "follow_up"],
+    "task_mode": ["action", "follow_up", "monitoring"],
     "task_type": [
         "research issue", "draft memo", "review markup", "prepare talking points",
         "schedule meeting", "get clearance", "follow up with client", "redline document",
@@ -57,13 +57,13 @@ ENUMS = {
         "primary topic", "secondary topic", "status update", "decision point", "coordination",
     ],
     "document_type": [
-        "memo", "briefing paper", "talking points", "redline", "regulatory text",
-        "comment summary", "clearance memo", "email draft", "hearing prep", "FAQ / Q&A",
-        "interagency paper", "other",
+        "rulemaking_text", "legal_memo", "options_memo", "comment_letter",
+        "testimony", "talking_points", "briefing_paper", "correspondence",
+        "report", "other",
     ],
     "document_status": [
-        "not started", "drafting", "under review", "awaiting comments",
-        "finalized", "sent", "superseded", "archived",
+        "not started", "drafting", "internal_review", "client_review",
+        "leadership_review", "clearance", "final", "sent", "archived",
     ],
     "review_role": [
         "drafter", "primary reviewer", "legal reviewer", "client reviewer",
@@ -73,8 +73,7 @@ ENUMS = {
         "not set", "pending", "in review", "comments returned", "approved", "declined",
     ],
     "decision_type": [
-        "boss decision", "leadership decision", "client decision",
-        "interagency decision", "legal interpretation", "process decision",
+        "policy", "legal", "resource", "timing", "personnel", "procedural",
     ],
     "decision_status": ["pending", "under consideration", "made", "deferred", "no longer needed"],
     "organization_type": [
@@ -86,9 +85,6 @@ ENUMS = {
     "relationship_category": [
         "Boss", "Leadership", "Direct report", "Indirect report", "OGC peer", "Internal client",
         "Commissioner office", "Partner agency", "Hill", "Outside party",
-    ],
-    "relationship_lane": [
-        "Decision-maker", "Recommender", "Drafter", "Blocker", "Influencer", "FYI only",
     ],
     "next_interaction_type": [
         "briefing", "follow-up", "check-in", "escalation", "decision request",

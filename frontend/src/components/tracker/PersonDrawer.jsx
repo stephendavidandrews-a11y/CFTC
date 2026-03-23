@@ -34,8 +34,6 @@ const EMPTY = {
   assistant_name: "",
   assistant_contact: "",
   relationship_category: "",
-  relationship_lane: "",
-  working_style_notes: "",
   substantive_areas: "",
   include_in_team_workload: false,
   is_active: true,
@@ -44,7 +42,6 @@ const EMPTY = {
   next_interaction_needed_date: "",
   next_interaction_type: "",
   next_interaction_purpose: "",
-  personality: "",
   relationship_assigned_to_person_id: "",
 };
 
@@ -62,12 +59,11 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
     if (!isOpen) return;
     Promise.all([
       getEnum("relationship_category").catch(() => []),
-      getEnum("relationship_lane").catch(() => []),
       getEnum("next_interaction_type").catch(() => []),
       listOrganizations({ limit: 100 }).catch(() => ({ items: [] })),
       listPeople({ limit: 100 }).catch(() => ({ items: [] })),
-    ]).then(([relCat, relLane, nextIntType, orgList, ppl]) => {
-      setEnums({ relationship_category: relCat, relationship_lane: relLane, next_interaction_type: nextIntType });
+    ]).then(([relCat, nextIntType, orgList, ppl]) => {
+      setEnums({ relationship_category: relCat, next_interaction_type: nextIntType });
       setOrgs(orgList.items || orgList || []);
       setPeople(ppl.items || ppl || []);
     });
@@ -85,8 +81,6 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
         assistant_name: person.assistant_name || "",
         assistant_contact: person.assistant_contact || "",
         relationship_category: person.relationship_category || "",
-        relationship_lane: person.relationship_lane || "",
-        working_style_notes: person.working_style_notes || "",
         substantive_areas: person.substantive_areas || "",
         include_in_team_workload: !!person.include_in_team_workload,
         is_active: person.is_active !== undefined ? !!person.is_active : true,
@@ -95,7 +89,6 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
         next_interaction_needed_date: (person.next_interaction_needed_date || "").slice(0, 10),
         next_interaction_type: person.next_interaction_type || "",
         next_interaction_purpose: person.next_interaction_purpose || "",
-        personality: person.personality || "",
         relationship_assigned_to_person_id: person.relationship_assigned_to_person_id || "",
       });
     } else {
@@ -211,18 +204,9 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
       {renderInput("Assistant Name", "assistant_name")}
       {renderInput("Assistant Contact", "assistant_contact")}
       {renderSelect("Relationship Category", "relationship_category", enums.relationship_category)}
-      {renderSelect("Relationship Lane", "relationship_lane", enums.relationship_lane)}
-      <div style={{ marginBottom: 14 }}>
-        <label style={LABEL_STYLE}>Working Style Notes</label>
-        <textarea style={{ ...INPUT_STYLE, minHeight: 80, resize: "vertical" }} value={form.working_style_notes} onChange={set("working_style_notes")} />
-      </div>
       <div style={{ marginBottom: 14 }}>
         <label style={LABEL_STYLE}>Substantive Areas</label>
         <textarea style={{ ...INPUT_STYLE, minHeight: 80, resize: "vertical" }} value={form.substantive_areas} onChange={set("substantive_areas")} />
-      </div>
-      <div style={{ marginBottom: 14 }}>
-        <label style={LABEL_STYLE}>Personality / Communication Style</label>
-        <textarea style={{ ...INPUT_STYLE, minHeight: 80, resize: "vertical" }} value={form.personality} onChange={set("personality")} placeholder="Communication preferences, temperament, what to avoid..." />
       </div>
 
       <div style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>

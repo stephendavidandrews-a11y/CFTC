@@ -431,18 +431,13 @@ export default function TasksPage() {
     const me = ownerId;
 
     // Section 1: My Action Items
-    // Tasks assigned to me (or unassigned) that are NOT delegated-to-someone-else
+    // Tasks assigned to me (or unassigned)
     const _myTasks = activeTasks
       .filter((t) => {
         if (!me) return true; // fallback if no owner configured
-        // My task if: assigned to me, OR unassigned, AND not a task I delegated to someone else
         const assignedToMe =
           t.assigned_to_person_id === me || !t.assigned_to_person_id;
-        const delegatedAway =
-          t.task_mode === "delegated" &&
-          t.assigned_to_person_id &&
-          t.assigned_to_person_id !== me;
-        return assignedToMe && !delegatedAway;
+        return assignedToMe;
       })
       .sort((a, b) => {
         // Overdue first, then by due date
@@ -454,16 +449,16 @@ export default function TasksPage() {
         return aD - bD;
       });
 
-    // Section 2: Delegated Work
-    // Tasks where I delegated (delegated_by = me) or task_mode starts with "delegated"
+    // Section 2: Assigned Work
+    // Tasks where I delegated (delegated_by = me) or action tasks assigned to others
     const delegatedTasks = activeTasks.filter((t) => {
       if (!me) return false;
       return (
         (t.delegated_by_person_id === me &&
           t.assigned_to_person_id !== me) ||
-        ((t.task_mode || "").startsWith("delegated") &&
-          t.assigned_to_person_id &&
-          t.assigned_to_person_id !== me)
+        (t.assigned_to_person_id &&
+          t.assigned_to_person_id !== me &&
+          t.supervising_person_id === me)
       );
     });
 
@@ -562,12 +557,12 @@ export default function TasksPage() {
       (a, b) => b.overdue - a.overdue || a.title.localeCompare(b.title)
     );
 
-    // Section 3: Waiting On
+    // Section 3: Follow-Ups
     const _waitingTasks = activeTasks
       .filter((t) => {
-        if (!me) return t.task_mode === "waiting";
+        if (!me) return t.task_mode === "follow_up";
         return (
-          t.task_mode === "waiting" ||
+          t.task_mode === "follow_up" ||
           (t.status === "waiting on others" &&
             t.assigned_to_person_id === me)
         );
@@ -845,8 +840,7 @@ export default function TasksPage() {
           label={val}
           colorMap={{
             action: { bg: "#1a4731", text: "#34d399" },
-            waiting: { bg: "#4a3728", text: "#fbbf24" },
-            delegated: { bg: "#1e3a5f", text: "#60a5fa" },
+            follow_up: { bg: "#4a3728", text: "#fbbf24" },
             monitoring: { bg: "#1a3a4a", text: "#38bdf8" },
           }}
         />
@@ -931,7 +925,7 @@ export default function TasksPage() {
         </div>
       </div>
       <div style={subtitleStyle}>
-        Execution control across your work, delegated work, and dependencies
+        Execution control across your work, assigned work, and follow-ups
       </div>
 
       {/* Search + Saved View Pills */}
@@ -1053,7 +1047,7 @@ export default function TasksPage() {
             </div>
           )}
 
-          {/* Section 2: Delegated Work */}
+          {/* Section 2: Assigned Work */}
           {delegatedGroups.length > 0 && (
             <div style={{ marginBottom: 8 }}>
               <div
@@ -1066,7 +1060,7 @@ export default function TasksPage() {
                   marginBottom: 12,
                 }}
               >
-                Delegated Work
+                Assigned Work
               </div>
               {delegatedGroups.map((group) => (
                 <div key={group.key} style={cardStyle}>
@@ -1087,7 +1081,7 @@ export default function TasksPage() {
                     data={group.rows}
                     onRowClick={(row) => openDrawer("task", row, refetch)}
                     pageSize={10}
-                    emptyMessage="No delegated tasks."
+                    emptyMessage="No assigned tasks."
                   />
                 </div>
               ))}
@@ -1098,7 +1092,7 @@ export default function TasksPage() {
           {waitingTasks.length > 0 && (
             <div style={cardStyle}>
               <div style={sectionHeaderStyle}>
-                <div style={sectionTitleStyle}>Waiting On</div>
+                <div style={sectionTitleStyle}>Follow-Ups</div>
                 <div style={sectionBadgeStyle}>
                   {waitingTasks.length} task
                   {waitingTasks.length !== 1 ? "s" : ""}
@@ -1302,7 +1296,7 @@ export default function TasksPage() {
       {!loading && !error && (
         <div style={{ marginTop: 12, fontSize: 12, color: theme.text.dim }}>
           {isGroupedMode
-            ? `${myTasks.length} personal + ${delegatedGroups.reduce((s, g) => s + g.rows.length, 0)} delegated + ${teamGroups.reduce((s, g) => s + g.rows.length, 0)} team + ${waitingTasks.length} waiting`
+            ? `${myTasks.length} personal + ${delegatedGroups.reduce((s, g) => s + g.rows.length, 0)} assigned + ${teamGroups.reduce((s, g) => s + g.rows.length, 0)} team + ${waitingTasks.length} follow-ups`
             : `Showing ${(filteredTasks || []).length} task${(filteredTasks || []).length !== 1 ? "s" : ""}`}
         </div>
       )}
