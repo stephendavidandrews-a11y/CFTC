@@ -4,6 +4,7 @@ import logging
 import asyncio
 
 import httpx
+import structlog
 
 from app.config import TRACKER_BASE_URL, TRACKER_USER, TRACKER_PASS
 
@@ -57,7 +58,15 @@ async def post_batch(operations: list[dict],
     for attempt in range(MAX_RETRIES + 1):
         try:
             async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
-                resp = await client.post(url, json=payload, auth=auth)
+                # Propagate request ID for cross-service tracing
+                headers = {}
+                try:
+                    ctx = structlog.contextvars.get_contextvars()
+                    if "request_id" in ctx:
+                        headers["X-Request-ID"] = ctx["request_id"]
+                except Exception:
+                    pass
+                resp = await client.post(url, json=payload, auth=auth, headers=headers)
 
             if resp.status_code == 200:
                 return resp.json()
