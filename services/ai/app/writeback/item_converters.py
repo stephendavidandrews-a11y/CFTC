@@ -330,6 +330,7 @@ def convert_meeting_record(item: dict, bundle: dict, refs: dict) -> list[tuple[d
         "purpose": data.get("purpose"),
         "readout_summary": data.get("readout_summary"),
         "boss_attends": 1 if data.get("boss_attends") else 0,
+        "external_parties_attend": 1 if data.get("external_parties_attend") or data.get("external_parties") else 0,
         "source": "ai",
         "source_id": item["id"],
         "external_refs": _external_refs(comm_id, bundle["id"], item["id"]),
@@ -366,6 +367,11 @@ def convert_meeting_record(item: dict, bundle: dict, refs: dict) -> list[tuple[d
                 "meeting_role": p.get("meeting_role"),
                 "attended": 1 if p.get("attended", True) else 0,
                 "stance_summary": p.get("stance_summary"),
+                "stance_confidence": p.get("stance_confidence"),
+                "position_strength": p.get("position_strength"),
+                "moved_position": 1 if p.get("moved_position") else (0 if p.get("moved_position") is not None else None),
+                "movement_summary": p.get("movement_summary"),
+                "key_contribution_summary": p.get("key_contribution_summary"),
             }
 
         part_data = {k: v for k, v in part_data.items() if v is not None}
@@ -485,13 +491,15 @@ def convert_context_note(item: dict, bundle: dict, refs: dict) -> list[tuple[dic
 
     ops = []
 
-    # Compute stale_after from durability
+    # Compute stale_after from durability — use absolute ISO timestamps
     stale_after = None
     durability = data.get("durability", "durable")
     if durability == "ephemeral":
-        stale_after = "+30 days"  # Will be resolved to actual date by tracker
+        from datetime import datetime, timedelta
+        stale_after = (datetime.utcnow() + timedelta(days=30)).isoformat() + "Z"
     elif durability == "medium_term":
-        stale_after = "+180 days"
+        from datetime import datetime, timedelta
+        stale_after = (datetime.utcnow() + timedelta(days=180)).isoformat() + "Z"
 
     # Op 1: INSERT context_notes
     note_data = {
@@ -511,6 +519,7 @@ def convert_context_note(item: dict, bundle: dict, refs: dict) -> list[tuple[dic
         "ai_confidence": item.get("confidence"),
         "automation_hold": data.get("automation_hold", 1),
         "is_active": 1,
+        "stale_after": stale_after,
         "effective_date": data.get("effective_date"),
         "external_refs": _external_refs(comm_id, bundle["id"], item["id"]),
     }

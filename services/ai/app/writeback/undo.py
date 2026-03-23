@@ -119,6 +119,18 @@ UNDOABLE_STATES = {"complete"}
 # Tracker interaction timeout
 TRACKER_TIMEOUT = 15.0
 
+# Nested route mappings: tables whose tracker endpoints require a parent ID.
+# Format: table_name -> (url_template, parent_id_field_in_written_data)
+# url_template uses {parent_id} and {id} placeholders.
+NESTED_ROUTES = {
+    "meeting_participants": ("meetings/{parent_id}/participants/{id}", "meeting_id"),
+    "meeting_matters": ("meetings/{parent_id}/matters/{id}", "meeting_id"),
+    "context_note_links": ("context-notes/{parent_id}/links/{id}", "context_note_id"),
+    "person_profiles": ("people/{parent_id}/profile", "person_id"),
+    "matter_people": ("matters/{parent_id}/people/{id}", "matter_id"),
+    "matter_organizations": ("matters/{parent_id}/organizations/{id}", "matter_id"),
+}
+
 # Fields to ignore when detecting conflicts (system-managed, not user-editable)
 SYSTEM_FIELDS = {
     "id", "created_at", "updated_at", "created_by", "updated_by",
@@ -137,9 +149,30 @@ def _tracker_auth():
     return None
 
 
-async def _tracker_get(table: str, record_id: str) -> dict | None:
+def _build_url(table: str, record_id: str, written_data: dict | None = None) -> str:
+    """Build the tracker URL, using nested routes when required."""
+    if table in NESTED_ROUTES:
+        template, parent_field = NESTED_ROUTES[table]
+        parent_id = None
+        if written_data:
+            parent_id = written_data.get(parent_field)
+        if parent_id:
+            # Strip $ref: prefix if present (resolved during commit)
+            if isinstance(parent_id, str) and parent_id.startswith("$ref:"):
+                parent_id = parent_id[5:]
+            return f"{TRACKER_BASE_URL}/{template.format(parent_id=parent_id, id=record_id)}"
+        else:
+            logger.warning(
+                "Nested route for %s but no %s in written_data — falling back to flat URL",
+                table, parent_field,
+            )
+    return f"{TRACKER_BASE_URL}/{table}/{record_id}"
+
+
+async def _tracker_get(table: str, record_id: str,
+                       written_data: dict | None = None) -> dict | None:
     """GET a single tracker record. Returns None if 404."""
-    url = f"{TRACKER_BASE_URL}/{table}/{record_id}"
+    url = _build_url(table, record_id, written_data)
     try:
         async with httpx.AsyncClient(timeout=TRACKER_TIMEOUT) as client:
             resp = await client.get(url, auth=_tracker_auth())
@@ -154,9 +187,10 @@ async def _tracker_get(table: str, record_id: str) -> dict | None:
         return None
 
 
-async def _tracker_delete(table: str, record_id: str) -> bool:
+async def _tracker_delete(table: str, record_id: str,
+                         written_data: dict | None = None) -> bool:
     """DELETE a tracker record. Returns True on success or 404 (already gone)."""
-    url = f"{TRACKER_BASE_URL}/{table}/{record_id}"
+    url = _build_url(table, record_id, written_data)
     try:
         async with httpx.AsyncClient(timeout=TRACKER_TIMEOUT) as client:
             resp = await client.delete(url, auth=_tracker_auth())
@@ -170,9 +204,10 @@ async def _tracker_delete(table: str, record_id: str) -> bool:
         return False
 
 
-async def _tracker_update(table: str, record_id: str, data: dict) -> bool:
+async def _tracker_update(table: str, record_id: str, data: dict,
+                         written_data: dict | None = None) -> bool:
     """PUT/PATCH a tracker record to restore previous_data. Returns True on success."""
-    url = f"{TRACKER_BASE_URL}/{table}/{record_id}"
+    url = _build_url(table, record_id, written_data)
     try:
         async with httpx.AsyncClient(timeout=TRACKER_TIMEOUT) as client:
             resp = await client.put(url, json=data, auth=_tracker_auth())
@@ -378,7 +413,8 @@ async def undo_communication(
                 continue
 
             # Fetch current state from tracker
-            current = await _tracker_get(wb["target_table"], wb["target_record_id"])
+            current = await _tracker_get(wb["target_table"], wb["target_record_id"],
+                                         written_data)
 
             if current is None:
                 # Record missing — for inserts, this is fine (already deleted)
@@ -442,9 +478,12 @@ async def undo_communication(
         )
 
         try:
+            written_data_for_url = _parse_json(wb["written_data"])
+
             if wb["write_type"] == "insert":
                 # Reverse an insert → delete the record
-                ok = await _tracker_delete(wb["target_table"], wb["target_record_id"])
+                ok = await _tracker_delete(wb["target_table"], wb["target_record_id"],
+                                           written_data_for_url)
                 if ok:
                     reversal.success = True
                     _mark_reversed(db, wb["id"])
@@ -458,6 +497,7 @@ async def undo_communication(
                 if previous:
                     ok = await _tracker_update(
                         wb["target_table"], wb["target_record_id"], previous,
+                        written_data_for_url,
                     )
                     if ok:
                         reversal.success = True

@@ -147,6 +147,7 @@ async def batch_write(body: dict, db=Depends(get_db),
             current_op = i
             table = op["table"]
             data = dict(op.get("data", {}))
+            meta = op.get("_meta", {})
             op_type = op["op"]
 
             # Resolve $ref: references
@@ -187,22 +188,70 @@ async def batch_write(body: dict, db=Depends(get_db),
 
                 columns = ", ".join(data.keys())
                 placeholders = ", ".join(["?"] * len(data))
-                db.execute(
-                    f"INSERT INTO {table} ({columns}) VALUES ({placeholders})",
-                    list(data.values())
-                )
 
-                if op.get("client_id"):
-                    id_map[op["client_id"]] = record_id
+                upsert_col = meta.get("upsert_by")
+                if upsert_col and upsert_col in valid_columns and upsert_col in data:
+                    # Upsert: check if record exists by the upsert key
+                    existing = db.execute(
+                        f"SELECT id FROM {table} WHERE {upsert_col} = ?",
+                        (data[upsert_col],)
+                    ).fetchone()
+                    if existing:
+                        # Update existing record
+                        record_id = existing["id"]
+                        upd = {k: v for k, v in data.items()
+                               if k not in ("id", upsert_col, "created_at")}
+                        upd["updated_at"] = now
+                        sets = [f"{k} = ?" for k in upd]
+                        db.execute(
+                            f"UPDATE {table} SET {', '.join(sets)} WHERE id = ?",
+                            list(upd.values()) + [record_id]
+                        )
+                        data["id"] = record_id
 
-                log_event(db, table_name=table, record_id=record_id,
-                          action="create", source=source, new_data=data)
+                        log_event(db, table_name=table, record_id=record_id,
+                                  action="update", source=source, new_data=upd)
 
-                results.append({
-                    "op": "insert", "table": table, "record_id": record_id,
-                    "client_id": op.get("client_id"),
-                    "previous_data": None,
-                })
+                        results.append({
+                            "op": "upsert_update", "table": table,
+                            "record_id": record_id,
+                            "client_id": op.get("client_id"),
+                            "previous_data": None,
+                        })
+                    else:
+                        db.execute(
+                            f"INSERT INTO {table} ({columns}) VALUES ({placeholders})",
+                            list(data.values())
+                        )
+
+                        if op.get("client_id"):
+                            id_map[op["client_id"]] = record_id
+
+                        log_event(db, table_name=table, record_id=record_id,
+                                  action="create", source=source, new_data=data)
+
+                        results.append({
+                            "op": "insert", "table": table, "record_id": record_id,
+                            "client_id": op.get("client_id"),
+                            "previous_data": None,
+                        })
+                else:
+                    db.execute(
+                        f"INSERT INTO {table} ({columns}) VALUES ({placeholders})",
+                        list(data.values())
+                    )
+
+                    if op.get("client_id"):
+                        id_map[op["client_id"]] = record_id
+
+                    log_event(db, table_name=table, record_id=record_id,
+                              action="create", source=source, new_data=data)
+
+                    results.append({
+                        "op": "insert", "table": table, "record_id": record_id,
+                        "client_id": op.get("client_id"),
+                        "previous_data": None,
+                    })
 
             elif op_type == "update":
                 record_id = op["record_id"]
@@ -258,30 +307,46 @@ async def batch_write(body: dict, db=Depends(get_db),
                     "previous_data": previous_data,
                 })
 
-        db.commit()
+        # Build response before commit so idempotency finalization is atomic
         response = {"success": True, "results": results}
 
-        # Finalize idempotency key
+        # Finalize idempotency key in same transaction as the operations
         if idempotency_key:
             db.execute("""
                 UPDATE idempotency_keys SET status_code = ?, response_body = ?
                 WHERE key = ? AND status_code IS NULL
             """, (200, json.dumps(response, default=str), idempotency_key))
-            db.commit()
 
+        db.commit()
         return response
 
     except HTTPException:
         db.rollback()
+        if idempotency_key:
+            _release_idempotency_key(db, idempotency_key)
         raise
     except Exception as e:
         db.rollback()
+        if idempotency_key:
+            _release_idempotency_key(db, idempotency_key)
         logger.error("Batch failed at operation %d: %s", current_op, str(e))
         raise HTTPException(status_code=500, detail={
             "error_type": "internal_error",
             "message": f"Batch failed at operation {current_op}: {str(e)}",
             "operation_index": current_op,
         })
+
+
+def _release_idempotency_key(db, key: str):
+    """Release a pending idempotency key so retries are not blocked."""
+    try:
+        db.execute(
+            "DELETE FROM idempotency_keys WHERE key = ? AND status_code IS NULL",
+            (key,),
+        )
+        db.commit()
+    except Exception:
+        pass  # Best effort — do not mask the original error
 
 
 def _typed_error(status_code: int, error_type: str, operation_index: int,

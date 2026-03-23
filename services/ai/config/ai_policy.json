@@ -89,7 +89,7 @@
     }
   },
   "model_config": {
-    "primary_extraction_model": "claude-sonnet-4-6",
+    "primary_extraction_model": "gpt-5.4",
     "escalation_model": null,
     "haiku_model": "claude-haiku-4-5-20251001",
     "opus_retry_triggers": {

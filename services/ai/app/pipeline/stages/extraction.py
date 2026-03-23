@@ -187,9 +187,9 @@ def _tier_context(full_context: dict, signals: dict) -> dict:
         # Speaker/entity is matter stakeholder
         if not is_tier_1:
             for stk in m.get("stakeholders", []):
-                # stakeholder data from ai-context uses full_name, we need
-                # to check by person_id in the matter_people join
-                pass
+                if stk.get("person_id") in all_person_ids:
+                    is_tier_1 = True
+                    break
 
         # Linked entity org is one of the matter's org roles
         if not is_tier_1 and eo_ids:
@@ -204,9 +204,9 @@ def _tier_context(full_context: dict, signals: dict) -> dict:
         # Linked entity org in matter's organizations list
         if not is_tier_1 and eo_ids:
             for org in m.get("organizations", []):
-                # org data from ai-context doesn't include organization_id
-                # directly — it has 'name' and 'organization_role'
-                pass
+                if org.get("organization_id") in eo_ids:
+                    is_tier_1 = True
+                    break
 
         # RIN match
         if not is_tier_1 and id_hits["rin"]:
@@ -1304,7 +1304,7 @@ async def _run_sonnet_extraction(
                 model=sonnet_model,
                 system_prompt=system_prompt,
                 user_prompt=prompt_for_attempt,
-                max_tokens=8192,
+                max_tokens=16384,
                 temperature=0.0,
             )
             total_cost += response.usage.cost_usd
@@ -1425,7 +1425,7 @@ async def _run_opus_escalation(
             model=opus_model,
             system_prompt=system_prompt,
             user_prompt=opus_prompt,
-            max_tokens=8192,
+            max_tokens=16384,
             temperature=0.0,
         )
 
