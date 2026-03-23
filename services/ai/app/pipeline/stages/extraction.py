@@ -20,7 +20,7 @@ from typing import Optional
 import httpx
 from pydantic import ValidationError
 
-from app.config import load_policy, TRACKER_BASE_URL, TRACKER_USER, TRACKER_PASS, PROMPT_BASE_DIR
+from app.config import load_policy, TRACKER_BASE_URL, PROMPT_BASE_DIR
 from app.llm.client import call_llm, BudgetExceededError, LLMError
 
 from app.pipeline.stages.extraction_models import (
@@ -28,6 +28,8 @@ from app.pipeline.stages.extraction_models import (
     VALID_BUNDLE_TYPES,
     VALID_ITEM_TYPES,
     POLICY_TOGGLE_MAP,
+    TASK_UPDATE_ALLOWED_FIELDS,
+    DECISION_UPDATE_ALLOWED_FIELDS,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,8 +44,13 @@ MAX_EXTRACTION_ATTEMPTS = 3
 # ═══════════════════════════════════════════════════════════════════════════
 
 def _load_system_prompt(version: str) -> str:
-    """Load the extraction system prompt for the given version."""
-    prompt_path = PROMPT_DIR / f"{version}.md"
+    """Load the extraction system prompt for the given version.
+
+    Version strings use dots (e.g. "v2.0.0") but prompt filenames use
+    underscores (e.g. "v2_0_0.md").
+    """
+    filename = version.replace(".", "_") + ".md"
+    prompt_path = PROMPT_DIR / filename
     if not prompt_path.exists():
         raise FileNotFoundError(f"Extraction prompt not found: {prompt_path}")
     return prompt_path.read_text(encoding="utf-8")
@@ -61,8 +68,7 @@ async def _fetch_tracker_context() -> dict:
     url = f"{TRACKER_BASE_URL}/ai-context"
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            auth = (TRACKER_USER, TRACKER_PASS) if TRACKER_USER and TRACKER_PASS else None
-            resp = await client.get(url, auth=auth)
+            resp = await client.get(url)
             resp.raise_for_status()
             return resp.json()
     except httpx.HTTPStatusError as e:
@@ -187,9 +193,9 @@ def _tier_context(full_context: dict, signals: dict) -> dict:
         # Speaker/entity is matter stakeholder
         if not is_tier_1:
             for stk in m.get("stakeholders", []):
-                if stk.get("person_id") in all_person_ids:
-                    is_tier_1 = True
-                    break
+                # stakeholder data from ai-context uses full_name, we need
+                # to check by person_id in the matter_people join
+                pass
 
         # Linked entity org is one of the matter's org roles
         if not is_tier_1 and eo_ids:
@@ -204,9 +210,9 @@ def _tier_context(full_context: dict, signals: dict) -> dict:
         # Linked entity org in matter's organizations list
         if not is_tier_1 and eo_ids:
             for org in m.get("organizations", []):
-                if org.get("organization_id") in eo_ids:
-                    is_tier_1 = True
-                    break
+                # org data from ai-context doesn't include organization_id
+                # directly — it has 'name' and 'organization_role'
+                pass
 
         # RIN match
         if not is_tier_1 and id_hits["rin"]:
@@ -306,6 +312,14 @@ def _build_user_prompt(
     policy: dict,
 ) -> str:
     """Build the complete user prompt for extraction."""
+    model_name = policy.get("model_config", {}).get("primary_extraction_model", "")
+    use_xml = model_name.startswith("claude-")
+
+    def _wrap(tag: str, content: str) -> str:
+        if use_xml:
+            return f"<{tag}>\n{content}\n</{tag}>"
+        return f"## {tag.replace('_', ' ').title()}\n{content}"
+
     sections = []
 
     # ── Communication data ──
@@ -315,65 +329,18 @@ def _build_user_prompt(
         FROM communications WHERE id = ?
     """, (communication_id,)).fetchone()
 
-    # Get the best date for when this conversation actually occurred:
-    # 1. Try to parse a date from the title/filename (e.g. "03-20 Meeting_..." or "2026-03-20...")
-    # 2. captured_at from audio file metadata (embedded by recording device)
-    # 3. Fall back to communications.created_at (DB insertion time)
-    # Then convert from UTC to local timezone for correct relative date resolution.
-    import re as _re
-    title_date = None
-    title_or_fn = comm["original_filename"] or ""
-    # Also check the communication title
-    title_row = db.execute("SELECT title FROM communications WHERE id = ?", (communication_id,)).fetchone()
-    if title_row and title_row["title"]:
-        title_or_fn = title_row["title"] + " " + title_or_fn
-    # Try ISO date: 2026-03-20
-    iso_match = _re.search(r"(20\d{2})-(\d{2})-(\d{2})", title_or_fn)
-    if iso_match:
-        title_date = f"{iso_match.group(1)}-{iso_match.group(2)}-{iso_match.group(3)}"
-    else:
-        # Try MM-DD pattern at start of title: "03-20 Meeting..."
-        mmdd_match = _re.search(r"\b(\d{2})-(\d{2})\b", title_or_fn)
-        if mmdd_match:
-            from datetime import datetime as _dt2
-            mm, dd = int(mmdd_match.group(1)), int(mmdd_match.group(2))
-            if 1 <= mm <= 12 and 1 <= dd <= 31:
-                year = _dt2.now().year
-                title_date = f"{year}-{mm:02d}-{dd:02d}"
-
-    captured_row = db.execute("""
-        SELECT captured_at FROM audio_files
-        WHERE communication_id = ? AND format != 'wav_normalized'
-              AND captured_at IS NOT NULL
-        LIMIT 1
-    """, (communication_id,)).fetchone()
-    raw_date = (
-        title_date
-        or (captured_row["captured_at"] if captured_row else None)
-        or comm["created_at"]
-    )
-    # Convert UTC timestamp to local date
-    from datetime import datetime as _dt, timezone as _tz
-    from zoneinfo import ZoneInfo
-    from app.config import LOCAL_TIMEZONE
-    try:
-        utc_dt = _dt.fromisoformat(raw_date.replace("Z", "+00:00"))
-        if utc_dt.tzinfo is None:
-            utc_dt = utc_dt.replace(tzinfo=_tz.utc)
-        local_dt = utc_dt.astimezone(ZoneInfo(LOCAL_TIMEZONE))
-        conversation_date = local_dt.strftime("%Y-%m-%d")
-    except Exception:
-        conversation_date = raw_date[:10] if raw_date else "unknown"
-
-    sections.append("## Communication Data\n")
     source_type = comm["source_type"] or "audio_upload"
 
-    sections.append(f"Communication ID: {communication_id}")
-    sections.append(f"Source Type: {source_type}")
-    sections.append(f"This conversation occurred on: {conversation_date}. Use this as the reference date for resolving all relative time expressions (e.g. 'tomorrow', 'next week', 'end of day').")
+    # Communication metadata section
+    comm_lines = [
+        f"Communication ID: {communication_id}",
+        f"Source Type: {source_type}",
+        f"Date: {comm['created_at']}",
+    ]
     if source_type != "email":
-        sections.append(f"Duration: {comm['duration_seconds'] or 0} seconds")
-    sections.append(f"Original Filename: {comm['original_filename'] or 'unknown'}")
+        comm_lines.append(f"Duration: {comm['duration_seconds'] or 0} seconds")
+    comm_lines.append(f"Original Filename: {comm['original_filename'] or 'unknown'}")
+    sections.append(_wrap("communication_data", "\n".join(comm_lines)))
 
     # Participants
     participants = db.execute("""
@@ -409,7 +376,8 @@ def _build_user_prompt(
             })
         sections.append(f"\n### Speakers (confirmed)\n```json\n{json.dumps(speaker_data, indent=2)}\n```")
 
-    # Enrichment summary
+    # Enrichment section
+    enrich_parts = []
     summary = None
     topics = []
     if comm["topic_segments_json"]:
@@ -421,9 +389,9 @@ def _build_user_prompt(
             pass
 
     if summary:
-        sections.append(f"\n### Enrichment Summary\n{summary}")
+        enrich_parts.append(f"### Enrichment Summary\n{summary}")
     if topics:
-        sections.append(f"\n### Topics\n```json\n{json.dumps(topics, indent=2)}\n```")
+        enrich_parts.append(f"### Topics\n```json\n{json.dumps(topics, indent=2)}\n```")
 
     # Confirmed entities
     entity_rows = db.execute("""
@@ -437,15 +405,17 @@ def _build_user_prompt(
 
     if entity_rows:
         entities = [dict(r) for r in entity_rows]
-        sections.append(f"\n### Confirmed Entities\n```json\n{json.dumps(entities, indent=2, default=str)}\n```")
+        enrich_parts.append(f"### Confirmed Entities\n```json\n{json.dumps(entities, indent=2, default=str)}\n```")
 
     # Sensitivity flags
     if comm["sensitivity_flags"]:
-        sections.append(f"\n### Sensitivity Flags\n{comm['sensitivity_flags']}")
+        enrich_parts.append(f"### Sensitivity Flags\n{comm['sensitivity_flags']}")
+
+    if enrich_parts:
+        sections.append(_wrap("enrichment", "\n\n".join(enrich_parts)))
 
     # Full content: email messages or audio transcript
     if source_type == "email":
-        # Email: include messages, attachments
         msg_rows = db.execute("""
             SELECT id, message_index, sender_email, sender_name,
                    recipient_emails, cc_emails, subject, body_text,
@@ -455,7 +425,6 @@ def _build_user_prompt(
             ORDER BY message_index
         """, (communication_id,)).fetchall()
 
-        # Build participant name lookup by email
         participant_names = {
             p["participant_email"]: (p["proposed_name"] or p["participant_email"])
             for p in participants
@@ -477,9 +446,8 @@ def _build_user_prompt(
                 "is_from_user": msg["is_from_user"],
                 "timestamp": msg["timestamp"],
             })
-        sections.append(f"\n### Email Thread\n```json\n{json.dumps(message_data, indent=2)}\n```")
+        content_parts = [f"```json\n{json.dumps(message_data, indent=2)}\n```"]
 
-        # Include attachment summaries
         att_rows = db.execute("""
             SELECT original_filename, mime_type, file_size_bytes,
                    extracted_text, text_extraction_status
@@ -499,18 +467,18 @@ def _build_user_prompt(
                 if att["extracted_text"]:
                     entry["extracted_text_preview"] = att["extracted_text"][:3000]
                 att_data.append(entry)
-            sections.append(f"\n### Attachments\n```json\n{json.dumps(att_data, indent=2)}\n```")
+            content_parts.append(f"### Attachments\n```json\n{json.dumps(att_data, indent=2)}\n```")
+
+        sections.append(_wrap("email_thread", "\n\n".join(content_parts)))
     else:
-        # Audio: include transcript segments
         segments = db.execute("""
             SELECT id, speaker_label, start_time, end_time,
-                   cleaned_text, raw_text, reviewed_text
+                   cleaned_text, raw_text
             FROM transcripts
             WHERE communication_id = ?
             ORDER BY start_time
         """, (communication_id,)).fetchall()
 
-        # Build speaker name lookup
         speaker_names = {
             p["speaker_label"]: (p["proposed_name"] or p["speaker_label"])
             for p in participants
@@ -524,9 +492,9 @@ def _build_user_prompt(
                 "speaker_name": speaker_names.get(seg["speaker_label"], seg["speaker_label"]),
                 "start": seg["start_time"],
                 "end": seg["end_time"],
-                "text": (seg["reviewed_text"] or seg["cleaned_text"] or seg["raw_text"] or ""),
+                "text": seg["cleaned_text"] or seg["raw_text"] or "",
             })
-        sections.append(f"\n### Full Transcript\n```json\n{json.dumps(transcript_data, indent=2)}\n```")
+        sections.append(_wrap("transcript", f"```json\n{json.dumps(transcript_data, indent=2)}\n```"))
 
     # ── Extraction policy (tell model what's disabled) ──
     extraction_policy = policy.get("extraction_policy", {})
@@ -536,64 +504,64 @@ def _build_user_prompt(
             disabled_types.append(item_type)
 
     if disabled_types:
-        sections.append(
-            "\n## Extraction Policy (current)\n"
+        policy_content = (
             "The following proposal types are DISABLED. You should still "
             "reason about them and note observations in "
             "suppressed_observations, but do NOT include them in "
             "bundles[].items[]:\n"
             + "\n".join(f"- {t}" for t in disabled_types)
         )
+        sections.append(_wrap("extraction_policy", policy_content))
 
     # ── Tiered tracker context ──
-    sections.append("\n## Tracker Context\n")
-
     t1 = tiered_context["tier_1_matters"]
     t2 = tiered_context["tier_2_matters"]
+    ctx_parts = []
 
     if t1:
-        sections.append(
+        ctx_parts.append(
             f"### Priority Matters ({len(t1)} — full detail, likely relevant)\n"
             f"```json\n{json.dumps(t1, indent=2, default=str)}\n```"
         )
     else:
-        sections.append(
+        ctx_parts.append(
             "### Priority Matters\nNo matters were pre-identified as relevant "
             "to this conversation's speakers or entities. Scan all matters "
-            "below for topical relevance.\n"
+            "below for topical relevance."
         )
 
     if t2:
-        sections.append(
-            f"\n### Other Open Matters ({len(t2)} — summary, check for unexpected relevance)\n"
+        ctx_parts.append(
+            f"### Other Open Matters ({len(t2)} — summary, check for unexpected relevance)\n"
             f"```json\n{json.dumps(t2, indent=2, default=str)}\n```"
         )
 
     if tiered_context["tier_1_meetings"]:
-        sections.append(
-            f"\n### Recent Meetings ({len(tiered_context['tier_1_meetings'])})\n"
+        ctx_parts.append(
+            f"### Recent Meetings ({len(tiered_context['tier_1_meetings'])})\n"
             f"```json\n{json.dumps(tiered_context['tier_1_meetings'], indent=2, default=str)}\n```"
         )
 
-    sections.append(
-        f"\n### People Registry ({len(tiered_context['people'])})\n"
+    ctx_parts.append(
+        f"### People Registry ({len(tiered_context['people'])})\n"
         f"```json\n{json.dumps(tiered_context['people'], indent=2, default=str)}\n```"
     )
-    sections.append(
-        f"\n### Organizations Registry ({len(tiered_context['organizations'])})\n"
+    ctx_parts.append(
+        f"### Organizations Registry ({len(tiered_context['organizations'])})\n"
         f"```json\n{json.dumps(tiered_context['organizations'], indent=2, default=str)}\n```"
     )
 
     if tiered_context["standalone_tasks"]:
-        sections.append(
-            f"\n### Standalone Tasks ({len(tiered_context['standalone_tasks'])})\n"
+        ctx_parts.append(
+            f"### Standalone Tasks ({len(tiered_context['standalone_tasks'])})\n"
             f"```json\n{json.dumps(tiered_context['standalone_tasks'], indent=2, default=str)}\n```"
         )
 
+    sections.append(_wrap("tracker_context", "\n\n".join(ctx_parts)))
+
     # ── Final instruction ──
     if source_type == "email":
-        sections.append(
-            "\n## Instructions\n\n"
+        instr = (
             "Analyze this email thread and extract actionable operational "
             "intelligence. Organize proposals into bundles grouped by the matter "
             "each set relates to. Follow all rules in your system prompt. "
@@ -602,13 +570,13 @@ def _build_user_prompt(
             "instead of time-based references."
         )
     else:
-        sections.append(
-            "\n## Instructions\n\n"
+        instr = (
             "Analyze this conversation and extract actionable operational "
             "intelligence. Organize proposals into bundles grouped by the matter "
             "each set relates to. Follow all rules in your system prompt. "
             "Prefer fewer, higher-quality proposals."
         )
+    sections.append(_wrap("instructions", instr))
 
     return "\n".join(sections)
 
@@ -618,9 +586,7 @@ def _build_user_prompt(
 # ═══════════════════════════════════════════════════════════════════════════
 
 def _parse_extraction_response(text: str) -> dict:
-    """Parse extraction response, tolerating markdown fencing."""
-    import logging as _log
-    _log.getLogger(__name__).info("Raw LLM response (first 500 chars): %s", repr(text[:500]))
+    """Parse Sonnet's extraction response, tolerating markdown fencing."""
     cleaned = text.strip()
     if cleaned.startswith("```"):
         lines = cleaned.split("\n")
@@ -637,6 +603,283 @@ def _parse_extraction_response(text: str) -> dict:
 # 6. Post-processing (7-step pass)
 # ═══════════════════════════════════════════════════════════════════════════
 
+def _resolve_name_to_id(name: str, registry: list, name_field: str, id_field: str = "id") -> str | None:
+    """Case-insensitive exact match of name against a registry list.
+
+    Returns the id if exactly one match, else None.
+    """
+    if not name:
+        return None
+    name_lower = name.strip().lower()
+    matches = [
+        entry[id_field] for entry in registry
+        if (entry.get(name_field) or "").strip().lower() == name_lower
+    ]
+    if len(matches) == 1:
+        return matches[0]
+    return None
+
+
+def _resolve_entity_names(extraction: "ExtractionOutput", full_context: dict) -> list[str]:
+    """Step 1.5: Resolve name-based references to UUIDs.
+
+    Checks item-level name fallbacks AND proposed_data name companions.
+    Returns a list of resolution log entries.
+    """
+    people = full_context.get("people", [])
+    orgs = full_context.get("organizations", [])
+    matters = full_context.get("matters", [])
+    resolution_log = []
+
+    # Name → ID resolution mappings
+    PERSON_PAIRS = [
+        ("assigned_to_person_id", "assigned_to_name"),
+        ("waiting_on_person_id", "waiting_on_name"),
+        ("decision_assigned_to_person_id", "decision_assigned_to_name"),
+        ("person_id", "person_name"),
+        ("delegated_by_person_id", "delegated_by_name"),
+        ("supervising_person_id", "supervising_name"),
+    ]
+    ORG_PAIRS = [
+        ("organization_id", "organization_name_ref"),
+        ("organization_id", "organization_name"),
+        ("waiting_on_org_id", "waiting_on_org_name"),
+        ("requesting_organization_id", "requesting_organization_name"),
+    ]
+
+    for bundle in extraction.bundles:
+        # Resolve bundle-level target_matter_id from target_matter_title
+        if not bundle.target_matter_id and bundle.target_matter_title:
+            for m in matters:
+                if _fuzzy_title_match(
+                    bundle.target_matter_title.lower(),
+                    (m.get("title") or "").lower(),
+                ):
+                    bundle.target_matter_id = m["id"]
+                    bundle.bundle_type = "matter"
+                    resolution_log.append(
+                        f"Bundle matter resolved: '{bundle.target_matter_title}' -> {m['id'][:8]}"
+                    )
+                    break
+
+        for item in bundle.items:
+            pd = item.proposed_data
+
+            # Item-level name fallbacks
+            for id_field, name_field in PERSON_PAIRS:
+                name_val = getattr(item, name_field, None) or pd.get(name_field)
+                id_val = pd.get(id_field)
+                if name_val and not id_val:
+                    resolved = _resolve_name_to_id(name_val, people, "full_name")
+                    if resolved:
+                        pd[id_field] = resolved
+                        item.rationale += f" [Name resolved: {name_field} '{name_val}' -> UUID]"
+                        resolution_log.append(f"Person resolved: '{name_val}' -> {resolved[:8]}")
+                    else:
+                        item.rationale += f" [Name unresolved: {name_field} '{name_val}' — no match in context]"
+                        resolution_log.append(f"Person unresolved: '{name_val}'")
+
+            for id_field, name_field in ORG_PAIRS:
+                name_val = getattr(item, name_field, None) or pd.get(name_field)
+                id_val = pd.get(id_field)
+                if name_val and not id_val:
+                    resolved = _resolve_name_to_id(name_val, orgs, "name")
+                    if resolved:
+                        pd[id_field] = resolved
+                        item.rationale += f" [Org resolved: '{name_val}' -> UUID]"
+                        resolution_log.append(f"Org resolved: '{name_val}' -> {resolved[:8]}")
+                    else:
+                        resolution_log.append(f"Org unresolved: '{name_val}'")
+
+            # Resolve linked_entities on context_note items
+            if item.item_type == "context_note":
+                for le in pd.get("linked_entities", []):
+                    if le.get("entity_id"):
+                        continue
+                    etype = le.get("entity_type", "")
+                    ename = le.get("entity_name", "")
+                    if etype == "person":
+                        resolved = _resolve_name_to_id(ename, people, "full_name")
+                    elif etype == "organization":
+                        resolved = _resolve_name_to_id(ename, orgs, "name")
+                    elif etype == "matter":
+                        resolved = _resolve_name_to_id(ename, matters, "title")
+                    else:
+                        resolved = None
+                    if resolved:
+                        le["entity_id"] = resolved
+                        resolution_log.append(
+                            f"Linked entity resolved: {etype} '{ename}' -> {resolved[:8]}"
+                        )
+
+            # Resolve meeting_record participant names
+            if item.item_type == "meeting_record":
+                for part in pd.get("participants", []):
+                    if not part.get("person_id") and part.get("person_name"):
+                        resolved = _resolve_name_to_id(
+                            part["person_name"], people, "full_name"
+                        )
+                        if resolved:
+                            part["person_id"] = resolved
+
+    return resolution_log
+
+
+def _validate_tracks_task_refs(extraction: "ExtractionOutput") -> list[str]:
+    """Validate $ref: references between items in the same bundle.
+
+    Returns list of warning messages.
+    """
+    warnings = []
+    for bundle in extraction.bundles:
+        # Build client_id index for this bundle
+        client_ids = {
+            item.client_id for item in bundle.items if item.client_id
+        }
+        for item in bundle.items:
+            ref = item.proposed_data.get("tracks_task_ref")
+            if ref and isinstance(ref, str) and ref.startswith("$ref:"):
+                ref_id = ref[5:]
+                if ref_id not in client_ids:
+                    warnings.append(
+                        f"Item '{item.proposed_data.get('title', '?')}' "
+                        f"references unknown client_id '{ref_id}' — cleared"
+                    )
+                    item.proposed_data["tracks_task_ref"] = None
+    return warnings
+
+
+def _validate_update_items(
+    extraction: "ExtractionOutput", full_context: dict,
+) -> list[str]:
+    """Validate task_update, decision_update, and org_detail_update items.
+
+    Logs warnings but does NOT remove items — lets them go to review.
+    Returns list of warning messages.
+    """
+    warnings = []
+
+    # Build lookup structures
+    all_task_ids = set()
+    all_decision_ids = set()
+    for m in full_context.get("matters", []):
+        for t in m.get("open_tasks", []):
+            all_task_ids.add(t.get("id"))
+        for d in m.get("open_decisions", m.get("decisions", [])):
+            all_decision_ids.add(d.get("id"))
+    for t in full_context.get("standalone_tasks", []):
+        all_task_ids.add(t.get("id"))
+    all_task_ids.discard(None)
+    all_decision_ids.discard(None)
+
+    valid_org_ids = {o["id"] for o in full_context.get("organizations", [])}
+
+    for bundle in extraction.bundles:
+        for item in bundle.items:
+            pd = item.proposed_data
+
+            if item.item_type == "task_update":
+                tid = pd.get("existing_task_id")
+                if not tid:
+                    w = "task_update missing existing_task_id"
+                    warnings.append(w)
+                    item.rationale += f" [VALIDATION: {w}]"
+                elif tid not in all_task_ids:
+                    w = f"task_update references unknown task {tid[:8] if tid else '?'}"
+                    warnings.append(w)
+                    item.rationale += f" [VALIDATION: {w}]"
+
+                changes = pd.get("changes", {})
+                if not changes:
+                    w = "task_update has empty changes"
+                    warnings.append(w)
+                    item.rationale += f" [VALIDATION: {w}]"
+                else:
+                    bad_fields = set(changes.keys()) - TASK_UPDATE_ALLOWED_FIELDS
+                    if bad_fields:
+                        w = f"task_update has disallowed fields: {bad_fields}"
+                        warnings.append(w)
+                        item.rationale += f" [VALIDATION: {w}]"
+
+                if not pd.get("change_summary"):
+                    w = "task_update missing change_summary"
+                    warnings.append(w)
+                    item.rationale += f" [VALIDATION: {w}]"
+
+            elif item.item_type == "decision_update":
+                did = pd.get("existing_decision_id")
+                if not did:
+                    w = "decision_update missing existing_decision_id"
+                    warnings.append(w)
+                    item.rationale += f" [VALIDATION: {w}]"
+                elif did not in all_decision_ids:
+                    w = f"decision_update references unknown decision {did[:8] if did else '?'}"
+                    warnings.append(w)
+                    item.rationale += f" [VALIDATION: {w}]"
+
+                changes = pd.get("changes", {})
+                if not changes:
+                    w = "decision_update has empty changes"
+                    warnings.append(w)
+                    item.rationale += f" [VALIDATION: {w}]"
+                else:
+                    bad_fields = set(changes.keys()) - DECISION_UPDATE_ALLOWED_FIELDS
+                    if bad_fields:
+                        w = f"decision_update has disallowed fields: {bad_fields}"
+                        warnings.append(w)
+                        item.rationale += f" [VALIDATION: {w}]"
+
+                if not pd.get("change_summary"):
+                    w = "decision_update missing change_summary"
+                    warnings.append(w)
+                    item.rationale += f" [VALIDATION: {w}]"
+
+            elif item.item_type == "org_detail_update":
+                oid = pd.get("existing_org_id")
+                if not oid:
+                    w = "org_detail_update missing existing_org_id"
+                    warnings.append(w)
+                    item.rationale += f" [VALIDATION: {w}]"
+                elif oid not in valid_org_ids:
+                    w = f"org_detail_update references unknown org {oid[:8] if oid else '?'}"
+                    warnings.append(w)
+                    item.rationale += f" [VALIDATION: {w}]"
+
+                changes = pd.get("changes", {})
+                if not changes:
+                    w = "org_detail_update has empty changes"
+                    warnings.append(w)
+                    item.rationale += f" [VALIDATION: {w}]"
+                elif set(changes.keys()) - {"jurisdiction"}:
+                    w = f"org_detail_update can only change jurisdiction, got: {set(changes.keys())}"
+                    warnings.append(w)
+                    item.rationale += f" [VALIDATION: {w}]"
+
+                if not pd.get("change_summary"):
+                    w = "org_detail_update missing change_summary"
+                    warnings.append(w)
+                    item.rationale += f" [VALIDATION: {w}]"
+
+    return warnings
+
+
+def _convert_legacy_follow_ups(extraction: "ExtractionOutput") -> int:
+    """Convert legacy item_type='follow_up' to task with task_mode='follow_up'.
+
+    Returns count of items converted.
+    """
+    count = 0
+    for bundle in extraction.bundles:
+        for item in bundle.items:
+            if item.item_type == "follow_up":
+                item.item_type = "task"
+                if "task_mode" not in item.proposed_data:
+                    item.proposed_data["task_mode"] = "follow_up"
+                item.rationale += " [Converted from legacy follow_up item type]"
+                count += 1
+    return count
+
+
 def _post_process(
     extraction: ExtractionOutput,
     full_context: dict,
@@ -644,7 +887,7 @@ def _post_process(
     db,
     communication_id: str,
 ) -> dict:
-    """Run the 7-step deterministic post-processing pass.
+    """Run the post-processing pass.
 
     Returns a dict with:
         bundles: list of validated bundles (ready for DB insert)
@@ -654,10 +897,26 @@ def _post_process(
         "code_suppressed_items": [],
         "dedup_warnings": [],
         "invalid_references_cleaned": [],
+        "name_resolutions": [],
+        "update_validation_warnings": [],
+        "ref_validation_warnings": [],
+        "legacy_follow_up_conversions": 0,
         "tier_1_matter_count": 0,
         "tier_2_matter_count": 0,
         "token_truncation_occurred": False,
     }
+
+    # ── Step 0: Convert legacy follow_up item types ──
+    log["legacy_follow_up_conversions"] = _convert_legacy_follow_ups(extraction)
+
+    # ── Step 1.5: Resolve entity names to UUIDs ──
+    log["name_resolutions"] = _resolve_entity_names(extraction, full_context)
+
+    # ── Step 1.7: Validate $ref: references between items ──
+    log["ref_validation_warnings"] = _validate_tracks_task_refs(extraction)
+
+    # ── Step 1.8: Validate update item types ──
+    log["update_validation_warnings"] = _validate_update_items(extraction, full_context)
 
     # Build lookup sets from full context for validation
     valid_person_ids = {p["id"] for p in full_context.get("people", [])}
@@ -755,88 +1014,11 @@ def _post_process(
             if cleaned_refs:
                 item.rationale += " [Note: some references were cleaned by post-processing.]"
 
-            # ── Step 2b: Context note linked_entities validation ──
-            if item.item_type == "context_note":
-                linked_entities = pd.get("linked_entities", [])
-                valid_linked = []
-                for le in linked_entities:
-                    etype = le.get("entity_type")
-                    eid = le.get("entity_id")
-                    valid = False
-                    if etype == "person" and eid in valid_person_ids:
-                        valid = True
-                    elif etype == "organization" and eid in valid_org_ids:
-                        valid = True
-                    elif etype == "matter" and eid in valid_matter_ids:
-                        valid = True
-                    elif etype in ("meeting", "task", "document", "decision"):
-                        valid = True  # Cannot validate these without extra queries
-                    if valid:
-                        valid_linked.append(le)
-                    else:
-                        log["invalid_references_cleaned"].append({
-                            "type": f"linked_entity.{etype}",
-                            "value": eid,
-                            "item_type": "context_note",
-                        })
-                pd["linked_entities"] = valid_linked
-                if not valid_linked and linked_entities:
-                    item.rationale += " [Note: all linked entities had invalid IDs — note is unlinked.]"
-
-                # Attribution enforcement
-                posture = pd.get("posture", "factual")
-                speaker = pd.get("speaker_attribution")
-                if posture == "attributed_view" and not speaker:
-                    item.rationale += " [WARNING: attributed_view without speaker_attribution — downgraded to tentative.]"
-                    pd["posture"] = "tentative"
-                if posture == "sensitive" and not speaker and not item.primary_excerpt:
-                    pd["automation_hold"] = 1
-                    item.rationale += " [Hold: sensitive note without speaker attribution or source excerpt.]"
-
-            # ── Step 2c: Person detail update validation ──
-            if item.item_type == "person_detail_update":
-                target_person_id = pd.get("person_id")
-                if target_person_id and target_person_id not in valid_person_ids:
-                    # Downgrade to unlinked context_note
-                    log["invalid_references_cleaned"].append({
-                        "type": "person_detail_update.person_id",
-                        "value": target_person_id,
-                        "item_type": "person_detail_update",
-                        "action": "downgraded_to_context_note",
-                    })
-                    item.item_type = "context_note"
-                    fields = pd.get("fields", {})
-                    person_name = pd.get("person_name", "unknown")
-                    field_desc = ", ".join(f"{k}={v}" for k, v in fields.items())
-                    pd.clear()
-                    pd["title"] = f"Profile info for {person_name} (unverified person)"
-                    pd["body"] = f"Extracted profile fields: {field_desc}. Person ID could not be verified."
-                    pd["category"] = "people_insight"
-                    pd["posture"] = "tentative"
-                    pd["durability"] = "durable"
-                    pd["sensitivity"] = "low"
-                    item.rationale += " [Downgraded from person_detail_update: invalid person_id.]"
-
-                # Confidence enforcement
-                elif item.confidence < 0.70:
-                    log["code_suppressed_items"].append({
-                        "item_type": "person_detail_update",
-                        "reason": f"confidence {item.confidence:.2f} < 0.70 threshold",
-                        "person_id": target_person_id,
-                        "fields": list(pd.get("fields", {}).keys()),
-                    })
-                    continue  # Skip this item
-                elif item.confidence < 0.85:
-                    pd["automation_hold"] = 1
-                    item.rationale += f" [Hold: confidence {item.confidence:.2f} is below 0.85 threshold.]"
-
             # ── Step 3: Apply extraction_policy suppression ──
             if item.item_type in disabled_types:
                 log["code_suppressed_items"].append({
                     "item_type": item.item_type,
-                    "reason": f"propose_{item.item_type}s disabled in extraction_policy"
-                              if item.item_type != "follow_up"
-                              else "propose_follow_ups disabled in extraction_policy",
+                    "reason": f"propose_{item.item_type}s disabled in extraction_policy",
                     "confidence": item.confidence,
                     "source_excerpt": item.source_excerpt[:200],
                 })
@@ -926,7 +1108,7 @@ def _post_process(
         ]
 
         for item in bundle.items:
-            if item.item_type in ("task", "follow_up") and existing_tasks:
+            if item.item_type == "task" and existing_tasks:
                 item_title = item.proposed_data.get("title", "").lower()
                 for et in existing_tasks:
                     if _fuzzy_title_match(item_title, et.get("title", "").lower()):
@@ -1028,14 +1210,11 @@ def _build_source_locator(db, item, communication_id: str) -> dict:
                     message_id = mr["id"]
                     break
 
-        evidence_list = item.get_evidence_list()
-
         return {
             "type": "email",
             "message_index": message_index,
             "message_id": message_id,
-            "excerpt": item.primary_excerpt,
-            "evidence": evidence_list,
+            "excerpt": item.source_excerpt,
             "entity_refs": entity_refs,
         }
 
@@ -1070,87 +1249,25 @@ def _build_source_locator(db, item, communication_id: str) -> dict:
             for t in td.get("topics", []):
                 t_start = t.get("start_time", 0)
                 t_end = t.get("end_time", 0)
-                if time_range and t_start < time_range.end and t_end > time_range.start:
+                if t_start < time_range.end and t_end > time_range.start:
                     enrichment_topic = t.get("topic")
                     break
         except (json.JSONDecodeError, TypeError):
             pass
 
-    # Build evidence array from all source_evidence pieces
-    evidence_list = item.get_evidence_list()
-
     return {
         "type": "transcript",
-        "segments": item.primary_segments,
+        "segments": seg_ids,
         "time_range": {
-            "start_seconds": item.primary_time_range.start if item.primary_time_range else (time_range.start if time_range else 0),
-            "end_seconds": item.primary_time_range.end if item.primary_time_range else (time_range.end if time_range else 0),
+            "start_seconds": time_range.start,
+            "end_seconds": time_range.end,
         },
         "speaker_label": speaker_label,
         "speaker_name": speaker_name,
-        "excerpt": item.primary_excerpt,
-        "evidence": evidence_list,
+        "excerpt": item.source_excerpt,
         "entity_refs": entity_refs,
         "enrichment_topic": enrichment_topic,
     }
-
-
-def _update_communication_title(db, communication_id: str, bundles: list):
-    """Update the communication title from extracted meeting_record if the current
-    title is generic (e.g., 'Test audio 3', UUID-like, or just a filename).
-    
-    Priority: first meeting_record title found, falling back to first bundle
-    target_matter_title prefixed with 'Discussion: '.
-    """
-    current = db.execute(
-        "SELECT title, original_filename FROM communications WHERE id = ?",
-        (communication_id,),
-    ).fetchone()
-    if not current:
-        return
-
-    cur_title = (current["title"] or "").strip()
-    orig_name = (current["original_filename"] or "").strip()
-
-    # Heuristic: title is "generic" if it matches the filename, looks like a UUID,
-    # starts with "Test audio", or is very short / empty
-    import re
-    is_generic = (
-        not cur_title
-        or cur_title == orig_name
-        or cur_title.lower().startswith("test audio")
-        or bool(re.match(r"^[0-9a-f]{8}-", cur_title))
-        or len(cur_title) < 3
-    )
-    if not is_generic:
-        return
-
-    # Look for the best title from extraction results
-    new_title = None
-    for b in bundles:
-        for item in b.items:
-            if item.item_type == "meeting_record" and item.proposed_data.get("title"):
-                new_title = item.proposed_data["title"]
-                break
-        if new_title:
-            break
-
-    # Fallback: use matter title from first matter-linked bundle
-    if not new_title:
-        for b in bundles:
-            if b.target_matter_title:
-                new_title = f"Discussion: {b.target_matter_title}"
-                break
-
-    if new_title and new_title != cur_title:
-        db.execute(
-            "UPDATE communications SET title = ?, updated_at = datetime('now') WHERE id = ?",
-            (new_title, communication_id),
-        )
-        logger.info(
-            "[%s] Communication title updated: '%s' -> '%s'",
-            communication_id[:8], cur_title, new_title,
-        )
 
 
 def _persist_extraction(
@@ -1238,16 +1355,13 @@ def _persist_extraction(
                 item_id, bundle_id, item.item_type,
                 json.dumps(item.proposed_data, ensure_ascii=False, default=str),
                 item.confidence, item.rationale,
-                item.primary_excerpt,
-                item.primary_segments[0] if item.primary_segments else None,
-                item.primary_time_range.start if item.primary_time_range else None,
-                item.primary_time_range.end if item.primary_time_range else None,
+                item.source_excerpt,
+                item.source_segments[0] if item.source_segments else None,
+                item.source_time_range.start,
+                item.source_time_range.end,
                 json.dumps(source_locator, ensure_ascii=False, default=str),
                 item_idx,
             ))
-
-    # Update communication title from meeting_record if current title is generic
-    _update_communication_title(db, communication_id, bundles)
 
     db.commit()
 
@@ -1304,7 +1418,7 @@ async def _run_sonnet_extraction(
                 model=sonnet_model,
                 system_prompt=system_prompt,
                 user_prompt=prompt_for_attempt,
-                max_tokens=16384,
+                max_tokens=8192,
                 temperature=0.0,
             )
             total_cost += response.usage.cost_usd
@@ -1425,7 +1539,7 @@ async def _run_opus_escalation(
             model=opus_model,
             system_prompt=system_prompt,
             user_prompt=opus_prompt,
-            max_tokens=16384,
+            max_tokens=8192,
             temperature=0.0,
         )
 
