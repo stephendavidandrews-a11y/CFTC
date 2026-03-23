@@ -73,7 +73,7 @@ def run_quality_gate(
         QualityGateResult with status and metrics.
     """
     from config import (
-        VP_MIN_DIARIZATION_CONFIDENCE, VP_MIN_SEGMENT_DURATION,
+        VP_MIN_SEGMENT_DURATION,
         VP_MIN_SNR_DB, VP_MIN_HNR_DB, VP_MAX_JITTER_PCT, VP_MAX_SHIMMER_PCT,
         VP_MAX_ENERGY_VARIANCE_STD, VP_MAX_F0_STDDEV_RATIO,
         VP_TARGET_DURATION_MIN, VP_TARGET_DURATION_MAX, VP_PROVISIONAL_IF_BELOW,

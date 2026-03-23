@@ -36,7 +36,6 @@ from pathlib import Path
 
 import httpx
 
-from app.config import load_policy
 
 logger = logging.getLogger(__name__)
 

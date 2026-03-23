@@ -23,11 +23,9 @@ Response shape:
 """
 import base64
 import logging
-import os
 import shutil
 import tempfile
 import time
-import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile

@@ -145,7 +145,7 @@ async def list_context_notes(
             FROM context_note_links cnl
             WHERE cnl.context_note_id = ?
         """, (item["id"],)).fetchall()
-        item["links"] = [dict(l) for l in links]
+        item["links"] = [dict(link) for link in links]
         items.append(item)
 
     return {"items": items, "total": total, "limit": limit, "offset": offset}
@@ -194,7 +194,7 @@ async def get_context_notes_by_entity(
             SELECT cnl.id, cnl.entity_type, cnl.entity_id, cnl.relationship_role
             FROM context_note_links cnl WHERE cnl.context_note_id = ?
         """, (item["id"],)).fetchall()
-        item["links"] = [dict(l) for l in links]
+        item["links"] = [dict(link) for link in links]
         items.append(item)
 
     return {"items": items, "total": len(items)}

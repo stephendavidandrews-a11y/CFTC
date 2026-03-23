@@ -7,20 +7,17 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import logging
-import sys
 import threading
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
-from config import SERVICE_PORT, BASE_DIR
+from config import SERVICE_PORT
 from db.schema import init_db
 from voice.pipeline.watcher import InboxWatcher
-from voice.pipeline.processor import process_conversation, process_pending
+from voice.pipeline.processor import process_conversation
 
 logging.basicConfig(
     level=logging.INFO,

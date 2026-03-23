@@ -26,8 +26,6 @@ import uuid
 import sqlite3
 import logging
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
-from datetime import datetime
 
 # Add parent to path so we can import app
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -59,7 +57,6 @@ from app.pipeline.stages.extraction import (
     _parse_extraction_response,
     _post_process,
     _persist_extraction,
-    run_extraction_stage,
 )
 from app.pipeline.stages.extraction_models import ExtractionOutput
 from app.config import load_policy
@@ -305,17 +302,17 @@ async def run_test():
     db = create_test_db()
     policy = load_policy()
 
-    print(f"\n[1] INPUT SUMMARY")
+    print("\n[1] INPUT SUMMARY")
     print(f"    Communication ID: {COMM_ID}")
-    print(f"    Source: audio, 235s, 12 segments, 2 speakers")
-    print(f"    Speakers: Alan Brubaker (Director), Mel Gunewardena (Sr Markets Advisor)")
-    print(f"    Topics: Event contract rulemaking, congressional crypto response, CME comment letter, SEC coordination")
-    print(f"    Entities: 11 confirmed (6 people, 3 orgs, 2 regulations)")
-    print(f"    Sensitivity: congressional_sensitive=True, deliberative=True")
-    print(f"    Disabled types: decision, status_change, new_matter (per ai_policy.json)")
+    print("    Source: audio, 235s, 12 segments, 2 speakers")
+    print("    Speakers: Alan Brubaker (Director), Mel Gunewardena (Sr Markets Advisor)")
+    print("    Topics: Event contract rulemaking, congressional crypto response, CME comment letter, SEC coordination")
+    print("    Entities: 11 confirmed (6 people, 3 orgs, 2 regulations)")
+    print("    Sensitivity: congressional_sensitive=True, deliberative=True")
+    print("    Disabled types: decision, status_change, new_matter (per ai_policy.json)")
 
     # ── Tiering ──
-    print(f"\n[2] TIERED CONTEXT SUMMARY")
+    print("\n[2] TIERED CONTEXT SUMMARY")
     signals = _gather_tiering_signals(db, COMM_ID)
     print(f"    Speaker person_ids: {len(signals['speaker_person_ids'])} ({', '.join(list(signals['speaker_person_ids'])[:2])})")
     print(f"    Entity person_ids: {len(signals['entity_person_ids'])}")
@@ -343,11 +340,11 @@ async def run_test():
     print(f"    Estimated input tokens: ~{(len(system_prompt) + len(user_prompt)) // 4}")
 
     # ── Call LLM ──
-    print(f"\n[3] CALLING SONNET 4...")
+    print("\n[3] CALLING SONNET 4...")
     # Use real available model (config says 4-6 which is future model ID)
     model = os.environ.get("TEST_MODEL_OVERRIDE", "claude-sonnet-4-20250514")
     print(f"    Model: {model}")
-    print(f"    Temperature: 0.0, max_tokens: 8192")
+    print("    Temperature: 0.0, max_tokens: 8192")
 
     t0 = time.time()
     response = await call_llm(
@@ -362,7 +359,7 @@ async def run_test():
     )
     elapsed = time.time() - t0
 
-    print(f"\n    RAW EXTRACTION OUTPUT SUMMARY")
+    print("\n    RAW EXTRACTION OUTPUT SUMMARY")
     print(f"    Response length: {len(response.text)} chars")
     print(f"    Stop reason: {response.stop_reason}")
 
@@ -387,7 +384,7 @@ async def run_test():
     print(f"    Extraction summary: {extraction.extraction_summary[:200]}")
 
     # ── Post-processing ──
-    print(f"\n[4] CODE-SIDE POST-PROCESSING")
+    print("\n[4] CODE-SIDE POST-PROCESSING")
     processed = _post_process(extraction, MOCK_TRACKER_CONTEXT, policy, db, COMM_ID)
     pp_log = processed["post_processing_log"]
 
@@ -413,7 +410,7 @@ async def run_test():
             print(f"        - {item.item_type}: {item.proposed_data.get('title', item.proposed_data.get('summary', ''))[:60]}")
 
     # ── Persist ──
-    print(f"\n[5] PERSISTENCE & STATE TRANSITION")
+    print("\n[5] PERSISTENCE & STATE TRANSITION")
     extraction_id = _persist_extraction(
         db=db,
         communication_id=COMM_ID,
@@ -452,10 +449,10 @@ async def run_test():
     print(f"    review_bundle_items: {len(item_rows)} rows")
 
     # Simulate CAS transition
-    print(f"    State transition: extracting → awaiting_bundle_review (would be CAS in orchestrator)")
+    print("    State transition: extracting → awaiting_bundle_review (would be CAS in orchestrator)")
 
     # ── Source locator samples ──
-    print(f"\n[6] SAMPLE source_locator_json ENTRIES")
+    print("\n[6] SAMPLE source_locator_json ENTRIES")
     for ir in item_rows[:3]:
         locator = json.loads(ir["source_locator_json"]) if ir["source_locator_json"] else {}
         print(f"    Item: {ir['item_type']} (conf={ir['confidence']})")
@@ -468,7 +465,7 @@ async def run_test():
         print(f"      enrichment_topic: {locator.get('enrichment_topic')}")
 
     # ── Cost and latency ──
-    print(f"\n[7] COST AND LATENCY")
+    print("\n[7] COST AND LATENCY")
     print(f"    Input tokens: {response.usage.input_tokens:,}")
     print(f"    Output tokens: {response.usage.output_tokens:,}")
     print(f"    Cost: ${response.usage.cost_usd:.4f}")
@@ -476,7 +473,7 @@ async def run_test():
     print(f"    Processing time (incl post-processing): {elapsed:.1f}s")
 
     # ── Quality assessment ──
-    print(f"\n[8] QUALITY ASSESSMENT — NOISY / LOW-QUALITY PROPOSALS")
+    print("\n[8] QUALITY ASSESSMENT — NOISY / LOW-QUALITY PROPOSALS")
     noisy = []
     for b in bundles:
         for item in b.items:
@@ -488,10 +485,10 @@ async def run_test():
         for n in noisy:
             print(f"    ⚠ {n}")
     else:
-        print(f"    ✓ No noisy or low-quality proposals detected")
+        print("    ✓ No noisy or low-quality proposals detected")
 
     # ── Conservative doctrine check ──
-    print(f"\n[9] CONSERVATIVE EXTRACTION DOCTRINE CHECK")
+    print("\n[9] CONSERVATIVE EXTRACTION DOCTRINE CHECK")
     checks = {
         "All items have provenance (source_excerpt)": all(
             ir["source_excerpt"] and len(ir["source_excerpt"]) > 10
@@ -535,30 +532,30 @@ async def run_test():
         print(f"    {status} {check}")
 
     # ── Regression check ──
-    print(f"\n[10] REGRESSION CHECK — PRIOR STAGES")
-    print(f"    ✓ Schema: all 20 tables created successfully")
-    print(f"    ✓ Communications table: seeded and queryable")
-    print(f"    ✓ Transcripts table: 12 segments inserted and read back")
-    print(f"    ✓ Communication entities: 11 entities with confirmed flags")
-    print(f"    ✓ Communication participants: 2 speakers with tracker_person_id")
-    print(f"    ✓ LLM usage: recorded (check llm_usage table)")
+    print("\n[10] REGRESSION CHECK — PRIOR STAGES")
+    print("    ✓ Schema: all 20 tables created successfully")
+    print("    ✓ Communications table: seeded and queryable")
+    print("    ✓ Transcripts table: 12 segments inserted and read back")
+    print("    ✓ Communication entities: 11 entities with confirmed flags")
+    print("    ✓ Communication participants: 2 speakers with tracker_person_id")
+    print("    ✓ LLM usage: recorded (check llm_usage table)")
 
     usage_row = db.execute("SELECT * FROM llm_usage WHERE communication_id = ?", (COMM_ID,)).fetchone()
     if usage_row:
         print(f"      llm_usage: stage={usage_row['stage']}, model={usage_row['model']}, cost=${usage_row['cost_usd']:.4f}")
     else:
-        print(f"      ✗ llm_usage row not found!")
+        print("      ✗ llm_usage row not found!")
 
-    print(f"    ✓ ai_extractions: row persisted with prompts and raw output")
+    print("    ✓ ai_extractions: row persisted with prompts and raw output")
     print(f"    ✓ review_bundles: {len(bundle_rows)} bundles persisted")
     print(f"    ✓ review_bundle_items: {len(item_rows)} items persisted")
 
     # ── Final verdict ──
     print(f"\n{'=' * 72}")
     if all_pass:
-        print(f"VERDICT: ✓ EXTRACTION VERIFICATION PASSED")
+        print("VERDICT: ✓ EXTRACTION VERIFICATION PASSED")
     else:
-        print(f"VERDICT: ✗ EXTRACTION VERIFICATION FAILED — see checks above")
+        print("VERDICT: ✗ EXTRACTION VERIFICATION FAILED — see checks above")
     print(f"{'=' * 72}\n")
 
     db.close()

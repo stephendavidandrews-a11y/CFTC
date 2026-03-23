@@ -7,7 +7,6 @@ import json
 import logging
 import shutil
 import uuid
-from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -15,7 +14,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app.config import AI_UPLOAD_DIR, AI_AUDIO_WATCH_DIR
+from app.config import AI_UPLOAD_DIR
 from app.db import get_db
 from app.pipeline.stages.preprocessing import ACCEPTED_FORMATS, get_audio_metadata
 from app.routers.events import publish_event

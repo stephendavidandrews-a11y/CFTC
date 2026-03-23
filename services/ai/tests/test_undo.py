@@ -11,9 +11,8 @@ import json
 import sqlite3
 import sys
 import uuid
-from datetime import datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -25,8 +24,6 @@ from app.writeback.undo import (
     undo_communication,
     UndoError,
     UndoErrorType,
-    UndoResult,
-    ConflictInfo,
     UNDOABLE_STATES,
 )
 
@@ -627,12 +624,12 @@ class TestRegression:
     """Verify undo doesn't break existing modules."""
 
     def test_writeback_ordering_unchanged(self):
-        from app.writeback.ordering import ITEM_TYPE_ORDER, order_items
+        from app.writeback.ordering import ITEM_TYPE_ORDER
         assert ITEM_TYPE_ORDER["new_organization"] == 0
         assert ITEM_TYPE_ORDER["status_change"] == 9
 
     def test_committer_imports_clean(self):
-        from app.writeback.committer import commit_communication, CommitResult
+        from app.writeback.committer import CommitResult
         assert CommitResult is not None
 
     def test_bundle_review_intact(self):
@@ -642,8 +639,7 @@ class TestRegression:
 
     def test_undo_module_imports_clean(self):
         from app.writeback.undo import (
-            undo_communication, UndoError, UndoErrorType,
-            UndoResult, ConflictInfo, UNDOABLE_STATES,
+            UndoErrorType,
         )
         assert "complete" in UNDOABLE_STATES
         assert UndoErrorType.CONFLICT_DETECTED.value == "conflict_detected"

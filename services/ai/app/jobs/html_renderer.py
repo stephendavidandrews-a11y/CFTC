@@ -496,9 +496,9 @@ def render_dev_report_html(data):
             bar_color = GREEN if pct >= 80 else ORANGE if pct >= 50 else RED
             source_badge = ""
             if f.get("source") == "ai":
-                source_badge = f' <span style="background:#1e3a5f;color:#60a5fa;padding:1px 5px;border-radius:3px;font-size:9px;">AI</span>'
+                source_badge = ' <span style="background:#1e3a5f;color:#60a5fa;padding:1px 5px;border-radius:3px;font-size:9px;">AI</span>'
             elif f.get("source") == "manual":
-                source_badge = f' <span style="background:#1f2937;color:#9ca3af;padding:1px 5px;border-radius:3px;font-size:9px;">MANUAL</span>'
+                source_badge = ' <span style="background:#1f2937;color:#9ca3af;padding:1px 5px;border-radius:3px;font-size:9px;">MANUAL</span>'
 
             field_html.append(
                 f'<div style="padding:8px 0;border-bottom:1px solid {CARD_BORDER};">'

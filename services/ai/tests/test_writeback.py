@@ -20,7 +20,7 @@ import sys
 import os
 import asyncio
 from pathlib import Path
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
 
 # Ensure the service root is on sys.path
 SERVICE_ROOT = Path(__file__).parent.parent
@@ -271,7 +271,6 @@ def test_1_02_committable_items_filter():
 
 def test_1_03_rejected_bundle_skipped():
     """Rejected bundles produce zero operations."""
-    from app.writeback.item_converters import convert_item
 
     # Simulate committer logic — rejected bundle should be skipped
     bundles = _shared_db.execute(

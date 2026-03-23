@@ -148,7 +148,7 @@ async def batch_write(body: dict, db=Depends(get_db),
                                f"Table '{table}' not allowed in batch")
         if op_type not in ("insert", "update", "delete"):
             raise _typed_error(400, "validation_failure", i,
-                               f"op must be 'insert', 'update', or 'delete'")
+                               "op must be 'insert', 'update', or 'delete'")
         if op_type in ("update", "delete") and not op.get("record_id"):
             raise _typed_error(400, "validation_failure", i,
                                f"'{op_type}' requires record_id")
