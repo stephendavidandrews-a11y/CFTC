@@ -8,8 +8,7 @@ import {
   listPeople, listOrganizations, listMatters,
   addMatterDependency, removeMatterDependency,
   getMatterTags, addMatterTag, removeMatterTag, listTags, createTag,
-  getEnums, deleteMatter,
-} from "../../api/tracker";
+  getEnums, deleteMatter, getContextNotesByEntity, listContextNotes} from "../../api/tracker";
 import { useDrawer } from "../../contexts/DrawerContext";
 import Badge from "../../components/shared/Badge";
 import DataTable from "../../components/shared/DataTable";
@@ -56,13 +55,23 @@ function formatDate(d) {
   return new Date(val).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-const TABS = ["Updates", "Tasks", "Stakeholders", "Organizations", "Meetings", "Documents", "Decisions", "Dependencies"];
+const TABS = ["Updates", "Tasks", "Stakeholders", "Organizations", "Meetings", "Documents", "Decisions", "Dependencies", "Context Notes"];
 
 export default function MatterDetailPage() {
   const { id } = useParams();
   const { openDrawer } = useDrawer();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("Updates");
+  const [ctxNotes, setCtxNotes] = useState([]);
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    listContextNotes({ matter_id: id }).then(d => {
+      if (!cancelled) setCtxNotes(d?.items || []);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [id]);
 
   const { data: matter, loading, error, refetch } = useApi(() => getMatter(id), [id]);
 
@@ -845,6 +854,64 @@ export default function MatterDetailPage() {
             )}
           </div>
         )}
+
+        {activeTab === "Context Notes" && (
+          <div style={cardStyle}>
+            <div style={sectionTitle}>Context Notes ({ctxNotes.length})</div>
+            {ctxNotes.length === 0 ? (
+              <div style={{ fontSize: 13, color: theme.text.faint, padding: "12px 0" }}>
+                No context notes linked to this matter.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {ctxNotes.map((note) => {
+                  const CAT_C = { people_insight: { bg: "#312e81", text: "#c4b5fd" }, institutional_knowledge: { bg: "#1e3a5f", text: "#60a5fa" }, process_note: { bg: "#0c4a6e", text: "#67e8f9" }, policy_operating_rule: { bg: "#14532d", text: "#4ade80" }, strategic_context: { bg: "#422006", text: "#fbbf24" }, culture_climate: { bg: "#431407", text: "#fb923c" }, relationship_dynamic: { bg: "#1e1b4b", text: "#a78bfa" } };
+                  const POS_C = { factual: { bg: "#1e3a5f", text: "#60a5fa" }, attributed_view: { bg: "#78350f", text: "#fbbf24" }, tentative: { bg: "#1f2937", text: "#9ca3af" }, interpretive: { bg: "#1e1b4b", text: "#a78bfa" }, sensitive: { bg: "#7f1d1d", text: "#fca5a5" } };
+                  const cc = CAT_C[note.category] || { bg: "#1f2937", text: "#9ca3af" };
+                  const pc = POS_C[note.posture] || { bg: "#1f2937", text: "#9ca3af" };
+                  return (
+                    <div key={note.id} style={{ background: theme.bg.input, borderRadius: 8, border: `1px solid ${theme.border.subtle}`, padding: "12px 16px" }}>
+                      <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap", alignItems: "center" }}>
+                        <span style={{ background: cc.bg, color: cc.text, fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 4, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                          {(note.category || "").replace(/_/g, " ")}
+                        </span>
+                        <span style={{ background: pc.bg, color: pc.text, fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 4, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                          {(note.posture || "").replace(/_/g, " ")}
+                        </span>
+                        {note.sensitivity && note.sensitivity !== "low" && (
+                          <span style={{ background: "#7f1d1d", color: "#fca5a5", fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 4, textTransform: "uppercase" }}>
+                            {note.sensitivity}
+                          </span>
+                        )}
+                        <span style={{ flex: 1 }} />
+                        <span style={{ fontSize: 10, color: theme.text.faint }}>{note.created_at?.slice(0, 10)}</span>
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: theme.text.primary, marginBottom: 4 }}>{note.title}</div>
+                      <div style={{ fontSize: 12, color: theme.text.muted, lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                        {note.body}
+                      </div>
+                      {note.speaker_attribution && (
+                        <div style={{ fontSize: 11, color: theme.text.dim, marginTop: 6, fontStyle: "italic" }}>
+                          — {note.speaker_attribution}
+                        </div>
+                      )}
+                      {note.links && note.links.length > 0 && (
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
+                          {note.links.map((lnk, i) => (
+                            <span key={i} style={{ background: "rgba(59,130,246,0.1)", color: "#93c5fd", fontSize: 10, padding: "2px 6px", borderRadius: 4, border: "1px solid rgba(59,130,246,0.2)" }}>
+                              {lnk.entity_name || lnk.entity_type} ({lnk.relationship_role})
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
     </div>
   );

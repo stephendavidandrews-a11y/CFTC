@@ -138,7 +138,7 @@ const columns = [
 export default function BundleReviewQueuePage() {
   const navigate = useNavigate();
   const { data, loading, error, refetch } = useApi(() => getBundleReviewQueue(), []);
-  const { connected, on } = useAIEvents(["review_ready", "bundle_review_complete"]);
+  const { connected, on } = useAIEvents(["review_ready", "bundle_review_complete", "communication_undo"]);
 
   // Auto-refresh on SSE events
   useEffect(() => {

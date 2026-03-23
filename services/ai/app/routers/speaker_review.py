@@ -50,6 +50,7 @@ class LinkSpeakerRequest(BaseModel):
     proposed_title: Optional[str] = None
     proposed_org: Optional[str] = None
     voiceprint_match_log_id: Optional[str] = None  # if confirming a voiceprint candidate
+    skip_voiceprint: bool = False  # link person without taking/updating voiceprint
 
 
 class NewPersonRequest(BaseModel):
@@ -233,19 +234,32 @@ async def get_speaker_review_detail(communication_id: str, db=Depends(get_db)):
                     issues.append(f"F0 variance high ({f0_ratio:.0%})")
                 vq["f0_stddev_ratio"] = round(f0_ratio, 3)
 
-            if not issues:
-                verdict = "good"
-            elif len(issues) <= 1:
-                verdict = "fair"
-            else:
-                verdict = "poor"
-
-            # Get embedding quality info
+            # Get embedding quality info (used for verdict)
             eq_row = db.execute(
                 "SELECT embedding_filtered, embedding_quality_score, embedding_clean_duration, embedding_segments_used "
                 "FROM voice_samples WHERE communication_id = ? AND speaker_label = ? LIMIT 1",
                 (communication_id, label),
             ).fetchone()
+
+            # Derive verdict from embedding filter results (per-segment best)
+            # rather than aggregated averages which get dragged down by noisy segments
+            if eq_row and eq_row["embedding_quality_score"] is not None:
+                eq_score = eq_row["embedding_quality_score"]
+                clean_dur = eq_row["embedding_clean_duration"] or 0
+                if eq_score >= 0.7 and clean_dur >= 30:
+                    verdict = "good"
+                elif eq_score >= 0.4 and clean_dur >= 15:
+                    verdict = "fair"
+                else:
+                    verdict = "poor"
+            else:
+                # Fallback to aggregated metrics if no embedding data
+                if not issues:
+                    verdict = "good"
+                elif len(issues) <= 1:
+                    verdict = "fair"
+                else:
+                    verdict = "poor"
 
             vocal_quality = {
                 "hnr_db": hnr,
@@ -375,10 +389,13 @@ async def link_speaker(
     ))
     db.commit()
 
-    # Quality-gated profile promotion (non-blocking)
-    profile_result = promote_sample_to_profile(
-        db, communication_id, participant["speaker_label"], req.tracker_person_id
-    )
+    # Quality-gated profile promotion (non-blocking, skippable)
+    if req.skip_voiceprint:
+        profile_result = {"status": "skipped", "reason": "user opted out of voiceprint"}
+    else:
+        profile_result = promote_sample_to_profile(
+            db, communication_id, participant["speaker_label"], req.tracker_person_id
+        )
 
     return {
         "status": "ok",

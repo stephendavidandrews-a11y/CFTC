@@ -1,0 +1,151 @@
+"""Intelligence briefs API router.
+
+Endpoints for listing, viewing, and manually generating daily/weekly briefs.
+"""
+import json
+import logging
+from datetime import date, datetime
+
+from fastapi import APIRouter, Query
+
+from app.db import get_connection
+
+logger = logging.getLogger(__name__)
+router = APIRouter(tags=["intelligence"])
+
+
+@router.get("/intelligence/briefs")
+def list_briefs(
+    brief_type: str = Query("daily", description="daily or weekly"),
+    limit: int = Query(20, ge=1, le=100),
+):
+    """List recent intelligence briefs."""
+    db = get_connection()
+    try:
+        rows = db.execute(
+            """SELECT id, brief_type, brief_date, model_used, docx_file_path, created_at
+               FROM intelligence_briefs
+               WHERE brief_type = ?
+               ORDER BY brief_date DESC
+               LIMIT ?""",
+            (brief_type, limit),
+        ).fetchall()
+        return {"items": [dict(r) for r in rows], "count": len(rows)}
+    finally:
+        db.close()
+
+
+@router.get("/intelligence/briefs/{brief_id}")
+def get_brief(brief_id: str):
+    """Get a specific brief with full content."""
+    db = get_connection()
+    try:
+        row = db.execute(
+            "SELECT * FROM intelligence_briefs WHERE id = ?", (brief_id,)
+        ).fetchone()
+        if not row:
+            return {"error": "Brief not found"}, 404
+        result = dict(row)
+        # Parse JSON content
+        if result.get("content"):
+            try:
+                result["content"] = json.loads(result["content"])
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return result
+    finally:
+        db.close()
+
+
+@router.get("/intelligence/briefs/by-date/{brief_type}/{brief_date}")
+def get_brief_by_date(brief_type: str, brief_date: str):
+    """Get a brief by type and date."""
+    db = get_connection()
+    try:
+        row = db.execute(
+            "SELECT * FROM intelligence_briefs WHERE brief_type = ? AND brief_date = ? ORDER BY created_at DESC LIMIT 1",
+            (brief_type, brief_date),
+        ).fetchone()
+        if not row:
+            return {"error": "No brief found for this date", "brief_type": brief_type, "date": brief_date}
+        result = dict(row)
+        if result.get("content"):
+            try:
+                result["content"] = json.loads(result["content"])
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return result
+    finally:
+        db.close()
+
+
+@router.post("/intelligence/generate")
+def generate_brief(brief_type: str = Query("daily", description="daily, weekly, or dev-report")):
+    """Manually trigger brief generation.
+
+    This runs synchronously and returns the generated brief.
+    Use for testing or ad-hoc generation.
+    """
+    db = get_connection()
+    try:
+        if brief_type == "daily":
+            from app.jobs.daily_brief import generate_daily_brief, store_brief
+            from app.jobs.html_renderer import render_daily_html
+            from app.jobs.docx_renderer import render_daily_docx
+            from app.jobs.email_sender import send_email
+
+            # Try to get LLM client for meeting prep
+            llm_client = None
+            try:
+                from app.llm.client import get_llm_client
+                llm_client = get_llm_client()
+            except Exception:
+                logger.info("LLM client unavailable, skipping meeting prep narratives")
+
+            data = generate_daily_brief(db, llm_client=llm_client)
+            today = date.today().isoformat()
+
+            # Render
+            html = render_daily_html(data)
+            docx_path = render_daily_docx(data)
+
+            # Store
+            model = "haiku" if any(m.get("prep_narrative") for m in data.get("meetings", [])) else None
+            brief_id = store_brief(db, "daily", today, data, str(docx_path), model)
+
+            # Send email
+            send_email(
+                subject=f"CFTC Daily Brief \u2014 {data.get('date_display', today)}",
+                html_body=html,
+                docx_path=docx_path,
+            )
+
+            return {
+                "status": "generated",
+                "brief_id": brief_id,
+                "brief_type": "daily",
+                "date": today,
+                "sections": {
+                    "what_changed": len(data.get("what_changed", [])),
+                    "action_list": len(data.get("action_list", [])),
+                    "meetings": len(data.get("meetings", [])),
+                    "followups": len(data.get("followups", [])),
+                },
+                "email_sent": True,
+                "docx_path": str(docx_path),
+            }
+
+        elif brief_type == "weekly":
+            return {"status": "not_implemented", "message": "Weekly brief coming in Phase B"}
+
+        elif brief_type == "dev-report":
+            return {"status": "not_implemented", "message": "Dev report coming in Phase C"}
+
+        else:
+            return {"error": f"Unknown brief type: {brief_type}"}
+
+    except Exception as e:
+        logger.error("Brief generation failed: %s", e, exc_info=True)
+        return {"error": str(e)}
+    finally:
+        db.close()
