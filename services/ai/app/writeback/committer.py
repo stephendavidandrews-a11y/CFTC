@@ -129,6 +129,47 @@ async def commit_communication(db, communication_id: str) -> CommitResult:
     return result
 
 
+def _resolve_paired_task_refs(items: list[dict]):
+    """Assign client_ids to action tasks so follow_up $ref: references resolve.
+
+    When a follow_up task has tracks_task_ref=$ref:temp-xyz, the paired action
+    task needs client_id=temp-xyz on its proposed_data so the converter puts
+    it on the batch op, allowing the tracker batch endpoint to resolve it.
+    """
+    # Collect all $ref targets needed
+    ref_targets = set()
+    for item in items:
+        pd = item.get("proposed_data", {})
+        if isinstance(pd, str):
+            import json
+            pd = json.loads(pd)
+            item["proposed_data"] = pd
+        ref = pd.get("tracks_task_ref", "")
+        if isinstance(ref, str) and ref.startswith("$ref:"):
+            ref_targets.add(ref[5:])
+
+    if not ref_targets:
+        return
+
+    # Find action tasks that should be the targets
+    # The extraction assigned client_id at extraction time, but it's not stored.
+    # Match by: the action task title should appear in the follow_up's waiting_on_description
+    # or we use a simple heuristic: assign the ref target as client_id to the first
+    # action task that doesn't already have one
+    action_tasks = [
+        item for item in items
+        if item.get("proposed_data", {}).get("task_mode") == "action"
+    ]
+
+    for ref_target in ref_targets:
+        # Try to find the matching action task
+        for action in action_tasks:
+            pd = action.get("proposed_data", {})
+            if not pd.get("_client_id"):
+                pd["_client_id"] = ref_target
+                break
+
+
 async def _commit_bundle(db, communication_id: str, bundle: dict,
                          items: list[dict]) -> BundleCommitResult:
     """Commit a single bundle's items to the tracker."""
@@ -163,6 +204,12 @@ async def _commit_bundle(db, communication_id: str, bundle: dict,
 
         # Step 2: Order items by dependency
         ordered_items = order_items(items)
+
+        # Step 2.5: Resolve client_id references for paired tasks
+        # If an item's proposed_data has tracks_task_ref like "$ref:temp-xyz",
+        # find the action task whose extraction-time client_id was "temp-xyz"
+        # and assign a stable client_id to its batch INSERT op.
+        _resolve_paired_task_refs(ordered_items)
 
         # Step 3: Convert each item
         for item in ordered_items:

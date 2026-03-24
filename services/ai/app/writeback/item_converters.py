@@ -209,11 +209,19 @@ def convert_task(item: dict, bundle: dict, refs: dict) -> list[tuple[dict, str]]
 
     op_data = {k: v for k, v in op_data.items() if v is not None}
 
-    return [({
+    op = {
         "op": "insert",
         "table": "tasks",
         "data": op_data,
-    }, item["id"])]
+    }
+
+    # If this task has a _client_id (set by committer for paired-task resolution),
+    # add it to the batch op so $ref: references from follow_up tasks resolve
+    client_id = data.get("_client_id")
+    if client_id:
+        op["client_id"] = client_id
+
+    return [(op, item["id"])]
 
 
 def convert_task_update(item: dict, bundle: dict, refs: dict) -> list[tuple[dict, str]]:
