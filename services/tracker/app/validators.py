@@ -1,17 +1,46 @@
 """
-CFTC Tracker — Pydantic request models for all write endpoints.
+CFTC Tracker - Pydantic request models for all write endpoints.
 
 FastAPI auto-returns 422 with structured errors when validation fails.
 All Optional fields default to None. Required fields raise 422 if missing.
 """
-from typing import Optional, List, Literal
+
 from datetime import datetime as dt
+from typing import ClassVar, List, Optional
+
 from pydantic import BaseModel, Field, model_validator
 
+from app.contracts import get_enum_values
 
-# ── People ───────────────────────────────────────────────────────────────────
 
-class CreatePerson(BaseModel):
+class EnumValidatedModel(BaseModel):
+    """Base model that validates selected fields against canonical tracker enums."""
+
+    __enum_fields__: ClassVar[dict[str, str]] = {}
+
+    @model_validator(mode="after")
+    def validate_enum_fields(self):
+        for field_name, enum_name in self.__enum_fields__.items():
+            value = getattr(self, field_name, None)
+            if value is None:
+                continue
+            allowed_values = get_enum_values(enum_name)
+            if value not in allowed_values:
+                raise ValueError(
+                    f"Invalid value for {field_name}: {value!r}. Allowed values: {allowed_values}"
+                )
+        return self
+
+
+# People
+
+class CreatePerson(EnumValidatedModel):
+    __enum_fields__ = {
+        "relationship_category": "relationship_category",
+        "next_interaction_type": "next_interaction_type",
+        "source": "source",
+    }
+
     full_name: str = Field(..., min_length=1, description="Required display name")
     first_name: Optional[str] = None
     last_name: Optional[str] = None
@@ -29,7 +58,7 @@ class CreatePerson(BaseModel):
     next_interaction_purpose: Optional[str] = None
     manager_person_id: Optional[str] = None
     include_in_team_workload: int = 0
-    include_in_team: Optional[bool] = None  # alias accepted from frontend
+    include_in_team: Optional[bool] = None
     relationship_assigned_to_person_id: Optional[str] = None
     is_active: int = 1
     source: str = "manual"
@@ -41,7 +70,13 @@ class CreatePerson(BaseModel):
             self.include_in_team_workload = 1 if self.include_in_team else 0
 
 
-class UpdatePerson(BaseModel):
+class UpdatePerson(EnumValidatedModel):
+    __enum_fields__ = {
+        "relationship_category": "relationship_category",
+        "next_interaction_type": "next_interaction_type",
+        "source": "source",
+    }
+
     full_name: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
@@ -66,9 +101,14 @@ class UpdatePerson(BaseModel):
     external_refs: Optional[str] = None
 
 
-# ── Organizations ────────────────────────────────────────────────────────────
+# Organizations
 
-class CreateOrganization(BaseModel):
+class CreateOrganization(EnumValidatedModel):
+    __enum_fields__ = {
+        "organization_type": "organization_type",
+        "source": "source",
+    }
+
     name: str = Field(..., min_length=1, description="Required org name")
     short_name: Optional[str] = None
     organization_type: Optional[str] = None
@@ -81,7 +121,12 @@ class CreateOrganization(BaseModel):
     external_refs: Optional[str] = None
 
 
-class UpdateOrganization(BaseModel):
+class UpdateOrganization(EnumValidatedModel):
+    __enum_fields__ = {
+        "organization_type": "organization_type",
+        "source": "source",
+    }
+
     name: Optional[str] = None
     short_name: Optional[str] = None
     organization_type: Optional[str] = None
@@ -94,9 +139,14 @@ class UpdateOrganization(BaseModel):
     external_refs: Optional[str] = None
 
 
-# ── Meetings ─────────────────────────────────────────────────────────────────
+# Meetings
 
-class MeetingParticipant(BaseModel):
+class MeetingParticipant(EnumValidatedModel):
+    __enum_fields__ = {
+        "meeting_role": "meeting_role",
+        "attendance_status": "attendance_status",
+    }
+
     person_id: str = Field(..., description="Required person ID")
     organization_id: Optional[str] = None
     meeting_role: str = "attendee"
@@ -106,7 +156,12 @@ class MeetingParticipant(BaseModel):
     notes: Optional[str] = None
 
 
-class CreateMeeting(BaseModel):
+class CreateMeeting(EnumValidatedModel):
+    __enum_fields__ = {
+        "meeting_type": "meeting_type",
+        "source": "source",
+    }
+
     title: str = Field(..., min_length=1, description="Required meeting title")
     meeting_type: Optional[str] = None
     date_time_start: str = Field(..., description="Required start time (ISO 8601)")
@@ -129,7 +184,11 @@ class CreateMeeting(BaseModel):
     external_refs: Optional[str] = None
 
 
-class UpdateMeeting(BaseModel):
+class UpdateMeeting(EnumValidatedModel):
+    __enum_fields__ = {
+        "meeting_type": "meeting_type",
+    }
+
     title: Optional[str] = None
     meeting_type: Optional[str] = None
     date_time_start: Optional[str] = None
@@ -146,15 +205,24 @@ class UpdateMeeting(BaseModel):
     assigned_to_person_id: Optional[str] = None
 
 
-# ── Tasks ────────────────────────────────────────────────────────────────────
+# Tasks
 
-class CreateTask(BaseModel):
+class CreateTask(EnumValidatedModel):
+    __enum_fields__ = {
+        "task_type": "task_type",
+        "status": "task_status",
+        "task_mode": "task_mode",
+        "priority": "task_priority",
+        "deadline_type": "deadline_type",
+        "source": "source",
+    }
+
     title: str = Field(..., min_length=1, description="Required task title")
     matter_id: Optional[str] = None
     description: Optional[str] = None
     task_type: Optional[str] = None
     status: str = "not started"
-    task_mode: Literal["action", "follow_up", "monitoring"] = "action"
+    task_mode: str = "action"
     priority: str = "normal"
     assigned_to_person_id: Optional[str] = None
     created_by_person_id: Optional[str] = None
@@ -180,13 +248,21 @@ class CreateTask(BaseModel):
     trigger_description: Optional[str] = None
 
 
-class UpdateTask(BaseModel):
+class UpdateTask(EnumValidatedModel):
+    __enum_fields__ = {
+        "task_type": "task_type",
+        "status": "task_status",
+        "task_mode": "task_mode",
+        "priority": "task_priority",
+        "deadline_type": "deadline_type",
+    }
+
     matter_id: Optional[str] = None
     title: Optional[str] = None
     description: Optional[str] = None
     task_type: Optional[str] = None
     status: Optional[str] = None
-    task_mode: Optional[Literal["action", "follow_up", "monitoring"]] = None
+    task_mode: Optional[str] = None
     priority: Optional[str] = None
     assigned_to_person_id: Optional[str] = None
     delegated_by_person_id: Optional[str] = None
@@ -216,33 +292,29 @@ class UpdateTask(BaseModel):
         return values
 
 
-# ── Matters ──────────────────────────────────────────────────────────────────
+# Matters
 
-class CreateMatter(BaseModel):
+class CreateMatter(EnumValidatedModel):
+    __enum_fields__ = {
+        "matter_type": "matter_type",
+        "status": "matter_status",
+        "priority": "matter_priority",
+        "sensitivity": "matter_sensitivity",
+        "risk_level": "risk_level",
+        "boss_involvement_level": "boss_involvement_level",
+        "regulatory_stage": "regulatory_stage",
+        "unified_agenda_priority": "unified_agenda_priority",
+        "source": "source",
+    }
+
     title: str = Field(..., min_length=1, description="Required matter title")
-    matter_type: Literal[
-    "rulemaking", "policy development", "enforcement referral",
-    "exemption request", "no-action request", "congressional response",
-    "interagency coordination", "advisory", "interpretation",
-    "administrative", "budget", "personnel", "it / systems",
-    "compliance review", "risk assessment", "other"
-] = Field(..., description="Required matter type")
+    matter_type: str = Field(..., description="Required matter type")
     description: Optional[str] = None
     problem_statement: Optional[str] = None
     why_it_matters: Optional[str] = None
-    status: Literal[
-    "new intake", "active", "on hold", "blocked",
-    "under review", "pending decision", "closed"
-] = "new intake"
-    priority: Literal[
-    "critical this week", "important this month",
-    "strategic / slow burn", "monitoring only"
-] = "important this month"
-    sensitivity: Literal[
-    "routine", "leadership-sensitive", "congressional-sensitive",
-    "enforcement-sensitive", "market-sensitive", "pre-decisional",
-    "fomc-restricted"
-] = "routine"
+    status: str = "new intake"
+    priority: str = "important this month"
+    sensitivity: str = "routine"
     risk_level: Optional[str] = None
     boss_involvement_level: str = "keep boss informed"
     assigned_to_person_id: Optional[str] = None
@@ -274,36 +346,29 @@ class CreateMatter(BaseModel):
     created_by_person_id: Optional[str] = None
 
 
-class UpdateMatter(BaseModel):
+class UpdateMatter(EnumValidatedModel):
+    __enum_fields__ = {
+        "matter_type": "matter_type",
+        "status": "matter_status",
+        "priority": "matter_priority",
+        "sensitivity": "matter_sensitivity",
+        "risk_level": "risk_level",
+        "boss_involvement_level": "boss_involvement_level",
+        "regulatory_stage": "regulatory_stage",
+        "unified_agenda_priority": "unified_agenda_priority",
+        "source": "source",
+    }
+
     title: Optional[str] = None
-    matter_type: Optional[Literal[
-    "rulemaking", "policy development", "enforcement referral",
-    "exemption request", "no-action request", "congressional response",
-    "interagency coordination", "advisory", "interpretation",
-    "administrative", "budget", "personnel", "it / systems",
-    "compliance review", "risk assessment", "other"
-]] = None
+    matter_type: Optional[str] = None
     description: Optional[str] = None
     problem_statement: Optional[str] = None
     why_it_matters: Optional[str] = None
-    status: Optional[Literal[
-    "new intake", "active", "on hold", "blocked",
-    "under review", "pending decision", "closed"
-]] = None
-    priority: Optional[Literal[
-    "critical this week", "important this month",
-    "strategic / slow burn", "monitoring only"
-]] = None
-    sensitivity: Optional[Literal[
-    "routine", "leadership-sensitive", "congressional-sensitive",
-    "enforcement-sensitive", "market-sensitive", "pre-decisional",
-    "fomc-restricted"
-]] = None
+    status: Optional[str] = None
+    priority: Optional[str] = None
+    sensitivity: Optional[str] = None
     risk_level: Optional[str] = None
-    boss_involvement_level: Optional[Literal[
-    "no boss involvement needed", "keep boss informed",
-    "boss reviewing", "boss deciding", "joint with boss"
-]] = None
+    boss_involvement_level: Optional[str] = None
     assigned_to_person_id: Optional[str] = None
     supervisor_person_id: Optional[str] = None
     requesting_organization_id: Optional[str] = None
@@ -343,30 +408,49 @@ class UpdateMatter(BaseModel):
         return values
 
 
-# ── Matter sub-resources ─────────────────────────────────────────────────────
+# Matter sub-resources
 
-class AddMatterPerson(BaseModel):
+class AddMatterPerson(EnumValidatedModel):
+    __enum_fields__ = {
+        "matter_role": "matter_role",
+        "engagement_level": "engagement_level",
+    }
+
     person_id: str = Field(..., description="Required person ID")
     matter_role: str = "FYI only"
     engagement_level: Optional[str] = None
     notes: Optional[str] = None
 
 
-class AddMatterOrg(BaseModel):
+class AddMatterOrg(EnumValidatedModel):
+    __enum_fields__ = {
+        "organization_role": "organization_role",
+    }
+
     organization_id: str = Field(..., description="Required org ID")
     organization_role: str = "FYI"
     notes: Optional[str] = None
 
 
-class AddMatterUpdate(BaseModel):
+class AddMatterUpdate(EnumValidatedModel):
+    __enum_fields__ = {
+        "update_type": "update_type",
+    }
+
     summary: str = Field(..., min_length=1, description="Required update text")
     update_type: str = "status update"
     created_by_person_id: Optional[str] = None
 
 
-# ── Decisions ────────────────────────────────────────────────────────────────
+# Decisions
 
-class CreateDecision(BaseModel):
+class CreateDecision(EnumValidatedModel):
+    __enum_fields__ = {
+        "decision_type": "decision_type",
+        "status": "decision_status",
+        "source": "source",
+    }
+
     matter_id: str = Field(..., description="Required matter ID")
     title: str = Field(..., min_length=1, description="Required decision title")
     decision_type: Optional[str] = None
@@ -385,7 +469,12 @@ class CreateDecision(BaseModel):
     external_refs: Optional[str] = None
 
 
-class UpdateDecision(BaseModel):
+class UpdateDecision(EnumValidatedModel):
+    __enum_fields__ = {
+        "decision_type": "decision_type",
+        "status": "decision_status",
+    }
+
     title: Optional[str] = None
     decision_type: Optional[str] = None
     status: Optional[str] = None
@@ -406,9 +495,15 @@ class UpdateDecision(BaseModel):
         return values
 
 
-# ── Documents ────────────────────────────────────────────────────────────────
+# Documents
 
-class CreateDocument(BaseModel):
+class CreateDocument(EnumValidatedModel):
+    __enum_fields__ = {
+        "document_type": "document_type",
+        "status": "document_status",
+        "source": "source",
+    }
+
     title: str = Field(..., min_length=1, description="Required document title")
     document_type: str = Field(..., min_length=1, description="Required document type")
     matter_id: Optional[str] = None
@@ -427,7 +522,12 @@ class CreateDocument(BaseModel):
     external_refs: Optional[str] = None
 
 
-class UpdateDocument(BaseModel):
+class UpdateDocument(EnumValidatedModel):
+    __enum_fields__ = {
+        "document_type": "document_type",
+        "status": "document_status",
+    }
+
     title: Optional[str] = None
     document_type: Optional[str] = None
     matter_id: Optional[str] = None
@@ -451,9 +551,13 @@ class UpdateDocument(BaseModel):
         return values
 
 
-# ── Context Notes ────────────────────────────────────────────────────────────
+# Context Notes
 
-class CreateContextNote(BaseModel):
+class CreateContextNote(EnumValidatedModel):
+    __enum_fields__ = {
+        "source": "source",
+    }
+
     title: str = Field(..., min_length=1, description="Required note title")
     body: str = Field(..., min_length=1, description="Required note body")
     category: str = Field(..., min_length=1, description="Required category")
@@ -508,7 +612,7 @@ class CreateContextNoteLink(BaseModel):
     relationship_role: str = Field(..., min_length=1, description="Required relationship role")
 
 
-# ── Person Profiles ──────────────────────────────────────────────────────────
+# Person Profiles
 
 class UpdatePersonProfile(BaseModel):
     birthday: Optional[str] = None
@@ -524,3 +628,169 @@ class UpdatePersonProfile(BaseModel):
     scheduling_notes: Optional[str] = None
     relationship_preferences: Optional[str] = None
     leadership_notes: Optional[str] = None
+
+
+# Comment Topics
+
+class CreateCommentTopic(EnumValidatedModel):
+    __enum_fields__ = {
+        "topic_area": "comment_topic_area",
+        "position_status": "comment_topic_position_status",
+        "source_document_type": "comment_topic_source_document_type",
+        "priority": "task_priority",
+        "deadline_type": "deadline_type",
+        "source": "source",
+    }
+
+    matter_id: str = Field(..., description="Required matter ID")
+    topic_label: str = Field(..., min_length=1, description="Required topic label")
+    topic_area: Optional[str] = None
+    assigned_to_person_id: Optional[str] = None
+    secondary_assignee_person_id: Optional[str] = None
+    position_status: str = "open"
+    position_summary: Optional[str] = None
+    priority: Optional[str] = None
+    due_date: Optional[str] = None
+    deadline_type: Optional[str] = None
+    source_fr_doc_number: Optional[str] = None
+    source_document_type: Optional[str] = None
+    response_fr_doc_number: Optional[str] = None
+    notes: Optional[str] = None
+    sort_order: Optional[int] = None
+    source: str = "manual"
+    source_id: Optional[str] = None
+    ai_confidence: Optional[float] = None
+    automation_hold: int = 0
+    external_refs: Optional[str] = None
+
+
+class UpdateCommentTopic(EnumValidatedModel):
+    __enum_fields__ = {
+        "topic_area": "comment_topic_area",
+        "position_status": "comment_topic_position_status",
+        "source_document_type": "comment_topic_source_document_type",
+        "priority": "task_priority",
+        "deadline_type": "deadline_type",
+    }
+
+    topic_label: Optional[str] = None
+    topic_area: Optional[str] = None
+    assigned_to_person_id: Optional[str] = None
+    secondary_assignee_person_id: Optional[str] = None
+    position_status: Optional[str] = None
+    position_summary: Optional[str] = None
+    priority: Optional[str] = None
+    due_date: Optional[str] = None
+    deadline_type: Optional[str] = None
+    source_fr_doc_number: Optional[str] = None
+    source_document_type: Optional[str] = None
+    response_fr_doc_number: Optional[str] = None
+    notes: Optional[str] = None
+    sort_order: Optional[int] = None
+
+
+# Comment Questions
+
+class CreateCommentQuestion(BaseModel):
+    question_number: str = Field(..., min_length=1, description="Required question number")
+    question_text: str = Field(..., min_length=1, description="Required question text")
+    sort_order: Optional[int] = None
+    source: str = "manual"
+    source_id: Optional[str] = None
+    ai_confidence: Optional[float] = None
+
+
+class UpdateCommentQuestion(BaseModel):
+    question_number: Optional[str] = None
+    question_text: Optional[str] = None
+    sort_order: Optional[int] = None
+
+
+class MoveCommentQuestion(BaseModel):
+    target_topic_id: str = Field(..., min_length=1, description="Target topic ID")
+
+
+# Policy Directives
+
+class CreatePolicyDirective(EnumValidatedModel):
+    __enum_fields__ = {
+        "source_document_type": "directive_source_document_type",
+        "priority_tier": "directive_priority_tier",
+        "responsible_entity": "directive_responsible_entity",
+        "ogc_role": "directive_ogc_role",
+        "implementation_status": "directive_implementation_status",
+        "source": "source",
+    }
+
+    source_document: str = Field(..., min_length=1, description="Required source document citation")
+    source_document_type: str = Field(..., min_length=1, description="Required document type")
+    source_document_url: Optional[str] = None
+    source_date: Optional[str] = None
+    directive_label: str = Field(..., min_length=1, description="Required directive label")
+    directive_text: Optional[str] = None
+    section_reference: Optional[str] = None
+    chapter: Optional[str] = None
+    priority_tier: Optional[str] = None
+    responsible_entity: Optional[str] = None
+    ogc_role: Optional[str] = None
+    assigned_to_person_id: Optional[str] = None
+    implementation_status: str = "not_started"
+    implementation_notes: Optional[str] = None
+    target_date: Optional[str] = None
+    completed_date: Optional[str] = None
+    notes: Optional[str] = None
+    sort_order: Optional[int] = None
+    source: str = "manual"
+    source_id: Optional[str] = None
+    external_refs: Optional[str] = None
+
+
+class UpdatePolicyDirective(EnumValidatedModel):
+    __enum_fields__ = {
+        "source_document_type": "directive_source_document_type",
+        "priority_tier": "directive_priority_tier",
+        "responsible_entity": "directive_responsible_entity",
+        "ogc_role": "directive_ogc_role",
+        "implementation_status": "directive_implementation_status",
+    }
+
+    source_document: Optional[str] = None
+    source_document_type: Optional[str] = None
+    source_document_url: Optional[str] = None
+    source_date: Optional[str] = None
+    directive_label: Optional[str] = None
+    directive_text: Optional[str] = None
+    section_reference: Optional[str] = None
+    chapter: Optional[str] = None
+    priority_tier: Optional[str] = None
+    responsible_entity: Optional[str] = None
+    ogc_role: Optional[str] = None
+    assigned_to_person_id: Optional[str] = None
+    implementation_status: Optional[str] = None
+    implementation_notes: Optional[str] = None
+    target_date: Optional[str] = None
+    completed_date: Optional[str] = None
+    notes: Optional[str] = None
+    sort_order: Optional[int] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def auto_fill_completed(cls, values):
+        if isinstance(values, dict):
+            if values.get("implementation_status") == "implemented" and not values.get("completed_date"):
+                from datetime import datetime as dt
+                values["completed_date"] = dt.now().isoformat()
+        return values
+
+
+# Directive-Matter Links
+
+class CreateDirectiveMatter(EnumValidatedModel):
+    __enum_fields__ = {
+        "relationship_type": "directive_matter_relationship_type",
+    }
+
+    directive_id: str = Field(..., description="Required directive ID")
+    matter_id: str = Field(..., description="Required matter ID")
+    relationship_type: str = "implements"
+    notes: Optional[str] = None

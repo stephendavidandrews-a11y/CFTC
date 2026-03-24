@@ -272,6 +272,53 @@ def _get_matters_with_nested(db):
     """, matter_ids):
         decisions_by_matter[row["matter_id"]].append(dict(row))
 
+    # Batch query: comment topics with nested questions
+    topics_by_matter = defaultdict(list)
+    questions_by_topic = defaultdict(list)
+    for row in db.execute(f"""
+        SELECT ct.matter_id, ct.id, ct.topic_label, ct.topic_area,
+               ct.position_status, ct.position_summary, ct.priority,
+               ct.due_date, ct.assigned_to_person_id, p.full_name as assigned_to_name,
+               ct.source_fr_doc_number, ct.source_document_type
+        FROM comment_topics ct
+        LEFT JOIN people p ON ct.assigned_to_person_id = p.id
+        WHERE ct.matter_id IN ({placeholders})
+        ORDER BY ct.sort_order ASC NULLS LAST
+    """, matter_ids):
+        topics_by_matter[row["matter_id"]].append(dict(row))
+
+    # Fetch questions for all topics
+    topic_ids = []
+    for tlist in topics_by_matter.values():
+        topic_ids.extend(t["id"] for t in tlist)
+    if topic_ids:
+        q_placeholders = ",".join("?" * len(topic_ids))
+        for row in db.execute(f"""
+            SELECT comment_topic_id, id, question_number, question_text, sort_order
+            FROM comment_questions
+            WHERE comment_topic_id IN ({q_placeholders})
+            ORDER BY sort_order ASC NULLS LAST, question_number ASC
+        """, topic_ids):
+            questions_by_topic[row["comment_topic_id"]].append(dict(row))
+
+    # Nest questions into topics
+    for tlist in topics_by_matter.values():
+        for topic in tlist:
+            topic["questions"] = questions_by_topic.get(topic["id"], [])
+
+    # Batch query: linked directives
+    directives_by_matter = defaultdict(list)
+    for row in db.execute(f"""
+        SELECT dm.matter_id, pd.id, pd.directive_label, pd.source_document,
+               pd.implementation_status, pd.priority_tier, pd.responsible_entity,
+               dm.relationship_type
+        FROM directive_matters dm
+        JOIN policy_directives pd ON dm.directive_id = pd.id
+        WHERE dm.matter_id IN ({placeholders})
+        ORDER BY pd.sort_order ASC NULLS LAST
+    """, matter_ids):
+        directives_by_matter[row["matter_id"]].append(dict(row))
+
     # Assemble
     matters = []
     for matter_row in rows:
@@ -283,6 +330,8 @@ def _get_matters_with_nested(db):
         matter["recent_updates"] = updates_by_matter.get(mid, [])
         matter["open_tasks"] = tasks_by_matter.get(mid, [])
         matter["open_decisions"] = decisions_by_matter.get(mid, [])
+        matter["comment_topics"] = topics_by_matter.get(mid, [])
+        matter["linked_directives"] = directives_by_matter.get(mid, [])
         matters.append(matter)
 
     return matters

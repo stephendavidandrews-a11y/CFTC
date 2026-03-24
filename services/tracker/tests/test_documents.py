@@ -68,7 +68,7 @@ def test_create_document_success(client, auth_headers, db):
     matter = seed_matter(db)
     payload = {
         "title": "New Document",
-        "document_type": "memo",
+        "document_type": "legal_memo",
         "matter_id": matter["id"],
     }
     resp = client.post("/tracker/documents", json=payload, headers=auth_headers)
@@ -78,7 +78,7 @@ def test_create_document_success(client, auth_headers, db):
 
 def test_create_document_validation_error(client, auth_headers):
     """POST /tracker/documents returns 422 when title is missing."""
-    payload = {"document_type": "memo"}
+    payload = {"document_type": "legal_memo"}
     resp = client.post("/tracker/documents", json=payload, headers=auth_headers)
     assert resp.status_code == 422
 

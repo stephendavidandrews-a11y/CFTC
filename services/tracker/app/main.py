@@ -33,6 +33,9 @@ from app.routers import (
     schema_version,
     export,
     context_notes,
+    comment_topics,
+    policy_directives,
+    directive_matters,
 )
 
 logger = logging.getLogger(__name__)
@@ -132,6 +135,9 @@ app.include_router(batch.router, prefix=router_prefix, dependencies=[Depends(ver
 app.include_router(schema_version.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 app.include_router(export.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 app.include_router(context_notes.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
+app.include_router(comment_topics.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
+app.include_router(policy_directives.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
+app.include_router(directive_matters.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 
 
 @app.get("/tracker/health")
