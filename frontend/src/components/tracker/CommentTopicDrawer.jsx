@@ -146,7 +146,7 @@ export default function CommentTopicDrawer({ isOpen, onClose, topic, matterId, o
         <button onClick={handleSave} disabled={saving}
           style={{ padding: "8px 18px", borderRadius: 6, fontSize: 13, fontWeight: 600,
             background: theme.accent.blue, color: "#fff", border: "none", cursor: "pointer",
-            opacity: saving ? 0.6 : 1 }}>{saving ? "Saving..." : "Save"}</button>
+            opacity: saving ? 0.6 : 1 }}>{saving ? "Saving..." : (topic ? "Save Changes" : "Create Topic")}</button>
       </div>
     </DrawerShell>
   );

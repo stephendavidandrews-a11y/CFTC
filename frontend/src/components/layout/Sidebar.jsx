@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import theme from "../../styles/theme";
 
@@ -45,6 +45,20 @@ const SECTIONS = [
 ];
 
 export default function Sidebar({ isMobile = false, onNavigate }) {
+  // Collapsible sections — remember state in localStorage
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("sidebar-collapsed") || '{}');
+    } catch { return {}; }
+  });
+
+  const toggleSection = (label) => {
+    setCollapsed((prev) => {
+      const next = { ...prev, [label]: !prev[label] };
+      localStorage.setItem("sidebar-collapsed", JSON.stringify(next));
+      return next;
+    });
+  };
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -81,21 +95,40 @@ export default function Sidebar({ isMobile = false, onNavigate }) {
 
       {/* Navigation */}
       <nav style={{ padding: "10px 8px", flex: 1, overflowY: "auto" }}>
-        {SECTIONS.map((s, idx) => {
+        {(() => {
+          let currentSection = "Operations";
+          return SECTIONS.map((s, idx) => {
+            if (s.separator) currentSection = s.label || currentSection;
           if (s.separator) {
             return (
               <div key={"sep-" + idx} style={{ margin: "8px 12px" }}>
                 <div style={{ height: 1, background: theme.border.subtle }} />
                 {s.label && (
-                  <div style={{
-                    fontSize: 9, fontWeight: 700, color: theme.text.faint,
-                    textTransform: "uppercase", letterSpacing: "0.08em",
-                    marginTop: 10, marginBottom: 2, paddingLeft: 4,
-                  }}>{s.label}</div>
+                  <div
+                    onClick={() => s.label !== "Operations" && toggleSection(s.label)}
+                    style={{
+                      fontSize: 9, fontWeight: 700, color: theme.text.faint,
+                      textTransform: "uppercase", letterSpacing: "0.08em",
+                      marginTop: 10, marginBottom: 2, paddingLeft: 4,
+                      cursor: s.label !== "Operations" ? "pointer" : "default",
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      userSelect: "none",
+                    }}
+                  >
+                    {s.label}
+                    {s.label !== "Operations" && (
+                      <span style={{ fontSize: 8, transition: "transform 0.2s", transform: collapsed[s.label] ? "rotate(-90deg)" : "rotate(0)" }}>
+                        \u25BC
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
             );
           }
+
+          // Hide items in collapsed sections
+          if (collapsed[currentSection]) return null;
 
           const isActive = s.path.includes("?")
             ? (location.pathname + location.search) === s.path
@@ -128,7 +161,8 @@ export default function Sidebar({ isMobile = false, onNavigate }) {
               )}
             </button>
           );
-        })}
+          });
+        })()}
       </nav>
 
       {/* Cmd+K hint */}
