@@ -341,6 +341,8 @@ export default function MatterDetailPage() {
 
   // Dependencies
   const { data: allMatters } = useApi(() => listMatters({ limit: 500 }), []);
+
+  React.useEffect(() => { if (matter?.title) document.title = matter?.title + " | Command Center"; }, [matter?.title]);
   const [depForm, setDepForm] = useState({ depends_on_matter_id: "", dependency_type: "" });
   const [showDepAdd, setShowDepAdd] = useState(false);
 
@@ -471,7 +473,13 @@ export default function MatterDetailPage() {
   if (error) {
     return (
       <div style={{ padding: "24px 32px" }}>
-        <div style={{ color: theme.accent.red, fontSize: 13 }}>Error: {error.message || String(error)}</div>
+        <EmptyState
+          icon="⚠"
+          title="Matter not found"
+          message="This matter may have been archived or deleted, or the ID may be invalid."
+          actionLabel="Go to Matters"
+          onAction={() => navigate("/matters")}
+        />
       </div>
     );
   }

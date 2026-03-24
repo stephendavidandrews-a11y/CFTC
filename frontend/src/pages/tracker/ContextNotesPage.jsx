@@ -35,6 +35,7 @@ function formatLabel(s) {
 }
 
 export default function ContextNotesPage() {
+  useEffect(() => { document.title = "Context Notes | Command Center"; }, []);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

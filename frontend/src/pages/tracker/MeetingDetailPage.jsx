@@ -804,6 +804,8 @@ export default function MeetingDetailPage() {
     [id]
   );
 
+  React.useEffect(() => { if (meeting?.title) document.title = meeting?.title + " | Command Center"; }, [meeting?.title]);
+
   // ---- Tasks & decisions from linked matters ----
   const [matterTasks, setMatterTasks] = useState([]);
   const [matterDecisions, setMatterDecisions] = useState([]);

@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo , useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
 import useApi from "../../hooks/useApi";
@@ -134,6 +134,7 @@ function buildRow(person, tasks, now) {
 /* ── main component ────────────────────────────────────────────────────── */
 
 export default function TeamWorkloadPage() {
+  useEffect(() => { document.title = "Team Workload | Command Center"; }, []);
   const navigate = useNavigate();
 
   const { data: peopleData, loading: loadingPeople } = useApi(

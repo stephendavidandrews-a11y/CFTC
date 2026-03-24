@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo , useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
 import { useToastContext } from "../../contexts/ToastContext";
@@ -334,6 +334,7 @@ function taskTitleColumn() {
 /* ── Component ───────────────────────────────────────────────── */
 
 export default function TasksPage() {
+  useEffect(() => { document.title = "Tasks | Command Center"; }, []);
   const navigate = useNavigate();
   const toast = useToastContext();
   const { openDrawer } = useDrawer();

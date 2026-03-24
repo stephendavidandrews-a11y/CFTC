@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState , useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
 import useApi from "../../hooks/useApi";
@@ -50,6 +50,7 @@ function fmt(val) {
 }
 
 export default function DirectivesPage() {
+  useEffect(() => { document.title = "Directives | Command Center"; }, []);
   const navigate = useNavigate();
   const { openDrawer } = useDrawer();
   const [filters, setFilters] = useState({});

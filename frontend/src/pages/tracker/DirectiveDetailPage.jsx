@@ -52,6 +52,8 @@ export default function DirectiveDetailPage() {
   const { data: mattersData } = useApi(() => listMatters({ limit: 500 }), []);
   const { data: enumsData } = useApi(() => getEnums(), []);
 
+  React.useEffect(() => { if (directive?.title) document.title = directive?.title + " | Command Center"; }, [directive?.title]);
+
   const d = directive || {};
   const matters = mattersData?.items || [];
   const linkedMatters = d.linked_matters || [];

@@ -6,6 +6,7 @@ import useApi from "../../hooks/useApi";
 import { getOrganization, deleteOrganization } from "../../api/tracker";
 import Badge from "../../components/shared/Badge";
 import { useDrawer } from "../../contexts/DrawerContext";
+import EmptyState from "../../components/shared/EmptyState";
 
 /* ── Styles ─────────────────────────────────────────────────────── */
 
@@ -105,13 +106,21 @@ export default function OrgDetailPage() {
 
   const { data: org, loading, error, refetch } = useApi(() => getOrganization(id), [id]);
 
+  React.useEffect(() => { if (org?.name) document.title = org?.name + " | Command Center"; }, [org?.name]);
+
   if (loading) {
     return <div style={{ padding: "60px 32px", textAlign: "center", color: theme.text.faint }}>Loading organization...</div>;
   }
   if (error) {
     return (
       <div style={{ padding: "24px 32px" }}>
-        <div style={{ color: theme.accent.red, fontSize: 13 }}>Error: {error.message || String(error)}</div>
+        <EmptyState
+          icon="⚠"
+          title="Organization not found"
+          message="This organization may have been archived or deleted, or the ID may be invalid."
+          actionLabel="Go to Organizations"
+          onAction={() => navigate("/organizations")}
+        />
       </div>
     );
   }

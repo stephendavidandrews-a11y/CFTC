@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
 import useApi from "../../hooks/useApi";
@@ -44,6 +44,7 @@ function HBar({ label, value, max, color }) {
 }
 
 export default function TrackerDashboardPage() {
+  useEffect(() => { document.title = "Dashboard | Command Center"; }, []);
   const navigate = useNavigate();
   const { data, loading, error } = useApi(() => getDashboard(), [], { refetchOnFocus: true });
 
