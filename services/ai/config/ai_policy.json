@@ -107,7 +107,7 @@
       "validation_failure": true
     },
     "active_prompt_versions": {
-      "extraction": "v2.0.0",
+      "extraction": "v2.0.1",
       "haiku_cleanup": "v1.0.0",
       "haiku_enrichment": "v1.0.0"
     },
@@ -157,5 +157,21 @@
       14,
       30
     ]
+  },
+  "federal_register": {
+    "enabled": false,
+    "poll_interval_hours": 24,
+    "tier3_promote_cfr_parts": [
+      "23",
+      "40",
+      "140",
+      "145"
+    ],
+    "extraction_prompt_version": "v2_0_0_fr",
+    "extraction_model": "sonnet",
+    "propose_comment_topics": true,
+    "propose_new_matters": true,
+    "propose_matter_updates": true,
+    "auto_commit": false
   }
 }
