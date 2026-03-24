@@ -155,7 +155,7 @@ ENUMS = {
     "directive_source_document_type": [
         "executive_order", "pwg_report", "congressional_mandate",
         "statutory_requirement", "gao_recommendation", "ig_finding",
-        "fsoc_recommendation", "interagency_agreement", "other",
+        "fsoc_recommendation", "interagency_agreement", "chairman_directive", "testimony_commitment", "other",
     ],
     "directive_priority_tier": [
         "immediate_action", "priority_guidance", "possible_regulation",
