@@ -6,6 +6,7 @@ Reads from tracker via /tracker/ai-context, writes via /tracker/batch.
 """
 import asyncio
 import logging
+import os
 import sqlite3
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -269,6 +270,69 @@ async def _tracker_health_probe_loop():
             logger.error("Tracker health probe error: %s", e)
 
 
+
+async def _fr_watcher_loop():
+    """Poll Federal Register for new CFTC publications on configured interval."""
+    from app.pipeline.fr_watcher import run_watcher
+    from app.pipeline.fr_processor import run_processor, TrackerAPI
+
+    logger.info("Federal Register watcher loop started")
+
+    while True:
+        try:
+            # Load config each cycle (allows runtime enable/disable)
+            try:
+                import json as _json
+                with open(Path(__file__).parent.parent / "config" / "ai_policy.json") as f:
+                    policy = _json.load(f)
+                fr_config = policy.get("federal_register", {})
+            except Exception:
+                fr_config = {}
+
+            if not fr_config.get("enabled", False):
+                await asyncio.sleep(3600)  # Check again in 1 hour
+                continue
+
+            poll_hours = fr_config.get("poll_interval_hours", 24)
+            logger.info("FR watcher: polling (interval=%dh)", poll_hours)
+
+            # Run watcher (fetch + classify + stage)
+            db = _get_ai_db()
+            try:
+                watcher_result = await run_watcher(db, fr_config)
+                new_count = watcher_result.get("new", 0)
+                logger.info("FR watcher: %d new documents staged", new_count)
+
+                # Run processor if we have new Tier 1/2 docs
+                if new_count > 0:
+                    tracker_url = os.environ.get("TRACKER_URL", "http://localhost:8004")
+                    tracker_user = os.environ.get("TRACKER_USER", "")
+                    tracker_pass = os.environ.get("TRACKER_PASS", "")
+                    if tracker_user and tracker_pass:
+                        tracker_api = TrackerAPI(tracker_url, (tracker_user, tracker_pass))
+                        results = await run_processor(db, tracker_api)
+                        created = sum(1 for r in results if r.get("matter_created"))
+                        matched = sum(1 for r in results if r.get("matter_matched"))
+                        topics = sum(r.get("topics_created", 0) for r in results)
+                        qs = sum(r.get("questions_extracted", 0) for r in results)
+                        logger.info(
+                            "FR processor: %d created, %d matched, %d topics, %d questions",
+                            created, matched, topics, qs
+                        )
+                    else:
+                        logger.warning("FR processor skipped: TRACKER_USER/TRACKER_PASS not set")
+            finally:
+                db.close()
+
+            # Sleep for poll interval
+            await asyncio.sleep(poll_hours * 3600)
+
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.error("FR watcher loop error: %s", e, exc_info=True)
+            await asyncio.sleep(3600)  # Retry in 1 hour on error
+
 async def _disk_monitor_loop():
     """Check disk space every hour. Set _disk_low flag when critically low."""
     global _disk_low
@@ -424,6 +488,7 @@ async def lifespan(app: FastAPI):
     api_probe_task = asyncio.create_task(_api_health_probe_loop())
     tracker_probe_task = asyncio.create_task(_tracker_health_probe_loop())
     disk_task = asyncio.create_task(_disk_monitor_loop())
+    fr_task = asyncio.create_task(_fr_watcher_loop())
 
     # Mark service as ready
     global _ready
