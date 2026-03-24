@@ -18,6 +18,7 @@ import { useDrawer } from "../../contexts/DrawerContext";
 import Badge from "../../components/shared/Badge";
 import DataTable from "../../components/shared/DataTable";
 import EmptyState from "../../components/shared/EmptyState";
+import Breadcrumb from "../../components/shared/Breadcrumb";
 
 const cardStyle = {
   background: theme.bg.card,
@@ -473,6 +474,7 @@ export default function MatterDetailPage() {
   if (error) {
     return (
       <div style={{ padding: "24px 32px" }}>
+      <Breadcrumb items={[{ label: "Matters", path: "/matters" }, { label: matter?.title || 'Matter' }]} />
         <EmptyState
           icon="⚠"
           title="Matter not found"

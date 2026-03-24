@@ -131,6 +131,11 @@ export default function Sidebar({ isMobile = false, onNavigate }) {
         })}
       </nav>
 
+      {/* Cmd+K hint */}
+      <div style={{ padding: "4px 16px 0", fontSize: 10, color: theme.text.ghost }}>
+        ⌘K to search anywhere
+      </div>
+
       {/* User */}
       <div style={{ padding: "14px 16px", borderTop: "1px solid " + theme.border.subtle, fontSize: 11 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
