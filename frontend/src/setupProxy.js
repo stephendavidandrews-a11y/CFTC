@@ -2,6 +2,9 @@
  * Dev proxy configuration for multiple backends.
  *
  * /tracker/*  -> Tracker service (port 8004)
+ * /ai/*       -> AI service (port 8006)
+ */
+const { createProxyMiddleware } = require("http-proxy-middleware");
 
 module.exports = function (app) {
   // Tracker backend
@@ -13,12 +16,11 @@ module.exports = function (app) {
     })
   );
 
-  // Pipeline backend
-  // Intake backend (voice pipeline + speaker review)
+  // AI backend
   app.use(
-    "/intake",
+    "/ai",
     createProxyMiddleware({
-      target: "http://localhost:8005",
+      target: "http://localhost:8006",
       changeOrigin: true,
     })
   );

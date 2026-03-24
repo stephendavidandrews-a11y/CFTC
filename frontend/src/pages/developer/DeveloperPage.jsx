@@ -27,7 +27,6 @@ const TABS = [
 const SVC = {
   tracker: { color: "#3b82f6", bg: "rgba(59,130,246,0.08)",  border: "rgba(59,130,246,0.25)", label: "Tracker" },
   ai:      { color: "#a855f7", bg: "rgba(168,85,247,0.08)",  border: "rgba(168,85,247,0.25)", label: "AI" },
-  intake:  { color: "#10b981", bg: "rgba(16,185,129,0.08)",  border: "rgba(16,185,129,0.25)", label: "Intake" },
 };
 
 // ── Field type badge colors ──────────────────────────────────────────
@@ -85,28 +84,6 @@ const API_ENDPOINTS = [
   // ── Tracker: Lookups ──
   { method: "GET",    path: "/tracker/lookups/enums/:name",  desc: "Enum values for dropdown fields" },
   { method: "GET",    path: "/tracker/lookups/enums",        desc: "All enum values (full dict)" },
-  // ── Intake: Conversations ──
-  { method: "GET",    path: "/intake/api/conversations",                      desc: "List conversations (filters: status, source)" },
-  { method: "GET",    path: "/intake/api/conversations/queue-counts",         desc: "Queue counts by processing status" },
-  { method: "GET",    path: "/intake/api/conversations/:id",                  desc: "Conversation detail with transcript + speakers" },
-  { method: "GET",    path: "/intake/api/conversations/:id/speaker-matches",  desc: "Speaker voiceprint match suggestions" },
-  { method: "PATCH",  path: "/intake/api/conversations/transcripts/:id",      desc: "Edit transcript segment text" },
-  { method: "POST",   path: "/intake/api/conversations/:id/confirm-speakers", desc: "Confirm speaker identities for conversation" },
-  { method: "PATCH",  path: "/intake/api/conversations/:id/discard",          desc: "Discard a conversation" },
-  // ── Intake: Speakers ──
-  { method: "POST",   path: "/intake/api/correct-speaker",                    desc: "Correct a speaker identity assignment" },
-  { method: "POST",   path: "/intake/api/merge-speakers",                     desc: "Merge two speaker labels into one" },
-  { method: "POST",   path: "/intake/api/reassign-segment",                   desc: "Reassign a transcript segment to a different speaker" },
-  { method: "GET",    path: "/intake/api/speaker-suggestions/:id",            desc: "Get speaker suggestions for a conversation" },
-  // ── Intake: Audio ──
-  { method: "GET",    path: "/intake/api/audio/:id",                          desc: "Serve full audio file for conversation" },
-  { method: "GET",    path: "/intake/api/audio/:id/clip",                     desc: "Serve audio clip (query: start, end)" },
-  { method: "GET",    path: "/intake/api/audio/:id/speaker-sample/:label",    desc: "Serve speaker voice sample" },
-  // ── Intake: Pipeline ──
-  { method: "POST",   path: "/intake/api/pipeline/upload",                    desc: "Upload audio file for processing" },
-  { method: "POST",   path: "/intake/api/pipeline/process-pending",           desc: "Trigger processing of pending conversations" },
-  { method: "POST",   path: "/intake/api/pipeline/process/:id",              desc: "Process a specific conversation" },
-  { method: "GET",    path: "/intake/api/pipeline/status",                    desc: "Pipeline processing status" },
   // ── AI: Communications ──
   { method: "GET",    path: "/ai/api/communications",                        desc: "List communications (filters: status, source_type, search)" },
   { method: "GET",    path: "/ai/api/communications/:id",                    desc: "Communication detail with transcript, participants, entities" },
@@ -119,7 +96,6 @@ const API_ENDPOINTS = [
   { method: "DELETE", path: "/ai/api/communications/:id",                    desc: "Delete communication and all related data" },
   { method: "POST",   path: "/ai/api/communications/:id/archive",            desc: "Archive a completed communication" },
   { method: "POST",   path: "/ai/api/communications/:id/unarchive",          desc: "Unarchive a communication" },
-  { method: "POST",   path: "/ai/api/communications/:id/complete",           desc: "Mark communication processing complete" },
   { method: "POST",   path: "/ai/api/communications/:id/retry",              desc: "Retry failed processing" },
   // ── AI: Bundle Review ──
   { method: "POST",   path: "/ai/api/bundle-review/:id/create-bundle",       desc: "Create new review bundle for communication" },
@@ -128,8 +104,6 @@ const API_ENDPOINTS = [
   { method: "POST",   path: "/ai/api/bundle-review/:id/accept-bundle",       desc: "Accept bundle for writeback" },
   { method: "POST",   path: "/ai/api/bundle-review/:id/reject-bundle",       desc: "Reject bundle" },
   { method: "POST",   path: "/ai/api/bundle-review/:id/accept-all",          desc: "Accept all proposed bundles" },
-  { method: "POST",   path: "/ai/api/bundle-review/:id/confirm-all",         desc: "Confirm all accepted bundles and commit" },
-  { method: "POST",   path: "/ai/api/bundle-review/:id/undo",                desc: "Undo committed writebacks" },
   // ── AI: Item Review ──
   { method: "POST",   path: "/ai/api/bundle-review/:id/add-item",            desc: "Add new item to a bundle" },
   { method: "POST",   path: "/ai/api/bundle-review/:id/edit-item",           desc: "Edit item proposed data" },
@@ -143,7 +117,6 @@ const API_ENDPOINTS = [
   { method: "POST",   path: "/ai/api/entity-review/:id/edit-entity",         desc: "Edit entity proposed data" },
   { method: "POST",   path: "/ai/api/entity-review/:id/merge-entities",      desc: "Merge duplicate entities" },
   { method: "POST",   path: "/ai/api/entity-review/:id/reject-entity",       desc: "Reject entity mention" },
-  { method: "POST",   path: "/ai/api/entity-review/:id/new-person",          desc: "Create new tracker person from entity" },
   // ── AI: Participant Review ──
   { method: "POST",   path: "/ai/api/participant-review/:id/link-speaker",    desc: "Map speaker label to tracker person" },
   { method: "POST",   path: "/ai/api/participant-review/:id/merge-speakers",  desc: "Merge two speaker labels" },
@@ -162,7 +135,6 @@ const API_ENDPOINTS = [
   { method: "GET",    path: "/ai/api/intelligence/briefs/by-date/:type/:date", desc: "Briefs by type and date" },
   // ── AI: Meeting Intelligence ──
   { method: "GET",    path: "/ai/api/meeting-intelligence/:meeting_id",       desc: "Meeting intelligence for a tracker meeting" },
-  { method: "POST",   path: "/ai/api/meeting-intelligence/generate",          desc: "Generate meeting intelligence from communication" },
   // ── AI: Events, Config, Telemetry, Health ──
   { method: "GET",    path: "/ai/api/events/stream",                          desc: "SSE stream for real-time pipeline events" },
   { method: "PUT",    path: "/ai/api/config/:section",                        desc: "Update AI policy/config section" },
@@ -676,16 +648,16 @@ function ServicesTab() {
 \u2502  \u2502  /*             \u2192 React SPA      (index.html fallback)           \u2502  \u2502
 \u2502  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518  \u2502
 \u2502                                                                           \u2502
-\u2502  Auth: HTTP Basic  \u00b7  DB: SQLite + WAL  \u00b7  Infra: Docker Compose         \u2502
+\u2502  Auth: HTTP Basic  \u00b7  DB: SQLite + WAL  \u00b7  Infra: launchd (Mac Mini)         \u2502
 \u2502                                                                           \u2502
-\u2502  Intake runs native (GPU/Metal) on Mac Mini, not in Docker              \u2502
+\u2502  All services run native on Mac Mini via launchd              \u2502
 \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518
 
 \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510
-\u2502  cftctools.stephenandrews.org (separate Docker Compose)                  \u2502
+\u2502  cftctools.stephenandrews.org (separate service)                  \u2502
 \u2502                                                                           \u2502
 \u2502  Analysis, Loper Bright, Pipeline, Work (legacy apps)                    \u2502
-\u2502  Shares cftc-shared Docker network for tracker bridge                    \u2502
+\u2502  Shares localhost network for tracker bridge                    \u2502
 \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518`}
         </div>
       </div>

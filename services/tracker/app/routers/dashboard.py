@@ -28,8 +28,8 @@ async def get_dashboard(db=Depends(get_db)):
         "SELECT COUNT(*) as c FROM tasks WHERE status NOT IN ('done', 'deferred') AND due_date < date('now') AND due_date IS NOT NULL"
     ).fetchone()["c"]
 
-    # Upcoming deadlines (past 7 days through next 30 days) across matters
-    upcoming_deadlines = [dict(row) for row in db.execute("""
+    # Upcoming deadlines: include overdue (past 90 days) and future (next 90 days)
+    raw_deadlines = [dict(row) for row in db.execute("""
         SELECT m.id, m.title, m.matter_type, m.work_deadline, m.decision_deadline,
                m.external_deadline, m.assigned_to_person_id, m.priority, m.status,
                p.full_name as owner_name
@@ -37,13 +37,43 @@ async def get_dashboard(db=Depends(get_db)):
         LEFT JOIN people p ON m.assigned_to_person_id = p.id
         WHERE m.status != 'closed'
         AND (
-            (m.work_deadline BETWEEN date('now', '-7 days') AND date('now', '+30 days'))
-            OR (m.decision_deadline BETWEEN date('now', '-7 days') AND date('now', '+30 days'))
-            OR (m.external_deadline BETWEEN date('now', '-7 days') AND date('now', '+30 days'))
+            m.work_deadline IS NOT NULL
+            OR m.decision_deadline IS NOT NULL
+            OR m.external_deadline IS NOT NULL
         )
         ORDER BY COALESCE(m.external_deadline, m.decision_deadline, m.work_deadline)
-        LIMIT 15
+        LIMIT 30
     """)]
+
+    # Flatten into one row per deadline type for the frontend
+    from datetime import date as date_type
+    upcoming_deadlines = []
+    for row in raw_deadlines:
+        for dtype, field in [("External Deadline", "external_deadline"),
+                             ("Work Deadline", "work_deadline"),
+                             ("Decision Deadline", "decision_deadline")]:
+            val = row.get(field)
+            if not val:
+                continue
+            try:
+                d_date = date_type.fromisoformat(str(val)[:10])
+                days_until = (d_date - date_type.today()).days
+            except (ValueError, TypeError):
+                continue
+            upcoming_deadlines.append({
+                "matter_id": row["id"],
+                "matter_title": row["title"],
+                "deadline_type": dtype,
+                "date": str(val)[:10],
+                "days_until": days_until,
+                "priority": row["priority"],
+                "status": row["status"],
+                "owner_name": row["owner_name"],
+            })
+
+    # Sort by date, overdue first
+    upcoming_deadlines.sort(key=lambda x: x["date"])
+    upcoming_deadlines = upcoming_deadlines[:15]
 
     # Recent matters (last 5 updated)
     recent_matters = [dict(row) for row in db.execute("""

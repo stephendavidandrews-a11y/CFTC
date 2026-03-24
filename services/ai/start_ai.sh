@@ -14,9 +14,9 @@ export PATH="/opt/homebrew/bin:$PATH"
 
 # Set app-specific env
 export APP_ENV=production
-export AI_DB_PATH="/Users/stephen/Documents/Website/cftc/volumes/ai/data/ai.db"
-export AI_UPLOAD_DIR="/Users/stephen/Documents/Website/cftc/volumes/ai/uploads"
-export AI_AUDIO_WATCH_DIR="/Users/stephen/Documents/Website/cftc/volumes/ai/audio-inbox"
+export AI_DB_PATH="$APP_DIR/data/ai.db"
+export AI_UPLOAD_DIR="$APP_DIR/uploads"
+export AI_AUDIO_WATCH_DIR="$APP_DIR/audio-inbox"
 export TRACKER_BASE_URL="http://127.0.0.1:8004/tracker"
 export PYTHONUNBUFFERED=1
 

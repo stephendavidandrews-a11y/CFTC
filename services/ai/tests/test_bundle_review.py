@@ -223,10 +223,15 @@ def _rebind_db():
     yield
 
 
-# Module-level client for use in test functions
-# (re-created with override in place via the autouse fixture above)
+# Module-level client with lifespan context manager
+# Starlette 1.0+ requires context manager for lifespan to execute
 _ensure_app()
-client = TestClient(_app)
+_client_cm = TestClient(_app)
+_client_cm.__enter__()
+client = _client_cm
+
+import atexit
+atexit.register(lambda: _client_cm.__exit__(None, None, None))
 
 
 # =====================================================================

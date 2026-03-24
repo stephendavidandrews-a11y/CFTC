@@ -324,12 +324,7 @@ export function completeEntityReview(communicationId) {
   });
 }
 
-// ── Intelligence (Phase 9+) ─────────────────────────────────────────────────
-export function getDigests(params = {}) {
-  const qs = new URLSearchParams(params).toString();
-  return fetchJSON(`/ai/api/intelligence/digests${qs ? "?" + qs : ""}`);
-}
-
+// ── Intelligence ─────────────────────────────────────────────────────────────
 export function getIntelligenceBriefs(params = {}) {
   const qs = new URLSearchParams(params).toString();
   return fetchJSON(`/ai/api/intelligence/briefs${qs ? "?" + qs : ""}`);

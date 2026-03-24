@@ -5,7 +5,8 @@
 cd "$(dirname "$0")"
 
 # Load env vars
-export AI_DB_PATH=/Users/stephen/Documents/Website/cftc/volumes/ai/data/ai.db
+# DB path defaults to services/ai/data/ai.db if not set
+export AI_DB_PATH="${AI_DB_PATH:-$(dirname "$0")/data/ai.db}"
 export TRACKER_BASE_URL=http://localhost:8004/tracker
 
 # Source .env for secrets (TRACKER_USER, TRACKER_PASS, OPENAI_API_KEY, SMTP_*, etc)

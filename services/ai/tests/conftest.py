@@ -1,18 +1,9 @@
-"""Root conftest — ensures test isolation for module-level DB fixtures.
+"""Root conftest for AI service tests.
 
-test_bundle_review.py uses module-level app.dependency_overrides setup.
-Other test files that import the app can clobber those overrides.
-This conftest adds a forked-process marker for files that need isolation.
+Previously contained a pytest_collection_modifyitems hook that forced
+test_bundle_review.py to run last, masking a test-isolation bug where
+tests/new/conftest.py's per-test TestClient lifespan shutdown poisoned
+the module-level _ready flag. That root cause is now fixed directly in
+tests/new/conftest.py (restoring _ready after TestClient exit), so the
+ordering hack is no longer needed.
 """
-
-
-def pytest_collection_modifyitems(items):
-    """Mark bundle_review tests to run last (after all other files)."""
-    bundle_tests = []
-    other_tests = []
-    for item in items:
-        if "test_bundle_review" in item.nodeid:
-            bundle_tests.append(item)
-        else:
-            other_tests.append(item)
-    items[:] = other_tests + bundle_tests

@@ -6,7 +6,7 @@ import json
 import logging
 from datetime import date
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from app.db import get_connection
 
@@ -44,7 +44,7 @@ def get_brief(brief_id: str):
             "SELECT * FROM intelligence_briefs WHERE id = ?", (brief_id,)
         ).fetchone()
         if not row:
-            return {"error": "Brief not found"}, 404
+            raise HTTPException(status_code=404, detail="Brief not found")
         result = dict(row)
         # Parse JSON content
         if result.get("content"):
@@ -67,7 +67,7 @@ def get_brief_by_date(brief_type: str, brief_date: str):
             (brief_type, brief_date),
         ).fetchone()
         if not row:
-            return {"error": "No brief found for this date", "brief_type": brief_type, "date": brief_date}
+            raise HTTPException(status_code=404, detail=f"No brief found for {brief_type} on {brief_date}")
         result = dict(row)
         if result.get("content"):
             try:
