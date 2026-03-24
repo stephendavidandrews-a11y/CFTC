@@ -81,6 +81,7 @@ def _make_db():
         end_time REAL,
         raw_text TEXT,
         cleaned_text TEXT,
+        reviewed_text TEXT,
         created_at TEXT DEFAULT (datetime('now'))
     )""")
     db.execute("""CREATE TABLE communication_participants (

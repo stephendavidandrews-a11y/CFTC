@@ -602,26 +602,21 @@ async def complete_entity_review(
     }
 
 
-# ── Helpers ──
+# ── Helpers (shared review helpers + entity-specific) ──
+
+from app.routers._review_helpers import (
+    check_review_state as _shared_check,
+    ensure_in_progress as _shared_ensure,
+    resume_pipeline as _resume_pipeline,
+)
+
 
 def _check_review_state(db, communication_id: str):
-    """Verify communication is in an entity review state."""
-    row = db.execute(
-        "SELECT processing_status FROM communications WHERE id = ?",
-        (communication_id,),
-    ).fetchone()
-    if not row:
-        raise HTTPException(404, detail={"error_type": "not_found"})
-    if row["processing_status"] not in ENTITY_REVIEW_STATES:
-        raise HTTPException(400, detail={
-            "error_type": "invalid_state",
-            "message": f"Communication not in entity review (current: {row['processing_status']})",
-        })
+    _shared_check(db, communication_id, ENTITY_REVIEW_STATES, "entity review")
 
 
 def _ensure_in_progress(db, communication_id: str):
-    """Move from awaiting_entity_review to entity_review_in_progress if needed."""
-    cas_transition(db, communication_id, "awaiting_entity_review", "entity_review_in_progress")
+    _shared_ensure(db, communication_id, "awaiting_entity_review", "entity_review_in_progress")
 
 
 def _get_entity(db, communication_id: str, entity_id: str) -> dict:
@@ -646,10 +641,4 @@ def _audit(db, communication_id: str, action_type: str, details: dict):
     """, (str(uuid.uuid4()), communication_id, action_type, json.dumps(details)))
 
 
-async def _resume_pipeline(communication_id: str):
-    """Resume pipeline after human gate."""
-    from app.pipeline.orchestrator import process_communication
-    try:
-        await process_communication(communication_id)
-    except Exception as e:
-        logger.exception("Pipeline resume failed for %s: %s", communication_id, e)
+# _resume_pipeline imported from _review_helpers above

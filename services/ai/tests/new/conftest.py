@@ -49,6 +49,12 @@ def client(db):
     Auth is disabled because AI_AUTH_USER / AI_AUTH_PASS are empty.
     Saves and restores any pre-existing get_db override so that
     existing test modules that set their own overrides are not affected.
+
+    IMPORTANT: The TestClient context manager triggers the app lifespan,
+    which sets the module-level _ready flag in app.main. On exit, the
+    lifespan sets _ready = False. We must restore it afterward so that
+    test files running later (e.g., test_bundle_review.py with its own
+    module-level TestClient) are not poisoned by a stale _ready = False.
     """
     from app.main import app
     from app.db import get_db
@@ -63,7 +69,13 @@ def client(db):
     with TestClient(app) as c:
         yield c
 
-    # Restore previous state
+    # Restore the readiness flag that the lifespan shutdown cleared.
+    # Without this, any later test module using a shared TestClient
+    # will see _ready=False and the readiness middleware will 503.
+    import app.main as _main_mod
+    _main_mod._ready = True
+
+    # Restore previous dependency override state
     if previous is _SENTINEL:
         app.dependency_overrides.pop(get_db, None)
     else:

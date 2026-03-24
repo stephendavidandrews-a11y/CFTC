@@ -22,21 +22,46 @@ async def get_ai_context(
     include_recent_meetings: bool = Query(True),
     include_standalone_tasks: bool = Query(True),
     meetings_days: int = Query(30),
+    matters_limit: int = Query(100, ge=1, le=500, description="Max matters to return"),
+    people_limit: int = Query(500, ge=1, le=2000, description="Max people to return"),
+    organizations_limit: int = Query(200, ge=1, le=1000, description="Max organizations to return"),
+    tasks_limit: int = Query(200, ge=1, le=1000, description="Max standalone tasks to return"),
 ):
-    """Return the full tracker context snapshot for AI extraction."""
+    """Return the tracker context snapshot for AI extraction.
+
+    Includes optional per-section limits to control payload size.
+    The _meta block in the response shows total counts and whether
+    any section was truncated.
+    """
     result = {"generated_at": datetime.now().isoformat()}
+    meta = {}
 
     if include_matters:
-        result["matters"] = _get_matters_with_nested(db)
+        all_matters = _get_matters_with_nested(db)
+        meta["matters_total"] = len(all_matters)
+        meta["matters_truncated"] = len(all_matters) > matters_limit
+        result["matters"] = all_matters[:matters_limit]
     if include_people:
-        result["people"] = _get_active_people(db)
+        all_people = _get_active_people(db)
+        meta["people_total"] = len(all_people)
+        meta["people_truncated"] = len(all_people) > people_limit
+        result["people"] = all_people[:people_limit]
     if include_organizations:
-        result["organizations"] = _get_active_organizations(db)
+        all_orgs = _get_active_organizations(db)
+        meta["organizations_total"] = len(all_orgs)
+        meta["organizations_truncated"] = len(all_orgs) > organizations_limit
+        result["organizations"] = all_orgs[:organizations_limit]
     if include_recent_meetings:
-        result["recent_meetings"] = _get_recent_meetings(db, meetings_days)
+        all_meetings = _get_recent_meetings(db, meetings_days)
+        meta["recent_meetings_total"] = len(all_meetings)
+        result["recent_meetings"] = all_meetings
     if include_standalone_tasks:
-        result["standalone_tasks"] = _get_standalone_tasks(db)
+        all_tasks = _get_standalone_tasks(db)
+        meta["standalone_tasks_total"] = len(all_tasks)
+        meta["standalone_tasks_truncated"] = len(all_tasks) > tasks_limit
+        result["standalone_tasks"] = all_tasks[:tasks_limit]
 
+    result["_meta"] = meta
     return result
 
 

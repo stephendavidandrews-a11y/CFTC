@@ -82,6 +82,7 @@ TABLES = [
         end_time REAL,
         raw_text TEXT,
         cleaned_text TEXT,
+        reviewed_text TEXT,
         enriched_text TEXT,
         word_timestamps TEXT,
         confidence REAL,
@@ -617,3 +618,11 @@ def _run_migrations(cursor):
             "CREATE INDEX IF NOT EXISTS idx_af_content_hash ON audio_files(content_hash)"
         )
         logger.info("Migration: added audio_files.content_hash column + index")
+
+    # Transcript corrections: add reviewed_text column
+    t_cols = {row[1] for row in cursor.execute("PRAGMA table_info(transcripts)")}
+    if "reviewed_text" not in t_cols:
+        cursor.execute(
+            "ALTER TABLE transcripts ADD COLUMN reviewed_text TEXT"
+        )
+        logger.info("Migration: added transcripts.reviewed_text column")

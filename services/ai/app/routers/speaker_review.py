@@ -1012,31 +1012,19 @@ def _extract_correction_pattern(original: str, corrected: str):
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Helpers (thin wrappers around shared review helpers)
 # ---------------------------------------------------------------------------
 
+from app.routers._review_helpers import (
+    check_review_state as _shared_check,
+    ensure_in_progress as _shared_ensure,
+    resume_pipeline as _resume_pipeline,
+)
+
+
 def _check_review_state(db, communication_id: str):
-    row = db.execute(
-        "SELECT processing_status FROM communications WHERE id = ?",
-        (communication_id,),
-    ).fetchone()
-    if not row:
-        raise HTTPException(404, detail={"error_type": "not_found"})
-    if row["processing_status"] not in SPEAKER_REVIEW_STATES:
-        raise HTTPException(400, detail={
-            "error_type": "invalid_state",
-            "message": f"Communication not in speaker review (current: {row['processing_status']})",
-        })
+    _shared_check(db, communication_id, SPEAKER_REVIEW_STATES, "speaker review")
 
 
 def _ensure_in_progress(db, communication_id: str):
-    """Auto-transition from awaiting → in_progress on first interaction."""
-    cas_transition(db, communication_id, "awaiting_speaker_review", "speaker_review_in_progress")
-
-
-async def _resume_pipeline(communication_id: str):
-    from app.pipeline.orchestrator import process_communication
-    try:
-        await process_communication(communication_id)
-    except Exception as e:
-        logger.exception("Pipeline resume failed for %s: %s", communication_id, e)
+    _shared_ensure(db, communication_id, "awaiting_speaker_review", "speaker_review_in_progress")

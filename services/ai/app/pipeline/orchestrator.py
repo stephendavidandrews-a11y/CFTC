@@ -748,7 +748,7 @@ async def _handle_committing(db, communication_id: str) -> str:
     from app.config import TRACKER_BASE_URL
     try:
         async with httpx.AsyncClient(timeout=5.0) as hc:
-            health_url = TRACKER_BASE_URL.replace("/tracker", "") + "/tracker/health"
+            health_url = TRACKER_BASE_URL.rstrip("/").rsplit("/tracker", 1)[0] + "/tracker/health"
             resp = await hc.get(health_url)
         if resp.status_code != 200:
             raise TrackerBatchError(0, "connection_error",

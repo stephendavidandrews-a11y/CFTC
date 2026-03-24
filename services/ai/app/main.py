@@ -22,8 +22,10 @@ from app.config import CORS_ORIGINS, AI_UPLOAD_DIR, AI_AUDIO_WATCH_DIR, load_pol
 from app.db import get_connection
 from app.schema import init_schema
 
-# Readiness flag: False during startup, True after all init is complete
+# Readiness flags: _ready is True after successful startup
+# _startup_error holds a description if startup failed
 _ready = False
+_startup_error = None
 
 from app.routers import events, config_api, health, communications, entity_review, bundle_review, participant_review, speaker_review, intelligence, meeting_intelligence, telemetry
 
@@ -408,6 +410,34 @@ async def lifespan(app: FastAPI):
         logger.info("WAL checkpoint completed for ai.db")
 
         logger.info("ai.db ready.")
+
+        # Crash recovery (same connection — avoids :memory: DB isolation issue)
+        stale_committing = conn.execute(
+            "SELECT id FROM communications WHERE processing_status = 'committing' "
+            "AND processing_lock_token IS NULL"
+        ).fetchall()
+        for row in stale_committing:
+            conn.execute(
+                "UPDATE communications SET processing_status = 'error', "
+                "error_message = 'Crash recovery: found in committing state on startup', "
+                "error_stage = 'committing', updated_at = datetime('now') WHERE id = ?",
+                (row["id"],)
+            )
+            logger.warning("Crash recovery: %s was stuck in 'committing' — moved to error", row["id"][:8])
+        if stale_committing:
+            conn.commit()
+            logger.info("Crash recovery: %d stale committing communications recovered", len(stale_committing))
+
+        # Clean up temp files in _incoming/
+        incoming_dir = AI_UPLOAD_DIR / "_incoming"
+        if incoming_dir.exists():
+            cleaned = 0
+            for f in incoming_dir.iterdir():
+                if f.is_file():
+                    f.unlink()
+                    cleaned += 1
+            if cleaned:
+                logger.info("Crash recovery: cleaned %d temp files from _incoming/", cleaned)
     finally:
         conn.close()
 
@@ -425,38 +455,6 @@ async def lifespan(app: FastAPI):
         logger.info("Audio inbox watcher started: %s", AI_AUDIO_WATCH_DIR)
     except Exception as e:
         logger.warning("Audio inbox watcher not started: %s", e)
-
-    # Crash recovery: transition stale 'committing' communications to error
-    stale = conn_cr = get_connection()
-    try:
-        stale_committing = conn_cr.execute(
-            "SELECT id FROM communications WHERE processing_status = 'committing' "
-            "AND processing_lock_token IS NULL"
-        ).fetchall()
-        for row in stale_committing:
-            conn_cr.execute(
-                "UPDATE communications SET processing_status = 'error', "
-                "error_message = 'Crash recovery: found in committing state on startup', "
-                "error_stage = 'committing', updated_at = datetime('now') WHERE id = ?",
-                (row["id"],)
-            )
-            logger.warning("Crash recovery: %s was stuck in 'committing' — moved to error", row["id"][:8])
-        if stale_committing:
-            conn_cr.commit()
-            logger.info("Crash recovery: %d stale committing communications recovered", len(stale_committing))
-
-        # Clean up temp files in _incoming/
-        incoming_dir = AI_UPLOAD_DIR / "_incoming"
-        if incoming_dir.exists():
-            cleaned = 0
-            for f in incoming_dir.iterdir():
-                if f.is_file():
-                    f.unlink()
-                    cleaned += 1
-            if cleaned:
-                logger.info("Crash recovery: cleaned %d temp files from _incoming/", cleaned)
-    finally:
-        conn_cr.close()
 
     # Inbox re-scan: find files that arrived while the service was down
     if watcher:
@@ -492,7 +490,7 @@ async def lifespan(app: FastAPI):
     fr_task = asyncio.create_task(_fr_watcher_loop())
 
     # Mark service as ready
-    global _ready
+    global _ready, _startup_error
     _ready = True
     logger.info("CFTC AI Layer ready.")
 
@@ -545,8 +543,13 @@ class ReadinessMiddleware(BaseHTTPMiddleware):
         if request.url.path == "/ai/api/health":
             return await call_next(request)
         if not _ready:
+            if _startup_error:
+                return StarletteJSONResponse(
+                    {"detail": f"Service startup failed: {_startup_error}", "ready": False, "failed": True},
+                    status_code=503,
+                )
             return StarletteJSONResponse(
-                {"detail": "Service starting up", "ready": False},
+                {"detail": "Service starting up", "ready": False, "failed": False},
                 status_code=503,
             )
         return await call_next(request)
@@ -599,9 +602,12 @@ else:
 
 # Mount routers under /ai/api/ prefix
 api_prefix = "/ai/api"
-app.include_router(health.router, prefix=api_prefix)
+# Public: liveness probe only (no auth)
+app.include_router(health.public_router, prefix=api_prefix)
+# Protected: operational/admin endpoints
+app.include_router(health.router, prefix=api_prefix, dependencies=_ai_auth_dep)
 app.include_router(config_api.router, prefix=api_prefix, dependencies=_ai_auth_dep)
-app.include_router(events.router, prefix=api_prefix)
+app.include_router(events.router, prefix=api_prefix, dependencies=_ai_auth_dep)
 app.include_router(communications.router, prefix=api_prefix, dependencies=_ai_auth_dep)
 app.include_router(entity_review.router, prefix=api_prefix, dependencies=_ai_auth_dep)
 app.include_router(bundle_review.router, prefix=api_prefix, dependencies=_ai_auth_dep)

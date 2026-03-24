@@ -9,10 +9,13 @@ from app.config import load_policy
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["health"])
 
+# Public liveness/readiness endpoint - no auth required
+public_router = APIRouter(tags=["health"])
+
 AI_SERVICE_VERSION = "0.5.0"
 
 
-@router.get("/health")
+@public_router.get("/health")
 async def health(db=Depends(get_db)):
     """Service health and queue stats."""
     # Count communications by status for queue overview

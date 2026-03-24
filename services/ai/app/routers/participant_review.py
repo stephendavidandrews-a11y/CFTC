@@ -255,29 +255,18 @@ async def get_artifacts(communication_id: str, db=Depends(get_db)):
     return {"communication_id": communication_id, "artifacts": [dict(r) for r in rows], "total": len(rows)}
 
 
-# -- Helpers --
+# -- Helpers (thin wrappers around shared review helpers) --
+
+from app.routers._review_helpers import (
+    check_review_state as _shared_check,
+    ensure_in_progress as _shared_ensure,
+    resume_pipeline as _resume_pipeline,
+)
+
 
 def _check_review_state(db, communication_id: str):
-    row = db.execute(
-        "SELECT processing_status FROM communications WHERE id = ?",
-        (communication_id,),
-    ).fetchone()
-    if not row:
-        raise HTTPException(404, detail={"error_type": "not_found"})
-    if row["processing_status"] not in PARTICIPANT_REVIEW_STATES:
-        raise HTTPException(400, detail={
-            "error_type": "invalid_state",
-            "message": f"Communication not in participant review (current: {row['processing_status']})",
-        })
+    _shared_check(db, communication_id, PARTICIPANT_REVIEW_STATES, "participant review")
 
 
 def _ensure_in_progress(db, communication_id: str):
-    cas_transition(db, communication_id, "awaiting_participant_review", "participant_review_in_progress")
-
-
-async def _resume_pipeline(communication_id: str):
-    from app.pipeline.orchestrator import process_communication
-    try:
-        await process_communication(communication_id)
-    except Exception as e:
-        logger.exception("Pipeline resume failed for %s: %s", communication_id, e)
+    _shared_ensure(db, communication_id, "awaiting_participant_review", "participant_review_in_progress")

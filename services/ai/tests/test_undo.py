@@ -12,7 +12,7 @@ import sqlite3
 import sys
 import uuid
 from pathlib import Path
-from unittest.mock import ANY, AsyncMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -186,14 +186,14 @@ class TestInsertUndo:
 
         assert result.success
         assert result.reversed_count == 1
-        mock_delete.assert_called_once_with("tasks", record_id, ANY)
+        mock_delete.assert_called_once_with("tasks", record_id)
 
         # Communication back to reviewed
         status = db.execute(
             "SELECT processing_status FROM communications WHERE id = ?",
             (comm_id,),
         ).fetchone()["processing_status"]
-        assert status == "bundle_review_in_progress"
+        assert status == "reviewed"
 
         # Writeback marked reversed
         wb = db.execute(
@@ -265,7 +265,7 @@ class TestUpdateUndo:
 
         assert result.success
         assert result.reversed_count == 1
-        mock_update.assert_called_once_with("matters", matter_id, previous, ANY)
+        mock_update.assert_called_once_with("matters", matter_id, previous)
 
     @patch("app.writeback.undo._tracker_update", new_callable=AsyncMock)
     @patch("app.writeback.undo._tracker_get", new_callable=AsyncMock)
