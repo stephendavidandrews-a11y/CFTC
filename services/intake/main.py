@@ -7,44 +7,45 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import logging
-import os
-import secrets
+import sqlite3
 import threading
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Depends
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
-# Auth config — uses PIPELINE_USER/PIPELINE_PASS from .env (intake is the pipeline service)
-INTAKE_USER = os.environ.get("PIPELINE_USER", "")
-INTAKE_PASS = os.environ.get("PIPELINE_PASS", "")
-security = HTTPBasic()
-
-
-def verify_intake_auth(credentials: HTTPBasicCredentials = Depends(security)):
-    """Verify HTTP Basic credentials for intake endpoints."""
-    if not INTAKE_USER or not INTAKE_PASS:
-        # No credentials configured — allow through (dev mode)
-        return credentials
-    user_ok = secrets.compare_digest(credentials.username.encode(), INTAKE_USER.encode())
-    pass_ok = secrets.compare_digest(credentials.password.encode(), INTAKE_PASS.encode())
-    if not (user_ok and pass_ok):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    return credentials
 
 from config import SERVICE_PORT
 from db.schema import init_db
 from voice.pipeline.watcher import InboxWatcher
 from voice.pipeline.processor import process_conversation
 
-from logging_config import setup_logging
-setup_logging("intake")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    handlers=[logging.StreamHandler()],
+)
 logger = logging.getLogger("cftc-intake")
 
 # Frontend served by Command Center - this service is API-only
 _watcher = None
+
+
+def _check_db_integrity(db_path, label: str) -> bool:
+    """Run PRAGMA quick_check on a database. Returns True if ok."""
+    try:
+        c = sqlite3.connect(str(db_path))
+        result = c.execute("PRAGMA quick_check").fetchone()[0]
+        c.close()
+        if result == "ok":
+            logger.info("Integrity check PASSED: %s", label)
+            return True
+        else:
+            logger.critical("Integrity check FAILED for %s: %s", label, result)
+            return False
+    except Exception as e:
+        logger.critical("Integrity check ERROR for %s: %s", label, e)
+        return False
 
 
 def _on_new_file(conversation_id: str, path):
@@ -65,6 +66,10 @@ async def lifespan(app: FastAPI):
     # Initialize database
     init_db()
     logger.info("Database initialized")
+
+    # Integrity check
+    from config import DB_PATH
+    _check_db_integrity(DB_PATH, "intake.db")
 
     # Start file watcher
     _watcher = InboxWatcher(on_new_file=_on_new_file)
@@ -114,101 +119,11 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080", "http://localhost:3000", "https://cftc.stephenandrews.org"],
+    allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Request ID + metrics + rate limiting middleware
-from middleware import RequestIDMiddleware, RateLimiter, metrics as request_metrics
-_rate_limiter = RateLimiter(
-    max_requests=120,
-    window_seconds=60,
-    exclude_paths={"/health", "/metrics"},
-)
-app.add_middleware(RequestIDMiddleware, rate_limiter=_rate_limiter)
-
-
-# ── 8A: Standard error response format ──
-from fastapi.exceptions import RequestValidationError
-from starlette.responses import JSONResponse as _JSONResponse
-import logging as _logging
-_err_logger = _logging.getLogger("cftc-intake")
-
-
-@app.exception_handler(HTTPException)
-async def _http_exception_handler(request, exc):
-    """Map FastAPI HTTPException to standard error envelope.
-
-    If the endpoint already provides a structured ``detail`` dict,
-    it is preserved in ``details`` so existing consumers keep working.
-    """
-    code_map = {
-        400: "BAD_REQUEST",
-        401: "UNAUTHORIZED",
-        403: "FORBIDDEN",
-        404: "NOT_FOUND",
-        409: "CONFLICT",
-        422: "VALIDATION_ERROR",
-        429: "RATE_LIMITED",
-    }
-    # Preserve structured detail dicts (e.g. batch endpoint error_type payloads)
-    if isinstance(exc.detail, dict):
-        details = exc.detail
-        message = exc.detail.get("message", str(exc.detail))
-    else:
-        details = {}
-        message = str(exc.detail)
-
-    body: dict = {
-        "error": {
-            "code": code_map.get(exc.status_code, f"HTTP_{exc.status_code}"),
-            "message": message,
-            "details": details,
-        },
-    }
-    # Also include top-level "detail" key for backwards compatibility
-    # with clients that read resp.json()["detail"]
-    if isinstance(exc.detail, dict):
-        body["detail"] = exc.detail
-
-    return _JSONResponse(
-        status_code=exc.status_code,
-        content=body,
-        headers=getattr(exc, "headers", None) or {},
-    )
-
-
-@app.exception_handler(RequestValidationError)
-async def _validation_exception_handler(request, exc):
-    """Map Pydantic / query-param validation errors to standard envelope."""
-    return _JSONResponse(
-        status_code=422,
-        content={
-            "error": {
-                "code": "VALIDATION_ERROR",
-                "message": "Request validation failed",
-                "details": {"errors": exc.errors()},
-            }
-        },
-    )
-
-
-@app.exception_handler(Exception)
-async def _generic_exception_handler(request, exc):
-    """Catch-all for unhandled exceptions."""
-    _err_logger.error("unhandled_exception: %s", exc, exc_info=True)
-    return _JSONResponse(
-        status_code=500,
-        content={
-            "error": {
-                "code": "INTERNAL_ERROR",
-                "message": "An unexpected error occurred",
-                "details": {},
-            }
-        },
-    )
 
 # Register API routers
 from api.conversations import router as conversations_router
@@ -217,11 +132,11 @@ from api.audio import router as audio_router
 from api.pipeline import router as pipeline_router
 from api.transcribe import router as transcribe_router
 
-app.include_router(conversations_router, prefix="/intake/api", dependencies=[Depends(verify_intake_auth)])
-app.include_router(speakers_router, prefix="/intake/api", dependencies=[Depends(verify_intake_auth)])
-app.include_router(audio_router, prefix="/intake/api", dependencies=[Depends(verify_intake_auth)])
-app.include_router(pipeline_router, prefix="/intake/api", dependencies=[Depends(verify_intake_auth)])
-app.include_router(transcribe_router, prefix="/intake/api", dependencies=[Depends(verify_intake_auth)])
+app.include_router(conversations_router, prefix="/intake/api")
+app.include_router(speakers_router, prefix="/intake/api")
+app.include_router(audio_router, prefix="/intake/api")
+app.include_router(pipeline_router, prefix="/intake/api")
+app.include_router(transcribe_router, prefix="/intake/api")
 
 
 @app.get("/intake/api/health")
@@ -245,12 +160,6 @@ def health_check():
         "voice_profiles": voice_profiles,
     }
 
-
-
-@app.get("/intake/api/metrics")
-async def get_metrics():
-    """Request metrics snapshot."""
-    return request_metrics.snapshot()
 
 
 if __name__ == "__main__":

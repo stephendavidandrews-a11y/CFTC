@@ -113,20 +113,8 @@ class UndoResult:
 # States from which undo is allowed
 UNDOABLE_STATES = {"complete"}
 
-# Tracker interaction timeout
-TRACKER_TIMEOUT = 15.0
-
-# Nested route mappings: tables whose tracker endpoints require a parent ID.
-# Format: table_name -> (url_template, parent_id_field_in_written_data)
-# url_template uses {parent_id} and {id} placeholders.
-NESTED_ROUTES = {
-    "meeting_participants": ("meetings/{parent_id}/participants/{id}", "meeting_id"),
-    "meeting_matters": ("meetings/{parent_id}/matters/{id}", "meeting_id"),
-    "context_note_links": ("context-notes/{parent_id}/links/{id}", "context_note_id"),
-    "person_profiles": ("people/{parent_id}/profile", "person_id"),
-    "matter_people": ("matters/{parent_id}/people/{id}", "matter_id"),
-    "matter_organizations": ("matters/{parent_id}/organizations/{id}", "matter_id"),
-}
+# Tracker interaction timeout — normalized to match tracker_client.py (30s)
+TRACKER_TIMEOUT = 30.0
 
 # Fields to ignore when detecting conflicts (system-managed, not user-editable)
 SYSTEM_FIELDS = {
@@ -146,30 +134,9 @@ def _tracker_auth():
     return None
 
 
-def _build_url(table: str, record_id: str, written_data: dict | None = None) -> str:
-    """Build the tracker URL, using nested routes when required."""
-    if table in NESTED_ROUTES:
-        template, parent_field = NESTED_ROUTES[table]
-        parent_id = None
-        if written_data:
-            parent_id = written_data.get(parent_field)
-        if parent_id:
-            # Strip $ref: prefix if present (resolved during commit)
-            if isinstance(parent_id, str) and parent_id.startswith("$ref:"):
-                parent_id = parent_id[5:]
-            return f"{TRACKER_BASE_URL}/{template.format(parent_id=parent_id, id=record_id)}"
-        else:
-            logger.warning(
-                "Nested route for %s but no %s in written_data — falling back to flat URL",
-                table, parent_field,
-            )
-    return f"{TRACKER_BASE_URL}/{table}/{record_id}"
-
-
-async def _tracker_get(table: str, record_id: str,
-                       written_data: dict | None = None) -> dict | None:
+async def _tracker_get(table: str, record_id: str) -> dict | None:
     """GET a single tracker record. Returns None if 404."""
-    url = _build_url(table, record_id, written_data)
+    url = f"{TRACKER_BASE_URL}/{table}/{record_id}"
     try:
         async with httpx.AsyncClient(timeout=TRACKER_TIMEOUT) as client:
             resp = await client.get(url, auth=_tracker_auth())
@@ -184,10 +151,9 @@ async def _tracker_get(table: str, record_id: str,
         return None
 
 
-async def _tracker_delete(table: str, record_id: str,
-                         written_data: dict | None = None) -> bool:
+async def _tracker_delete(table: str, record_id: str) -> bool:
     """DELETE a tracker record. Returns True on success or 404 (already gone)."""
-    url = _build_url(table, record_id, written_data)
+    url = f"{TRACKER_BASE_URL}/{table}/{record_id}"
     try:
         async with httpx.AsyncClient(timeout=TRACKER_TIMEOUT) as client:
             resp = await client.delete(url, auth=_tracker_auth())
@@ -201,10 +167,9 @@ async def _tracker_delete(table: str, record_id: str,
         return False
 
 
-async def _tracker_update(table: str, record_id: str, data: dict,
-                         written_data: dict | None = None) -> bool:
+async def _tracker_update(table: str, record_id: str, data: dict) -> bool:
     """PUT/PATCH a tracker record to restore previous_data. Returns True on success."""
-    url = _build_url(table, record_id, written_data)
+    url = f"{TRACKER_BASE_URL}/{table}/{record_id}"
     try:
         async with httpx.AsyncClient(timeout=TRACKER_TIMEOUT) as client:
             resp = await client.put(url, json=data, auth=_tracker_auth())
@@ -239,12 +204,6 @@ def _detect_conflicts(
 
     for field_name, written_value in written_data.items():
         if field_name in SYSTEM_FIELDS:
-            continue
-
-        # Skip unresolved $ref: placeholders — these are batch client-id
-        # references that got resolved to real UUIDs during commit.
-        # They will never match and are not real conflicts.
-        if isinstance(written_value, str) and written_value.startswith("$ref:"):
             continue
 
         current_value = current_record.get(field_name)
@@ -291,13 +250,10 @@ def _detect_conflicts(
 # Undo must delete in reverse order to avoid FK constraint violations
 # e.g., delete meeting_participants before meetings, stakeholders before people
 UNDO_TABLE_ORDER = {
-    "context_note_links": 0,   # links before parent notes (FK dependency)
     "matter_updates": 0,
     "decisions": 0,
     "tasks": 0,
     "documents": 0,
-    "context_notes": 1,        # after links are deleted
-    "person_profiles": 1,      # standalone, safe at this tier
     "meeting_matters": 1,
     "meeting_participants": 1,
     "matter_people": 2,
@@ -410,8 +366,7 @@ async def undo_communication(
                 continue
 
             # Fetch current state from tracker
-            current = await _tracker_get(wb["target_table"], wb["target_record_id"],
-                                         written_data)
+            current = await _tracker_get(wb["target_table"], wb["target_record_id"])
 
             if current is None:
                 # Record missing — for inserts, this is fine (already deleted)
@@ -475,12 +430,9 @@ async def undo_communication(
         )
 
         try:
-            written_data_for_url = _parse_json(wb["written_data"])
-
             if wb["write_type"] == "insert":
                 # Reverse an insert → delete the record
-                ok = await _tracker_delete(wb["target_table"], wb["target_record_id"],
-                                           written_data_for_url)
+                ok = await _tracker_delete(wb["target_table"], wb["target_record_id"])
                 if ok:
                     reversal.success = True
                     _mark_reversed(db, wb["id"])
@@ -494,7 +446,6 @@ async def undo_communication(
                 if previous:
                     ok = await _tracker_update(
                         wb["target_table"], wb["target_record_id"], previous,
-                        written_data_for_url,
                     )
                     if ok:
                         reversal.success = True
@@ -527,22 +478,11 @@ async def undo_communication(
     failed_reversals = [r for r in result.reversals if not r.success and not r.skipped]
     result.success = len(failed_reversals) == 0
 
-    # ── Step 7: Clean up meeting intelligence (local ai.db data) ──
-    if result.success:
-        mi_deleted = db.execute(
-            "DELETE FROM meeting_intelligence WHERE communication_id = ?",
-            (communication_id,),
-        ).rowcount
-        if mi_deleted:
-            logger.info("[%s] Cleaned up %d meeting_intelligence record(s)",
-                        communication_id[:8], mi_deleted)
-        db.commit()
-
-    # ── Step 8: Update communication status ──
+    # ── Step 7: Update communication status ──
     if result.success:
         db.execute("""
             UPDATE communications
-            SET processing_status = 'bundle_review_in_progress',
+            SET processing_status = 'reviewed',
                 error_message = NULL,
                 error_stage = NULL,
                 updated_at = datetime('now')
@@ -558,7 +498,7 @@ async def undo_communication(
         db.commit()
 
         logger.info(
-            "[%s] Undo complete: %d reversed, %d skipped, status -> bundle_review_in_progress",
+            "[%s] Undo complete: %d reversed, %d skipped",
             communication_id[:8], result.reversed_count, result.skipped_count,
         )
     else:

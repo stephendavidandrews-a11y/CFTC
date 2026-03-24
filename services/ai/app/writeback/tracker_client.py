@@ -1,10 +1,13 @@
-"""HTTP client for POST /tracker/batch with retry, idempotency, and error handling."""
+"""HTTP client for POST /tracker/batch with retry, idempotency, and error handling.
+
+Uses a shared httpx.AsyncClient to reuse TCP connections across calls.
+"""
 
 import logging
 import asyncio
+from typing import Optional
 
 import httpx
-import structlog
 
 from app.config import TRACKER_BASE_URL, TRACKER_USER, TRACKER_PASS
 
@@ -14,6 +17,29 @@ logger = logging.getLogger(__name__)
 MAX_RETRIES = 2
 RETRY_BACKOFF_SECONDS = [1.0, 3.0]
 TIMEOUT_SECONDS = 30.0
+
+# Shared httpx client — reuses TCP connections across calls
+_shared_client: Optional[httpx.AsyncClient] = None
+
+
+def _get_shared_client() -> httpx.AsyncClient:
+    """Get or create the shared httpx.AsyncClient."""
+    global _shared_client
+    if _shared_client is None or _shared_client.is_closed:
+        _shared_client = httpx.AsyncClient(
+            timeout=TIMEOUT_SECONDS,
+            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+        )
+    return _shared_client
+
+
+async def close_shared_client():
+    """Close the shared client. Call on service shutdown."""
+    global _shared_client
+    if _shared_client and not _shared_client.is_closed:
+        await _shared_client.aclose()
+        _shared_client = None
+        logger.info("Shared tracker httpx client closed.")
 
 
 class TrackerBatchError(Exception):
@@ -57,16 +83,8 @@ async def post_batch(operations: list[dict],
     last_error = None
     for attempt in range(MAX_RETRIES + 1):
         try:
-            async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
-                # Propagate request ID for cross-service tracing
-                headers = {}
-                try:
-                    ctx = structlog.contextvars.get_contextvars()
-                    if "request_id" in ctx:
-                        headers["X-Request-ID"] = ctx["request_id"]
-                except Exception:
-                    pass
-                resp = await client.post(url, json=payload, auth=auth, headers=headers)
+            client = _get_shared_client()
+            resp = await client.post(url, json=payload, auth=auth)
 
             if resp.status_code == 200:
                 return resp.json()

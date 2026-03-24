@@ -4,32 +4,315 @@ CFTC AI Layer — FastAPI Application
 Standalone service for AI extraction, review, and intelligence.
 Reads from tracker via /tracker/ai-context, writes via /tracker/batch.
 """
+import asyncio
 import logging
+import sqlite3
 from contextlib import asynccontextmanager
+from datetime import datetime
 
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
-import secrets
 
-from app.config import CORS_ORIGINS, AI_UPLOAD_DIR, AI_AUDIO_WATCH_DIR, load_policy, validate_config
+import shutil
+
+
+from app.config import CORS_ORIGINS, AI_UPLOAD_DIR, AI_AUDIO_WATCH_DIR, load_policy
 from app.db import get_connection
 from app.schema import init_schema
 
-from app.routers import events, config_api, health, communications, entity_review, bundle_review, participant_review, speaker_review
-from app.routers import meeting_intelligence as meeting_intelligence_api
-from app.routers import intelligence as intelligence_api
-from app.routers import telemetry as telemetry_api
+# Readiness flag: False during startup, True after all init is complete
+_ready = False
 
-from app.logging_config import setup_logging
-setup_logging("ai")
+from app.routers import events, config_api, health, communications, entity_review, bundle_review, participant_review, speaker_review
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+)
 logger = logging.getLogger(__name__)
+
+
+# Stuck recovery configuration
+STUCK_SCAN_INTERVAL = 900  # 15 minutes
+STUCK_THRESHOLD_MINUTES = 60  # Communications stuck longer than this are recovered
+
+# States that are automated (not terminal, not human gate)
+_AUTOMATED_STATES = {
+    "preprocessing", "transcribing", "cleaning", "enriching", "extracting",
+    "committing", "parsing", "processing_attachments",
+    "speakers_confirmed", "participants_confirmed", "entities_confirmed",
+}
+
+# Review-in-progress states that can be reset to their awaiting counterpart
+_REVIEW_IN_PROGRESS_RESET = {
+    "speaker_review_in_progress": "awaiting_speaker_review",
+    "entity_review_in_progress": "awaiting_entity_review",
+    "bundle_review_in_progress": "awaiting_bundle_review",
+}
+
+
+def run_stuck_recovery(conn=None) -> list[dict]:
+    """Scan for stuck communications and recover them.
+
+    Returns a list of recovery actions taken.
+    Can be called manually (with conn) or from the background loop.
+    """
+    from app.pipeline.orchestrator import TERMINAL_STATES, HUMAN_GATE_STATES, _log_error
+
+    close_conn = False
+    if conn is None:
+        conn = get_connection()
+        close_conn = True
+
+    try:
+        now = datetime.utcnow().isoformat()
+        threshold = "-%d minutes" % STUCK_THRESHOLD_MINUTES
+        actions = []
+
+        # Find communications that are:
+        # 1. Not in a terminal or human gate state
+        # 2. Updated more than STUCK_THRESHOLD_MINUTES ago
+        # 3. Not currently locked (lock expired or released)
+        # Use julianday() for comparison — handles both 'T' and space datetime separators
+        stuck = conn.execute("""
+            SELECT id, processing_status, updated_at
+            FROM communications
+            WHERE processing_status NOT IN (%s)
+            AND julianday(updated_at) < julianday('now', ?)
+            AND (processing_lock_token IS NULL
+                 OR julianday(lock_expires_at) < julianday('now'))
+        """ % ",".join("?" for _ in (TERMINAL_STATES | HUMAN_GATE_STATES)),
+            list(TERMINAL_STATES | HUMAN_GATE_STATES) + [threshold]
+        ).fetchall()
+
+        for row in stuck:
+            comm_id = row["id"]
+            status = row["processing_status"]
+            updated = row["updated_at"]
+
+            if status in _AUTOMATED_STATES:
+                # Transition to error with recovery message
+                msg = "Auto-recovered: stuck in '%s' for >%d min (last update: %s)" % (
+                    status, STUCK_THRESHOLD_MINUTES, updated)
+                _log_error(conn, comm_id, status, msg)
+                conn.execute("""
+                    UPDATE communications
+                    SET processing_status = 'error',
+                        error_message = ?,
+                        error_stage = ?,
+                        updated_at = ?
+                    WHERE id = ?
+                """, (msg, status, now, comm_id))
+                conn.commit()
+                actions.append({"id": comm_id, "from": status, "to": "error", "reason": msg})
+                logger.warning("Stuck recovery: %s '%s' -> 'error'", comm_id[:8], status)
+
+            elif status in _REVIEW_IN_PROGRESS_RESET:
+                # Reset to awaiting state
+                reset_to = _REVIEW_IN_PROGRESS_RESET[status]
+                conn.execute("""
+                    UPDATE communications
+                    SET processing_status = ?, updated_at = ?
+                    WHERE id = ?
+                """, (reset_to, now, comm_id))
+                conn.commit()
+                actions.append({"id": comm_id, "from": status, "to": reset_to, "reason": "reset to gate"})
+                logger.warning("Stuck recovery: %s '%s' -> '%s'", comm_id[:8], status, reset_to)
+
+            else:
+                logger.warning("Stuck recovery: %s in unexpected state '%s' — skipping", comm_id[:8], status)
+
+        if actions:
+            logger.info("Stuck recovery: %d communications recovered", len(actions))
+        return actions
+
+    finally:
+        if close_conn:
+            conn.close()
+
+
+async def _stuck_recovery_loop():
+    """Background task: scan for stuck communications every STUCK_SCAN_INTERVAL seconds."""
+    logger.info("Stuck recovery scanner started (interval=%ds, threshold=%dm)",
+                STUCK_SCAN_INTERVAL, STUCK_THRESHOLD_MINUTES)
+    while True:
+        try:
+            await asyncio.sleep(STUCK_SCAN_INTERVAL)
+            actions = run_stuck_recovery()
+            if actions:
+                from app.routers.events import publish_event
+                for action in actions:
+                    await publish_event("communication_status", {
+                        "communication_id": action["id"],
+                        "status": action["to"],
+                        "previous_status": action["from"],
+                        "recovery": True,
+                    })
+        except asyncio.CancelledError:
+            logger.info("Stuck recovery scanner stopped.")
+            raise
+        except Exception as e:
+            logger.error("Stuck recovery scanner error: %s", e)
+            # Continue scanning despite errors
+
+
+# ---------------------------------------------------------------------------
+# Health probe loops — resume deferred communications when dependencies return
+# ---------------------------------------------------------------------------
+
+HEALTH_PROBE_INTERVAL = 300  # 5 minutes
+
+# Disk space thresholds
+DISK_WARNING_BYTES = 1 * 1024 * 1024 * 1024   # 1 GB
+DISK_CRITICAL_BYTES = 200 * 1024 * 1024        # 200 MB
+_disk_low = False  # Set True when disk is critically low
+
+
+async def _api_health_probe_loop():
+    """Probe Anthropic API every 5 minutes. Resume waiting_for_api communications when healthy."""
+    logger.info("API health probe started (interval=%ds)", HEALTH_PROBE_INTERVAL)
+    while True:
+        try:
+            await asyncio.sleep(HEALTH_PROBE_INTERVAL)
+            conn = get_connection()
+            try:
+                waiting = conn.execute(
+                    "SELECT id, error_stage FROM communications WHERE processing_status = 'waiting_for_api'"
+                ).fetchall()
+                if not waiting:
+                    continue
+
+                # Probe: try a tiny API call
+                import anthropic
+                from app.config import ANTHROPIC_API_KEY
+                try:
+                    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+                    client.messages.create(
+                        model="claude-haiku-4-5-20251001",
+                        max_tokens=1,
+                        messages=[{"role": "user", "content": "ping"}],
+                    )
+                    api_healthy = True
+                except Exception:
+                    api_healthy = False
+
+                if api_healthy:
+                    logger.info("API health probe: Anthropic API is healthy. Resuming %d communications.", len(waiting))
+                    for row in waiting:
+                        resume_to = row["error_stage"] or "pending"
+                        conn.execute(
+                            "UPDATE communications SET processing_status = ?, error_message = NULL, "
+                            "error_stage = NULL, updated_at = datetime('now') WHERE id = ?",
+                            (resume_to, row["id"]),
+                        )
+                    conn.commit()
+
+                    # Trigger processing for each resumed communication
+                    from app.pipeline.orchestrator import process_communication
+                    for row in waiting:
+                        asyncio.create_task(process_communication(row["id"]))
+            finally:
+                conn.close()
+
+        except asyncio.CancelledError:
+            logger.info("API health probe stopped.")
+            raise
+        except Exception as e:
+            logger.error("API health probe error: %s", e)
+
+
+async def _tracker_health_probe_loop():
+    """Probe tracker service every 5 minutes. Resume awaiting_tracker communications when healthy."""
+    logger.info("Tracker health probe started (interval=%ds)", HEALTH_PROBE_INTERVAL)
+    while True:
+        try:
+            await asyncio.sleep(HEALTH_PROBE_INTERVAL)
+            conn = get_connection()
+            try:
+                waiting = conn.execute(
+                    "SELECT id, error_stage FROM communications WHERE processing_status = 'awaiting_tracker'"
+                ).fetchall()
+                if not waiting:
+                    continue
+
+                # Probe: ping tracker health endpoint
+                import httpx
+                from app.config import TRACKER_BASE_URL
+                try:
+                    async with httpx.AsyncClient(timeout=5.0) as hc:
+                        resp = await hc.get(TRACKER_BASE_URL.replace("/tracker", "") + "/tracker/health")
+                    tracker_healthy = resp.status_code == 200
+                except Exception:
+                    tracker_healthy = False
+
+                if tracker_healthy:
+                    logger.info("Tracker health probe: tracker is healthy. Resuming %d communications.", len(waiting))
+                    for row in waiting:
+                        resume_to = row["error_stage"] or "pending"
+                        conn.execute(
+                            "UPDATE communications SET processing_status = ?, error_message = NULL, "
+                            "error_stage = NULL, updated_at = datetime('now') WHERE id = ?",
+                            (resume_to, row["id"]),
+                        )
+                    conn.commit()
+
+                    from app.pipeline.orchestrator import process_communication
+                    for row in waiting:
+                        asyncio.create_task(process_communication(row["id"]))
+            finally:
+                conn.close()
+
+        except asyncio.CancelledError:
+            logger.info("Tracker health probe stopped.")
+            raise
+        except Exception as e:
+            logger.error("Tracker health probe error: %s", e)
+
+
+async def _disk_monitor_loop():
+    """Check disk space every hour. Set _disk_low flag when critically low."""
+    global _disk_low
+    logger.info("Disk monitor started (warning=%dMB, critical=%dMB)",
+                DISK_WARNING_BYTES // (1024*1024), DISK_CRITICAL_BYTES // (1024*1024))
+    while True:
+        try:
+            await asyncio.sleep(3600)  # 1 hour
+            usage = shutil.disk_usage("/")
+            free = usage.free
+            if free < DISK_CRITICAL_BYTES:
+                logger.critical("DISK CRITICALLY LOW: %dMB free", free // (1024*1024))
+                _disk_low = True
+            elif free < DISK_WARNING_BYTES:
+                logger.warning("Disk space low: %dMB free", free // (1024*1024))
+                _disk_low = False
+            else:
+                _disk_low = False
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.error("Disk monitor error: %s", e)
+
+
+def _check_db_integrity(db_path, label: str) -> bool:
+    """Run PRAGMA quick_check on a database. Returns True if ok."""
+    try:
+        c = sqlite3.connect(str(db_path))
+        result = c.execute("PRAGMA quick_check").fetchone()[0]
+        c.close()
+        if result == "ok":
+            logger.info("Integrity check PASSED: %s", label)
+            return True
+        else:
+            logger.critical("Integrity check FAILED for %s: %s", label, result)
+            return False
+    except Exception as e:
+        logger.critical("Integrity check ERROR for %s: %s", label, e)
+        return False
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize database, config, and file watcher on startup."""
-    validate_config()
     logger.info("Starting CFTC AI Layer...")
 
     # Ensure directories exist
@@ -50,6 +333,15 @@ async def lifespan(app: FastAPI):
             WHERE lock_expires_at < datetime('now')
         """)
         conn.commit()
+
+        # Integrity check
+        from app.config import AI_DB_PATH
+        _check_db_integrity(AI_DB_PATH, "ai.db")
+
+        # WAL checkpoint — flush pending WAL frames to main DB
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        logger.info("WAL checkpoint completed for ai.db")
+
         logger.info("ai.db ready.")
     finally:
         conn.close()
@@ -69,156 +361,94 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Audio inbox watcher not started: %s", e)
 
-    # Start APScheduler for intelligence briefs
-    scheduler = None
+    # Crash recovery: transition stale 'committing' communications to error
+    stale = conn_cr = get_connection()
     try:
-        from apscheduler.schedulers.background import BackgroundScheduler
-        from apscheduler.triggers.cron import CronTrigger
-
-        def _run_daily_brief():
-            try:
-                from app.jobs.daily_brief import generate_daily_brief, store_brief
-                from app.jobs.html_renderer import render_daily_html
-                from app.jobs.docx_renderer import render_daily_docx
-                from app.jobs.email_sender import send_email
-                from app.db import get_connection
-                from datetime import date
-
-                db = get_connection()
-                try:
-                    llm_client = None
-                    try:
-                        from app.llm.client import get_llm_client
-                        llm_client = get_llm_client()
-                    except Exception:
-                        pass
-
-                    data = generate_daily_brief(db, llm_client=llm_client)
-                    today = date.today().isoformat()
-                    html = render_daily_html(data)
-                    docx_path = render_daily_docx(data)
-                    model = "haiku" if any(m.get("prep_narrative") for m in data.get("meetings", [])) else None
-                    store_brief(db, "daily", today, data, str(docx_path), model)
-                    send_email(
-                        subject="CFTC Daily Brief \u2014 " + data.get("date_display", today),
-                        html_body=html,
-                        docx_path=docx_path,
-                    )
-                    logger.info("Daily brief generated and sent for %s", today)
-                finally:
-                    db.close()
-            except Exception as e:
-                logger.error("Daily brief job failed: %s", e, exc_info=True)
-
-        scheduler = BackgroundScheduler(daemon=True)
-        reports_policy = policy.get("scheduled_reports", {})
-
-        if reports_policy.get("daily_digest", {}).get("enabled", False):
-            scheduler.add_job(
-                _run_daily_brief,
-                CronTrigger(hour=5, minute=55),
-                id="daily_brief",
-                replace_existing=True,
+        stale_committing = conn_cr.execute(
+            "SELECT id FROM communications WHERE processing_status = 'committing' "
+            "AND processing_lock_token IS NULL"
+        ).fetchall()
+        for row in stale_committing:
+            conn_cr.execute(
+                "UPDATE communications SET processing_status = 'error', "
+                "error_message = 'Crash recovery: found in committing state on startup', "
+                "error_stage = 'committing', updated_at = datetime('now') WHERE id = ?",
+                (row["id"],)
             )
-            logger.info("Daily brief job scheduled (05:55)")
-        else:
-            logger.info("Daily brief job DISABLED by policy")
+            logger.warning("Crash recovery: %s was stuck in 'committing' — moved to error", row["id"][:8])
+        if stale_committing:
+            conn_cr.commit()
+            logger.info("Crash recovery: %d stale committing communications recovered", len(stale_committing))
 
-        scheduler.start()
-        def _run_weekly_brief():
-            try:
-                from app.jobs.weekly_brief import generate_weekly_brief, add_executive_summary
-                from app.jobs.daily_brief import store_brief
-                from app.jobs.html_renderer import render_weekly_html
-                from app.jobs.docx_renderer import render_weekly_docx
-                from app.jobs.email_sender import send_email
-                from app.db import get_connection
-                from datetime import date
+        # Clean up temp files in _incoming/
+        incoming_dir = AI_UPLOAD_DIR / "_incoming"
+        if incoming_dir.exists():
+            cleaned = 0
+            for f in incoming_dir.iterdir():
+                if f.is_file():
+                    f.unlink()
+                    cleaned += 1
+            if cleaned:
+                logger.info("Crash recovery: cleaned %d temp files from _incoming/", cleaned)
+    finally:
+        conn_cr.close()
 
-                db = get_connection()
-                try:
-                    data = generate_weekly_brief(db)
-                    try:
-                        data = add_executive_summary(data, True)
-                    except Exception:
-                        pass
-                    today = date.today().isoformat()
-                    html = render_weekly_html(data)
-                    docx_path = render_weekly_docx(data)
-                    model = "sonnet" if data.get("executive_summary") else None
-                    store_brief(db, "weekly", today, data, str(docx_path), model)
-                    send_email(
-                        subject="CFTC Weekly Brief \u2014 " + data.get("date_display", today),
-                        html_body=html,
-                        docx_path=docx_path,
-                    )
-                    logger.info("Weekly brief generated and sent for %s", today)
-                finally:
-                    db.close()
-            except Exception as e:
-                logger.error("Weekly brief job failed: %s", e, exc_info=True)
+    # Inbox re-scan: find files that arrived while the service was down
+    if watcher:
+        rescan_conn = get_connection()
+        try:
+            rescan_count = 0
+            for subdir in AI_AUDIO_WATCH_DIR.iterdir():
+                if not subdir.is_dir() or subdir.name.startswith("_"):
+                    continue
+                for f in subdir.iterdir():
+                    if not f.is_file() or f.suffix.lower() not in (".wav", ".flac", ".mp3", ".m4a", ".ogg", ".opus"):
+                        continue
+                    existing = rescan_conn.execute(
+                        "SELECT id FROM audio_files WHERE file_path = ?", (str(f),)
+                    ).fetchone()
+                    if not existing:
+                        rescan_count += 1
+                        logger.info("Inbox re-scan: found unregistered file %s", f.name)
+            if rescan_count:
+                logger.info("Inbox re-scan: %d unregistered files found (watcher will process them)", rescan_count)
+            else:
+                logger.debug("Inbox re-scan: no unregistered files found")
+        except Exception as e:
+            logger.warning("Inbox re-scan failed: %s", e)
+        finally:
+            rescan_conn.close()
 
-        if reports_policy.get("weekly_brief", {}).get("enabled", False):
-            scheduler.add_job(
-                _run_weekly_brief,
-                CronTrigger(day_of_week="sun", hour=20, minute=0),
-                id="weekly_brief",
-                replace_existing=True,
-            )
-            logger.info("Weekly brief job scheduled (Sun 20:00)")
-        else:
-            logger.info("Weekly brief job DISABLED by policy")
-        def _run_dev_report():
-            try:
-                from app.jobs.dev_report import generate_dev_report
-                from app.jobs.daily_brief import store_brief
-                from app.jobs.html_renderer import render_dev_report_html
-                from app.jobs.email_sender import send_email
-                from app.db import get_connection
-                from datetime import date
+    # Start background tasks
+    stuck_task = asyncio.create_task(_stuck_recovery_loop())
+    api_probe_task = asyncio.create_task(_api_health_probe_loop())
+    tracker_probe_task = asyncio.create_task(_tracker_health_probe_loop())
+    disk_task = asyncio.create_task(_disk_monitor_loop())
 
-                db = get_connection()
-                try:
-                    data = generate_dev_report(db)
-                    today = date.today().isoformat()
-                    html = render_dev_report_html(data)
-                    store_brief(db, "dev-report", today, data, None, None)
-                    send_email(
-                        subject="CFTC App Health — " + data.get("date_display", today),
-                        html_body=html,
-                    )
-                    logger.info("Dev report generated and sent for %s", today)
-                finally:
-                    db.close()
-            except Exception as e:
-                logger.error("Dev report job failed: %s", e, exc_info=True)
-
-        if reports_policy.get("dev_report", {}).get("enabled", False):
-            scheduler.add_job(
-                _run_dev_report,
-                CronTrigger(day_of_week="sun", hour=20, minute=30),
-                id="dev_report",
-                replace_existing=True,
-            )
-            logger.info("Dev report job scheduled (Sun 20:30)")
-        else:
-            logger.info("Dev report job DISABLED by policy")
-
-        logger.info("APScheduler started. Check above for enabled jobs.")
-    except ImportError:
-        logger.warning("APScheduler not installed \u2014 intelligence briefs will not auto-generate")
-    except Exception as e:
-        logger.warning("Scheduler setup failed: %s", e)
+    # Mark service as ready
+    global _ready
+    _ready = True
+    logger.info("CFTC AI Layer ready.")
 
     yield
 
-    # Shutdown
+    _ready = False
+
+    # Shutdown — cancel all background tasks
+    for task in [stuck_task, api_probe_task, tracker_probe_task, disk_task]:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    # Close shared httpx client
+    from app.writeback.tracker_client import close_shared_client
+    await close_shared_client()
+
     if watcher:
         watcher.stop()
         logger.info("Audio inbox watcher stopped.")
-    if scheduler:
-        scheduler.shutdown(wait=False)
-        logger.info("APScheduler stopped.")
     logger.info("Shutting down CFTC AI Layer.")
 
 
@@ -237,140 +467,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Request ID + metrics + rate limiting middleware
-from app.middleware import RequestIDMiddleware, RateLimiter, metrics as request_metrics
-_rate_limiter = RateLimiter(
-    max_requests=300,
-    window_seconds=60,
-    exclude_paths={"/health", "/metrics", "/ai/api/events/stream"},
-)
-app.add_middleware(RequestIDMiddleware, rate_limiter=_rate_limiter)
+
+# Readiness middleware: return 503 during startup
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse as StarletteJSONResponse
 
 
-# ── 8A: Standard error response format ──
-from fastapi.exceptions import RequestValidationError
-from starlette.responses import JSONResponse as _JSONResponse
-import traceback as _tb
-
-
-@app.exception_handler(HTTPException)
-async def _http_exception_handler(request, exc):
-    """Map FastAPI HTTPException to standard error envelope.
-
-    If the endpoint already provides a structured ``detail`` dict,
-    it is preserved in ``details`` so existing consumers keep working.
-    """
-    code_map = {
-        400: "BAD_REQUEST",
-        401: "UNAUTHORIZED",
-        403: "FORBIDDEN",
-        404: "NOT_FOUND",
-        409: "CONFLICT",
-        422: "VALIDATION_ERROR",
-        429: "RATE_LIMITED",
-    }
-    # Preserve structured detail dicts (e.g. batch endpoint error_type payloads)
-    if isinstance(exc.detail, dict):
-        details = exc.detail
-        message = exc.detail.get("message", str(exc.detail))
-    else:
-        details = {}
-        message = str(exc.detail)
-
-    body: dict = {
-        "error": {
-            "code": code_map.get(exc.status_code, f"HTTP_{exc.status_code}"),
-            "message": message,
-            "details": details,
-        },
-    }
-    # Also include top-level "detail" key for backwards compatibility
-    # with clients that read resp.json()["detail"]
-    if isinstance(exc.detail, dict):
-        body["detail"] = exc.detail
-
-    return _JSONResponse(
-        status_code=exc.status_code,
-        content=body,
-        headers=getattr(exc, "headers", None) or {},
-    )
-
-
-@app.exception_handler(RequestValidationError)
-async def _validation_exception_handler(request, exc):
-    """Map Pydantic / query-param validation errors to standard envelope."""
-    return _JSONResponse(
-        status_code=422,
-        content={
-            "error": {
-                "code": "VALIDATION_ERROR",
-                "message": "Request validation failed",
-                "details": {"errors": exc.errors()},
-            }
-        },
-    )
-
-
-@app.exception_handler(Exception)
-async def _generic_exception_handler(request, exc):
-    """Catch-all for unhandled exceptions."""
-    logger.error("unhandled_exception", error=str(exc), tb=_tb.format_exc())
-    return _JSONResponse(
-        status_code=500,
-        content={
-            "error": {
-                "code": "INTERNAL_ERROR",
-                "message": "An unexpected error occurred",
-                "details": {},
-            }
-        },
-    )
-
-# Optional auth dependency — enabled when AI_AUTH_USER and AI_AUTH_PASS are set
-from app.config import AI_AUTH_USER, AI_AUTH_PASS
-
-_ai_security = HTTPBasic(auto_error=False)
-_auth_deps = []
-
-if AI_AUTH_USER and AI_AUTH_PASS:
-    def _verify_ai_auth(credentials: HTTPBasicCredentials = Depends(_ai_security)):
-        if credentials is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required",
-                headers={"WWW-Authenticate": "Basic"},
+class ReadinessMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        # Allow health check during startup (for liveness probes)
+        if request.url.path == "/ai/api/health":
+            return await call_next(request)
+        if not _ready:
+            return StarletteJSONResponse(
+                {"detail": "Service starting up", "ready": False},
+                status_code=503,
             )
-        ok_user = secrets.compare_digest(credentials.username.encode(), AI_AUTH_USER.encode())
-        ok_pass = secrets.compare_digest(credentials.password.encode(), AI_AUTH_PASS.encode())
-        if not (ok_user and ok_pass):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials",
-                headers={"WWW-Authenticate": "Basic"},
-            )
-        return credentials.username
+        return await call_next(request)
 
-    _auth_deps = [Depends(_verify_ai_auth)]
-    logger.info("AI auth ENABLED (AI_AUTH_USER is set)")
-else:
-    logger.warning("AI auth DISABLED — set AI_AUTH_USER and AI_AUTH_PASS to enable")
 
-@app.get("/ai/api/metrics")
-async def get_metrics():
-    """Request metrics snapshot."""
-    return request_metrics.snapshot()
-
+app.add_middleware(ReadinessMiddleware)
 
 # Mount routers under /ai/api/ prefix
 api_prefix = "/ai/api"
 app.include_router(health.router, prefix=api_prefix)
-app.include_router(config_api.router, prefix=api_prefix, dependencies=_auth_deps)
-app.include_router(events.router, prefix=api_prefix, dependencies=_auth_deps)
-app.include_router(communications.router, prefix=api_prefix, dependencies=_auth_deps)
-app.include_router(entity_review.router, prefix=api_prefix, dependencies=_auth_deps)
-app.include_router(bundle_review.router, prefix=api_prefix, dependencies=_auth_deps)
-app.include_router(participant_review.router, prefix=api_prefix, dependencies=_auth_deps)
-app.include_router(speaker_review.router, prefix=api_prefix, dependencies=_auth_deps)
-app.include_router(meeting_intelligence_api.router, prefix=api_prefix, dependencies=_auth_deps)
-app.include_router(intelligence_api.router, prefix=api_prefix, dependencies=_auth_deps)
-app.include_router(telemetry_api.router, prefix=api_prefix, dependencies=_auth_deps)
+app.include_router(config_api.router, prefix=api_prefix)
+app.include_router(events.router, prefix=api_prefix)
+app.include_router(communications.router, prefix=api_prefix)
+app.include_router(entity_review.router, prefix=api_prefix)
+app.include_router(bundle_review.router, prefix=api_prefix)
+app.include_router(participant_review.router, prefix=api_prefix)
+app.include_router(speaker_review.router, prefix=api_prefix)
