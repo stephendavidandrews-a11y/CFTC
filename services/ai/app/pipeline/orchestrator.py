@@ -104,6 +104,18 @@ EMAIL_TRANSITIONS = {
     "committing": "complete",
 }
 
+
+# Federal Register pipeline — shorter, no transcription/speaker/entity review
+FR_TRANSITIONS = {
+    "pending": "fetching_text",
+    "fetching_text": "extracting",
+    "extracting": "awaiting_bundle_review",
+    "awaiting_bundle_review": "bundle_review_in_progress",
+    "bundle_review_in_progress": "reviewed",
+    "reviewed": "committing",
+    "committing": "complete",
+}
+
 # Lock duration for processing
 LOCK_DURATION_MINUTES = 15  # Increased from 10; renewal heartbeat extends lease
 
@@ -227,6 +239,8 @@ def get_transitions_for_source(source_type: str) -> dict:
     """Return the valid transition map for a source type."""
     if source_type == "email":
         return EMAIL_TRANSITIONS
+    if source_type == "federal_register":
+        return FR_TRANSITIONS
     return AUDIO_TRANSITIONS
 
 

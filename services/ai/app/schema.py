@@ -362,6 +362,34 @@ TABLES = [
         error_message TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )"""),
+    # ---- Federal Register staging ----
+    ("fr_documents", """CREATE TABLE IF NOT EXISTS fr_documents (
+        id TEXT PRIMARY KEY,
+        document_number TEXT NOT NULL UNIQUE,
+        title TEXT NOT NULL,
+        fr_type TEXT,
+        action TEXT,
+        abstract TEXT,
+        publication_date TEXT,
+        agencies_json TEXT,
+        comments_close_on TEXT,
+        docket_ids_json TEXT,
+        regulation_id_numbers_json TEXT,
+        cfr_references_json TEXT,
+        html_url TEXT,
+        pdf_url TEXT,
+        body_html_url TEXT,
+        raw_text_url TEXT,
+        full_text TEXT,
+        routing_tier INTEGER NOT NULL,
+        processing_status TEXT NOT NULL DEFAULT 'pending',
+        communication_id TEXT,
+        matter_id TEXT,
+        notes TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+    )"""),
+
 ]
 
 # ---------------------------------------------------------------------------
@@ -471,6 +499,13 @@ INDEXES = [
     # -- communication_error_log --
     "CREATE INDEX IF NOT EXISTS idx_error_log_comm ON communication_error_log(communication_id);",
     "CREATE INDEX IF NOT EXISTS idx_error_log_created ON communication_error_log(created_at);",
+
+    # -- fr_documents --
+    "CREATE INDEX IF NOT EXISTS idx_fr_docs_docnum ON fr_documents(document_number);",
+    "CREATE INDEX IF NOT EXISTS idx_fr_docs_status ON fr_documents(processing_status);",
+    "CREATE INDEX IF NOT EXISTS idx_fr_docs_tier ON fr_documents(routing_tier);",
+    "CREATE INDEX IF NOT EXISTS idx_fr_docs_pub_date ON fr_documents(publication_date);",
+
 ]
 
 
