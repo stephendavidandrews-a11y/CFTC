@@ -40,6 +40,8 @@ import AISettingsPage from "./pages/settings/AISettingsPage";
 // -- Intelligence --
 import DailyBriefPage from "./pages/intelligence/DailyBriefPage";
 import WeeklyBriefPage from "./pages/intelligence/WeeklyBriefPage";
+import DirectivesPage from "./pages/tracker/DirectivesPage";
+import DirectiveDetailPage from "./pages/tracker/DirectiveDetailPage";
 
 // -- Intelligence / Settings stubs --
 const AIPlaceholder = ({ title }) => (
@@ -59,6 +61,8 @@ export default function App() {
           <Route index element={<TrackerDashboardPage />} />
           <Route path="/matters" element={<MattersPage />} />
           <Route path="/matters/:id" element={<MatterDetailPage />} />
+            <Route path="/directives" element={<DirectivesPage />} />
+            <Route path="/directives/:id" element={<DirectiveDetailPage />} />
           <Route path="/tasks" element={<TrackerTasksPage />} />
           <Route path="/people" element={<PeoplePage />} />
           <Route path="/people/:id" element={<PersonDetailPage />} />

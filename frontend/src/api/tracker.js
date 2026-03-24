@@ -354,3 +354,84 @@ export function getPersonProfile(personId) {
 export function updatePersonProfile(personId, data) {
   return fetchJSON(`${P}/people/${personId}/profile`, { method: "PUT", body: JSON.stringify(data) });
 }
+
+
+// ── Comment Topics ──────────────────────────────────────────────────────────
+
+export function listCommentTopics(matterId, params = {}) {
+  return fetchJSON(`${P}/matters/${matterId}/comment-topics${qs(params)}`);
+}
+
+export function createCommentTopic(matterId, data) {
+  return fetchJSON(`${P}/matters/${matterId}/comment-topics`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export function getCommentTopic(topicId) {
+  return fetchJSON(`${P}/comment-topics/${topicId}`);
+}
+
+export function updateCommentTopic(topicId, data, etag) {
+  const headers = etag ? { "If-Match": etag } : {};
+  return fetchJSON(`${P}/comment-topics/${topicId}`, { method: "PUT", headers, body: JSON.stringify(data) });
+}
+
+export function deleteCommentTopic(topicId, etag) {
+  return fetchJSON(`${P}/comment-topics/${topicId}`, { method: "DELETE", headers: etag ? { "If-Match": etag } : {} });
+}
+
+export function createCommentQuestion(topicId, data) {
+  return fetchJSON(`${P}/comment-topics/${topicId}/questions`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export function updateCommentQuestion(questionId, data) {
+  return fetchJSON(`${P}/comment-questions/${questionId}`, { method: "PUT", body: JSON.stringify(data) });
+}
+
+export function deleteCommentQuestion(questionId) {
+  return fetchJSON(`${P}/comment-questions/${questionId}`, { method: "DELETE" });
+}
+
+export function moveCommentQuestion(questionId, targetTopicId) {
+  return fetchJSON(`${P}/comment-questions/${questionId}/move`, { method: "PATCH", body: JSON.stringify({ target_topic_id: targetTopicId }) });
+}
+
+// ── Policy Directives ───────────────────────────────────────────────────────
+
+export function listPolicyDirectives(params = {}) {
+  return fetchJSON(`${P}/policy-directives${qs(params)}`);
+}
+
+export function createPolicyDirective(data) {
+  return fetchJSON(`${P}/policy-directives`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export function getPolicyDirective(id) {
+  return fetchJSON(`${P}/policy-directives/${id}`);
+}
+
+export function updatePolicyDirective(id, data, etag) {
+  const headers = etag ? { "If-Match": etag } : {};
+  return fetchJSON(`${P}/policy-directives/${id}`, { method: "PUT", headers, body: JSON.stringify(data) });
+}
+
+export function deletePolicyDirective(id, etag) {
+  return fetchJSON(`${P}/policy-directives/${id}`, { method: "DELETE", headers: etag ? { "If-Match": etag } : {} });
+}
+
+// ── Directive-Matter Links ──────────────────────────────────────────────────
+
+export function listDirectiveMatters(directiveId) {
+  return fetchJSON(`${P}/policy-directives/${directiveId}/matters`);
+}
+
+export function listMatterDirectives(matterId) {
+  return fetchJSON(`${P}/matters/${matterId}/directives`);
+}
+
+export function createDirectiveMatter(data) {
+  return fetchJSON(`${P}/directive-matters`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export function deleteDirectiveMatter(linkId) {
+  return fetchJSON(`${P}/directive-matters/${linkId}`, { method: "DELETE" });
+}
