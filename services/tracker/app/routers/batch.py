@@ -305,7 +305,8 @@ async def batch_write(body: dict, db=Depends(get_db),
 
                 record_id = str(uuid.uuid4())
                 data["id"] = record_id
-                data["created_at"] = now
+                if "created_at" in valid_columns:
+                    data["created_at"] = now
                 if "updated_at" in valid_columns:
                     data["updated_at"] = now
                 if "source" in valid_columns:
