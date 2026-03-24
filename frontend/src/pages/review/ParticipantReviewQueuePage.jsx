@@ -127,7 +127,7 @@ export default function ParticipantReviewQueuePage() {
 
       {!loading && items.length === 0 && !error && (
         <EmptyState
-          icon="\ud83d\udc65"
+          icon="👥"
           title="No communications awaiting participant review"
           message="Email communications will appear here when participants need confirmation before extraction."
         />

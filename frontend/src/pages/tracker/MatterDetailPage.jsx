@@ -150,7 +150,7 @@ function CommentTopicsTab({ matterId }) {
       )}
 
       {topics.length === 0 ? (
-        <EmptyState icon="\ud83d\udcac" title="No comment topics" subtitle="Add topics to track position development for this matter" />
+        <EmptyState icon="💬" title="No comment topics" subtitle="Add topics to track position development for this matter" />
       ) : (
         <div>
           {topics.map((topic) => {
