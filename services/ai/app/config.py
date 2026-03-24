@@ -169,7 +169,6 @@ def _default_policy() -> dict:
             "propose_meeting_records": True,
             "propose_new_matters": False,
             "propose_stakeholders": True,
-            "propose_follow_ups": True,
             "propose_new_people": True,
             "propose_new_organizations": True,
             "propose_status_changes": False,
@@ -187,7 +186,7 @@ def _default_policy() -> dict:
             for action in [
                 "task", "matter_update", "decision", "status_change",
                 "meeting_record", "stakeholder_addition", "new_matter",
-                "new_person", "new_organization", "follow_up", "document"
+                "new_person", "new_organization", "document"
             ]
         },
         "model_config": {

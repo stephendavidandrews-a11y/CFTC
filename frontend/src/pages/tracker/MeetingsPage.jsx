@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
+import { useToastContext } from "../../contexts/ToastContext";
 import useApi from "../../hooks/useApi";
 import { listMeetings, listMatters, updateMeeting, deleteMeeting } from "../../api/tracker";
 import DataTable from "../../components/shared/DataTable";
@@ -60,6 +61,7 @@ function formatDateTime(d) {
 
 export default function MeetingsPage() {
   const navigate = useNavigate();
+  const toast = useToastContext();
   const { openDrawer } = useDrawer();
   const [filters, setFilters] = useState({ search: "", date_from: "", date_to: "", matter_id: "" });
   const [confirmAction, setConfirmAction] = useState(null); // { id, action, title }
@@ -88,7 +90,7 @@ export default function MeetingsPage() {
         refetch();
       } catch (err) {
         console.error(`Meeting ${action} failed:`, err);
-        alert(`Failed to ${action} meeting: ${err.message || err}`);
+        toast.error(`Failed to ${action} meeting: ${err.message || err}`);
       } finally {
         setActionBusy((prev) => ({ ...prev, [id]: false }));
       }

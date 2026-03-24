@@ -3,7 +3,7 @@
 from pathlib import Path
 
 # -- Paths --
-BASE_DIR = Path("/Users/stephen/Documents/Website/cftc/services/intake")
+BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR / "data"
 DB_PATH = DATA_DIR / "cftc_voice.db"
 INBOX_DIR = DATA_DIR / "inbox"

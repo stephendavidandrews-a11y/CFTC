@@ -3,6 +3,7 @@
 .env.save
 .env.*
 !.env.example
+services/*/.env
 
 # databases and data
 /data/

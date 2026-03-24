@@ -190,11 +190,49 @@ def render_daily_docx(data: dict, path: str | Path | None = None) -> Path:
     if not overdue and not overloaded:
         _add_para(doc, "No team execution risks.", color=(34, 197, 94))
 
+    # Section 6: Comment Deadlines
+    _add_heading(doc, "Comment Deadlines", level=1)
+    comment_dls = data.get("comment_deadlines", [])
+    if comment_dls:
+        table = doc.add_table(rows=1, cols=5)
+        table.style = "Table Grid"
+        for i, label in enumerate(["Matter", "Deadline", "Days Left", "Topics", "Progress"]):
+            table.rows[0].cells[i].text = label
+            for p in table.rows[0].cells[i].paragraphs:
+                for run in p.runs:
+                    run.bold = True
+                    run.font.name = "Arial"
+                    run.font.size = Pt(9)
+        for cd in comment_dls:
+            sc = cd.get("status_counts", {})
+            taken = sc.get("position_taken", 0)
+            total = cd.get("total_topics", 0)
+            pct = f"{round(taken / total * 100)}%" if total else "0%"
+            _add_table_row(table, [
+                cd.get("matter_title", "")[:45],
+                cd.get("comment_deadline", ""),
+                str(cd.get("days_remaining", "")),
+                f"{total} topics, {cd.get('total_questions', 0)} questions",
+                f"{taken}/{total} ({pct})",
+            ])
+    else:
+        _add_para(doc, "No comment periods closing in the next 30 days.", color=(148, 163, 184))
+
+    # Section 7: Directives Watch
+    _add_heading(doc, "Directives Watch", level=1)
+    dir_watch = data.get("directives_watch", [])
+    if dir_watch:
+        for dw in dir_watch:
+            days = dw.get("days_remaining")
+            deadline_str = f"{days}d to deadline" if days is not None else "NEW"
+            _add_para(doc, f"{dw.get('title', '')} — {dw.get('source_type', '')} — {deadline_str}", size=10)
+    else:
+        _add_para(doc, "No directives requiring attention.", color=(148, 163, 184))
+
     # Save
     doc.save(str(path))
     logger.info("DOCX saved: %s", path)
     return path
-
 
 
 def render_weekly_docx(data, path=None):
@@ -217,8 +255,7 @@ def render_weekly_docx(data, path=None):
     cal = data.get("calibration", {})
     _add_heading(doc, "What I Got Wrong", level=1)
     if cal.get("has_data"):
-        score = cal.get("score", 0)
-        _add_para(doc, f"Signal Quality: {score}%", bold=True, size=14)
+        _add_para(doc, f"Signal Quality: {cal.get('score', 0)}%", bold=True, size=14)
         _add_para(doc, f"Materialized: {cal.get('materialized', 0)}, Resolved: {cal.get('resolved', 0)}, Still open: {cal.get('still_open', 0)}, Wrong: {cal.get('wrong', 0)}")
     else:
         _add_para(doc, cal.get("message", "No calibration data."), color=(148, 163, 184))
@@ -326,6 +363,56 @@ def render_weekly_docx(data, path=None):
     for c in hygiene.get("checks", []):
         field = c.get("field", "")
         _add_para(doc, f"  {field}: {c['count']}/{c['total']} ({c['pct']}%)", size=9)
+
+    # Rulemaking Comment Progress
+    _add_heading(doc, "Rulemaking Comment Progress", level=1)
+    cp = data.get("comment_progress", {})
+    cp_matters = cp.get("matters", [])
+    cp_totals = cp.get("totals", {})
+    if cp_matters:
+        sb = cp_totals.get("status_breakdown", {})
+        _add_para(doc, f"Positions taken: {sb.get('position_taken', 0)} | In progress: {sb.get('drafting', 0) + sb.get('final_review', 0)} | Not started: {sb.get('open', 0) + sb.get('not_started', 0)}", bold=True)
+        table = doc.add_table(rows=1, cols=5)
+        table.style = "Table Grid"
+        for i, h in enumerate(["Matter", "Deadline", "Topics", "Questions", "Complete"]):
+            table.rows[0].cells[i].text = h
+            for p in table.rows[0].cells[i].paragraphs:
+                for run in p.runs:
+                    run.bold = True
+                    run.font.name = "Arial"
+                    run.font.size = Pt(9)
+        for cm in cp_matters:
+            dr = cm.get("days_remaining")
+            dl_str = f"{cm.get('comment_deadline', '')} ({dr}d)" if dr is not None else "none"
+            _add_table_row(table, [
+                cm.get("matter_title", "")[:40],
+                dl_str,
+                str(cm.get("total_topics", 0)),
+                str(cm.get("total_questions", 0)),
+                f"{cm.get('completion_pct', 0)}%",
+            ])
+    else:
+        _add_para(doc, "No comment topics tracked.", color=(148, 163, 184))
+
+    # Policy Directives Status
+    _add_heading(doc, "Policy Directives", level=1)
+    dir_status = data.get("directives_status", {})
+    if dir_status.get("has_data"):
+        by_st = dir_status.get("by_status", {})
+        status_line = ", ".join(f"{st.replace('_', ' ').title()}: {count}" for st, count in by_st.items())
+        _add_para(doc, f"Total: {dir_status.get('total', 0)} — {status_line}", bold=True)
+        overdue_dir = dir_status.get("overdue", [])
+        if overdue_dir:
+            _add_para(doc, f"Overdue ({len(overdue_dir)}):", bold=True, color=(239, 68, 68))
+            for od in overdue_dir:
+                _add_para(doc, f"  {od.get('title', '')} - {od.get('deadline', '')} - {abs(od.get('days_remaining', 0))}d overdue", size=9)
+        upcoming_dir = dir_status.get("upcoming", [])
+        if upcoming_dir:
+            _add_para(doc, f"Approaching ({len(upcoming_dir)}):", bold=True)
+            for ud in upcoming_dir:
+                _add_para(doc, f"  {ud.get('title', '')} - {ud.get('deadline', '')} - {ud.get('days_remaining', 0)}d", size=9)
+    else:
+        _add_para(doc, "No policy directives tracked.", color=(148, 163, 184))
 
     doc.save(str(path))
     logger.info("Weekly DOCX saved: %s", path)

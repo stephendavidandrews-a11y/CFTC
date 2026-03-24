@@ -1,6 +1,7 @@
 import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
+import { useToastContext } from "../../contexts/ToastContext";
 import useApi from "../../hooks/useApi";
 import { getOrganization, deleteOrganization } from "../../api/tracker";
 import Badge from "../../components/shared/Badge";
@@ -98,6 +99,7 @@ function SectionCard({ title, count, action, children }) {
 
 export default function OrgDetailPage() {
   const { id } = useParams();
+  const toast = useToastContext();
   const navigate = useNavigate();
   const { openDrawer } = useDrawer();
 
@@ -167,7 +169,7 @@ export default function OrgDetailPage() {
             try {
               await deleteOrganization(id);
               navigate("/organizations");
-            } catch (e) { alert(e.message); }
+            } catch (e) { toast.error(e.message || "Operation failed"); }
           }}>
             Delete
           </button>

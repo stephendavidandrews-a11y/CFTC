@@ -4,4 +4,4 @@ cd "$(dirname "$0")"
 if [ -d .venv ]; then
     source .venv/bin/activate
 fi
-uvicorn app.main:app --host 0.0.0.0 --port 8004
+uvicorn app.main:app --host 127.0.0.1 --port 8004

@@ -61,6 +61,10 @@ def classify_tier(
     action_lower = (action or "").lower()
     fr_type_lower = (fr_type or "").lower()
 
+    # Withdrawal override: withdrawals are never Tier 1, even if fr_type is "Proposed Rule"
+    if "withdrawal" in action_lower:
+        return 2
+
     # Tier 1: proposed rules and comment solicitations
     if fr_type_lower == "proposed rule":
         return 1

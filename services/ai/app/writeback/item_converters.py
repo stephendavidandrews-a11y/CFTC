@@ -86,7 +86,7 @@ def convert_new_matter_bundle(bundle: dict, refs: dict) -> list[tuple[dict, str 
             "description": proposed.get("description"),
             "problem_statement": proposed.get("problem_statement"),
             "why_it_matters": proposed.get("why_it_matters"),
-            "status": proposed.get("status", "active"),
+            "status": proposed.get("status", "new intake"),
             "priority": proposed.get("priority"),
             "sensitivity": proposed.get("sensitivity"),
             "boss_involvement_level": proposed.get("boss_involvement_level"),
@@ -427,7 +427,7 @@ def convert_meeting_record(item: dict, bundle: dict, refs: dict) -> list[tuple[d
             "data": {
                 "meeting_id": f"$ref:{meeting_client_id}",
                 "matter_id": matter_id,
-                "relationship_type": "discussed",
+                "relationship_type": "primary topic",
             },
         }, item["id"]))
 
@@ -440,7 +440,7 @@ def convert_meeting_record(item: dict, bundle: dict, refs: dict) -> list[tuple[d
                 "data": {
                     "meeting_id": f"$ref:{meeting_client_id}",
                     "matter_id": link_matter_id,
-                    "relationship_type": ml.get("relationship_type", "discussed"),
+                    "relationship_type": ml.get("relationship_type", "secondary topic"),
                 },
             }, item["id"]))
 
@@ -466,7 +466,6 @@ def convert_stakeholder_addition(item: dict, bundle: dict, refs: dict) -> list[t
             "matter_id": matter_id,
             "organization_id": org_id,
             "organization_role": data.get("role") or data.get("matter_role"),
-            "engagement_level": data.get("engagement_level"),
             "notes": data.get("rationale_detail") or data.get("notes"),
         }
         op_data = {k: v for k, v in op_data.items() if v is not None}
@@ -503,7 +502,7 @@ def convert_document(item: dict, bundle: dict, refs: dict) -> list[tuple[dict, s
         "title": data["title"],
         "matter_id": matter_id,
         "document_type": data.get("document_type"),
-        "status": data.get("status", "draft"),
+        "status": data.get("status", "drafting"),
         "assigned_to_person_id": data.get("assigned_to_person_id"),
         "due_date": data.get("due_date"),
         "summary": data.get("summary"),

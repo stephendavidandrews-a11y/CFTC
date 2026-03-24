@@ -7,6 +7,7 @@ import Badge from "../../components/shared/Badge";
 import DataTable from "../../components/shared/DataTable";
 import EmptyState from "../../components/shared/EmptyState";
 import { useDrawer } from "../../contexts/DrawerContext";
+import { formatDate } from "../../utils/dateUtils";
 
 const cardStyle = {
   background: theme.bg.card,
@@ -40,11 +41,6 @@ const btnPrimary = {
   cursor: "pointer",
 };
 
-function formatDate(d) {
-  if (!d) return "\u2014";
-  const val = typeof d === "string" && d.length === 10 ? d + "T12:00:00" : d;
-  return new Date(val).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
 
 function isOverdue(dateStr) {
   if (!dateStr) return false;

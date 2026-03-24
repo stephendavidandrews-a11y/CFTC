@@ -595,6 +595,13 @@ TABLES = [
         next_run_at TEXT,
         config_json TEXT
     )"""),
+
+    # ---- System Config (key-value store) ----
+    ("system_config", """CREATE TABLE IF NOT EXISTS system_config (
+        key TEXT PRIMARY KEY,
+        value TEXT,
+        updated_at TEXT DEFAULT (datetime('now'))
+    )"""),
 ]
 
 # ---------------------------------------------------------------------------

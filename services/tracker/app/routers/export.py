@@ -28,7 +28,7 @@ EXPORT_TABLES = [
     "context_notes",
     "context_note_links",
     "tags",
-    "entity_tags",
+    "matter_tags",
 ]
 
 

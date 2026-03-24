@@ -22,7 +22,7 @@ async def list_meetings(
     matter_id: str = Query(None),
     sort_by: str = Query("date_time_start"),
     sort_dir: str = Query("desc"),
-    limit: int = Query(100),
+    limit: int = Query(100, le=500),
     offset: int = Query(0),
 ):
     conditions, params = [], []

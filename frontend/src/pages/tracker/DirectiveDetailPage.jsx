@@ -92,13 +92,13 @@ export default function DirectiveDetailPage() {
   if (!directive) return <div style={{ padding: 40, color: theme.text.dim }}>Directive not found</div>;
 
   const matterColumns = [
-    { key: "matter_title", label: "Matter", flex: 1, render: (r) => <span style={{ fontWeight: 600 }}>{r.matter_title}</span> },
+    { key: "matter_title", label: "Matter", flex: 1, render: (_, r) => <span style={{ fontWeight: 600 }}>{r.matter_title}</span> },
     { key: "matter_number", label: "Number", width: 120 },
     { key: "matter_status", label: "Status", width: 120 },
     { key: "relationship_type", label: "Relationship", width: 120,
-      render: (r) => <Badge bg={theme.bg.input} text={theme.text.secondary} label={fmt(r.relationship_type)} /> },
+      render: (_, r) => <Badge bg={theme.bg.input} text={theme.text.secondary} label={fmt(r.relationship_type)} /> },
     { key: "actions", label: "", width: 60,
-      render: (r) => <button onClick={(e) => { e.stopPropagation(); handleUnlink(r.id); }}
+      render: (_, r) => <button onClick={(e) => { e.stopPropagation(); handleUnlink(r.id); }}
         style={{ background: "none", border: "none", color: theme.accent.red, cursor: "pointer", fontSize: 12 }}>Unlink</button> },
   ];
 

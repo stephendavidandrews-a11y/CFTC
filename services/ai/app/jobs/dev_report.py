@@ -77,12 +77,10 @@ TASK_FIELDS = [
 PEOPLE_FIELDS = [
     {"field": "relationship_category", "purpose": "Role type (Boss, Leadership, etc.)", "source": "manual", "impact": "Brief cannot distinguish stakeholder types", "weight": 2, "is_enum": True,
      "enum_values": ["Boss", "Leadership", "Direct report", "Indirect report", "OGC peer", "Internal client", "Commissioner office", "Partner agency", "Hill", "Outside party"]},
-    {"field": "relationship_lane", "purpose": "Decision role (maker, blocker, etc.)", "source": "manual", "impact": "Meeting prep cannot flag who matters most", "weight": 2, "is_enum": True,
-     "enum_values": ["Decision-maker", "Recommender", "Drafter", "Blocker", "Influencer", "FYI only"]},
+    {"field": "stakeholder_role", "purpose": "Stakeholder influence type", "source": "manual", "impact": "Cannot assess stakeholder influence", "weight": 1, "is_enum": True, "enum_values": ["Decision-maker", "Recommender", "Drafter", "Blocker", "Influencer", "FYI only"]},
     {"field": "last_interaction_date", "purpose": "When you last engaged", "source": "manual", "impact": "Relationship neglect invisible", "weight": 2},
     {"field": "next_interaction_needed_date", "purpose": "When to follow up", "source": "manual", "impact": "Follow-up section of brief is empty", "weight": 2},
     {"field": "next_interaction_type", "purpose": "How to follow up", "source": "manual", "impact": "Follow-ups are vague", "weight": 1},
-    {"field": "working_style_notes", "purpose": "How this person operates (private)", "source": "manual", "impact": "No prep context for meetings", "weight": 1},
     {"field": "substantive_areas", "purpose": "What this person works on", "source": "manual", "impact": "Extraction cannot route to relevant people", "weight": 1},
     {"field": "manager_person_id", "purpose": "Org chart hierarchy", "source": "manual", "impact": "No supervisory chain reasoning", "weight": 1},
     {"field": "title", "purpose": "Job title", "source": "manual", "impact": "No role context in briefs", "weight": 1},

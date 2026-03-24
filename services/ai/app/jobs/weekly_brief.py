@@ -1,6 +1,6 @@
 """Weekly brief data assembly, calibration, and generation.
 
-Queries tracker and AI databases to assemble the 10-section weekly brief:
+Queries tracker and AI databases to assemble the 12-section weekly brief:
 0. What I Got Wrong (calibration)
 1. Executive Summary (Sonnet)
 2. Portfolio Health by Matter
@@ -11,22 +11,19 @@ Queries tracker and AI databases to assemble the 10-section weekly brief:
 7. Documents & Deliverables Pipeline
 8. Risk & Escalation Register
 9. Data Hygiene Score
+10. Rulemaking Comment Progress (topic status by matter, question coverage)
+11. Policy Directives Status (implementation tracking, overdue compliance)
 
 Cost: ~$0.15/week (one Sonnet call for executive summary).
 """
+from __future__ import annotations
+
 import json
 import logging
 import os
 from datetime import date, timedelta
 
 import httpx
-
-try:
-    from dotenv import load_dotenv
-    import os as _os
-    load_dotenv(_os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))), ".env"))
-except ImportError:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -259,7 +256,7 @@ def _assemble_decisions():
 # ═══════════════════════════════════════════════════════════════════════════
 
 def _assemble_team():
-    """Workload and execution by person."""
+    """Workload and execution by person, including comment topic assignments."""
     intel = _tracker_get("/ai-context/intelligence-data")
     workload = intel.get("workload", [])
     overdue = intel.get("overdue_tasks", [])
@@ -270,28 +267,41 @@ def _assemble_team():
         name = t.get("assignee_name", "Unassigned")
         overdue_by_person.setdefault(name, []).append(t.get("title", ""))
 
-    # Find drifting matters (no update in 14+ days)
-    matters = _items(_tracker_get("/matters"))
+    # Count open comment topics per person by iterating matters
+    topics_by_person = {}
+    matters = _items(_tracker_get("/matters", {"limit": "200"}))
     today = date.today()
     drifting = []
     for m in matters:
         status = m.get("status", "")
-        if status in ("closed", "archived", "withdrawn", "parked / monitoring"):
+        if status in ("closed", "archived", "withdrawn"):
             continue
-        updated = m.get("updated_at", "")
-        if updated:
-            try:
-                updated_date = date.fromisoformat(updated[:10])
-                days_stale = (today - updated_date).days
-                if days_stale >= 14:
-                    owner = m.get("next_step_owner_name", "")
-                    drifting.append({
-                        "title": m.get("title", ""),
-                        "owner": owner,
-                        "days_stale": days_stale,
-                    })
-            except (ValueError, TypeError):
-                pass
+
+        # Check for drifting (no update in 14+ days)
+        if status != "parked / monitoring":
+            updated = m.get("updated_at", "")
+            if updated:
+                try:
+                    updated_date = date.fromisoformat(updated[:10])
+                    days_stale = (today - updated_date).days
+                    if days_stale >= 14:
+                        drifting.append({
+                            "title": m.get("title", ""),
+                            "owner": m.get("next_step_owner_name", ""),
+                            "days_stale": days_stale,
+                        })
+                except (ValueError, TypeError):
+                    pass
+
+        # Fetch topics for this matter to count per-person assignments
+        topics_resp = _tracker_get(f"/matters/{m['id']}/comment-topics")
+        topics = _items(topics_resp)
+        for t in topics:
+            if t.get("position_status") in ("position_taken",):
+                continue
+            assignee = t.get("assigned_to_name", "")
+            if assignee:
+                topics_by_person[assignee] = topics_by_person.get(assignee, 0) + 1
 
     drifting.sort(key=lambda x: -x.get("days_stale", 0))
 
@@ -302,9 +312,11 @@ def _assemble_team():
                 "open_tasks": w.get("open_task_count", 0),
                 "open_matters": w.get("matter_count", 0),
                 "overdue": len(overdue_by_person.get(w.get("full_name", ""), [])),
+                "open_topics": topics_by_person.get(w.get("full_name", ""), 0),
             }
             for w in workload
         ],
+        "topics_by_person": topics_by_person,
         "overdue_by_person": {k: len(v) for k, v in overdue_by_person.items()},
         "drifting_matters": drifting[:10],
     }
@@ -334,7 +346,7 @@ def _assemble_stakeholders():
                 "name": p.get("full_name", ""),
                 "organization": p.get("org_name", ""),
                 "category": category,
-                "lane": p.get("relationship_lane", ""),
+                "lane": p.get("relationship_category", ""),
                 "next_date": next_date,
                 "purpose": p.get("next_interaction_purpose", ""),
             })
@@ -524,6 +536,139 @@ def _assemble_hygiene():
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# Section 10: Rulemaking Comment Progress
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _assemble_comment_progress():
+    """Comment topic status and question coverage by matter."""
+    matters = _items(_tracker_get("/matters", {"limit": "200"}))
+    today = date.today()
+
+    rulemaking_matters = []
+    overall_status = {"open": 0, "drafting": 0, "final_review": 0, "position_taken": 0, "not_started": 0}
+    total_topics_all = 0
+    total_questions_all = 0
+
+    for m in matters:
+        status = m.get("status", "")
+        if status in ("closed", "archived", "withdrawn"):
+            continue
+
+        # Fetch topics for this matter
+        topics_resp = _tracker_get(f"/matters/{m['id']}/comment-topics")
+        topics = _items(topics_resp)
+        if not topics:
+            continue
+
+        total_topics = len(topics)
+        total_questions = 0
+        status_counts = {}
+        topic_summaries = []
+        for t in topics:
+            ps = t.get("position_status", "open")
+            status_counts[ps] = status_counts.get(ps, 0) + 1
+            overall_status[ps] = overall_status.get(ps, 0) + 1
+            questions = t.get("questions", [])
+            total_questions += len(questions)
+            topic_summaries.append({
+                "label": t.get("topic_label", ""),
+                "status": ps,
+                "question_count": len(questions),
+                "assignee": t.get("assigned_to_name", ""),
+                "due_date": t.get("due_date"),
+            })
+
+        total_topics_all += total_topics
+        total_questions_all += total_questions
+
+        deadline = m.get("external_deadline")
+        days_remaining = None
+        if deadline:
+            try:
+                dl_date = date.fromisoformat(deadline)
+                days_remaining = (dl_date - today).days
+            except (ValueError, TypeError):
+                pass
+
+        rulemaking_matters.append({
+            "matter_id": m.get("id"),
+            "matter_title": m.get("title", ""),
+            "comment_deadline": deadline,
+            "days_remaining": days_remaining,
+            "total_topics": total_topics,
+            "total_questions": total_questions,
+            "status_counts": status_counts,
+            "completion_pct": round(status_counts.get("position_taken", 0) / total_topics * 100) if total_topics else 0,
+            "topics": topic_summaries,
+        })
+
+    rulemaking_matters.sort(key=lambda x: x.get("days_remaining") or 9999)
+
+    return {
+        "matters": rulemaking_matters,
+        "totals": {
+            "matters_with_topics": len(rulemaking_matters),
+            "total_topics": total_topics_all,
+            "total_questions": total_questions_all,
+            "status_breakdown": overall_status,
+        },
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Section 11: Policy Directives Status
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _assemble_directives_status():
+    """Policy directive tracking — implementation status and compliance deadlines."""
+    directives = _items(_tracker_get("/policy-directives", {"limit": "100"}))
+    today = date.today()
+
+    if not directives:
+        return {"has_data": False, "message": "No policy directives tracked."}
+
+    by_status = {}
+    overdue = []
+    upcoming = []
+
+    for d in directives:
+        impl = d.get("implementation_status", "pending")
+        by_status[impl] = by_status.get(impl, 0) + 1
+
+        deadline = d.get("compliance_deadline")
+        if deadline and impl not in ("implemented", "superseded"):
+            try:
+                dl_date = date.fromisoformat(deadline)
+                days_remaining = (dl_date - today).days
+                item = {
+                    "title": d.get("directive_title", ""),
+                    "source_type": d.get("source_document_type", ""),
+                    "issued_by": d.get("issuing_authority", ""),
+                    "deadline": deadline,
+                    "days_remaining": days_remaining,
+                    "status": impl,
+                    "priority": d.get("priority_level", ""),
+                }
+                if days_remaining < 0:
+                    overdue.append(item)
+                elif days_remaining <= 30:
+                    upcoming.append(item)
+            except (ValueError, TypeError):
+                pass
+
+    overdue.sort(key=lambda x: x["days_remaining"])
+    upcoming.sort(key=lambda x: x["days_remaining"])
+
+    return {
+        "has_data": True,
+        "total": len(directives),
+        "by_status": by_status,
+        "overdue": overdue,
+        "upcoming": upcoming,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Main Assembly
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -544,15 +689,21 @@ def assemble_weekly_data(db):
         "documents": _assemble_documents(),
         "risks": _assemble_risks(),
         "hygiene": _assemble_hygiene(),
+        "comment_progress": _assemble_comment_progress(),
+        "directives_status": _assemble_directives_status(),
         "executive_summary": None,  # Filled by Sonnet
     }
 
+    comment_totals = data["comment_progress"]["totals"]
     logger.info(
-        "Weekly data: %d matters, %d decisions, %d touchpoints, hygiene=%d%%",
+        "Weekly data: %d matters, %d decisions, %d touchpoints, hygiene=%d%%, %d topics across %d rulemakings, %d directives",
         data["portfolio"]["total_active"],
         len(data["decisions"]),
         len(data["stakeholders"]["touchpoints_due"]),
         data["hygiene"]["score"],
+        comment_totals["total_topics"],
+        comment_totals["matters_with_topics"],
+        data["directives_status"].get("total", 0),
     )
     return data
 
@@ -609,6 +760,33 @@ def add_executive_summary(data, llm_client):
 
     # Hygiene
     context_parts.append(f"Data hygiene score: {hygiene.get('score', 0)}%")
+
+    # Comment progress
+    comment = data.get("comment_progress", {})
+    comment_totals = comment.get("totals", {})
+    if comment_totals.get("total_topics", 0) > 0:
+        sb = comment_totals.get("status_breakdown", {})
+        context_parts.append(
+            f"Rulemaking comments: {comment_totals['total_topics']} topics across "
+            f"{comment_totals['matters_with_topics']} matters — "
+            f"{sb.get('position_taken', 0)} positions taken, "
+            f"{sb.get('drafting', 0) + sb.get('final_review', 0)} in progress, "
+            f"{sb.get('open', 0) + sb.get('not_started', 0)} not started"
+        )
+        for cm in comment.get("matters", [])[:3]:
+            dr = cm.get("days_remaining")
+            dr_str = f"{dr} days remaining" if dr is not None else "no deadline"
+            context_parts.append(
+                f"  {cm['matter_title'][:50]}: {cm['total_topics']} topics, "
+                f"{cm['completion_pct']}% complete, {dr_str}"
+            )
+
+    # Directives
+    dir_data = data.get("directives_status", {})
+    if dir_data.get("has_data"):
+        context_parts.append(f"Policy directives: {dir_data['total']} tracked")
+        if dir_data.get("overdue"):
+            context_parts.append(f"  {len(dir_data['overdue'])} overdue directives")
 
     context = "\n".join(context_parts)
 

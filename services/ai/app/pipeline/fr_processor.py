@@ -429,6 +429,16 @@ class TrackerAPI:
             resp.raise_for_status()
             return resp.json()
 
+    async def update_matter(self, matter_id: str, data: dict) -> dict:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.put(
+                f"{self.base_url}/tracker/matters/{matter_id}",
+                json=data,
+                auth=self.auth,
+            )
+            resp.raise_for_status()
+            return resp.json()
+
     async def batch_write(self, operations: list) -> dict:
         """Execute batch operations via the tracker batch API."""
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -490,40 +500,141 @@ def _infer_comment_period_type(fr_type: str, action: str) -> str:
 
 
 
+def _infer_priority(fr_type: str, action: str, comments_close_on: str = None) -> str:
+    """Determine matter priority based on FR document type and comment deadline."""
+    from datetime import date
+    action_lower = (action or "").lower()
+    fr_type_lower = (fr_type or "").lower()
+    today = date.today()
+
+    # Check if comment deadline is within 30 days
+    comment_imminent = False
+    if comments_close_on:
+        try:
+            dl = date.fromisoformat(comments_close_on)
+            comment_imminent = 0 <= (dl - today).days <= 30
+        except (ValueError, TypeError):
+            pass
+
+    # ANPRMs and concept releases: monitoring unless comment deadline is imminent
+    if "advance notice" in action_lower or "concept release" in action_lower:
+        if comment_imminent:
+            return "important this month"
+        return "monitoring only"
+
+    # Proposed rules with active comment periods: needs active work
+    if fr_type_lower == "proposed rule" or "proposed rule" in action_lower:
+        return "important this month"
+
+    # Final rules
+    if fr_type_lower == "rule" or "final rule" in action_lower:
+        return "important this month"
+
+    # Withdrawals
+    if "withdrawal" in action_lower:
+        return "monitoring only"
+
+    # Default
+    return "important this month"
+
+
 def _infer_topic_area(section_label: str) -> str:
-    """Infer comment_topic_area enum value from section heading."""
+    """Infer comment_topic_area enum value from section heading.
+
+    Uses two strategies in priority order:
+    1. CFR section number lookup (Sec. 23.xxx -> known topic area)
+    2. Expanded keyword matching against known regulatory concepts
+    """
+    import re as _re
     label_lower = section_label.lower()
-    mapping = {
-        "core principle": "core_principles",
-        "public interest": "public_interest",
-        "market structure": "market_structure",
-        "disclosure": "disclosure",
-        "registration": "registration",
-        "clearing": "clearing",
-        "margin": "margin",
-        "reporting": "reporting",
-        "surveillance": "surveillance",
-        "position limit": "position_limits",
-        "cost": "cost_benefit",
-        "benefit": "cost_benefit",
-        "definition": "definitional",
-        "classification": "definitional",
-        "jurisdiction": "jurisdictional",
-        "technology": "technology",
-        "blockchain": "technology",
-        "consumer": "consumer_protection",
-        "procedural": "procedural",
-        "gaming": "public_interest",
-        "terrorism": "public_interest",
-        "manipulation": "surveillance",
-        "inside information": "surveillance",
-        "wash sale": "surveillance",
-        "swap": "market_structure",
-        "special entity": "special_entity",
-    }
-    for keyword, area in mapping.items():
+
+    # Strategy 1: CFR section number lookup
+    # CFTC Part 23 (Swap Dealer / MSP rules) subpart mapping
+    sec_match = _re.search(r"(?:sec(?:tion)?\.?\s*)(?:sec\.?\s*)?(\d+)\.(\d+)", label_lower)
+    if sec_match:
+        part = sec_match.group(1)
+        section = int(sec_match.group(2))
+        if part == "23":
+            if 200 <= section <= 206:
+                return "reporting"
+            elif 400 <= section <= 402:
+                return "documentation"
+            elif 410 <= section <= 412:
+                return "disclosure"
+            elif 430 <= section <= 434:
+                return "disclosure"
+            elif 440 <= section <= 451:
+                return "special_entity"
+            elif 500 <= section <= 506:
+                return "documentation"
+        elif part in ("37", "38"):
+            return "market_structure"
+        elif part == "39":
+            return "clearing"
+        elif part == "40":
+            return "procedural"
+        elif part in ("150", "151"):
+            return "position_limits"
+
+    # Strategy 2: Expanded keyword matching
+    keyword_mapping = [
+        ("core principle", "core_principles"),
+        ("public interest", "public_interest"),
+        ("market structure", "market_structure"),
+        ("market integrity", "market_structure"),
+        ("disclosure", "disclosure"),
+        ("daily mark", "disclosure"),
+        ("scenario analysis", "disclosure"),
+        ("documentation", "documentation"),
+        ("recordkeep", "documentation"),
+        ("registration", "registration"),
+        ("special entity", "special_entity"),
+        ("special entities", "special_entity"),
+        ("clearing", "clearing"),
+        ("margin", "margin"),
+        ("collateral", "margin"),
+        ("reporting", "reporting"),
+        ("swap data", "reporting"),
+        ("surveillance", "surveillance"),
+        ("inside information", "surveillance"),
+        ("manipulation", "surveillance"),
+        ("wash sale", "surveillance"),
+        ("anti-fraud", "surveillance"),
+        ("position limit", "position_limits"),
+        ("position accountability", "position_limits"),
+        ("cost", "cost_benefit"),
+        ("benefit", "cost_benefit"),
+        ("economic analysis", "cost_benefit"),
+        ("definition", "definitional"),
+        ("classification", "definitional"),
+        ("jurisdiction", "jurisdictional"),
+        ("cross-border", "jurisdictional"),
+        ("substituted compliance", "jurisdictional"),
+        ("technology", "technology"),
+        ("blockchain", "technology"),
+        ("digital asset", "technology"),
+        ("cyber", "technology"),
+        ("consumer", "consumer_protection"),
+        ("customer protection", "consumer_protection"),
+        ("segregation", "consumer_protection"),
+        ("political contribution", "political_contributions"),
+        ("procedural", "procedural"),
+        ("compliance date", "procedural"),
+        ("exemption", "procedural"),
+        ("event contract", "public_interest"),
+        ("gaming", "public_interest"),
+        ("terrorism", "public_interest"),
+        ("activit", "public_interest"),  # matches activity/activities
+        ("swap dealer", "market_structure"),
+        ("swap execution", "market_structure"),
+        ("designated contract market", "market_structure"),
+        ("proposed amendment", "procedural"),
+        ("proposed elimination", "procedural"),
+    ]
+    for keyword, area in keyword_mapping:
         if keyword in label_lower:
             return area
+
     return "other"
 
 # ── Main processor ───────────────────────────────────────────────────────────
@@ -563,12 +674,31 @@ async def process_fr_document(
     logger.info("Processing FR doc %s [Tier %d]: %s", doc_num, tier,
                 doc_row["title"][:60])
 
+    # Detect if this is a withdrawal document
+    is_withdrawal = "withdrawal" in action.lower()
+
     # 1. Match or create matter
     existing = await find_matching_matter(tracker_api, doc_row)
     if existing:
         result["matter_matched"] = True
         result["matter_id"] = existing["id"]
         logger.info("Matched to existing matter: %s", existing.get("title", "")[:40])
+
+        # If this is a withdrawal, update the existing matter stage/status
+        if is_withdrawal:
+            try:
+                await tracker_api.update_matter(existing["id"], {
+                    "regulatory_stage": "withdrawn",
+                    "status": "parked / monitoring",
+                })
+                logger.info("Updated matter %s to withdrawn", existing["id"][:8])
+            except Exception as e:
+                logger.warning("Failed to update matter %s to withdrawn: %s",
+                               existing["id"][:8], e)
+    elif is_withdrawal:
+        # Withdrawal with no matching matter — log but do NOT create a new matter
+        logger.info("Withdrawal doc %s has no matching matter; skipping matter creation",
+                     doc_num)
     elif tier == 1:
         # Create new matter from API metadata
         rins = json.loads(doc_row.get("regulation_id_numbers_json") or "[]")
@@ -576,20 +706,69 @@ async def process_fr_document(
         if rins:
             rin_str = rins[0].get("regulation_id_number", rins[0]) if isinstance(rins[0], dict) else str(rins[0])
 
+        # Build CFR citation string from stored JSON
+        cfr_refs = json.loads(doc_row.get("cfr_references_json") or "[]")
+        cfr_citation = None
+        if cfr_refs:
+            cfr_parts = []
+            for ref in cfr_refs:
+                title = ref.get("title", "")
+                part = ref.get("part", "")
+                if title and part:
+                    cfr_parts.append(f"{title} CFR Part {part}")
+                elif title:
+                    cfr_parts.append(f"{title} CFR")
+            if cfr_parts:
+                cfr_citation = "; ".join(cfr_parts)
+
+        # Extract docket number from docket_ids or regulations.gov info
+        docket_ids = json.loads(doc_row.get("docket_ids_json") or "[]")
+        docket_number = docket_ids[0] if docket_ids else None
+        # If no docket_ids, try regulations_dot_gov_info stored in external data
+        if not docket_number:
+            regs_info = json.loads(doc_row.get("regulations_dot_gov_json") or "null") or {}
+            docket_number = regs_info.get("document_id")
+
+        # Build external_refs JSON bag with FR metadata
+        external_refs = {
+            "fr_citation": doc_row.get("fr_citation"),
+            "fr_volume": doc_row.get("fr_volume"),
+            "fr_start_page": doc_row.get("fr_start_page"),
+            "fr_end_page": doc_row.get("fr_end_page"),
+            "fr_page_length": doc_row.get("fr_page_length"),
+            "pdf_url": doc_row.get("pdf_url"),
+            "raw_text_url": doc_row.get("raw_text_url"),
+            "body_html_url": doc_row.get("body_html_url"),
+        }
+        # Strip None values
+        external_refs = {k: v for k, v in external_refs.items() if v is not None}
+
+        # Determine priority based on document type
+        priority = _infer_priority(fr_type, action, doc_row.get("comments_close_on"))
+
+        # Use abstract as description (truncate if very long)
+        abstract = doc_row.get("abstract") or ""
+        description = abstract[:2000] if abstract else None
+
         matter_data = {
             "title": doc_row["title"],
             "matter_type": _infer_matter_type(fr_type, action),
             "regulatory_stage": _infer_regulatory_stage(fr_type, action),
             "status": "awaiting comments" if doc_row.get("comments_close_on") else "new intake",
-            "priority": "important this month",
+            "priority": priority,
             "sensitivity": "deliberative / predecisional",
             "boss_involvement_level": "keep boss informed",
             "next_step": f"Review FR publication {doc_num} and develop positions",
+            "opened_date": doc_row.get("publication_date"),
             "rin": rin_str,
             "fr_doc_number": doc_num,
             "federal_register_citation": doc_row.get("html_url"),
+            "cfr_citation": cfr_citation,
+            "docket_number": docket_number,
+            "description": description,
             "source": "federal_register",
             "external_deadline": doc_row.get("comments_close_on"),
+            "external_refs": json.dumps(external_refs) if external_refs else None,
         }
         try:
             new_matter = await tracker_api.create_matter(matter_data)

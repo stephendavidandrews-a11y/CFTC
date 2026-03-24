@@ -94,12 +94,26 @@ export async function fetchJSON(url, options = {}) {
   }
 }
 
-export async function uploadFile(url, formData) {
-  const response = await fetch(`${BASE}${url}`, {
-    method: "POST",
-    headers: { "X-Request-ID": generateRequestId() },
-    body: formData,
-  });
+export async function uploadFile(url, formData, { timeout = 300000 } = {}) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  let response;
+  try {
+    response = await fetch(`${BASE}${url}`, {
+      method: "POST",
+      headers: { "X-Request-ID": generateRequestId() },
+      body: formData,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === "AbortError") {
+      throw new ApiError(0, "Upload timed out", "Timeout");
+    }
+    throw new ApiError(0, err.message || "Upload failed", "NetworkError");
+  }
+  clearTimeout(timeoutId);
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");

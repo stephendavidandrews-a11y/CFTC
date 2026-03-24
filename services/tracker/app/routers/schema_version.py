@@ -5,19 +5,9 @@ Allows the AI service and frontend to verify compatibility with the tracker.
 """
 from fastapi import APIRouter, Depends
 from app.db import get_db
-from app.routers.lookups import ENUMS
+from app.contracts import AI_WRITABLE_TABLES, ENUMS, TRACKER_SCHEMA_VERSION
 
 router = APIRouter(prefix="/schema", tags=["schema"])
-
-# Increment when tracker schema changes in ways that affect AI/frontend contracts
-TRACKER_SCHEMA_VERSION = "1.0.0"
-
-# Tables that the AI layer may write to via /tracker/batch
-AI_WRITABLE_TABLES = [
-    "organizations", "people", "matters", "tasks", "meetings",
-    "meeting_participants", "meeting_matters", "documents", "document_files",
-    "decisions", "matter_people", "matter_organizations", "matter_updates",
-]
 
 # Capabilities supported by this tracker version
 CAPABILITIES = [
@@ -30,6 +20,8 @@ CAPABILITIES = [
     "soft_delete",
     "audit_logging",
     "etag_concurrency",
+    "enum_validation",
+    "upsert_by",
 ]
 
 
@@ -40,7 +32,7 @@ async def get_schema_version():
         "schema_version": TRACKER_SCHEMA_VERSION,
         "service": "cftc-tracker",
         "capabilities": CAPABILITIES,
-        "ai_writable_tables": AI_WRITABLE_TABLES,
+        "ai_writable_tables": list(AI_WRITABLE_TABLES),
     }
 
 
@@ -57,11 +49,12 @@ async def get_capabilities():
         "capabilities": CAPABILITIES,
         "batch_write": {
             "endpoint": "POST /tracker/batch",
-            "allowed_tables": AI_WRITABLE_TABLES,
+            "allowed_tables": list(AI_WRITABLE_TABLES),
             "supports_idempotency": True,
             "supports_forward_refs": True,
             "supports_soft_delete": True,
             "atomic": True,
+            "supports_upsert_by": True,
         },
         "ai_context": {
             "endpoint": "GET /tracker/ai-context",
