@@ -152,6 +152,13 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.rate_limiter = rate_limiter
 
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") == "http" and "/events/stream" in scope.get("path", ""):
+            # Bypass ALL middleware for SSE — BaseHTTPMiddleware buffers StreamingResponse
+            await self.app(scope, receive, send)
+            return
+        await super().__call__(scope, receive, send)
+
     async def dispatch(self, request: Request, call_next):
         # ── Rate limiting ──
         if self.rate_limiter is not None:

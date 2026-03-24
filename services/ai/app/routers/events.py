@@ -39,8 +39,6 @@ async def event_stream(request: Request):
         try:
             yield "retry: 5000\n\n"
             while True:
-                if await request.is_disconnected():
-                    break
                 try:
                     message = await asyncio.wait_for(queue.get(), timeout=30)
                     event_name, payload = message
