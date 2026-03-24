@@ -206,7 +206,7 @@ export default function MattersPage() {
       ),
     },
     {
-      key: "client_org_name", label: "Client", width: 80,
+      key: "client_org_name", label: "Client", width: 120,
       render: (val) => <span style={{ color: theme.text.muted }}>{val || "\u2014"}</span>,
     },
     {
