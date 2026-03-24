@@ -7,12 +7,32 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import logging
+import os
+import secrets
 import threading
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.middleware.cors import CORSMiddleware
+
+# Auth config — uses PIPELINE_USER/PIPELINE_PASS from .env (intake is the pipeline service)
+INTAKE_USER = os.environ.get("PIPELINE_USER", "")
+INTAKE_PASS = os.environ.get("PIPELINE_PASS", "")
+security = HTTPBasic()
+
+
+def verify_intake_auth(credentials: HTTPBasicCredentials = Depends(security)):
+    """Verify HTTP Basic credentials for intake endpoints."""
+    if not INTAKE_USER or not INTAKE_PASS:
+        # No credentials configured — allow through (dev mode)
+        return credentials
+    user_ok = secrets.compare_digest(credentials.username.encode(), INTAKE_USER.encode())
+    pass_ok = secrets.compare_digest(credentials.password.encode(), INTAKE_PASS.encode())
+    if not (user_ok and pass_ok):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return credentials
 
 from config import SERVICE_PORT
 from db.schema import init_db
@@ -197,11 +217,11 @@ from api.audio import router as audio_router
 from api.pipeline import router as pipeline_router
 from api.transcribe import router as transcribe_router
 
-app.include_router(conversations_router, prefix="/intake/api")
-app.include_router(speakers_router, prefix="/intake/api")
-app.include_router(audio_router, prefix="/intake/api")
-app.include_router(pipeline_router, prefix="/intake/api")
-app.include_router(transcribe_router, prefix="/intake/api")
+app.include_router(conversations_router, prefix="/intake/api", dependencies=[Depends(verify_intake_auth)])
+app.include_router(speakers_router, prefix="/intake/api", dependencies=[Depends(verify_intake_auth)])
+app.include_router(audio_router, prefix="/intake/api", dependencies=[Depends(verify_intake_auth)])
+app.include_router(pipeline_router, prefix="/intake/api", dependencies=[Depends(verify_intake_auth)])
+app.include_router(transcribe_router, prefix="/intake/api", dependencies=[Depends(verify_intake_auth)])
 
 
 @app.get("/intake/api/health")

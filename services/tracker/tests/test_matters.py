@@ -125,9 +125,9 @@ def test_create_matter_success(client, auth_headers):
         "title": "New Rulemaking",
         "matter_type": "rulemaking",
         "status": "new intake",
-        "priority": "high",
-        "sensitivity": "normal",
-        "boss_involvement_level": "informed",
+        "priority": "important this month",
+        "sensitivity": "routine",
+        "boss_involvement_level": "keep boss informed",
         "next_step": "Draft proposal",
     }
     resp = client.post("/tracker/matters", json=payload, headers=auth_headers)
@@ -152,9 +152,9 @@ def test_create_matter_idempotency(client, auth_headers):
         "title": "Idem Test",
         "matter_type": "rulemaking",
         "status": "new intake",
-        "priority": "high",
-        "sensitivity": "normal",
-        "boss_involvement_level": "informed",
+        "priority": "important this month",
+        "sensitivity": "routine",
+        "boss_involvement_level": "keep boss informed",
         "next_step": "Next",
     }
     headers = {**auth_headers, "idempotency-key": idem_key}

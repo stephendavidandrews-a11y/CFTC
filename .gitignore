@@ -45,3 +45,10 @@ services/intake/data/models/
 
 # Runtime data volumes
 volumes/
+
+# Runtime artifacts
+logs/*.log
+services/ai/data/
+services/ai/uploads/
+*_extraction_output.json
+"services/ai/NOT SET"

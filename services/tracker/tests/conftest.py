@@ -40,8 +40,8 @@ def client(db):
     """FastAPI TestClient wired to the in-memory DB, with valid auth."""
     import os
 
-    os.environ.setdefault("TRACKER_USER", "testuser")
-    os.environ.setdefault("TRACKER_PASS", "testpass")
+    os.environ["TRACKER_USER"] = "testuser"
+    os.environ["TRACKER_PASS"] = "testpass"
 
     from app.main import app
     from app.db import get_db
