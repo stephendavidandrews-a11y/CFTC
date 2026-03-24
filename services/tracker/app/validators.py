@@ -220,13 +220,29 @@ class UpdateTask(BaseModel):
 
 class CreateMatter(BaseModel):
     title: str = Field(..., min_length=1, description="Required matter title")
-    matter_type: str = Field(..., min_length=1, description="Required matter type")
+    matter_type: Literal[
+    "rulemaking", "policy development", "enforcement referral",
+    "exemption request", "no-action request", "congressional response",
+    "interagency coordination", "advisory", "interpretation",
+    "administrative", "budget", "personnel", "it / systems",
+    "compliance review", "risk assessment", "other"
+] = Field(..., description="Required matter type")
     description: Optional[str] = None
     problem_statement: Optional[str] = None
     why_it_matters: Optional[str] = None
-    status: str = "new intake"
-    priority: str = "important this month"
-    sensitivity: str = "routine"
+    status: Literal[
+    "new intake", "active", "on hold", "blocked",
+    "under review", "pending decision", "closed"
+] = "new intake"
+    priority: Literal[
+    "critical this week", "important this month",
+    "strategic / slow burn", "monitoring only"
+] = "important this month"
+    sensitivity: Literal[
+    "routine", "leadership-sensitive", "congressional-sensitive",
+    "enforcement-sensitive", "market-sensitive", "pre-decisional",
+    "fomc-restricted"
+] = "routine"
     risk_level: Optional[str] = None
     boss_involvement_level: str = "keep boss informed"
     assigned_to_person_id: Optional[str] = None
@@ -260,15 +276,34 @@ class CreateMatter(BaseModel):
 
 class UpdateMatter(BaseModel):
     title: Optional[str] = None
-    matter_type: Optional[str] = None
+    matter_type: Optional[Literal[
+    "rulemaking", "policy development", "enforcement referral",
+    "exemption request", "no-action request", "congressional response",
+    "interagency coordination", "advisory", "interpretation",
+    "administrative", "budget", "personnel", "it / systems",
+    "compliance review", "risk assessment", "other"
+]] = None
     description: Optional[str] = None
     problem_statement: Optional[str] = None
     why_it_matters: Optional[str] = None
-    status: Optional[str] = None
-    priority: Optional[str] = None
-    sensitivity: Optional[str] = None
+    status: Optional[Literal[
+    "new intake", "active", "on hold", "blocked",
+    "under review", "pending decision", "closed"
+]] = None
+    priority: Optional[Literal[
+    "critical this week", "important this month",
+    "strategic / slow burn", "monitoring only"
+]] = None
+    sensitivity: Optional[Literal[
+    "routine", "leadership-sensitive", "congressional-sensitive",
+    "enforcement-sensitive", "market-sensitive", "pre-decisional",
+    "fomc-restricted"
+]] = None
     risk_level: Optional[str] = None
-    boss_involvement_level: Optional[str] = None
+    boss_involvement_level: Optional[Literal[
+    "no boss involvement needed", "keep boss informed",
+    "boss reviewing", "boss deciding", "joint with boss"
+]] = None
     assigned_to_person_id: Optional[str] = None
     supervisor_person_id: Optional[str] = None
     requesting_organization_id: Optional[str] = None
