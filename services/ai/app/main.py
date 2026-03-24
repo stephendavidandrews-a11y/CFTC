@@ -240,9 +240,9 @@ app.add_middleware(
 # Request ID + metrics + rate limiting middleware
 from app.middleware import RequestIDMiddleware, RateLimiter, metrics as request_metrics
 _rate_limiter = RateLimiter(
-    max_requests=60,
+    max_requests=300,
     window_seconds=60,
-    exclude_paths={"/health", "/metrics"},
+    exclude_paths={"/health", "/metrics", "/ai/api/events/stream"},
 )
 app.add_middleware(RequestIDMiddleware, rate_limiter=_rate_limiter)
 

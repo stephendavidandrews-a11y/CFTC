@@ -153,11 +153,10 @@ def convert_new_person(item: dict, bundle: dict, refs: dict) -> list[tuple[dict,
         "email": data.get("email"),
         "phone": data.get("phone"),
         "relationship_category": data.get("relationship_category"),
+        "substantive_areas": data.get("substantive_areas"),
         "is_active": 1,
         "source": "ai",
         "source_id": item["id"],
-        "ai_confidence": item.get("confidence"),
-        "automation_hold": 1,
         "external_refs": _external_refs(
             bundle.get("_communication_id", ""), bundle["id"], item["id"]),
     }

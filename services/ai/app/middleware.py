@@ -122,7 +122,7 @@ class RateLimiter:
         Returns (allowed, retry_after_seconds).
         """
         # Skip rate limiting for test clients and localhost
-        if ip in ("testclient", "unknown", "127.0.0.1"):
+        if ip in ("testclient", "unknown", "127.0.0.1", "::1"):
             return True, 0
         for excluded in self.exclude_paths:
             if excluded in path:
