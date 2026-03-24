@@ -197,14 +197,28 @@ def _join_continuation_lines(lines: list[str]) -> str:
     return " ".join(parts)
 
 
-def extract_questions(full_text: str) -> list[dict]:
+def extract_questions(full_text: str, fr_type: str = "", action: str = "") -> list[dict]:
     """
     Extract numbered questions from FR document full text.
 
-    Only extracts from "Request for Comment" / "Questions" sections.
+    Only extracts from documents that actively solicit comments (proposed rules,
+    ANPRMs, concept releases). Final rules, corrections, and withdrawals are
+    skipped even if they reference prior comment periods.
+
     Returns list of {question_number, question_text, section_heading, sort_order}.
     """
     if not full_text:
+        return []
+
+    # Skip document types that don't solicit new comments
+    action_lower = (action or "").lower()
+    fr_type_lower = (fr_type or "").lower()
+    if fr_type_lower == "rule" and "request for comment" not in action_lower:
+        # Final rules discussing prior comments — not a current solicitation
+        return []
+    if "withdrawal" in action_lower and "comment" not in action_lower:
+        return []
+    if "correction" in action_lower or "correcting" in action_lower:
         return []
 
     # Strip HTML first
@@ -215,8 +229,7 @@ def extract_questions(full_text: str) -> list[dict]:
     if comment_section:
         cleaned = _clean_text(comment_section)
     else:
-        # No comment section found — this doc probably doesn't have questions
-        # (e.g., final rules, corrections, fee schedules)
+        # No comment section found
         return []
     lines = cleaned.split("\n")
 
@@ -416,6 +429,18 @@ class TrackerAPI:
             resp.raise_for_status()
             return resp.json()
 
+    async def batch_write(self, operations: list) -> dict:
+        """Execute batch operations via the tracker batch API."""
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                f"{self.base_url}/tracker/batch",
+                json={"operations": operations},
+                auth=self.auth,
+                headers={"X-Write-Source": "federal_register"},
+            )
+            resp.raise_for_status()
+            return resp.json()
+
 
 # ── Document type mapping ────────────────────────────────────────────────────
 
@@ -536,9 +561,52 @@ async def process_fr_document(
         except Exception as e:
             logger.error("Failed to create matter for %s: %s", doc_num, e)
 
-    # 2. Extract questions if we have full text and a matter
+    # 2. Create rulemaking metadata records if we have a matter
+    if result["matter_id"]:
+        matter_id = result["matter_id"]
+        batch_ops = []
+
+        # Comment period record (if document has comment deadline)
+        if doc_row.get("comments_close_on"):
+            batch_ops.append({
+                "table": "rulemaking_comment_periods",
+                "op": "insert",
+                "data": {
+                    "matter_id": matter_id,
+                    "comment_period_type": _infer_comment_period_type(fr_type, action),
+                    "opens_at": doc_row.get("publication_date"),
+                    "closes_at": doc_row["comments_close_on"],
+                    "fr_doc_number": doc_num,
+                    "notes": f"Auto-created from FR doc {doc_num}",
+                },
+            })
+
+        # Publication status record
+        batch_ops.append({
+            "table": "rulemaking_publication_status",
+            "op": "insert",
+            "data": {
+                "matter_id": matter_id,
+                "ofr_publication_date": doc_row.get("publication_date"),
+                "ofr_doc_number": doc_num,
+                "notes": f"Auto-created from FR doc {doc_num}",
+            },
+            "_meta": {"upsert_by": ["matter_id"]},
+        })
+
+        if batch_ops:
+            try:
+                await tracker_api.batch_write(batch_ops)
+                logger.info("Created %d rulemaking records for matter %s",
+                            len(batch_ops), matter_id[:8])
+            except Exception as e:
+                # Non-fatal — matter and questions are more important
+                logger.warning("Failed to create rulemaking records for %s: %s",
+                               doc_num, e)
+
+    # 3. Extract questions if we have full text and a matter
     if full_text and result["matter_id"]:
-        questions = extract_questions(full_text)
+        questions = extract_questions(full_text, fr_type=fr_type, action=action)
         result["questions_extracted"] = len(questions)
 
         if questions:
@@ -582,7 +650,7 @@ async def process_fr_document(
             except Exception as e:
                 logger.error("Failed to create topic for %s: %s", doc_num, e)
 
-    # 3. Update fr_documents status
+    # 4. Update fr_documents status
     now = datetime.now().isoformat()
     new_status = "complete" if result["matter_id"] else "awaiting_review"
     db.execute(

@@ -205,6 +205,8 @@ AI_WRITABLE_TABLES = (
     "person_profiles",
     "comment_topics",
     "comment_questions",
+    "rulemaking_comment_periods",
+    "rulemaking_publication_status",
 )
 
 
@@ -235,6 +237,7 @@ BATCH_SOFT_DELETE_TABLES = {
 
 BATCH_UPSERT_RULES = {
     "person_profiles": ("person_id",),
+    "rulemaking_publication_status": ("matter_id",),
 }
 
 
@@ -309,6 +312,9 @@ AI_WRITABLE_ENUM_COLUMNS = {
         "priority": "task_priority",
         "deadline_type": "deadline_type",
         "source": "source",
+    },
+    "rulemaking_comment_periods": {
+        "comment_period_type": "comment_period_type",
     },
     "comment_questions": {
         "source": "source",
