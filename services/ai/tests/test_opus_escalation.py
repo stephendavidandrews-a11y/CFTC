@@ -90,7 +90,15 @@ def _make_db():
         tracker_person_id TEXT,
         proposed_name TEXT,
         proposed_title TEXT,
-        proposed_org TEXT
+        proposed_org TEXT,
+        proposed_org_id TEXT,
+        participant_email TEXT,
+        header_role TEXT,
+        participant_role TEXT,
+        match_source TEXT,
+        confirmed INTEGER DEFAULT 0,
+        voiceprint_confidence REAL,
+        voiceprint_method TEXT
     )""")
     db.execute("""CREATE TABLE communication_entities (
         id TEXT PRIMARY KEY,

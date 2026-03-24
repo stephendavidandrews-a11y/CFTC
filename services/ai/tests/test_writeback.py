@@ -34,14 +34,14 @@ os.environ.setdefault("AI_DB_PATH", ":memory:")
 # -----------------------------------------------------------------------
 COMM_ID = str(uuid.uuid4())
 # Bundle 0: matter bundle with existing matter (task, matter_update, stakeholder)
-# Bundle 1: matter bundle (follow_up, meeting_record, document)
+# Bundle 1: matter bundle (task/follow_up, meeting_record, document)
 # Bundle 2: new_matter bundle (task, new_person)
 # Bundle 3: standalone rejected (should be skipped)
 # Bundle 4: standalone with moved item (should exclude moved original)
 BUNDLE_IDS = [str(uuid.uuid4()) for _ in range(5)]
 ITEM_IDS = {
     0: [str(uuid.uuid4()) for _ in range(3)],  # task, matter_update, stakeholder
-    1: [str(uuid.uuid4()) for _ in range(3)],  # follow_up, meeting_record, document
+    1: [str(uuid.uuid4()) for _ in range(3)],  # task(follow_up), meeting_record, document
     2: [str(uuid.uuid4()) for _ in range(2)],  # task, new_person
     3: [str(uuid.uuid4()) for _ in range(1)],  # task (rejected bundle)
     4: [str(uuid.uuid4()) for _ in range(2)],  # original (moved), reviewer-added task
@@ -97,8 +97,9 @@ def _init_db(db: sqlite3.Connection):
                 datetime('now'), datetime('now'))
     """, (BUNDLE_IDS[1], COMM_ID))
 
-    _insert_item(db, ITEM_IDS[1][0], BUNDLE_IDS[1], "follow_up", "accepted",
-                 {"title": "Schedule coordination call", "due_date": "2026-03-25"}, 0.88, 1)
+    _insert_item(db, ITEM_IDS[1][0], BUNDLE_IDS[1], "task", "accepted",
+                 {"title": "Schedule coordination call", "due_date": "2026-03-25",
+                  "task_mode": "follow_up"}, 0.88, 1)
     _insert_item(db, ITEM_IDS[1][1], BUNDLE_IDS[1], "meeting_record", "accepted",
                  {"title": "Enforcement Strategy Sync", "date": "2026-03-18",
                   "meeting_type": "internal",
@@ -402,7 +403,7 @@ def test_3_05_bundle_1_compound_meeting():
 
     tables = [op["table"] for op in ops]
 
-    # follow_up -> tasks (1)
+    # task (follow_up mode) -> tasks (1)
     # meeting_record -> meetings (1) + meeting_participants (2) + meeting_matters (1) = 4
     # document rejected -> excluded
     # Total: 5
@@ -411,7 +412,7 @@ def test_3_05_bundle_1_compound_meeting():
     assert tables.count("meetings") == 1
     assert tables.count("meeting_participants") == 2
     assert tables.count("meeting_matters") == 1
-    assert tables.count("tasks") == 1  # follow_up
+    assert tables.count("tasks") == 1  # task (follow_up mode)
 
     # Meeting participants use $ref to meeting
     meeting_op = next(op for op in ops if op["table"] == "meetings")
