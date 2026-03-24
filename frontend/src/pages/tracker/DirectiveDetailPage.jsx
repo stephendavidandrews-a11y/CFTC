@@ -172,7 +172,7 @@ export default function DirectiveDetailPage() {
           <button style={btnPrimary} onClick={() => setShowLinkMatter(true)}>+ Link Matter</button>
         </div>
         {linkedMatters.length === 0
-          ? <EmptyState icon="\ud83d\udd17" title="No linked matters" subtitle="Link regulatory actions that implement this directive" />
+          ? <EmptyState icon="🔗" title="No linked matters" subtitle="Link regulatory actions that implement this directive" />
           : <DataTable columns={matterColumns} data={linkedMatters}
               onRowClick={(r) => navigate(`/matters/${r.matter_id}`)} />
         }
