@@ -83,7 +83,7 @@ Tracker:
 
 ```bash
 cd services/tracker
-.venv/bin/python -m pytest tests/test_validators.py tests/test_batch.py
+.venv/bin/python -m pytest tests/test_validators.py tests/test_batch.py tests/test_comment_topics.py tests/test_policy_directives.py
 ```
 
 AI:
@@ -92,6 +92,58 @@ AI:
 cd services/ai
 .venv/bin/python -m pytest tests/test_contract_phase1.py tests/test_extraction_routing.py tests/test_v2_extraction_e2e.py
 ```
+
+
+## Table Categories
+
+### AI-writable tables (batch API + dedicated routers)
+
+These tables can be written by both the AI pipeline (via batch API) and human users (via CRUD routers):
+
+`organizations`, `people`, `matters`, `tasks`, `meetings`, `meeting_participants`, `meeting_matters`, `documents`, `document_files`, `decisions`, `matter_people`, `matter_organizations`, `matter_updates`, `context_notes`, `context_note_links`, `person_profiles`, **`comment_topics`**, **`comment_questions`**
+
+### Manual-only tables (dedicated routers only)
+
+These tables are written only by human users through dedicated CRUD routers. They are NOT in `AI_WRITABLE_TABLES` and cannot be written via the batch API:
+
+- **`policy_directives`** — External mandates (EOs, PWG reports, congressional mandates). CRUD via `app/routers/policy_directives.py`. Enum validation in the router via Pydantic validators, not via batch.
+- **`directive_matters`** — Join table linking directives to matters. CRUD via `app/routers/directive_matters.py`. In `BATCH_DELETE_ALLOWED_TABLES` for cleanup only.
+
+### Delete behavior
+
+- **`comment_topics`**: Hard delete via CRUD router. Cascade-deletes all child `comment_questions`. In `BATCH_DELETE_ALLOWED_TABLES`.
+- **`comment_questions`**: Hard delete. In `BATCH_DELETE_ALLOWED_TABLES`.
+- **`policy_directives`**: Hard delete via CRUD router. Cascade-deletes all `directive_matters` links.
+- **`directive_matters`**: Hard delete. In `BATCH_DELETE_ALLOWED_TABLES`.
+
+## New Enum Groups (v1.2.0)
+
+### Comment Topics enums
+- `comment_topic_area` — Broad classification of a comment topic
+- `comment_topic_position_status` — Position development lifecycle
+- `comment_topic_source_document_type` — Type of FR action that originated the topic
+
+### Policy Directive enums
+- `directive_source_document_type` — Type of source document
+- `directive_priority_tier` — Urgency classification
+- `directive_responsible_entity` — Which agency is responsible
+- `directive_ogc_role` — OGC's role in implementation
+- `directive_implementation_status` — Implementation lifecycle
+- `directive_matter_relationship_type` — How a matter relates to a directive
+
+### Expanded existing enums (v1.2.0)
+- `regulatory_stage` += `petition_received`, `interpretive_release`
+- `matter_dependency_type` += `supersedes`, `joint_action`
+- `comment_period_type` += `anprm`, `nprm`, `proposed_order`, `concept_release`, `final_rule_with_comment`, `pra_60_day`, `pra_30_day`
+- `source` += `federal_register`
+
+## Router File Map
+
+| Router file | Tables | Pattern |
+|---|---|---|
+| `comment_topics.py` | `comment_topics`, `comment_questions` | Nested CRUD — topics scoped to matter, questions scoped to topic |
+| `policy_directives.py` | `policy_directives` | Standard CRUD with rich filters |
+| `directive_matters.py` | `directive_matters` | Join table link/unlink with reverse lookup |
 
 ## Practical Summary
 
