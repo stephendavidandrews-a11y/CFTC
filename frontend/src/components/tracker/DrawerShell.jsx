@@ -1,12 +1,6 @@
 import React from "react";
+import theme from "../../styles/theme";
 
-const THEME = {
-  bg: "#111827",
-  border: "#1f2937",
-  text: "#f1f5f9",
-  dim: "#64748b",
-  overlay: "rgba(0,0,0,0.45)",
-};
 
 export default function DrawerShell({ isOpen, onClose, title, width = 520, children }) {
   // Close on Escape
@@ -25,7 +19,7 @@ export default function DrawerShell({ isOpen, onClose, title, width = 520, child
         style={{
           position: "fixed",
           inset: 0,
-          background: THEME.overlay,
+          background: "rgba(0,0,0,0.45)",
           zIndex: 500,
           opacity: isOpen ? 1 : 0,
           pointerEvents: isOpen ? "auto" : "none",
@@ -42,8 +36,8 @@ export default function DrawerShell({ isOpen, onClose, title, width = 520, child
           bottom: 0,
           width,
           maxWidth: "100vw",
-          background: THEME.bg,
-          borderLeft: `1px solid ${THEME.border}`,
+          background: theme.bg.card,
+          borderLeft: `1px solid ${theme.border.default}`,
           zIndex: 501,
           display: "flex",
           flexDirection: "column",
@@ -58,17 +52,17 @@ export default function DrawerShell({ isOpen, onClose, title, width = 520, child
             alignItems: "center",
             justifyContent: "space-between",
             padding: "16px 20px",
-            borderBottom: `1px solid ${THEME.border}`,
+            borderBottom: `1px solid ${theme.border.default}`,
             flexShrink: 0,
           }}
         >
-          <span style={{ fontSize: 16, fontWeight: 700, color: THEME.text }}>{title}</span>
+          <span style={{ fontSize: 16, fontWeight: 700, color: theme.text.primary }}>{title}</span>
           <button
             onClick={onClose}
             style={{
               background: "none",
               border: "none",
-              color: THEME.dim,
+              color: theme.text.dim,
               fontSize: 20,
               cursor: "pointer",
               padding: "2px 6px",

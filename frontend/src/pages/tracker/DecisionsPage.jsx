@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback , useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
 import useApi from "../../hooks/useApi";
@@ -48,6 +48,7 @@ function isOverdue(dateStr) {
 }
 
 export default function DecisionsPage() {
+  useEffect(() => { document.title = "Decisions | Command Center"; }, []);
   const navigate = useNavigate();
   const { openDrawer } = useDrawer();
   const [filters, setFilters] = useState({ status: "", matter_id: "", search: "" });

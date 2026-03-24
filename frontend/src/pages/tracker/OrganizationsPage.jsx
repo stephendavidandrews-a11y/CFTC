@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo , useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
 import useApi from "../../hooks/useApi";
@@ -51,6 +51,7 @@ const SAVED_VIEWS = [
 ];
 
 export default function OrganizationsPage() {
+  useEffect(() => { document.title = "Organizations | Command Center"; }, []);
   const navigate = useNavigate();
   const { openDrawer } = useDrawer();
   const [search, setSearch] = useState("");

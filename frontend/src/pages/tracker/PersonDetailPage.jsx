@@ -6,6 +6,7 @@ import useApi from "../../hooks/useApi";
 import { getPerson, deletePerson, getPersonProfile, getContextNotesByEntity } from "../../api/tracker";
 import Badge from "../../components/shared/Badge";
 import { useDrawer } from "../../contexts/DrawerContext";
+import EmptyState from "../../components/shared/EmptyState";
 
 /* ── Styles ──────────────────────────────────────────────────── */
 
@@ -151,6 +152,8 @@ export default function PersonDetailPage() {
 
   const { data: person, loading, error, refetch } = useApi(() => getPerson(id), [id]);
 
+  React.useEffect(() => { if (person) document.title = (person?.full_name || ((person?.first_name || "") + " " + (person?.last_name || "")).trim()) + " | Command Center"; }, [person]);
+
   const [profile, setProfile] = useState(null);
   const [contextNotes, setContextNotes] = useState([]);
 
@@ -184,7 +187,13 @@ export default function PersonDetailPage() {
   if (error) {
     return (
       <div style={{ padding: "24px 32px" }}>
-        <div style={{ color: theme.accent.red, fontSize: 13 }}>Error: {error.message || String(error)}</div>
+        <EmptyState
+          icon="⚠"
+          title="Person not found"
+          message="This person may have been archived or deleted, or the ID may be invalid."
+          actionLabel="Go to People"
+          onAction={() => navigate("/people")}
+        />
       </div>
     );
   }

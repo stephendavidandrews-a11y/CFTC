@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback , useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
 import { useToastContext } from "../../contexts/ToastContext";
@@ -59,11 +59,20 @@ function formatDateTime(d) {
   });
 }
 
+function defaultDateRange() {
+  const today = new Date();
+  const future = new Date(Date.now() + 30 * 86400000);
+  const fmt = (d) => d.toISOString().split("T")[0];
+  return { from: fmt(today), to: fmt(future) };
+}
+
 export default function MeetingsPage() {
+  useEffect(() => { document.title = "Meetings | Command Center"; }, []);
   const navigate = useNavigate();
   const toast = useToastContext();
   const { openDrawer } = useDrawer();
-  const [filters, setFilters] = useState({ search: "", date_from: "", date_to: "", matter_id: "" });
+  const defaults = defaultDateRange();
+  const [filters, setFilters] = useState({ search: "", date_from: defaults.from, date_to: defaults.to, matter_id: "" });
   const [confirmAction, setConfirmAction] = useState(null); // { id, action, title }
   const [actionBusy, setActionBusy] = useState({});
 

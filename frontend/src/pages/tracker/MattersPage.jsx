@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo , useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
 import useApi from "../../hooks/useApi";
@@ -107,6 +107,7 @@ function matterRankScore(m) {
 }
 
 export default function MattersPage() {
+  useEffect(() => { document.title = "Matters | Command Center"; }, []);
   const navigate = useNavigate();
   const { openDrawer } = useDrawer();
   const [search, setSearch] = useState("");
