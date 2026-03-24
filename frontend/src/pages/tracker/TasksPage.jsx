@@ -1045,7 +1045,7 @@ export default function TasksPage() {
                 data={myTasks}
                 onRowClick={(row) => openDrawer("task", row, refetch)}
                 pageSize={15}
-                emptyMessage="No action items."
+                emptyMessage="No action items assigned to you. Tasks created in matters will appear here when assigned."
               />
             </div>
           )}
@@ -1084,7 +1084,7 @@ export default function TasksPage() {
                     data={group.rows}
                     onRowClick={(row) => openDrawer("task", row, refetch)}
                     pageSize={10}
-                    emptyMessage="No assigned tasks."
+                    emptyMessage="No assigned tasks right now."
                   />
                 </div>
               ))}
