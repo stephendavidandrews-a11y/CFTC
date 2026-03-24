@@ -278,7 +278,7 @@ def extract_questions(full_text: str, fr_type: str = "", action: str = "") -> li
             text_part = m_num.group(2)
             # Avoid matching section numbers that aren't questions
             # (e.g., "1. Background" in a non-question section)
-            if any(c.isalpha() for c in num_part) or text_part.strip().startswith(("What ", "How ", "Are ", "Should ", "Do ", "To what", "In what", "Is ", "Would ", "The Commission")):
+            if True:  # Inside a scoped comment section, numbered paragraphs are questions
                 flush_question()
                 current_q_num = num_part
                 current_q_lines = [text_part]
@@ -489,6 +489,43 @@ def _infer_comment_period_type(fr_type: str, action: str) -> str:
     return "original"
 
 
+
+def _infer_topic_area(section_label: str) -> str:
+    """Infer comment_topic_area enum value from section heading."""
+    label_lower = section_label.lower()
+    mapping = {
+        "core principle": "core_principles",
+        "public interest": "public_interest",
+        "market structure": "market_structure",
+        "disclosure": "disclosure",
+        "registration": "registration",
+        "clearing": "clearing",
+        "margin": "margin",
+        "reporting": "reporting",
+        "surveillance": "surveillance",
+        "position limit": "position_limits",
+        "cost": "cost_benefit",
+        "benefit": "cost_benefit",
+        "definition": "definitional",
+        "classification": "definitional",
+        "jurisdiction": "jurisdictional",
+        "technology": "technology",
+        "blockchain": "technology",
+        "consumer": "consumer_protection",
+        "procedural": "procedural",
+        "gaming": "public_interest",
+        "terrorism": "public_interest",
+        "manipulation": "surveillance",
+        "inside information": "surveillance",
+        "wash sale": "surveillance",
+        "swap": "market_structure",
+        "special entity": "special_entity",
+    }
+    for keyword, area in mapping.items():
+        if keyword in label_lower:
+            return area
+    return "other"
+
 # ── Main processor ───────────────────────────────────────────────────────────
 
 async def process_fr_document(
@@ -520,6 +557,7 @@ async def process_fr_document(
         "matter_id": None,
         "questions_extracted": 0,
         "topic_created": False,
+        "topics_created": 0,
     }
 
     logger.info("Processing FR doc %s [Tier %d]: %s", doc_num, tier,
@@ -610,45 +648,68 @@ async def process_fr_document(
         result["questions_extracted"] = len(questions)
 
         if questions:
-            # Create a catch-all topic for extracted questions
-            short_title = doc_row["title"][:60]
-            topic_data = {
-                "matter_id": result["matter_id"],
-                "topic_label": f"Extracted Questions — {short_title}",
-                "topic_area": "other",
-                "position_status": "open",
-                "source_fr_doc_number": doc_num,
-                "source_document_type": _infer_source_document_type(fr_type, action),
-                "source": "federal_register",
-                "notes": (
-                    f"Auto-extracted {len(questions)} questions from FR doc {doc_num}. "
-                    "Review and reorganize into analytical topic clusters."
-                ),
-            }
-            try:
-                topic = await tracker_api.create_comment_topic(
-                    result["matter_id"], topic_data
-                )
-                topic_id = topic["id"]
-                result["topic_created"] = True
+            # Group questions by section heading into topics
+            section_groups = {}
+            ungrouped = []
+            for q in questions:
+                section = q.get("section_heading") or ""
+                if section:
+                    section_groups.setdefault(section, []).append(q)
+                else:
+                    ungrouped.append(q)
 
-                # Create individual question records
-                for q in questions:
-                    try:
-                        await tracker_api.create_comment_question(topic_id, {
-                            "question_number": q["question_number"],
-                            "question_text": q["question_text"],
-                            "sort_order": q["sort_order"],
-                            "source": "federal_register",
-                        })
-                    except Exception as e:
-                        logger.warning("Failed to create question %s: %s",
-                                       q["question_number"], e)
+            # If no sections found, use a single topic
+            if not section_groups and ungrouped:
+                section_groups["General Questions"] = ungrouped
+                ungrouped = []
 
-                logger.info("Created topic with %d questions for matter %s",
-                            len(questions), result["matter_id"][:8])
-            except Exception as e:
-                logger.error("Failed to create topic for %s: %s", doc_num, e)
+            # If there are ungrouped questions, add them to an "Other" group
+            if ungrouped:
+                section_groups["Other Questions"] = ungrouped
+
+            source_doc_type = _infer_source_document_type(fr_type, action)
+            topics_created = 0
+            total_qs_created = 0
+
+            for section_label, section_qs in section_groups.items():
+                topic_data = {
+                    "matter_id": result["matter_id"],
+                    "topic_label": section_label,
+                    "topic_area": _infer_topic_area(section_label),
+                    "position_status": "open",
+                    "source_fr_doc_number": doc_num,
+                    "source_document_type": source_doc_type,
+                    "source": "federal_register",
+                    "sort_order": topics_created + 1,
+                    "notes": f"Auto-extracted {len(section_qs)} questions from FR doc {doc_num}.",
+                }
+                try:
+                    topic = await tracker_api.create_comment_topic(
+                        result["matter_id"], topic_data
+                    )
+                    topic_id = topic["id"]
+                    topics_created += 1
+
+                    for q in section_qs:
+                        try:
+                            await tracker_api.create_comment_question(topic_id, {
+                                "question_number": q["question_number"],
+                                "question_text": q["question_text"],
+                                "sort_order": q["sort_order"],
+                                "source": "federal_register",
+                            })
+                            total_qs_created += 1
+                        except Exception as e:
+                            logger.warning("Failed to create question %s: %s",
+                                           q["question_number"], e)
+                except Exception as e:
+                    logger.error("Failed to create topic '%s' for %s: %s",
+                                 section_label, doc_num, e)
+
+            result["topics_created"] = topics_created
+            result["topic_created"] = topics_created > 0
+            logger.info("Created %d topics with %d questions for matter %s",
+                        topics_created, total_qs_created, result["matter_id"][:8])
 
     # 4. Update fr_documents status
     now = datetime.now().isoformat()
