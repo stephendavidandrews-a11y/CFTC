@@ -138,7 +138,7 @@ export default function TrackerDashboardPage() {
 
       {/* Row 3: Upcoming Deadlines */}
       <div style={{ ...cardStyle, marginBottom: 24 }}>
-        <div style={sectionTitle}>Upcoming Deadlines</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={sectionTitle}>Upcoming Deadlines</div><span onClick={() => navigate("/tasks")} style={{ fontSize: 12, color: theme.accent.blueLight, cursor: "pointer" }}>View All &rarr;</span></div>
         {deadlines.length === 0 ? (
           <div style={{ fontSize: 13, color: theme.text.faint }}>No upcoming deadlines</div>
         ) : (
@@ -186,7 +186,7 @@ export default function TrackerDashboardPage() {
       {/* Row 4: Recent Matters + Recent Updates */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
         <div style={cardStyle}>
-          <div style={sectionTitle}>Recent Matters</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={sectionTitle}>Recent Matters</div><span onClick={() => navigate("/matters")} style={{ fontSize: 12, color: theme.accent.blueLight, cursor: "pointer" }}>View All &rarr;</span></div>
           {recentMatters.length === 0 ? (
             <div style={{ fontSize: 13, color: theme.text.faint }}>No recent matters</div>
           ) : (
@@ -245,7 +245,7 @@ export default function TrackerDashboardPage() {
 
       {/* Row 5: Tasks Due Soon */}
       <div style={cardStyle}>
-        <div style={sectionTitle}>Tasks Due Soon</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={sectionTitle}>Tasks Due Soon</div><span onClick={() => navigate("/tasks")} style={{ fontSize: 12, color: theme.accent.blueLight, cursor: "pointer" }}>View All &rarr;</span></div>
         {tasksDue.length === 0 ? (
           <div style={{ fontSize: 13, color: theme.text.faint }}>No tasks due soon</div>
         ) : (
