@@ -143,29 +143,43 @@ async def fetch_fr_documents(
 
 
 async def fetch_full_text(doc: dict) -> Optional[str]:
-    """Fetch full text for a document via raw_text_url or body_html_url."""
+    """Fetch full text for a document via raw_text_url or body_html_url.
+
+    The raw_text_url sometimes returns a short HTML wrapper (~713 bytes)
+    instead of the full document. When that happens, fall back to body_html_url.
+    Minimum useful document length threshold: 1000 chars.
+    """
     raw_url = doc.get("raw_text_url")
     html_url = doc.get("body_html_url")
+    min_length = 1000  # Short responses are redirect pages, not real content
 
     async with httpx.AsyncClient(timeout=60.0) as client:
-        # Prefer raw text (smaller, cleaner)
+        # Try raw text first
         if raw_url:
             try:
                 resp = await client.get(raw_url, follow_redirects=True)
                 resp.raise_for_status()
                 text = resp.text
-                if text and len(text) > 100:
+                if text and len(text) > min_length:
                     return text
+                else:
+                    logger.info("raw_text_url returned only %d chars for %s, trying body_html_url",
+                                len(text) if text else 0, doc.get("document_number"))
             except Exception as e:
                 logger.warning("Failed to fetch raw text for %s: %s",
                                doc.get("document_number"), e)
 
-        # Fall back to HTML
+        # Fall back to HTML body
         if html_url:
             try:
                 resp = await client.get(html_url, follow_redirects=True)
                 resp.raise_for_status()
-                return resp.text
+                text = resp.text
+                if text and len(text) > min_length:
+                    return text
+                else:
+                    logger.warning("body_html_url also short (%d chars) for %s",
+                                   len(text) if text else 0, doc.get("document_number"))
             except Exception as e:
                 logger.warning("Failed to fetch HTML for %s: %s",
                                doc.get("document_number"), e)
