@@ -94,6 +94,7 @@ export default function BundleReviewDetailPage() {
     return unsub;
   }, [on, id, refetch]);
 
+  const { people: lookupPeople, orgs: lookupOrgs, matters: lookupMatters } = useReviewLookups(!!data);
   const [busy, setBusy] = useState({});
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [editModal, setEditModal] = useState(null);
@@ -265,6 +266,7 @@ export default function BundleReviewDetailPage() {
           allBundles={nonRejectedBundles}
           commId={id}
           busy={busy}
+          lookups={{ people: lookupPeople, orgs: lookupOrgs, matters: lookupMatters }}
           onAcceptItem={handleAcceptItem}
           onRejectItem={handleRejectItem}
           onRestoreItem={handleRestoreItem}
@@ -475,7 +477,7 @@ export default function BundleReviewDetailPage() {
 // ── Bundle Card ─────────────────────────────────────────────────────────────
 
 function BundleCard({
-  bundle, allBundles, commId, busy,
+  bundle, allBundles, commId, busy, lookups,
   onAcceptItem, onRejectItem, onRestoreItem, onEditItem, onAddItem,
   onAcceptBundle, onRejectBundle, onMoveItem, onMerge,
 }) {
@@ -589,6 +591,7 @@ function BundleCard({
                   bundleStatus={bundle.status}
                   allBundles={allBundles}
                   busy={busy}
+                  lookups={lookups}
                   onAccept={() => onAcceptItem(bundle.id, item.id)}
                   onReject={() => onRejectItem(bundle.id, item.id)}
                   onRestore={() => onRestoreItem(bundle.id, item.id)}
@@ -629,15 +632,31 @@ function BundleCard({
 
 // ── Item Card ───────────────────────────────────────────────────────────────
 
-function ItemCard({ item, bundleId, bundleStatus, allBundles, busy, onAccept, onReject, onRestore, onEdit, onMove }) {
+function ItemCard({ item, bundleId, bundleStatus, allBundles, busy, lookups, onAccept, onReject, onRestore, onEdit, onMove }) {
   const [moveTarget, setMoveTarget] = useState("");
   const tColor = ITEM_TYPE_COLORS[item.item_type] || ITEM_TYPE_COLORS.task;
   const sColor = BUNDLE_STATUS[item.status] || BUNDLE_STATUS.proposed;
   const isTerminal = item.status === "accepted" || item.status === "rejected";
   const bundleTerminal = bundleStatus === "accepted" || bundleStatus === "rejected";
 
-  // Fields from proposed_data
-  const proposedFields = item.proposed_data ? Object.entries(item.proposed_data) : [];
+  const people = lookups?.people || [];
+  const orgs = lookups?.orgs || [];
+  const personName = (id) => { const p = people.find((x) => x.id === id); return p ? (p.full_name || `${p.first_name || ""} ${p.last_name || ""}`.trim()) : null; };
+  const orgName = (id) => { const o = orgs.find((x) => x.id === id); return o ? o.name : null; };
+
+  // Fields from proposed_data — resolve IDs to names for display
+  const resolveValue = (key, val) => {
+    if (val && typeof val === "string" && key.endsWith("_person_id")) return personName(val) || val;
+    if (val && typeof val === "string" && key.endsWith("_org_id") || key === "organization_id") return orgName(val) || val;
+    // Parse JSON strings that should be objects
+    if (typeof val === "string" && (key === "linked_entities" || key === "participants" || key === "matter_links" || key === "changes" || key === "fields")) {
+      try { return JSON.parse(val); } catch { return val; }
+    }
+    return val;
+  };
+  const proposedFields = item.proposed_data
+    ? Object.entries(item.proposed_data).map(([k, v]) => [k, resolveValue(k, v)])
+    : [];
   const hasOriginal = item.original_proposed_data && item.status === "edited";
 
   const movableBundles = allBundles.filter((b) => b.id !== bundleId);
@@ -692,19 +711,110 @@ function ItemCard({ item, bundleId, bundleStatus, allBundles, busy, onAccept, on
             background: theme.bg.input, borderRadius: 6, padding: "10px 12px",
             marginBottom: 8, border: `1px solid ${theme.border.subtle}`,
           }}>
-            {proposedFields.map(([key, val]) => (
-              <div key={key} style={{ marginBottom: 4, display: "flex", gap: 8 }}>
-                <span style={{
-                  fontSize: 11, fontWeight: 600, color: theme.text.faint,
-                  minWidth: 80, textTransform: "capitalize",
-                }}>
-                  {key.replace(/_/g, " ")}:
-                </span>
-                <span style={{ fontSize: 12, color: theme.text.secondary }}>
-                  {typeof val === "object" ? JSON.stringify(val) : String(val ?? "")}
-                </span>
-              </div>
-            ))}
+            {proposedFields.map(([key, val]) => {
+              // Participants: render as readable cards
+              if (key === "participants" && Array.isArray(val)) {
+                return (
+                  <div key={key} style={{ marginBottom: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: theme.text.faint, textTransform: "capitalize" }}>
+                      participants ({val.length}):
+                    </span>
+                    {val.map((p, i) => (
+                      <div key={i} style={{
+                        background: "rgba(96,165,250,0.06)", borderRadius: 4,
+                        padding: "6px 10px", marginTop: 4, border: "1px solid rgba(96,165,250,0.1)",
+                      }}>
+                        <div style={{ fontSize: 12, color: theme.text.secondary }}>
+                          <strong style={{ color: "#93c5fd" }}>{p.person_name || personName(p.person_id) || p.person_id?.slice(0, 8) || "?"}</strong>
+                          {p.meeting_role && <span style={{ color: theme.text.dim }}> ({p.meeting_role})</span>}
+                          {p.attended === false && <span style={{ color: theme.accent.red }}> [absent]</span>}
+                          {p.follow_up_expected && <span style={{ color: theme.accent.yellow }}> [follow-up]</span>}
+                        </div>
+                        {p.key_contribution_summary && (
+                          <div style={{ fontSize: 11, color: theme.text.dim, marginTop: 2 }}>{p.key_contribution_summary}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+              // Linked entities: render as readable tags
+              if (key === "linked_entities" && Array.isArray(val)) {
+                return (
+                  <div key={key} style={{ marginBottom: 4 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: theme.text.faint }}>linked entities: </span>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 2 }}>
+                      {val.map((le, i) => (
+                        <span key={i} style={{
+                          display: "inline-block", padding: "2px 8px", borderRadius: 4,
+                          fontSize: 11, background: "rgba(94,234,212,0.1)", color: "#5eead4",
+                          border: "1px solid rgba(94,234,212,0.2)",
+                        }}>
+                          {le.entity_name || le.entity_id?.slice(0, 8) || "?"} <span style={{ color: theme.text.dim }}>({le.relationship_role || le.entity_type})</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+              // Matter links: render as readable list
+              if (key === "matter_links" && Array.isArray(val)) {
+                return (
+                  <div key={key} style={{ marginBottom: 4 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: theme.text.faint }}>matter links: </span>
+                    {val.map((ml, i) => (
+                      <span key={i} style={{ fontSize: 12, color: theme.text.secondary }}>
+                        {ml.matter_title || ml.matter_id?.slice(0, 8) || "?"}{ml.relationship_type ? ` (${ml.relationship_type})` : ""}{i < val.length - 1 ? ", " : ""}
+                      </span>
+                    ))}
+                  </div>
+                );
+              }
+              // Fields dict (person_detail_update): render as key-value pairs
+              if (key === "fields" && typeof val === "object" && val !== null && !Array.isArray(val)) {
+                return (
+                  <div key={key} style={{ marginBottom: 4 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: theme.text.faint }}>profile fields:</span>
+                    {Object.entries(val).map(([fk, fv]) => (
+                      <div key={fk} style={{ marginLeft: 12, fontSize: 12 }}>
+                        <span style={{ color: theme.text.dim }}>{fk.replace(/_/g, " ")}: </span>
+                        <span style={{ color: theme.text.secondary }}>{String(fv)}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+              // Changes dict (task_update etc): render as field changes
+              if (key === "changes" && typeof val === "object" && val !== null && !Array.isArray(val)) {
+                return (
+                  <div key={key} style={{ marginBottom: 4 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: theme.text.faint }}>changes:</span>
+                    {Object.entries(val).map(([ck, cv]) => (
+                      <div key={ck} style={{ marginLeft: 12, fontSize: 12 }}>
+                        <span style={{ color: theme.text.dim }}>{ck.replace(/_/g, " ")}: </span>
+                        <span style={{ color: "#93c5fd" }}>{String(cv)}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+              // Default: text or JSON
+              // Clean up display label: remove _person_id, _org_id suffixes
+              const displayKey = key.replace(/_person_id$/, "").replace(/_org_id$/, "").replace(/^organization_id$/, "organization").replace(/_/g, " ");
+              return (
+                <div key={key} style={{ marginBottom: 4, display: "flex", gap: 8 }}>
+                  <span style={{
+                    fontSize: 11, fontWeight: 600, color: theme.text.faint,
+                    minWidth: 80, textTransform: "capitalize",
+                  }}>
+                    {displayKey}:
+                  </span>
+                  <span style={{ fontSize: 12, color: theme.text.secondary }}>
+                    {typeof val === "object" ? JSON.stringify(val) : String(val ?? "")}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )
       )}
@@ -938,7 +1048,7 @@ const FIELD_SCHEMAS = {
     { key: "readout_summary", label: "Readout Summary", type: "textarea" },
     { key: "boss_attends", label: "Boss Attends", type: "boolean" },
     { key: "external_parties_attend", label: "External Parties Attend", type: "boolean" },
-    { key: "participants", label: "Participants (JSON)", type: "json" },
+    { key: "participants", label: "Participants", type: "participants" },
     { key: "matter_links", label: "Matter Links (JSON)", type: "json" },
   ],
   matter_update: [
@@ -1112,6 +1222,75 @@ function SchemaField({ field, value, onChange, people, orgs, matters }) {
         <textarea value={value ?? ""} onChange={(e) => onChange(e.target.value)}
           rows={3} style={{ ...INPUT_STYLE, fontSize: 12, fontFamily: theme.font.family, resize: "vertical" }} />
       );
+
+    case "participants": {
+      const MEETING_ROLES = ["chair", "presenter", "attendee", "decision-maker", "note-taker", "guest"];
+      const parts = Array.isArray(value) ? value : [];
+      const updatePart = (idx, key, val) => {
+        const updated = parts.map((p, i) => i === idx ? { ...p, [key]: val } : p);
+        onChange(updated);
+      };
+      const addPart = () => onChange([...parts, { person_id: "", meeting_role: "attendee", attended: true, key_contribution_summary: "", stance_summary: "", follow_up_expected: false }]);
+      const removePart = (idx) => onChange(parts.filter((_, i) => i !== idx));
+      const personName = (pid) => {
+        const p = (people || []).find((x) => x.id === pid);
+        return p ? (p.full_name || `${p.first_name || ""} ${p.last_name || ""}`.trim() || pid) : pid;
+      };
+
+      return (
+        <div style={{ marginBottom: 14 }}>
+          {label}
+          {parts.map((p, idx) => (
+            <div key={idx} style={{
+              background: theme.bg.input, border: `1px solid ${theme.border.subtle}`,
+              borderRadius: 6, padding: "10px 12px", marginBottom: 6,
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: theme.text.faint }}>Participant {idx + 1}</span>
+                <button onClick={() => removePart(idx)} style={{ ...btnBase, padding: "2px 8px", fontSize: 10, background: "transparent", color: theme.accent.red, border: `1px solid ${theme.accent.red}` }}>Remove</button>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 6 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: theme.text.dim, marginBottom: 2 }}>Person</div>
+                  <select value={p.person_id || ""} onChange={(e) => updatePart(idx, "person_id", e.target.value)} style={{ ...INPUT_STYLE, fontSize: 12, padding: "6px 8px" }}>
+                    <option value="">--</option>
+                    {(people || []).map((pp) => <option key={pp.id} value={pp.id}>{pp.full_name || `${pp.first_name || ""} ${pp.last_name || ""}`.trim() || pp.id}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: theme.text.dim, marginBottom: 2 }}>Role</div>
+                  <select value={p.meeting_role || ""} onChange={(e) => updatePart(idx, "meeting_role", e.target.value)} style={{ ...INPUT_STYLE, fontSize: 12, padding: "6px 8px" }}>
+                    <option value="">--</option>
+                    {MEETING_ROLES.map((r) => <option key={r} value={r}>{formatLabel(r)}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <input type="checkbox" checked={!!p.attended} onChange={(e) => updatePart(idx, "attended", e.target.checked)} style={{ width: 14, height: 14 }} />
+                  <span style={{ fontSize: 11, color: theme.text.secondary }}>Attended</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <input type="checkbox" checked={!!p.follow_up_expected} onChange={(e) => updatePart(idx, "follow_up_expected", e.target.checked)} style={{ width: 14, height: 14 }} />
+                  <span style={{ fontSize: 11, color: theme.text.secondary }}>Follow-up expected</span>
+                </div>
+              </div>
+              <div style={{ marginBottom: 4 }}>
+                <div style={{ fontSize: 10, color: theme.text.dim, marginBottom: 2 }}>Key Contribution</div>
+                <input type="text" value={p.key_contribution_summary || ""} onChange={(e) => updatePart(idx, "key_contribution_summary", e.target.value)} style={{ ...INPUT_STYLE, fontSize: 12, padding: "6px 8px" }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: theme.text.dim, marginBottom: 2 }}>Stance</div>
+                <input type="text" value={p.stance_summary || ""} onChange={(e) => updatePart(idx, "stance_summary", e.target.value)} style={{ ...INPUT_STYLE, fontSize: 12, padding: "6px 8px" }} />
+              </div>
+            </div>
+          ))}
+          <button onClick={addPart} style={{ ...btnBase, background: "transparent", color: theme.text.dim, border: `1px dashed ${theme.border.default}`, width: "100%", padding: "8px" }}>
+            + Add Participant
+          </button>
+        </div>
+      );
+    }
 
     case "json":
       return wrap(

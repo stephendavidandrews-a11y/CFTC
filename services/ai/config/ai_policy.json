@@ -14,19 +14,20 @@
   },
   "extraction_policy": {
     "propose_tasks": true,
-    "propose_decisions": false,
+    "propose_decisions": true,
     "propose_matter_updates": true,
     "propose_meeting_records": true,
-    "propose_new_matters": false,
+    "propose_new_matters": true,
     "propose_stakeholders": true,
     "propose_new_people": true,
     "propose_new_organizations": true,
-    "propose_status_changes": false,
+    "propose_status_changes": true,
     "propose_documents": true,
     "propose_context_notes": true,
     "propose_person_details": true,
     "capture_stance_data": true,
-    "capture_intelligence_notes": true
+    "capture_intelligence_notes": true,
+    "propose_follow_ups": true
   },
   "sensitivity_policy": {
     "flag_enforcement_sensitive": true,
@@ -115,7 +116,7 @@
   },
   "proactive_config": {
     "daily_digest": {
-      "enabled": false,
+      "enabled": true,
       "schedule_time": "06:00",
       "email_digest": false
     },
@@ -147,7 +148,7 @@
       "upcoming_days": 3
     },
     "workload_thresholds": {
-      "multiplier": 2.0,
+      "multiplier": 2,
       "max_matters_flag": 5
     },
     "snooze_options_days": [
