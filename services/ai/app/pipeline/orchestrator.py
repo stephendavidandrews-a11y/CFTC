@@ -21,12 +21,40 @@ from app.routers.events import publish_event
 
 logger = logging.getLogger(__name__)
 
+
+def _log_error(db, communication_id: str, error_stage: str, error_message: str,
+               target_state: str = "error"):
+    """Persist error to communication_error_log and send notification."""
+    try:
+        db.execute(
+            "INSERT INTO communication_error_log (communication_id, error_stage, error_message) "
+            "VALUES (?, ?, ?)",
+            (communication_id, error_stage, error_message[:2000] if error_message else None),
+        )
+        db.commit()
+    except Exception as log_err:
+        logger.warning("Failed to write error log for %s: %s", communication_id, log_err)
+
+    # Send notification (non-blocking, debounced)
+    try:
+        title_row = db.execute(
+            "SELECT title FROM communications WHERE id = ?", (communication_id,)
+        ).fetchone()
+        title = title_row["title"] if title_row else None
+        from app.notifications import notify_pipeline_error
+        notify_pipeline_error(communication_id, title, error_stage,
+                              error_message or "", target_state)
+    except Exception as notif_err:
+        logger.warning("Failed to send error notification for %s: %s", communication_id[:8], notif_err)
+
+
 # Semaphores for resource gating
 TRANSCRIPTION_SEMAPHORE = asyncio.Semaphore(1)   # Whisper is memory-heavy
 LLM_SEMAPHORE = asyncio.Semaphore(3)             # Claude API calls can overlap
 
 # Terminal states — pipeline stops here
-TERMINAL_STATES = {"complete", "duplicate", "error", "paused_budget"}
+TERMINAL_STATES = {"complete", "duplicate", "error", "paused_budget",
+                   "waiting_for_api", "awaiting_tracker"}
 
 # Human gate states — pipeline pauses for user action
 HUMAN_GATE_STATES = {
@@ -34,6 +62,7 @@ HUMAN_GATE_STATES = {
     "awaiting_participant_review",
     "awaiting_entity_review",
     "awaiting_bundle_review",
+    "reviewed",
 }
 
 # Valid transitions: current_status -> next_status
@@ -76,7 +105,10 @@ EMAIL_TRANSITIONS = {
 }
 
 # Lock duration for processing
-LOCK_DURATION_MINUTES = 10
+LOCK_DURATION_MINUTES = 15  # Increased from 10; renewal heartbeat extends lease
+
+# Lock renewal interval (seconds) — must be well under LOCK_DURATION_MINUTES
+LOCK_RENEWAL_INTERVAL = 300  # 5 minutes
 
 
 def acquire_processing_lock(db, communication_id: str) -> str | None:
@@ -117,6 +149,47 @@ def release_processing_lock(db, communication_id: str, token: str):
     db.commit()
 
 
+def renew_processing_lock(db, communication_id: str, token: str) -> bool:
+    """Extend the lock lease by LOCK_DURATION_MINUTES from now.
+
+    Returns True if renewal succeeded (we still hold the lock).
+    Returns False if the lock was stolen or released.
+    """
+    new_expires = (datetime.utcnow() + timedelta(minutes=LOCK_DURATION_MINUTES)).isoformat()
+    cursor = db.execute("""
+        UPDATE communications
+        SET lock_expires_at = ?
+        WHERE id = ? AND processing_lock_token = ?
+    """, (new_expires, communication_id, token))
+    db.commit()
+    return cursor.rowcount == 1
+
+
+async def _lock_renewal_task(communication_id: str, token: str, db_factory):
+    """Background coroutine that renews the processing lock every LOCK_RENEWAL_INTERVAL seconds.
+
+    Runs until cancelled. If renewal fails (lock stolen), logs a warning.
+    The main processing loop will detect the stale lock on its next CAS attempt.
+    """
+    while True:
+        await asyncio.sleep(LOCK_RENEWAL_INTERVAL)
+        try:
+            db = db_factory()
+            try:
+                renewed = renew_processing_lock(db, communication_id, token)
+                if renewed:
+                    logger.debug("Lock renewed for %s (token %s)", communication_id[:8], token[:8])
+                else:
+                    logger.warning("Lock renewal FAILED for %s — lock may have been stolen", communication_id[:8])
+                    return  # Stop renewing; processing loop will detect
+            finally:
+                db.close()
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.warning("Lock renewal error for %s: %s", communication_id[:8], e)
+
+
 def cas_transition(db, communication_id: str, expected_status: str,
                    next_status: str, error_message: str = None,
                    error_stage: str = None) -> bool:
@@ -125,7 +198,9 @@ def cas_transition(db, communication_id: str, expected_status: str,
     Returns True if the transition succeeded, False if the status was already changed.
     """
     now = datetime.utcnow().isoformat()
-    if next_status == "error":
+    # States that preserve error_message/error_stage (for targeted retry/resume)
+    _error_like_states = {"error", "paused_budget", "waiting_for_api", "awaiting_tracker"}
+    if next_status in _error_like_states:
         cursor = db.execute("""
             UPDATE communications
             SET processing_status = ?,
@@ -169,7 +244,8 @@ async def process_communication(communication_id: str, db_factory=None):
     """
     from app.db import get_connection
 
-    db = db_factory() if db_factory else get_connection()
+    _db_factory = db_factory or get_connection
+    db = _db_factory()
     try:
         # Acquire lock
         lock_token = acquire_processing_lock(db, communication_id)
@@ -177,7 +253,16 @@ async def process_communication(communication_id: str, db_factory=None):
             logger.warning("Could not acquire lock for %s — skipping", communication_id)
             return
 
+        # Start lock renewal heartbeat
+        renewal_task = asyncio.create_task(
+            _lock_renewal_task(communication_id, lock_token, _db_factory)
+        )
+        logger.debug("Lock renewal task started for %s", communication_id[:8])
+
         try:
+            stage_retries = 0  # Reset on each new stage; tracks recoverable LLM retries
+            prev_stage = None
+
             while True:
                 comm = db.execute(
                     "SELECT id, processing_status, source_type FROM communications WHERE id = ?",
@@ -209,9 +294,21 @@ async def process_communication(communication_id: str, db_factory=None):
                     logger.warning("No transition from status %s for %s", status, communication_id)
                     break
 
+                # Reset retry counter when stage changes
+                if status != prev_stage:
+                    stage_retries = 0
+                    prev_stage = status
+
                 try:
+                    # Savepoint: all stage writes can be rolled back on failure
+                    savepoint_name = "stage_%s" % status.replace("-", "_")
+                    db.execute("SAVEPOINT %s" % savepoint_name)
+
                     # Run the stage handler
                     next_status = await run_stage(db, communication_id, status, source_type)
+
+                    # Release savepoint (merge stage writes into main transaction)
+                    db.execute("RELEASE SAVEPOINT %s" % savepoint_name)
 
                     # CAS transition
                     if not cas_transition(db, communication_id, status, next_status):
@@ -225,13 +322,22 @@ async def process_communication(communication_id: str, db_factory=None):
                     })
 
                 except Exception as e:
+                    # Roll back partial stage writes before handling the error
+                    try:
+                        db.execute("ROLLBACK TO SAVEPOINT %s" % savepoint_name)
+                        db.execute("RELEASE SAVEPOINT %s" % savepoint_name)
+                        logger.debug("Rolled back savepoint %s for %s", savepoint_name, communication_id[:8])
+                    except Exception as rb_err:
+                        logger.warning("Savepoint rollback failed for %s: %s", communication_id[:8], rb_err)
+
                     # Budget exhaustion → paused_budget (not error)
-                    from app.llm.client import BudgetExceededError
+                    from app.llm.client import BudgetExceededError, LLMError
                     if isinstance(e, BudgetExceededError):
                         logger.warning(
                             "Budget exceeded for %s at stage %s: %s",
                             communication_id, status, e,
                         )
+                        _log_error(db, communication_id, status, str(e), "paused_budget")
                         cas_transition(
                             db, communication_id, status, "paused_budget",
                             error_message=str(e), error_stage=status,
@@ -244,7 +350,59 @@ async def process_communication(communication_id: str, db_factory=None):
                         })
                         break
 
+                    # Recoverable LLM errors → retry with backoff (4B)
+                    if isinstance(e, LLMError) and e.recoverable:
+                        stage_retries += 1
+                        if stage_retries <= 3:
+                            wait = [30, 60, 120][min(stage_retries - 1, 2)]
+                            logger.warning(
+                                "Recoverable LLM error for %s at %s (attempt %d/3, "
+                                "retrying in %ds): %s",
+                                communication_id[:8], status, stage_retries, wait, e,
+                            )
+                            await asyncio.sleep(wait)
+                            continue  # Re-enter the while loop at the same stage
+
+                    # LLM connection error (retries exhausted) → waiting_for_api
+                    if isinstance(e, LLMError) and e.error_type in ("connection_error", "rate_limit"):
+                        logger.warning(
+                            "LLM unavailable for %s at %s (retries exhausted) — deferring",
+                            communication_id[:8], status,
+                        )
+                        _log_error(db, communication_id, status, str(e), "waiting_for_api")
+                        cas_transition(
+                            db, communication_id, status, "waiting_for_api",
+                            error_message=str(e), error_stage=status,
+                        )
+                        await publish_event("communication_status", {
+                            "communication_id": communication_id,
+                            "status": "waiting_for_api",
+                            "previous_status": status,
+                        })
+                        break
+
+                    # Tracker connection error → awaiting_tracker
+                    from app.writeback.tracker_client import TrackerBatchError
+                    if isinstance(e, TrackerBatchError) and e.error_type == "connection_error":
+                        logger.warning(
+                            "Tracker unavailable for %s at %s — deferring",
+                            communication_id[:8], status,
+                        )
+                        _log_error(db, communication_id, status, str(e), "awaiting_tracker")
+                        cas_transition(
+                            db, communication_id, status, "awaiting_tracker",
+                            error_message=str(e), error_stage=status,
+                        )
+                        await publish_event("communication_status", {
+                            "communication_id": communication_id,
+                            "status": "awaiting_tracker",
+                            "previous_status": status,
+                        })
+                        break
+
+                    # Non-recoverable error
                     logger.error("Stage %s failed for %s: %s", status, communication_id, str(e))
+                    _log_error(db, communication_id, status, str(e))
                     cas_transition(
                         db, communication_id, status, "error",
                         error_message=str(e), error_stage=status
@@ -259,6 +417,13 @@ async def process_communication(communication_id: str, db_factory=None):
                     break
 
         finally:
+            # Cancel lock renewal heartbeat
+            renewal_task.cancel()
+            try:
+                await renewal_task
+            except asyncio.CancelledError:
+                pass
+            logger.debug("Lock renewal task stopped for %s", communication_id[:8])
             release_processing_lock(db, communication_id, lock_token)
     finally:
         db.close()
@@ -388,24 +553,6 @@ async def _handle_preprocessing(db, communication_id: str) -> str:
             updated_at = datetime('now')
         WHERE id = ?
     """, (json.dumps(metadata), communication_id))
-
-    # If metadata contains a creation_time from the file, use it as captured_at
-    creation_time = metadata.get("creation_time")
-    if creation_time:
-        try:
-            from datetime import datetime as dt
-            parsed = dt.fromisoformat(creation_time.replace("Z", "+00:00"))
-            db.execute("""
-                UPDATE audio_files
-                SET captured_at = ?
-                WHERE communication_id = ? AND format != 'wav_normalized'
-            """, (parsed.isoformat(), communication_id))
-            logger.info("[%s] Set captured_at from file metadata: %s",
-                        communication_id[:8], parsed.isoformat())
-        except (ValueError, TypeError) as e:
-            logger.warning("[%s] Could not parse creation_time '%s': %s",
-                           communication_id[:8], creation_time, e)
-
     db.commit()
 
     # Store the normalized path for downstream stages
@@ -580,6 +727,21 @@ async def _handle_extraction(db, communication_id: str) -> str:
 async def _handle_committing(db, communication_id: str) -> str:
     """Run tracker writeback — commit all accepted/edited items to tracker via batch API."""
     from app.writeback.committer import commit_communication
+    from app.writeback.tracker_client import TrackerBatchError
+
+    # Pre-commit health check: verify tracker is reachable before starting
+    import httpx
+    from app.config import TRACKER_BASE_URL
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as hc:
+            health_url = TRACKER_BASE_URL.replace("/tracker", "") + "/tracker/health"
+            resp = await hc.get(health_url)
+        if resp.status_code != 200:
+            raise TrackerBatchError(0, "connection_error",
+                                    "Pre-commit health check: tracker returned %d" % resp.status_code)
+    except (httpx.ConnectError, httpx.TimeoutException, OSError) as e:
+        raise TrackerBatchError(0, "connection_error",
+                                "Pre-commit health check: tracker unreachable — %s" % e)
 
     await publish_event("stage_progress", {
         "communication_id": communication_id,
@@ -617,17 +779,4 @@ async def _handle_committing(db, communication_id: str) -> str:
         result.total_records,
         result.bundles_skipped,
     )
-
-    # Post-commit hook: generate meeting intelligence if a meeting was committed
-    try:
-        from app.pipeline.stages.meeting_intelligence import generate_meeting_intelligence
-        intel = await generate_meeting_intelligence(db, communication_id)
-        if intel:
-            logger.info("[%s] Meeting intelligence generated successfully",
-                        communication_id[:8])
-    except Exception as e:
-        # Meeting intelligence is non-critical -- log and continue
-        logger.warning("[%s] Meeting intelligence generation failed (non-fatal): %s",
-                       communication_id[:8], e)
-
     return "complete"  # next state

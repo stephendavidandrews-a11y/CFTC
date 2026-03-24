@@ -20,12 +20,18 @@ def accept_bundle(db, communication_id: str, bundle_id: str,
             "message": f"Bundle already in terminal state: {bundle['status']}",
         })
 
-    db.execute("""
+    # CAS: only update if bundle is still in expected state
+    cursor = db.execute("""
         UPDATE review_bundles
         SET status = 'accepted', reviewed_by = 'user', reviewed_at = datetime('now'),
             updated_at = datetime('now')
-        WHERE id = ?
-    """, (bundle_id,))
+        WHERE id = ? AND status = ?
+    """, (bundle_id, bundle["status"]))
+    if cursor.rowcount == 0:
+        raise HTTPException(409, detail={
+            "error_type": "concurrent_modification",
+            "message": f"Bundle {bundle_id} status changed since read (expected '{bundle['status']}')",
+        })
 
     # Auto-accept all proposed items (don't touch already-rejected or edited items)
     auto_count = db.execute("""
@@ -54,12 +60,18 @@ def reject_bundle(db, communication_id: str, bundle_id: str,
             "message": f"Bundle already in terminal state: {bundle['status']}",
         })
 
-    db.execute("""
+    # CAS: only update if bundle is still in expected state
+    cursor = db.execute("""
         UPDATE review_bundles
         SET status = 'rejected', reviewed_by = 'user', reviewed_at = datetime('now'),
             updated_at = datetime('now')
-        WHERE id = ?
-    """, (bundle_id,))
+        WHERE id = ? AND status = ?
+    """, (bundle_id, bundle["status"]))
+    if cursor.rowcount == 0:
+        raise HTTPException(409, detail={
+            "error_type": "concurrent_modification",
+            "message": f"Bundle {bundle_id} status changed since read (expected '{bundle['status']}')",
+        })
 
     auto_count = db.execute("""
         UPDATE review_bundle_items

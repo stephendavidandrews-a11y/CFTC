@@ -24,11 +24,17 @@ def accept_item(db, communication_id: str, bundle_id: str, item_id: str,
             "message": f"Cannot accept item in '{item['status']}' state",
         })
 
-    db.execute("""
+    # CAS: only update if item is still in expected state
+    cursor = db.execute("""
         UPDATE review_bundle_items
         SET status = 'accepted', reviewed_at = datetime('now'), updated_at = datetime('now')
-        WHERE id = ?
-    """, (item_id,))
+        WHERE id = ? AND status = ?
+    """, (item_id, item["status"]))
+    if cursor.rowcount == 0:
+        raise HTTPException(409, detail={
+            "error_type": "concurrent_modification",
+            "message": "Item %s status changed since read (expected '%s')" % (item_id, item["status"]),
+        })
 
     write_audit(db, communication_id, bundle_id, item_id, "accept_item", {
         "item_type": item["item_type"],
@@ -47,11 +53,17 @@ def reject_item(db, communication_id: str, bundle_id: str, item_id: str,
             "message": "Cannot reject a moved item — reject it in its destination bundle",
         })
 
-    db.execute("""
+    # CAS: only update if item is still in expected state
+    cursor = db.execute("""
         UPDATE review_bundle_items
         SET status = 'rejected', reviewed_at = datetime('now'), updated_at = datetime('now')
-        WHERE id = ?
-    """, (item_id,))
+        WHERE id = ? AND status = ?
+    """, (item_id, item["status"]))
+    if cursor.rowcount == 0:
+        raise HTTPException(409, detail={
+            "error_type": "concurrent_modification",
+            "message": "Item %s status changed since read (expected '%s')" % (item_id, item["status"]),
+        })
 
     write_audit(db, communication_id, bundle_id, item_id, "reject_item", {
         "item_type": item["item_type"],

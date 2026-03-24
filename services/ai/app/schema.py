@@ -354,41 +354,13 @@ TABLES = [
         created_at TEXT DEFAULT (datetime('now'))
     )"""),
 
-    # ---- Table 19: meeting_intelligence ----
-    ("meeting_intelligence", """CREATE TABLE IF NOT EXISTS meeting_intelligence (
-        id TEXT PRIMARY KEY,
-        meeting_id TEXT NOT NULL,
-        communication_id TEXT,
-        version INTEGER NOT NULL DEFAULT 1,
-        tier TEXT NOT NULL DEFAULT 'core',
-        executive_summary TEXT NOT NULL,
-        decisions_made TEXT,
-        non_decisions TEXT,
-        action_items_summary TEXT,
-        risks_surfaced TEXT,
-        briefing_required TEXT,
-        key_issues_discussed TEXT,
-        participant_positions TEXT,
-        dependencies_surfaced TEXT,
-        what_changed_in_matter TEXT,
-        commitments_made TEXT,
-        recommended_next_move TEXT,
-        purpose_and_context TEXT,
-        materials_referenced TEXT,
-        detailed_notes TEXT,
-        tags TEXT,
-        why_this_meeting_mattered TEXT,
-        what_changed TEXT,
-        what_i_need_to_do TEXT,
-        what_boss_needs_to_know TEXT,
-        what_can_wait TEXT,
-        generated_by TEXT,
-        prompt_version TEXT,
-        input_tokens INTEGER,
-        output_tokens INTEGER,
-        cost_usd REAL,
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
+    # ---- Hardening: communication_error_log (error history) ----
+    ("communication_error_log", """CREATE TABLE IF NOT EXISTS communication_error_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        communication_id TEXT NOT NULL REFERENCES communications(id),
+        error_stage TEXT,
+        error_message TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )"""),
 ]
 
@@ -428,10 +400,6 @@ INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_msg_hash ON communication_messages(message_hash);",
     "CREATE INDEX IF NOT EXISTS idx_msg_new ON communication_messages(communication_id, is_new);",
     "CREATE INDEX IF NOT EXISTS idx_msg_sender ON communication_messages(sender_email);",
-
-    # -- meeting_intelligence --
-    "CREATE INDEX IF NOT EXISTS idx_meeting_intel_meeting ON meeting_intelligence(meeting_id);",
-    "CREATE INDEX IF NOT EXISTS idx_meeting_intel_comm ON meeting_intelligence(communication_id);",
 
     # -- communication_artifacts --
     "CREATE INDEX IF NOT EXISTS idx_artifact_comm ON communication_artifacts(communication_id);",
@@ -499,6 +467,10 @@ INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_review_action_comm ON review_action_log(communication_id);",
     "CREATE INDEX IF NOT EXISTS idx_review_action_type ON review_action_log(action_type);",
     "CREATE INDEX IF NOT EXISTS idx_review_action_created ON review_action_log(created_at);",
+
+    # -- communication_error_log --
+    "CREATE INDEX IF NOT EXISTS idx_error_log_comm ON communication_error_log(communication_id);",
+    "CREATE INDEX IF NOT EXISTS idx_error_log_created ON communication_error_log(created_at);",
 ]
 
 
@@ -565,35 +537,6 @@ def _run_migrations(cursor):
             "ALTER TABLE voice_samples ADD COLUMN speech_duration_seconds REAL"
         )
         logger.info("Migration: added voice_samples.speech_duration_seconds column")
-    if "vocal_quality_json" not in vs_cols:
-        cursor.execute(
-            "ALTER TABLE voice_samples ADD COLUMN vocal_quality_json TEXT"
-        )
-        logger.info("Migration: added voice_samples.vocal_quality_json column")
-    if "hnr_db" not in vs_cols:
-        for col in ["hnr_db REAL", "jitter REAL", "shimmer REAL",
-                     "pitch_mean REAL", "pitch_std REAL", "speaking_rate_wpm REAL"]:
-            col_name = col.split()[0]
-            if col_name not in vs_cols:
-                cursor.execute(f"ALTER TABLE voice_samples ADD COLUMN {col}")
-        logger.info("Migration: added vocal quality columns to voice_samples")
-    if "embedding_filtered" not in vs_cols:
-        for col in ["embedding_filtered INTEGER DEFAULT 0",
-                     "embedding_quality_score REAL",
-                     "embedding_clean_duration REAL",
-                     "embedding_segments_used INTEGER"]:
-            col_name = col.split()[0]
-            if col_name not in vs_cols:
-                cursor.execute(f"ALTER TABLE voice_samples ADD COLUMN {col}")
-        logger.info("Migration: added embedding quality columns to voice_samples")
-
-    # Add overlap_regions_json to communications
-    comm_cols = {row[1] for row in cursor.execute("PRAGMA table_info(communications)")}
-    if "overlap_regions_json" not in comm_cols:
-        cursor.execute(
-            "ALTER TABLE communications ADD COLUMN overlap_regions_json TEXT"
-        )
-        logger.info("Migration: added communications.overlap_regions_json column")
 
     # Archive support: add archived_at to communications (2026-03-19)
     comm_cols = {row[1] for row in cursor.execute("PRAGMA table_info(communications)")}
@@ -602,3 +545,14 @@ def _run_migrations(cursor):
             "ALTER TABLE communications ADD COLUMN archived_at TEXT"
         )
         logger.info("Migration: added communications.archived_at column")
+
+    # Phase 7: content_hash for dedup on audio_files
+    af_cols = {row[1] for row in cursor.execute("PRAGMA table_info(audio_files)")}
+    if "content_hash" not in af_cols:
+        cursor.execute(
+            "ALTER TABLE audio_files ADD COLUMN content_hash TEXT"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_af_content_hash ON audio_files(content_hash)"
+        )
+        logger.info("Migration: added audio_files.content_hash column + index")
