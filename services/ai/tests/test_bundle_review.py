@@ -183,26 +183,50 @@ def _init_db(db: sqlite3.Connection):
     db.commit()
 
 
+import pytest
+from fastapi.testclient import TestClient
+
+
 def _get_test_db():
     return _shared_db
 
 
-def _create_app():
-    from app.main import app
-    from app.db import get_db
-    app.dependency_overrides[get_db] = _get_test_db
-    return app
-
-
-# Module-level setup
+# Module-level DB setup (fast — done once at import)
 _shared_db = sqlite3.connect(":memory:", check_same_thread=False)
 _shared_db.row_factory = sqlite3.Row
 _init_db(_shared_db)
-_app = _create_app()
 
-from fastapi.testclient import TestClient
-client = TestClient(_app)
+# Lazy app reference
+_app = None
 PREFIX = "/ai/api/bundle-review"
+
+
+def _ensure_app():
+    """Get the app singleton with our DB override applied."""
+    global _app
+    from app.main import app
+    from app.db import get_db
+    app.dependency_overrides[get_db] = _get_test_db
+    _app = app
+    return app
+
+
+@pytest.fixture(autouse=True)
+def _rebind_db():
+    """Re-apply our DB override before every test.
+
+    This is the root-cause fix: other test files share the app singleton
+    and may reset dependency_overrides. By re-binding per-test, we
+    guarantee our _shared_db is always active.
+    """
+    _ensure_app()
+    yield
+
+
+# Module-level client for use in test functions
+# (re-created with override in place via the autouse fixture above)
+_ensure_app()
+client = TestClient(_app)
 
 
 # =====================================================================

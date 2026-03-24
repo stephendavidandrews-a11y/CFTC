@@ -26,3 +26,12 @@ format:
 	$(INTAKE_VENV)/ruff format services/intake/
 
 check: lint test
+
+## Service management ─────────────────────────────────────────────
+start:  ## Start all services (canonical method)
+	./scripts/start_services.sh all
+
+stop:  ## Stop all services
+	./scripts/start_services.sh stop
+
+restart: stop start  ## Restart all services

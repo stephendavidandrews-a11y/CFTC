@@ -12,7 +12,7 @@ import sqlite3
 import sys
 import uuid
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import ANY, AsyncMock, patch
 
 import pytest
 
@@ -92,6 +92,15 @@ def _make_db():
         bundle_id TEXT,
         item_type TEXT,
         status TEXT DEFAULT 'accepted'
+    )""")
+    db.execute("""CREATE TABLE meeting_intelligence (
+        id TEXT PRIMARY KEY,
+        communication_id TEXT,
+        meeting_id TEXT,
+        intelligence_type TEXT,
+        content TEXT,
+        confidence REAL,
+        created_at TEXT DEFAULT (datetime('now'))
     )""")
     db.commit()
     return db
@@ -177,14 +186,14 @@ class TestInsertUndo:
 
         assert result.success
         assert result.reversed_count == 1
-        mock_delete.assert_called_once_with("tasks", record_id)
+        mock_delete.assert_called_once_with("tasks", record_id, ANY)
 
         # Communication back to reviewed
         status = db.execute(
             "SELECT processing_status FROM communications WHERE id = ?",
             (comm_id,),
         ).fetchone()["processing_status"]
-        assert status == "reviewed"
+        assert status == "bundle_review_in_progress"
 
         # Writeback marked reversed
         wb = db.execute(
@@ -209,7 +218,7 @@ class TestInsertUndo:
         ])
 
         # Return matching data for each record so no conflicts are detected
-        def _get_by_table(table, record_id):
+        def _get_by_table(table, record_id, written_data=None):
             if table == "tasks":
                 return {"title": "Task 1"}
             elif table == "decisions":
@@ -256,7 +265,7 @@ class TestUpdateUndo:
 
         assert result.success
         assert result.reversed_count == 1
-        mock_update.assert_called_once_with("matters", matter_id, previous)
+        mock_update.assert_called_once_with("matters", matter_id, previous, ANY)
 
     @patch("app.writeback.undo._tracker_update", new_callable=AsyncMock)
     @patch("app.writeback.undo._tracker_get", new_callable=AsyncMock)
@@ -314,7 +323,7 @@ class TestCompoundUndo:
         ])
 
         # Return matching data for each record so no conflicts are detected
-        def _get_by_table(table, record_id):
+        def _get_by_table(table, record_id, written_data=None):
             if table == "meetings":
                 return {"title": "Standup"}
             elif table == "meeting_participants":
