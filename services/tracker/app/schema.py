@@ -1,7 +1,7 @@
 """
 CFTC Regulatory Ops Tracker — Database Schema
 
-Creates all 24 tables + indexes. Idempotent (CREATE TABLE/INDEX IF NOT EXISTS).
+Creates all 28 tables + indexes. Idempotent (CREATE TABLE/INDEX IF NOT EXISTS).
 Returns list of newly created table names on each run.
 """
 
@@ -475,6 +475,84 @@ TABLES = [
         updated_at TEXT DEFAULT (datetime('now'))
     )"""),
 
+    # ---- Comment & Directive tables ----
+    ("comment_topics", """CREATE TABLE IF NOT EXISTS comment_topics (
+        id TEXT PRIMARY KEY,
+        matter_id TEXT NOT NULL REFERENCES matters(id),
+        topic_label TEXT NOT NULL,
+        topic_area TEXT,
+        assigned_to_person_id TEXT REFERENCES people(id),
+        secondary_assignee_person_id TEXT REFERENCES people(id),
+        position_status TEXT NOT NULL DEFAULT 'open',
+        position_summary TEXT,
+        priority TEXT,
+        due_date TEXT,
+        deadline_type TEXT,
+        source_fr_doc_number TEXT,
+        source_document_type TEXT,
+        response_fr_doc_number TEXT,
+        notes TEXT,
+        sort_order INTEGER,
+        source TEXT DEFAULT 'manual',
+        source_id TEXT,
+        ai_confidence REAL,
+        automation_hold INTEGER DEFAULT 0,
+        external_refs TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+    )"""),
+
+    ("comment_questions", """CREATE TABLE IF NOT EXISTS comment_questions (
+        id TEXT PRIMARY KEY,
+        comment_topic_id TEXT NOT NULL REFERENCES comment_topics(id),
+        question_number TEXT NOT NULL,
+        question_text TEXT NOT NULL,
+        sort_order INTEGER,
+        source TEXT DEFAULT 'manual',
+        source_id TEXT,
+        ai_confidence REAL,
+        created_at TEXT DEFAULT (datetime('now'))
+    )"""),
+
+    ("policy_directives", """CREATE TABLE IF NOT EXISTS policy_directives (
+        id TEXT PRIMARY KEY,
+        source_document TEXT NOT NULL,
+        source_document_type TEXT NOT NULL,
+        source_document_url TEXT,
+        source_date TEXT,
+        directive_label TEXT NOT NULL,
+        directive_text TEXT,
+        section_reference TEXT,
+        chapter TEXT,
+        priority_tier TEXT,
+        responsible_entity TEXT,
+        ogc_role TEXT,
+        assigned_to_person_id TEXT REFERENCES people(id),
+        implementation_status TEXT NOT NULL DEFAULT 'not_started',
+        implementation_notes TEXT,
+        target_date TEXT,
+        completed_date TEXT,
+        notes TEXT,
+        sort_order INTEGER,
+        source TEXT DEFAULT 'manual',
+        source_id TEXT,
+        external_refs TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+    )"""),
+
+    ("directive_matters", """CREATE TABLE IF NOT EXISTS directive_matters (
+        id TEXT PRIMARY KEY,
+        directive_id TEXT NOT NULL REFERENCES policy_directives(id),
+        matter_id TEXT NOT NULL REFERENCES matters(id),
+        relationship_type TEXT NOT NULL DEFAULT 'implements',
+        notes TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        UNIQUE(directive_id, matter_id)
+    )"""),
+
+
+    # ---- Comment & Directive tables ----
     # ---- Automation tables ----
     ("system_events", """CREATE TABLE IF NOT EXISTS system_events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -639,6 +717,38 @@ INDEXES = [
     # -- decisions --
     "CREATE INDEX IF NOT EXISTS idx_decisions_matter ON decisions(matter_id);",
     "CREATE INDEX IF NOT EXISTS idx_decisions_status ON decisions(status);",
+
+    # -- comment_topics --
+    "CREATE INDEX IF NOT EXISTS idx_comment_topics_matter ON comment_topics(matter_id);",
+    "CREATE INDEX IF NOT EXISTS idx_comment_topics_status ON comment_topics(position_status);",
+    "CREATE INDEX IF NOT EXISTS idx_comment_topics_assigned ON comment_topics(assigned_to_person_id);",
+    "CREATE INDEX IF NOT EXISTS idx_comment_topics_due ON comment_topics(due_date);",
+    "CREATE INDEX IF NOT EXISTS idx_comment_topics_source_doc ON comment_topics(source_fr_doc_number);",
+    "CREATE INDEX IF NOT EXISTS idx_comment_topics_area ON comment_topics(topic_area);",
+
+    # -- comment_questions --
+    "CREATE INDEX IF NOT EXISTS idx_comment_questions_topic ON comment_questions(comment_topic_id);",
+
+    # -- policy_directives --
+    "CREATE INDEX IF NOT EXISTS idx_directives_status ON policy_directives(implementation_status);",
+    "CREATE INDEX IF NOT EXISTS idx_directives_responsible ON policy_directives(responsible_entity);",
+    "CREATE INDEX IF NOT EXISTS idx_directives_assigned ON policy_directives(assigned_to_person_id);",
+    "CREATE INDEX IF NOT EXISTS idx_directives_source_type ON policy_directives(source_document_type);",
+    "CREATE INDEX IF NOT EXISTS idx_directives_source_date ON policy_directives(source_date);",
+    "CREATE INDEX IF NOT EXISTS idx_directives_ogc_role ON policy_directives(ogc_role);",
+    "CREATE INDEX IF NOT EXISTS idx_directives_target_date ON policy_directives(target_date);",
+
+    # -- directive_matters --
+    "CREATE INDEX IF NOT EXISTS idx_dir_matters_directive ON directive_matters(directive_id);",
+    "CREATE INDEX IF NOT EXISTS idx_dir_matters_matter ON directive_matters(matter_id);",
+    # -- comment_topics --
+
+    # -- comment_questions --
+
+    # -- policy_directives --
+
+    # -- directive_matters --
+
 ]
 
 
@@ -694,7 +804,101 @@ MIGRATIONS = [
         "CREATE INDEX IF NOT EXISTS idx_meetings_meeting_type ON meetings(meeting_type)",
         "CREATE INDEX IF NOT EXISTS idx_documents_document_type ON documents(document_type)",
     ]),
-]
+
+    # Version 3: comment topics, policy directives tables and indexes
+    (3, "comment_topics_policy_directives", [
+        # Tables
+        """CREATE TABLE IF NOT EXISTS comment_topics (
+            id TEXT PRIMARY KEY,
+            matter_id TEXT NOT NULL REFERENCES matters(id),
+            topic_label TEXT NOT NULL,
+            topic_area TEXT,
+            assigned_to_person_id TEXT REFERENCES people(id),
+            secondary_assignee_person_id TEXT REFERENCES people(id),
+            position_status TEXT NOT NULL DEFAULT 'open',
+            position_summary TEXT,
+            priority TEXT,
+            due_date TEXT,
+            deadline_type TEXT,
+            source_fr_doc_number TEXT,
+            source_document_type TEXT,
+            response_fr_doc_number TEXT,
+            notes TEXT,
+            sort_order INTEGER,
+            source TEXT DEFAULT 'manual',
+            source_id TEXT,
+            ai_confidence REAL,
+            automation_hold INTEGER DEFAULT 0,
+            external_refs TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )""",
+        """CREATE TABLE IF NOT EXISTS comment_questions (
+            id TEXT PRIMARY KEY,
+            comment_topic_id TEXT NOT NULL REFERENCES comment_topics(id),
+            question_number TEXT NOT NULL,
+            question_text TEXT NOT NULL,
+            sort_order INTEGER,
+            source TEXT DEFAULT 'manual',
+            source_id TEXT,
+            ai_confidence REAL,
+            created_at TEXT DEFAULT (datetime('now'))
+        )""",
+        """CREATE TABLE IF NOT EXISTS policy_directives (
+            id TEXT PRIMARY KEY,
+            source_document TEXT NOT NULL,
+            source_document_type TEXT NOT NULL,
+            source_document_url TEXT,
+            source_date TEXT,
+            directive_label TEXT NOT NULL,
+            directive_text TEXT,
+            section_reference TEXT,
+            chapter TEXT,
+            priority_tier TEXT,
+            responsible_entity TEXT,
+            ogc_role TEXT,
+            assigned_to_person_id TEXT REFERENCES people(id),
+            implementation_status TEXT NOT NULL DEFAULT 'not_started',
+            implementation_notes TEXT,
+            target_date TEXT,
+            completed_date TEXT,
+            notes TEXT,
+            sort_order INTEGER,
+            source TEXT DEFAULT 'manual',
+            source_id TEXT,
+            external_refs TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )""",
+        """CREATE TABLE IF NOT EXISTS directive_matters (
+            id TEXT PRIMARY KEY,
+            directive_id TEXT NOT NULL REFERENCES policy_directives(id),
+            matter_id TEXT NOT NULL REFERENCES matters(id),
+            relationship_type TEXT NOT NULL DEFAULT 'implements',
+            notes TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(directive_id, matter_id)
+        )""",
+        # Indexes
+        "CREATE INDEX IF NOT EXISTS idx_comment_topics_matter ON comment_topics(matter_id)",
+        "CREATE INDEX IF NOT EXISTS idx_comment_topics_status ON comment_topics(position_status)",
+        "CREATE INDEX IF NOT EXISTS idx_comment_topics_assigned ON comment_topics(assigned_to_person_id)",
+        "CREATE INDEX IF NOT EXISTS idx_comment_topics_due ON comment_topics(due_date)",
+        "CREATE INDEX IF NOT EXISTS idx_comment_topics_source_doc ON comment_topics(source_fr_doc_number)",
+        "CREATE INDEX IF NOT EXISTS idx_comment_topics_area ON comment_topics(topic_area)",
+        "CREATE INDEX IF NOT EXISTS idx_comment_questions_topic ON comment_questions(comment_topic_id)",
+        "CREATE INDEX IF NOT EXISTS idx_directives_status ON policy_directives(implementation_status)",
+        "CREATE INDEX IF NOT EXISTS idx_directives_responsible ON policy_directives(responsible_entity)",
+        "CREATE INDEX IF NOT EXISTS idx_directives_assigned ON policy_directives(assigned_to_person_id)",
+        "CREATE INDEX IF NOT EXISTS idx_directives_source_type ON policy_directives(source_document_type)",
+        "CREATE INDEX IF NOT EXISTS idx_directives_source_date ON policy_directives(source_date)",
+        "CREATE INDEX IF NOT EXISTS idx_directives_ogc_role ON policy_directives(ogc_role)",
+        "CREATE INDEX IF NOT EXISTS idx_directives_target_date ON policy_directives(target_date)",
+        "CREATE INDEX IF NOT EXISTS idx_dir_matters_directive ON directive_matters(directive_id)",
+        "CREATE INDEX IF NOT EXISTS idx_dir_matters_matter ON directive_matters(matter_id)",
+    ]),
+    # Version 3: comment topics, policy directives tables and indexes
+    ]
 
 
 def _get_current_version(conn: sqlite3.Connection) -> int:

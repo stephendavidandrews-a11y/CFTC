@@ -139,7 +139,7 @@ def test_create_task_missing_title(client, auth_headers, db):
     """POST /tracker/tasks returns 422 when title is missing."""
     m = seed_matter(db)
     resp = client.post("/tracker/tasks",
-                       json={"matter_id": m["id"], "status": "open", "task_mode": "action"},
+                       json={"matter_id": m["id"], "status": "not started", "task_mode": "action"},
                        headers=auth_headers)
     assert resp.status_code == 422
 
@@ -149,7 +149,7 @@ def test_create_task_invalid_mode(client, auth_headers, db):
     m = seed_matter(db)
     resp = client.post("/tracker/tasks",
                        json={"title": "Bad", "matter_id": m["id"],
-                             "status": "open", "task_mode": "invalid_mode"},
+                             "status": "not started", "task_mode": "invalid_mode"},
                        headers=auth_headers)
     assert resp.status_code == 422
 
@@ -159,7 +159,7 @@ def test_create_task_idempotency(client, auth_headers, db):
     m = seed_matter(db)
     idem_key = str(uuid.uuid4())
     payload = {"title": "Idem Task", "matter_id": m["id"],
-               "status": "open", "task_mode": "action"}
+               "status": "not started", "task_mode": "action"}
     headers = {**auth_headers, "idempotency-key": idem_key}
     resp1 = client.post("/tracker/tasks", json=payload, headers=headers)
     resp2 = client.post("/tracker/tasks", json=payload, headers=headers)

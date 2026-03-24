@@ -96,7 +96,7 @@ def test_create_meeting_with_participants(client, auth_headers, db):
         "title": "Meeting With People",
         "date_time_start": "2026-04-01T10:00:00",
         "participants": [
-            {"person_id": person["id"], "meeting_role": "lead"},
+            {"person_id": person["id"], "meeting_role": "presenter"},
         ],
     }
     resp = client.post("/tracker/meetings", json=payload, headers=auth_headers)

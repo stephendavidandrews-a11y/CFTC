@@ -221,7 +221,7 @@ def test_add_and_list_matter_person(client, auth_headers, db):
     m = seed_matter(db)
     p = seed_person(db)
     resp = client.post(f"/tracker/matters/{m['id']}/people",
-                       json={"person_id": p["id"], "matter_role": "lead"},
+                       json={"person_id": p["id"], "matter_role": "lead attorney"},
                        headers=auth_headers)
     assert resp.status_code == 200
     mp_id = resp.json()["id"]
@@ -248,7 +248,7 @@ def test_add_and_list_matter_org(client, auth_headers, db):
     m = seed_matter(db)
     org = seed_organization(db)
     resp = client.post(f"/tracker/matters/{m['id']}/orgs",
-                       json={"organization_id": org["id"], "organization_role": "client"},
+                       json={"organization_id": org["id"], "organization_role": "client office"},
                        headers=auth_headers)
     assert resp.status_code == 200
     mo_id = resp.json()["id"]

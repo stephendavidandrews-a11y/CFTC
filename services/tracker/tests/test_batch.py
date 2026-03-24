@@ -20,7 +20,7 @@ def test_batch_single_insert(client, auth_headers, db):
     """Batch insert creates a record and returns its ID."""
     resp = _batch(client, auth_headers, [
         {"op": "insert", "table": "organizations", "data": {
-            "name": "Batch Org", "organization_type": "federal_agency",
+            "name": "Batch Org", "organization_type": "Federal agency",
         }},
     ])
     assert resp.status_code == 200
@@ -117,13 +117,13 @@ def test_batch_forward_reference(client, auth_headers, db):
     resp = _batch(client, auth_headers, [
         {"op": "insert", "table": "matters", "client_id": "m1",
          "data": {"title": "Ref Matter", "matter_type": "rulemaking",
-                  "status": "active", "priority": "high",
-                  "sensitivity": "normal",
-                  "boss_involvement_level": "informed",
+                  "status": "framing issue", "priority": "important this month",
+                  "sensitivity": "routine",
+                  "boss_involvement_level": "keep boss informed",
                   "next_step": "Draft"}},
         {"op": "insert", "table": "tasks",
          "data": {"title": "Ref Task", "matter_id": "$ref:m1",
-                  "status": "open", "task_mode": "action", "priority": "medium"}},
+                  "status": "not started", "task_mode": "action", "priority": "normal"}},
     ])
     assert resp.status_code == 200
     results = resp.json()["results"]
@@ -138,7 +138,7 @@ def test_batch_unresolved_reference(client, auth_headers):
     resp = _batch(client, auth_headers, [
         {"op": "insert", "table": "tasks",
          "data": {"title": "Bad Ref", "matter_id": "$ref:nonexistent",
-                  "status": "open", "task_mode": "action", "priority": "medium"}},
+                  "status": "not started", "task_mode": "action", "priority": "normal"}},
     ])
     assert resp.status_code == 400
     assert resp.json()["detail"]["error_type"] == "reference_resolution_failure"
@@ -195,10 +195,113 @@ def test_batch_enum_constraint_violation(client, auth_headers, db):
     resp = _batch(client, auth_headers, [
         {"op": "insert", "table": "tasks",
          "data": {"title": "Bad Mode", "matter_id": matter["id"],
-                  "status": "open", "task_mode": "invalid_mode", "priority": "medium"}},
+                  "status": "not started", "task_mode": "invalid_mode", "priority": "normal"}},
     ])
     assert resp.status_code == 400
     assert resp.json()["detail"]["error_type"] == "validation_failure"
+
+
+def test_batch_rejects_invalid_meeting_relationship_enum(client, auth_headers, db):
+    """Batch validates enum-backed relationship_type on meeting_matters."""
+    matter = seed_matter(db)
+    meeting_id = make_id()
+    db.execute(
+        "INSERT INTO meetings (id, title, date_time_start, meeting_type, source, created_at, updated_at) "
+        "VALUES (?, 'Test Meeting', datetime('now'), 'leadership meeting', 'manual', datetime('now'), datetime('now'))",
+        (meeting_id,),
+    )
+    db.commit()
+
+    resp = _batch(client, auth_headers, [
+        {"op": "insert", "table": "meeting_matters", "data": {
+            "meeting_id": meeting_id,
+            "matter_id": matter["id"],
+            "relationship_type": "discussed",
+        }},
+    ])
+    assert resp.status_code == 400
+    assert resp.json()["detail"]["error_type"] == "validation_failure"
+
+
+def test_batch_accepts_context_note_and_links(client, auth_headers, db):
+    """Batch supports context_notes and context_note_links as first-class AI writes."""
+    matter = seed_matter(db)
+    resp = _batch(client, auth_headers, [
+        {"op": "insert", "table": "context_notes", "client_id": "note1", "data": {
+            "title": "Leadership preference",
+            "body": "Keep drafts tight and decision-oriented.",
+            "category": "policy_operating_rule",
+            "matter_id": matter["id"],
+        }},
+        {"op": "insert", "table": "context_note_links", "data": {
+            "context_note_id": "$ref:note1",
+            "entity_type": "matter",
+            "entity_id": matter["id"],
+            "relationship_role": "subject",
+        }},
+    ])
+    assert resp.status_code == 200
+    note_id = resp.json()["results"][0]["record_id"]
+    note = db.execute("SELECT * FROM context_notes WHERE id = ?", (note_id,)).fetchone()
+    link = db.execute("SELECT * FROM context_note_links WHERE context_note_id = ?", (note_id,)).fetchone()
+    assert note["matter_id"] == matter["id"]
+    assert link["entity_id"] == matter["id"]
+
+
+def test_batch_rejects_unsupported_org_stakeholder_shape(client, auth_headers, db):
+    """Batch rejects stale AI shapes that send nonexistent matter_organizations columns."""
+    matter = seed_matter(db)
+    org = seed_organization(db)
+    resp = _batch(client, auth_headers, [
+        {"op": "insert", "table": "matter_organizations", "data": {
+            "matter_id": matter["id"],
+            "organization_id": org["id"],
+            "organization_role": "partner agency",
+            "engagement_level": "consulted",
+        }},
+    ])
+    assert resp.status_code == 400
+    assert resp.json()["detail"]["error_type"] == "schema_mismatch"
+
+
+def test_batch_upserts_person_profile_by_person_id(client, auth_headers, db):
+    """Repeated person_profiles inserts upsert deterministically by person_id."""
+    person = seed_person(db)
+
+    first = _batch(client, auth_headers, [
+        {"op": "insert", "table": "person_profiles", "data": {
+            "person_id": person["id"],
+            "education_summary": "Georgetown Law",
+        }, "_meta": {"upsert_by": "person_id"}},
+    ])
+    assert first.status_code == 200
+
+    second = _batch(client, auth_headers, [
+        {"op": "insert", "table": "person_profiles", "data": {
+            "person_id": person["id"],
+            "education_summary": "Georgetown Law",
+            "prior_roles_summary": "SEC Division of Trading and Markets",
+        }, "_meta": {"upsert_by": "person_id"}},
+    ])
+    assert second.status_code == 200
+
+    rows = db.execute("SELECT * FROM person_profiles WHERE person_id = ?", (person["id"],)).fetchall()
+    assert len(rows) == 1
+    assert rows[0]["prior_roles_summary"] == "SEC Division of Trading and Markets"
+    assert second.json()["results"][0]["op"] == "update"
+
+
+def test_schema_version_reports_stabilized_contract(client, auth_headers):
+    """Schema handshake advertises the live contract tables and capabilities."""
+    resp = client.get("/tracker/schema/version", headers=auth_headers)
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["schema_version"] == "1.2.0"
+    assert "context_notes" in payload["ai_writable_tables"]
+    assert "context_note_links" in payload["ai_writable_tables"]
+    assert "person_profiles" in payload["ai_writable_tables"]
+    assert "enum_validation" in payload["capabilities"]
+    assert "upsert_by" in payload["capabilities"]
 
 
 # ── Idempotency ──────────────────────────────────────────────────────────────
