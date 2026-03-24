@@ -12,6 +12,8 @@ import MeetingDrawer from "../tracker/MeetingDrawer";
 import OrganizationDrawer from "../tracker/OrganizationDrawer";
 import DecisionDrawer from "../tracker/DecisionDrawer";
 import DocumentDrawer from "../tracker/DocumentDrawer";
+import DirectiveDrawer from "../tracker/DirectiveDrawer";
+import CommentTopicDrawer from "../tracker/CommentTopicDrawer";
 
 function DrawerRenderer() {
   const { drawer, closeDrawer } = useDrawer();
@@ -68,6 +70,19 @@ function DrawerRenderer() {
         onClose={closeDrawer}
         document={type === "document" && data?.id ? data : null}
         matterId={type === "document" && data?.matter_id && !data?.id ? data.matter_id : null}
+        onSaved={handleSaved}
+      />
+      <CommentTopicDrawer
+        isOpen={type === "comment_topic"}
+        onClose={closeDrawer}
+        topic={type === "comment_topic" && data?.id ? data : null}
+        matterId={type === "comment_topic" && data?.matter_id && !data?.id ? data.matter_id : null}
+        onSaved={handleSaved}
+      />
+      <DirectiveDrawer
+        isOpen={type === "directive"}
+        onClose={closeDrawer}
+        directive={type === "directive" && data?.id ? data : null}
         onSaved={handleSaved}
       />
     </>
