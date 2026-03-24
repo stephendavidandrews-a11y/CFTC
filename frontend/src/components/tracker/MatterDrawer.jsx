@@ -287,7 +287,7 @@ export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", paddingTop: 16, borderTop: "1px solid #1f2937", marginTop: 10 }}>
         <button style={CANCEL_BTN} onClick={onClose}>Cancel</button>
         <button style={{ ...SAVE_BTN, opacity: saving ? 0.6 : 1 }} onClick={handleSave} disabled={saving}>
-          {saving ? "Saving..." : "Save"}
+          {saving ? "Saving..." : (matter ? "Save Changes" : "Create Matter")}
         </button>
       </div>
     </DrawerShell>

@@ -159,7 +159,7 @@ export default function DirectiveDrawer({ isOpen, onClose, directive, onSaved })
         <button onClick={handleSave} disabled={saving}
           style={{ padding: "8px 18px", borderRadius: 6, fontSize: 13, fontWeight: 600,
             background: theme.accent.blue, color: "#fff", border: "none", cursor: "pointer",
-            opacity: saving ? 0.6 : 1 }}>{saving ? "Saving..." : "Save"}</button>
+            opacity: saving ? 0.6 : 1 }}>{saving ? "Saving..." : (directive ? "Save Changes" : "Create Directive")}</button>
       </div>
     </DrawerShell>
   );
