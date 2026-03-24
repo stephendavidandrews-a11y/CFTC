@@ -67,7 +67,12 @@ export default function TrackerDashboardPage() {
   }
 
   const d = data || {};
-  const stats = d.stats || {};
+  const stats = {
+    open_matters: d.total_open_matters ?? d.stats?.open_matters ?? 0,
+    open_tasks: d.total_open_tasks ?? d.stats?.open_tasks ?? 0,
+    overdue_tasks: d.overdue_tasks ?? d.stats?.overdue_tasks ?? 0,
+    pending_decisions: Array.isArray(d.pending_decisions) ? d.pending_decisions.length : (d.stats?.pending_decisions ?? 0),
+  };
   const mattersByStatus = d.matters_by_status || {};
   const mattersByPriority = d.matters_by_priority || {};
   const deadlines = (d.upcoming_deadlines || []).slice(0, 5);
@@ -183,7 +188,52 @@ export default function TrackerDashboardPage() {
         )}
       </div>
 
-      {/* Row 4: Recent Matters + Recent Updates */}
+      {/* Row 4: Tasks Due Soon */}
+      <div style={cardStyle}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={sectionTitle}>Tasks Due Soon</div><span onClick={() => navigate("/tasks")} style={{ fontSize: 12, color: theme.accent.blueLight, cursor: "pointer" }}>View All &rarr;</span></div>
+        {tasksDue.length === 0 ? (
+          <div style={{ fontSize: 13, color: theme.text.faint }}>No tasks due soon</div>
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                {["Title", "Assignee", "Due Date", "Status"].map((h) => (
+                  <th key={h} style={{
+                    textAlign: "left", padding: "8px 12px", fontSize: 11, fontWeight: 700,
+                    color: theme.text.faint, textTransform: "uppercase", letterSpacing: "0.05em",
+                    borderBottom: `1px solid ${theme.border.default}`,
+                  }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {tasksDue.map((t, i) => {
+                const st = theme.status[t.status] || { bg: theme.bg.input, text: theme.text.faint, label: t.status };
+                return (
+                  <tr key={t.id || i}
+                    onMouseEnter={(e) => e.currentTarget.style.background = theme.bg.cardHover}
+                    onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                  >
+                    <td style={{ padding: "10px 12px", fontSize: 13, color: theme.text.secondary, borderBottom: `1px solid ${theme.border.subtle}` }}>
+                      {t.title}
+                    </td>
+                    <td style={{ padding: "10px 12px", fontSize: 13, color: theme.text.muted, borderBottom: `1px solid ${theme.border.subtle}` }}>
+                      {t.assignee_name || t.assigned_to_name || "\u2014"}
+                    </td>
+                    <td style={{ padding: "10px 12px", fontSize: 13, color: theme.text.muted, borderBottom: `1px solid ${theme.border.subtle}` }}>
+                      {formatDate(t.due_date)}
+                    </td>
+                    <td style={{ padding: "10px 12px", borderBottom: `1px solid ${theme.border.subtle}` }}>
+                      <Badge bg={st.bg} text={st.text} label={st.label || t.status} />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+{/* Row 5: Recent Matters + Recent Updates */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
         <div style={cardStyle}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={sectionTitle}>Recent Matters</div><span onClick={() => navigate("/matters")} style={{ fontSize: 12, color: theme.accent.blueLight, cursor: "pointer" }}>View All &rarr;</span></div>
@@ -243,51 +293,6 @@ export default function TrackerDashboardPage() {
         </div>
       </div>
 
-      {/* Row 5: Tasks Due Soon */}
-      <div style={cardStyle}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={sectionTitle}>Tasks Due Soon</div><span onClick={() => navigate("/tasks")} style={{ fontSize: 12, color: theme.accent.blueLight, cursor: "pointer" }}>View All &rarr;</span></div>
-        {tasksDue.length === 0 ? (
-          <div style={{ fontSize: 13, color: theme.text.faint }}>No tasks due soon</div>
-        ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                {["Title", "Assignee", "Due Date", "Status"].map((h) => (
-                  <th key={h} style={{
-                    textAlign: "left", padding: "8px 12px", fontSize: 11, fontWeight: 700,
-                    color: theme.text.faint, textTransform: "uppercase", letterSpacing: "0.05em",
-                    borderBottom: `1px solid ${theme.border.default}`,
-                  }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {tasksDue.map((t, i) => {
-                const st = theme.status[t.status] || { bg: theme.bg.input, text: theme.text.faint, label: t.status };
-                return (
-                  <tr key={t.id || i}
-                    onMouseEnter={(e) => e.currentTarget.style.background = theme.bg.cardHover}
-                    onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                  >
-                    <td style={{ padding: "10px 12px", fontSize: 13, color: theme.text.secondary, borderBottom: `1px solid ${theme.border.subtle}` }}>
-                      {t.title}
-                    </td>
-                    <td style={{ padding: "10px 12px", fontSize: 13, color: theme.text.muted, borderBottom: `1px solid ${theme.border.subtle}` }}>
-                      {t.assignee_name || t.assigned_to_name || "\u2014"}
-                    </td>
-                    <td style={{ padding: "10px 12px", fontSize: 13, color: theme.text.muted, borderBottom: `1px solid ${theme.border.subtle}` }}>
-                      {formatDate(t.due_date)}
-                    </td>
-                    <td style={{ padding: "10px 12px", borderBottom: `1px solid ${theme.border.subtle}` }}>
-                      <Badge bg={st.bg} text={st.text} label={st.label || t.status} />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
+          </div>
   );
 }
