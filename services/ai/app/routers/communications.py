@@ -54,7 +54,7 @@ class CommunicationSummary(BaseModel):
     title: Optional[str] = None
     processing_status: str
     duration_seconds: Optional[float] = None
-    sensitivity_flags: Optional[list] = None
+    sensitivity_flags: Optional[list | dict] = None
     error_message: Optional[str] = None
     error_stage: Optional[str] = None
     archived_at: Optional[str] = None
