@@ -3,6 +3,7 @@ import React from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import { ToastProvider } from "./contexts/ToastContext";
 import AppShell from "./components/layout/AppShell";
+import CommandPalette from "./components/shared/CommandPalette";
 
 // -- Tracker (Operations) --
 import TrackerDashboardPage from "./pages/tracker/TrackerDashboardPage";
@@ -51,6 +52,7 @@ export default function App() {
   return (
     <ErrorBoundary>
     <ToastProvider>
+      <CommandPalette />
       <Routes>
         <Route element={<AppShell />}>
           {/* -- Operations (Tracker) -- */}

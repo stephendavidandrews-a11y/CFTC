@@ -7,6 +7,7 @@ import { getPerson, deletePerson, getPersonProfile, getContextNotesByEntity } fr
 import Badge from "../../components/shared/Badge";
 import { useDrawer } from "../../contexts/DrawerContext";
 import EmptyState from "../../components/shared/EmptyState";
+import Breadcrumb from "../../components/shared/Breadcrumb";
 
 /* ── Styles ──────────────────────────────────────────────────── */
 
@@ -187,6 +188,7 @@ export default function PersonDetailPage() {
   if (error) {
     return (
       <div style={{ padding: "24px 32px" }}>
+      <Breadcrumb items={[{ label: "People", path: "/people" }, { label: person?.full_name || person?.first_name || 'Person' }]} />
         <EmptyState
           icon="⚠"
           title="Person not found"

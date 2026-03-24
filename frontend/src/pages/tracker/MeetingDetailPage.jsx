@@ -15,6 +15,7 @@ import { getMeetingIntelligence } from "../../api/ai";
 import Badge from "../../components/shared/Badge";
 import DataTable from "../../components/shared/DataTable";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
+import Breadcrumb from "../../components/shared/Breadcrumb";
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -13,6 +13,7 @@ import EmptyState from "../../components/shared/EmptyState";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
 import { useDrawer } from "../../contexts/DrawerContext";
 import { useToastContext } from "../../contexts/ToastContext";
+import Breadcrumb from "../../components/shared/Breadcrumb";
 
 const STATUS_COLORS = {
   not_started: { bg: theme.bg.input, text: theme.text.dim },
