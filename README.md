@@ -6,11 +6,43 @@ Multi-service system for CFTC regulatory operational tracking, AI-powered extrac
 
 ## Services
 
-| Route | Service | Source | Database |
-|-------|---------|--------|----------|
-| `/` | Command Center (React dashboard) | `frontend/` | — |
-| `/tracker/*` | Tracker (FastAPI) | `services/tracker/` | tracker.db |
-| `/ai/*` | AI Layer (FastAPI) | `services/ai/` | ai.db |
+| Route | Service | Port | Source | Database |
+|-------|---------|------|--------|----------|
+| `/` | Command Center (React) | via nginx | `frontend/` | — |
+| `/tracker/*` | Tracker (FastAPI) | 8004 | `services/tracker/` | tracker.db |
+| `/ai/*` | AI Layer (FastAPI) | 8006 | `services/ai/` | ai.db |
+| `/intake/*` | Intake (FastAPI) | 8005 | `services/intake/` | intake.db |
+
+## Quick Start
+
+```bash
+# Start all services (sources .env automatically)
+make start
+
+# Stop all services
+make stop
+
+# Restart
+make restart
+
+# Or directly:
+./scripts/start_services.sh all
+./scripts/start_services.sh tracker   # single service
+./scripts/start_services.sh stop
+```
+
+Logs are written to `logs/{tracker,ai,intake}.log` (append mode).
+
+## Testing
+
+```bash
+make test          # all services (354 tests)
+make test-tracker  # tracker only (203 tests)
+make test-ai       # AI only (143 tests)
+make test-intake   # intake only (8 tests)
+make lint          # ruff check on all services
+make check         # lint + test
+```
 
 ## Structure
 
@@ -19,27 +51,37 @@ frontend/              React Command Center (nginx serves SPA + proxies)
 services/
   tracker/             Tracker service (matters, tasks, people, orgs)
   ai/                  AI extraction, review, intelligence, writeback
-  intake/              Intake ingest service (GPU-bound, runs natively on port 8005)
-docker-compose.yml     Production compose (tracker, ai, command-center, caddy)
-Caddyfile              Caddy (personal site only — nginx handles app routing)
-.env                   Production secrets (gitignored)
-```
-
-## Deploy
-
-```bash
-docker compose up -d --build
-docker compose logs -f
+  intake/              Intake ingest service (audio processing)
+scripts/
+  start_services.sh    Canonical startup (sources .env, manages all services)
+  backup.sh            Database backup
+docs/                  Implementation notes and residual risks
+logs/                  Service log files (gitignored)
+.env                   Secrets (gitignored)
 ```
 
 ## Auth
 
-- **Tracker**: HTTP Basic Auth (`TRACKER_USER`/`TRACKER_PASS`) on all endpoints
-- **AI Layer**: Optional HTTP Basic Auth (`AI_AUTH_USER`/`AI_AUTH_PASS`) — disabled by default, enable via env vars
-- **Edge**: Cloudflare tunnel restricts external access
+| Service | Mechanism | Env Vars |
+|---------|-----------|----------|
+| Tracker | HTTP Basic (required) | `TRACKER_USER`, `TRACKER_PASS` |
+| AI | HTTP Basic (optional) | `AI_AUTH_USER`, `AI_AUTH_PASS` |
+| Intake | HTTP Basic (required) | `PIPELINE_USER`, `PIPELINE_PASS` |
 
-## Secrets
+Health and metrics endpoints are unauthenticated on all services.
 
-- `.env` at repo root — gitignored
-- Required: `ANTHROPIC_API_KEY`, `TRACKER_USER`, `TRACKER_PASS`, `SECRET_KEY`
-- Optional: `AI_AUTH_USER`, `AI_AUTH_PASS` (enables AI service auth)
+## Environment
+
+All services use `python-dotenv` to load `.env` from the repo root.
+
+Required variables:
+- `ANTHROPIC_API_KEY` — LLM API access
+- `TRACKER_USER`, `TRACKER_PASS` — Tracker auth
+- `PIPELINE_USER`, `PIPELINE_PASS` — Intake auth
+- `SECRET_KEY` — Session signing
+
+Optional:
+- `AI_AUTH_USER`, `AI_AUTH_PASS` — Enable AI service auth
+- `TRACKER_DB_PATH` — Override default DB location
+- `LOG_LEVEL` — Logging verbosity (default: INFO)
+- `ENVIRONMENT` — `development` (console logs) or `production` (JSON logs)
