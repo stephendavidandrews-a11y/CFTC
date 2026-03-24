@@ -30,7 +30,7 @@ SCHEMA_SOURCES = {
     "intake": REPO_ROOT / "services" / "intake" / "db" / "schema.py",
 }
 
-LOOKUPS_PATH = REPO_ROOT / "services" / "tracker" / "app" / "routers" / "lookups.py"
+LOOKUPS_PATH = REPO_ROOT / "services" / "tracker" / "app" / "contracts.py"
 OUTPUT_PATH = REPO_ROOT / "frontend" / "src" / "data" / "schema-manifest.json"
 
 SERVICE_META = {
@@ -50,7 +50,7 @@ def parse_enums(path: Path) -> dict[str, list[str]]:
     # Find the ENUMS = { ... } block
     m = re.search(r"ENUMS\s*=\s*\{", text)
     if not m:
-        print("WARNING: Could not find ENUMS dict in lookups.py", file=sys.stderr)
+        print("WARNING: Could not find ENUMS dict in contracts.py", file=sys.stderr)
         return {}
 
     # Find matching closing brace
@@ -401,7 +401,7 @@ def build_field(
 
 def main():
     # 1. Parse enums
-    print("Parsing enums from lookups.py...")
+    print("Parsing enums from contracts.py...")
     enums = parse_enums(LOOKUPS_PATH)
     enum_keys = {k.lower() for k in enums}
     print(f"  Found {len(enums)} enum definitions")

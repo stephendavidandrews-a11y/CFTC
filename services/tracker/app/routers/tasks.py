@@ -28,7 +28,7 @@ async def list_tasks(
     exclude_done: bool = Query(None),
     sort_by: str = Query("due_date"),
     sort_dir: str = Query("asc"),
-    limit: int = Query(500, le=500),
+    limit: int = Query(100, le=500),
     offset: int = Query(0),
 ):
     conditions = []

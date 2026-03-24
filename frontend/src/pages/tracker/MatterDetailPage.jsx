@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
+import { useToastContext } from "../../contexts/ToastContext";
 import useApi from "../../hooks/useApi";
 import {
   getMatter, addMatterUpdate, addMatterPerson, removeMatterPerson,
@@ -90,7 +91,7 @@ function CommentTopicsTab({ matterId }) {
     try {
       await deleteCommentTopic(topicId);
       refetch();
-    } catch (err) { alert(err.detail || "Delete failed"); }
+    } catch (err) { toast.error(err.detail || "Delete failed"); }
   };
 
   const handleAddQuestion = async (topicId) => {
@@ -100,21 +101,21 @@ function CommentTopicsTab({ matterId }) {
       setNewQ({ question_number: "", question_text: "" });
       setAddingQuestion(null);
       refetch();
-    } catch (err) { alert(err.detail || "Add failed"); }
+    } catch (err) { toast.error(err.detail || "Add failed"); }
   };
 
   const handleDeleteQuestion = async (qId) => {
     try {
       await deleteCommentQuestion(qId);
       refetch();
-    } catch (err) { alert(err.detail || "Delete failed"); }
+    } catch (err) { toast.error(err.detail || "Delete failed"); }
   };
 
   const handleMoveQuestion = async (qId, topicId) => {
     try {
       await moveCommentQuestion(qId, topicId);
       refetch();
-    } catch (err) { alert(err.detail || "Move failed"); }
+    } catch (err) { toast.error(err.detail || "Move failed"); }
   };
 
   // Summary bar
@@ -181,7 +182,7 @@ function CommentTopicsTab({ matterId }) {
                 {/* Expanded content */}
                 {isExpanded && (
                   <div style={{ borderTop: `1px solid ${theme.border.default}`, padding: 14 }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
                       {/* Left: Questions */}
                       <div>
                         <div style={{ fontSize: 12, fontWeight: 600, color: theme.text.secondary, marginBottom: 8 }}>
@@ -297,6 +298,7 @@ function DirectiveLinkage({ matterId }) {
 
 export default function MatterDetailPage() {
   const { id } = useParams();
+  const toast = useToastContext();
   const { openDrawer } = useDrawer();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("Updates");
@@ -359,6 +361,7 @@ export default function MatterDetailPage() {
       refetch();
     } catch (e) {
       console.error("Failed to save update:", e);
+      toast.error("Failed to save update: " + (e.message || "Unknown error"));
     } finally {
       setSavingUpdate(false);
     }
@@ -372,7 +375,7 @@ export default function MatterDetailPage() {
       setStakeholderForm({ person_id: "", matter_role: "", engagement_level: "", notes: "" });
       setShowStakeholderAdd(false);
       refetch();
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e); toast.error(e.message || "Operation failed"); }
   }, [id, stakeholderForm, refetch]);
 
   const handleRemoveStakeholder = useCallback(async (mpId) => {
@@ -380,7 +383,7 @@ export default function MatterDetailPage() {
     try {
       await removeMatterPerson(id, mpId);
       refetch();
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e); toast.error(e.message || "Operation failed"); }
   }, [id, refetch]);
 
   const handleRemoveOrg = useCallback(async (moId) => {
@@ -388,7 +391,7 @@ export default function MatterDetailPage() {
     try {
       await removeMatterOrg(id, moId);
       refetch();
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e); toast.error(e.message || "Operation failed"); }
   }, [id, refetch]);
 
   const handleAddOrg = useCallback(async () => {
@@ -399,7 +402,7 @@ export default function MatterDetailPage() {
       setOrgForm({ organization_id: "", organization_role: "", notes: "" });
       setShowOrgAdd(false);
       refetch();
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e); toast.error(e.message || "Operation failed"); }
   }, [id, orgForm, refetch]);
 
   // Fetch tags
@@ -422,7 +425,7 @@ export default function MatterDetailPage() {
       const updated = await getMatterTags(id);
       setTags(Array.isArray(updated) ? updated : (updated?.items || updated || []));
       setSelectedTagId("");
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e); toast.error(e.message || "Operation failed"); }
   }, [id, selectedTagId]);
 
   const handleRemoveTag = useCallback(async (tagId) => {
@@ -430,7 +433,7 @@ export default function MatterDetailPage() {
       await removeMatterTag(id, tagId);
       const updated = await getMatterTags(id);
       setTags(Array.isArray(updated) ? updated : (updated?.items || updated || []));
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e); toast.error(e.message || "Operation failed"); }
   }, [id]);
 
   const handleCreateTag = useCallback(async () => {
@@ -440,7 +443,7 @@ export default function MatterDetailPage() {
       setAllTags((prev) => [...prev, newTag]);
       setNewTagName("");
       setShowNewTag(false);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e); toast.error(e.message || "Operation failed"); }
   }, [newTagName]);
 
   // Dependencies handlers
@@ -451,7 +454,7 @@ export default function MatterDetailPage() {
       setDepForm({ depends_on_matter_id: "", dependency_type: "" });
       setShowDepAdd(false);
       refetch();
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e); toast.error(e.message || "Operation failed"); }
   }, [id, depForm, refetch]);
 
   const handleRemoveDep = useCallback(async (depId) => {
@@ -459,7 +462,7 @@ export default function MatterDetailPage() {
     try {
       await removeMatterDependency(id, depId);
       refetch();
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e); toast.error(e.message || "Operation failed"); }
   }, [id, refetch]);
 
   if (loading) {
@@ -548,7 +551,7 @@ export default function MatterDetailPage() {
               await deleteMatter(matter.id);
               navigate("/matters");
             } catch (e) {
-              alert(e.message);
+              toast.error(e.message || "Operation failed");
             }
           }}
         >

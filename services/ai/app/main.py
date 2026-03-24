@@ -15,6 +15,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import shutil
+from pathlib import Path
 
 
 from app.config import CORS_ORIGINS, AI_UPLOAD_DIR, AI_AUDIO_WATCH_DIR, load_policy
@@ -24,7 +25,7 @@ from app.schema import init_schema
 # Readiness flag: False during startup, True after all init is complete
 _ready = False
 
-from app.routers import events, config_api, health, communications, entity_review, bundle_review, participant_review, speaker_review
+from app.routers import events, config_api, health, communications, entity_review, bundle_review, participant_review, speaker_review, intelligence, meeting_intelligence, telemetry
 
 logging.basicConfig(
     level=logging.INFO,
@@ -297,7 +298,7 @@ async def _fr_watcher_loop():
             logger.info("FR watcher: polling (interval=%dh)", poll_hours)
 
             # Run watcher (fetch + classify + stage)
-            db = _get_ai_db()
+            db = get_connection()
             try:
                 watcher_result = await run_watcher(db, fr_config)
                 new_count = watcher_result.get("new", 0)
@@ -500,7 +501,7 @@ async def lifespan(app: FastAPI):
     _ready = False
 
     # Shutdown — cancel all background tasks
-    for task in [stuck_task, api_probe_task, tracker_probe_task, disk_task]:
+    for task in [stuck_task, api_probe_task, tracker_probe_task, disk_task, fr_task]:
         task.cancel()
         try:
             await task
@@ -528,8 +529,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Write-Source", "X-Request-ID", "If-Match"],
 )
 
 
@@ -553,13 +554,59 @@ class ReadinessMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(ReadinessMiddleware)
 
+
+# -- Global exception handler --
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    import traceback
+    logger.error("Unhandled exception: %s\n%s", exc, traceback.format_exc())
+    request_id = request.headers.get("x-request-id", "unknown")
+    return StarletteJSONResponse(
+        status_code=500,
+        content={"error_type": "internal_error", "message": "Internal server error", "request_id": request_id},
+        headers={"X-Request-ID": request_id},
+    )
+
+
+# ── Authentication (HTTP Basic) ──────────────────────────────────────────
+from app.config import AI_AUTH_USER, AI_AUTH_PASS, APP_ENV
+if AI_AUTH_USER and AI_AUTH_PASS:
+    from fastapi.security import HTTPBasic, HTTPBasicCredentials
+    from fastapi import Depends, HTTPException, status
+    import secrets as _secrets
+    _security = HTTPBasic()
+
+    def _verify_ai_auth(credentials: HTTPBasicCredentials = Depends(_security)):
+        correct_user = _secrets.compare_digest(credentials.username.encode(), AI_AUTH_USER.encode())
+        correct_pass = _secrets.compare_digest(credentials.password.encode(), AI_AUTH_PASS.encode())
+        if not (correct_user and correct_pass):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials",
+                headers={"WWW-Authenticate": "Basic"},
+            )
+        return credentials.username
+
+    _ai_auth_dep = [Depends(_verify_ai_auth)]
+    logger.info("AI service: HTTP Basic auth ENABLED")
+else:
+    _ai_auth_dep = []
+    if APP_ENV == "production":
+        logger.warning("AI service: auth NOT configured in production — set AI_AUTH_USER and AI_AUTH_PASS")
+    else:
+        logger.info("AI service: auth disabled (development mode)")
+
 # Mount routers under /ai/api/ prefix
 api_prefix = "/ai/api"
 app.include_router(health.router, prefix=api_prefix)
-app.include_router(config_api.router, prefix=api_prefix)
+app.include_router(config_api.router, prefix=api_prefix, dependencies=_ai_auth_dep)
 app.include_router(events.router, prefix=api_prefix)
-app.include_router(communications.router, prefix=api_prefix)
-app.include_router(entity_review.router, prefix=api_prefix)
-app.include_router(bundle_review.router, prefix=api_prefix)
-app.include_router(participant_review.router, prefix=api_prefix)
-app.include_router(speaker_review.router, prefix=api_prefix)
+app.include_router(communications.router, prefix=api_prefix, dependencies=_ai_auth_dep)
+app.include_router(entity_review.router, prefix=api_prefix, dependencies=_ai_auth_dep)
+app.include_router(bundle_review.router, prefix=api_prefix, dependencies=_ai_auth_dep)
+app.include_router(participant_review.router, prefix=api_prefix, dependencies=_ai_auth_dep)
+app.include_router(speaker_review.router, prefix=api_prefix, dependencies=_ai_auth_dep)
+app.include_router(intelligence.router, prefix=api_prefix, dependencies=_ai_auth_dep)
+app.include_router(meeting_intelligence.router, prefix=api_prefix, dependencies=_ai_auth_dep)
+app.include_router(telemetry.router, prefix=api_prefix, dependencies=_ai_auth_dep)

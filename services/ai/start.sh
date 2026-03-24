@@ -19,4 +19,4 @@ echo "  DB: $AI_DB_PATH"
 echo "  Tracker: $TRACKER_BASE_URL"
 echo "  Model: $(grep primary_extraction_model config/ai_policy.json 2>/dev/null | head -1)"
 
-exec .venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8007
+exec .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8006

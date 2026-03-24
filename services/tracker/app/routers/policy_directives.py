@@ -30,7 +30,7 @@ async def list_policy_directives(
     assigned_to_person_id: str = Query(None),
     sort_by: str = Query("sort_order"),
     sort_dir: str = Query("asc"),
-    limit: int = Query(100),
+    limit: int = Query(100, le=500),
     offset: int = Query(0),
 ):
     conditions, params = [], []

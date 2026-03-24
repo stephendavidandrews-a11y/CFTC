@@ -31,6 +31,45 @@ function parseJSON(val) {
   }
 }
 
+// Render a value that may be a string or a JSON object
+function renderTextOrObject(val) {
+  if (!val) return null;
+  if (typeof val === "string") {
+    try {
+      const parsed = JSON.parse(val);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return renderObjectCards(parsed);
+      }
+      return val;
+    } catch {
+      return val;
+    }
+  }
+  if (typeof val === "object" && !Array.isArray(val)) {
+    return renderObjectCards(val);
+  }
+  return String(val);
+}
+
+function renderObjectCards(obj) {
+  const entries = Object.entries(obj);
+  if (!entries.length) return null;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {entries.map(([key, value]) => (
+        <div key={key} style={{ borderLeft: "2px solid " + theme.border.default, paddingLeft: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: theme.text.dim, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
+            {key.replace(/_/g, " ")}
+          </div>
+          <div style={{ color: theme.text.secondary, fontSize: 13, lineHeight: 1.6 }}>
+            {typeof value === "string" ? value : typeof value === "object" ? JSON.stringify(value) : String(value)}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function formatDateTime(d) {
   if (!d) return "\u2014";
   const val = typeof d === "string" && d.length === 10 ? d + "T12:00:00" : d;
@@ -365,9 +404,17 @@ function SkimLayer({ intel }) {
           <div style={sectionHeaderStyle}>Non-Decisions</div>
           {nonDecisions.map((d, i) => (
             <div key={i} style={leftBorderCard(theme.accent.yellow)}>
-              <span style={{ color: theme.text.secondary, fontSize: 13 }}>
-                {typeof d === "string" ? d : d.item || d.title || d.summary || JSON.stringify(d)}
-              </span>
+              <div style={{ color: theme.text.secondary, fontSize: 13, fontWeight: 500 }}>
+                {typeof d === "string" ? d : d.issue || d.item || d.title || d.summary || JSON.stringify(d)}
+              </div>
+              {typeof d === "object" && (d.why_unresolved || d.who_resolves || d.by_when || d.info_needed) && (
+                <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }}>
+                  {d.why_unresolved && <div style={{ color: theme.text.muted }}><span style={{ fontWeight: 600, color: theme.text.dim }}>Why unresolved: </span>{d.why_unresolved}</div>}
+                  {d.who_resolves && <div style={{ color: theme.text.muted }}><span style={{ fontWeight: 600, color: theme.text.dim }}>Who resolves: </span>{d.who_resolves}</div>}
+                  {d.by_when && <div style={{ color: theme.text.muted }}><span style={{ fontWeight: 600, color: theme.text.dim }}>By when: </span>{d.by_when}</div>}
+                  {d.info_needed && <div style={{ color: theme.text.muted }}><span style={{ fontWeight: 600, color: theme.text.dim }}>Info needed: </span>{d.info_needed}</div>}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -497,7 +544,7 @@ function ClosingBlock({ intel }) {
                 >
                   {item.label}
                 </div>
-                <div style={{ color: theme.text.secondary, fontSize: 13, lineHeight: 1.6 }}>{item.value}</div>
+                <div style={{ color: theme.text.secondary, fontSize: 13, lineHeight: 1.6 }}>{renderTextOrObject(item.value)}</div>
               </div>
             )
         )}
@@ -570,7 +617,7 @@ function OperatingLayer({ intel }) {
         <div>
           <div style={sectionHeaderStyle}>What Changed in Matter</div>
           <div style={{ color: theme.text.secondary, fontSize: 13, lineHeight: 1.7 }}>
-            {intel.what_changed_in_matter}
+            {renderTextOrObject(intel.what_changed_in_matter)}
           </div>
         </div>
       )}
@@ -628,7 +675,7 @@ function OperatingLayer({ intel }) {
           <div style={sectionHeaderStyle}>Recommended Next Move</div>
           <div style={leftBorderCard(theme.accent.green)}>
             <div style={{ color: theme.text.secondary, fontSize: 13, lineHeight: 1.7 }}>
-              {intel.recommended_next_move}
+              {renderTextOrObject(intel.recommended_next_move)}
             </div>
           </div>
         </div>
@@ -648,7 +695,7 @@ function RecordLayer({ intel }) {
         <div>
           <div style={sectionHeaderStyle}>Purpose and Context</div>
           <div style={{ color: theme.text.secondary, fontSize: 13, lineHeight: 1.7 }}>
-            {intel.purpose_and_context}
+            {renderTextOrObject(intel.purpose_and_context)}
           </div>
         </div>
       )}
@@ -677,7 +724,7 @@ function RecordLayer({ intel }) {
               whiteSpace: "pre-wrap",
             }}
           >
-            {intel.detailed_notes}
+            {renderTextOrObject(intel.detailed_notes)}
           </div>
         </div>
       )}

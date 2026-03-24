@@ -37,6 +37,7 @@ from app.routers import (
     policy_directives,
     directive_matters,
 )
+from app.routers import config as config_router
 
 logger = logging.getLogger(__name__)
 security = HTTPBasic()
@@ -113,8 +114,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Write-Source", "X-Request-ID", "If-Match"],
 )
 
 # Mount routers — all under /tracker/ prefix, all require auth
@@ -138,7 +139,21 @@ app.include_router(context_notes.router, prefix=router_prefix, dependencies=[Dep
 app.include_router(comment_topics.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 app.include_router(policy_directives.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 app.include_router(directive_matters.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
+app.include_router(config_router.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 
+
+
+# -- Global exception handler --
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    import traceback
+    logger.error("Unhandled exception: %s\n%s", exc, traceback.format_exc())
+    request_id = request.headers.get("x-request-id", "unknown")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error", "request_id": request_id},
+        headers={"X-Request-ID": request_id},
+    )
 
 @app.get("/tracker/health")
 async def health():

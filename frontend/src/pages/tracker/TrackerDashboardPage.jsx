@@ -5,6 +5,7 @@ import useApi from "../../hooks/useApi";
 import { getDashboard } from "../../api/tracker";
 import StatCard from "../../components/shared/StatCard";
 import Badge from "../../components/shared/Badge";
+import { formatDate } from "../../utils/dateUtils";
 
 const cardStyle = {
   background: theme.bg.card,
@@ -23,11 +24,6 @@ function daysColor(days) {
   return theme.text.secondary;
 }
 
-function formatDate(d) {
-  if (!d) return "\u2014";
-  const val = typeof d === "string" && d.length === 10 ? d + "T12:00:00" : d;
-  return new Date(val).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
 
 function HBar({ label, value, max, color }) {
   const pct = max > 0 ? (value / max) * 100 : 0;

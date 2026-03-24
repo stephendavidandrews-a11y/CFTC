@@ -21,6 +21,7 @@ const SECTIONS = [
   { separator: true, label: "AI Review" },
   { path: "/review/communications", label: "Communications", icon: "◎" },
   { path: "/review/speakers", label: "Speaker Review", icon: "\u25ce" },
+  { path: "/review/participants", label: "Participant Review", icon: "\u2461" },
   { path: "/review/entities", label: "Entity Review", icon: "\u22a1" },
   { path: "/review/bundles", label: "Bundle Review", icon: "\u25a4" },
   { path: "/review/commit", label: "Ready to Commit", icon: "\u2611" },

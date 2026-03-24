@@ -159,7 +159,7 @@
     ]
   },
   "federal_register": {
-    "enabled": false,
+    "enabled": true,
     "poll_interval_hours": 24,
     "tier3_promote_cfr_parts": [
       "23",

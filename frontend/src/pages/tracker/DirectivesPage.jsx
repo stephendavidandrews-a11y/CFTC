@@ -64,22 +64,22 @@ export default function DirectivesPage() {
 
   const columns = [
     { key: "directive_label", label: "Directive", flex: 1,
-      render: (r) => <span style={{ fontWeight: 600 }}>{r.directive_label}</span> },
+      render: (_, r) => <span style={{ fontWeight: 600 }}>{r?.directive_label || ""}</span> },
     { key: "source_document", label: "Source", width: 180,
-      render: (r) => <span title={r.source_document} style={{ fontSize: 12, color: theme.text.dim }}>
-        {r.source_document?.length > 30 ? r.source_document.slice(0, 30) + "..." : r.source_document}
+      render: (_, r) => <span title={r?.source_document || ""} style={{ fontSize: 12, color: theme.text.dim }}>
+        {r?.source_document?.length > 30 ? r.source_document.slice(0, 30) + "..." : r.source_document}
       </span> },
     { key: "priority_tier", label: "Priority", width: 130,
-      render: (r) => r.priority_tier ? <Badge {...(TIER_COLORS[r.priority_tier] || {})} label={fmt(r.priority_tier)} /> : null },
+      render: (_, r) => r.priority_tier ? <Badge {...(TIER_COLORS[r.priority_tier] || {})} label={fmt(r.priority_tier)} /> : null },
     { key: "responsible_entity", label: "Responsible", width: 100,
-      render: (r) => r.responsible_entity ? <Badge bg={theme.bg.input} text={theme.text.secondary} label={fmt(r.responsible_entity)} /> : null },
+      render: (_, r) => r.responsible_entity ? <Badge bg={theme.bg.input} text={theme.text.secondary} label={fmt(r.responsible_entity)} /> : null },
     { key: "ogc_role", label: "OGC Role", width: 100,
-      render: (r) => r.ogc_role ? <span style={{ fontSize: 12, color: theme.text.dim }}>{fmt(r.ogc_role)}</span> : null },
+      render: (_, r) => r.ogc_role ? <span style={{ fontSize: 12, color: theme.text.dim }}>{fmt(r.ogc_role)}</span> : null },
     { key: "implementation_status", label: "Status", width: 140,
-      render: (r) => <Badge {...(STATUS_COLORS[r.implementation_status] || {})} label={fmt(r.implementation_status)} /> },
-    { key: "linked_matter_count", label: "Matters", width: 70, render: (r) => r.linked_matter_count || 0 },
+      render: (_, r) => <Badge {...(STATUS_COLORS[r.implementation_status] || {})} label={fmt(r.implementation_status)} /> },
+    { key: "linked_matter_count", label: "Matters", width: 70, render: (_, r) => r.linked_matter_count || 0 },
     { key: "assigned_to_name", label: "Assigned To", width: 130,
-      render: (r) => r.assigned_to_name || <span style={{ color: theme.text.dim }}>--</span> },
+      render: (_, r) => r.assigned_to_name || <span style={{ color: theme.text.dim }}>--</span> },
   ];
 
   // Summary cards

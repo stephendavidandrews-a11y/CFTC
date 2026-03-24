@@ -36,8 +36,15 @@ start_service() {
     pids=$(lsof -ti :"$port" 2>/dev/null || true)
     if [ -n "$pids" ]; then
         echo "Stopping existing $name (PIDs: $pids)..."
-        echo "$pids" | xargs kill -9 2>/dev/null || true
-        sleep 1
+        echo "$pids" | xargs kill -15 2>/dev/null || true
+        sleep 2
+        # Force kill if still running
+        local remaining
+        remaining=$(lsof -ti :"$port" 2>/dev/null || true)
+        if [ -n "$remaining" ]; then
+            echo "$remaining" | xargs kill -9 2>/dev/null || true
+            sleep 1
+        fi
     fi
 
     echo "Starting $name on port $port..."
@@ -68,7 +75,13 @@ stop_all() {
         pids=$(lsof -ti :"$port" 2>/dev/null || true)
         if [ -n "$pids" ]; then
             echo "  Killing port $port (PIDs: $pids)"
-            echo "$pids" | xargs kill -9 2>/dev/null || true
+            echo "$pids" | xargs kill -15 2>/dev/null || true
+            sleep 2
+            local leftovers
+            leftovers=$(lsof -ti :"$port" 2>/dev/null || true)
+            if [ -n "$leftovers" ]; then
+                echo "$leftovers" | xargs kill -9 2>/dev/null || true
+            fi
         fi
     done
     echo "All services stopped."

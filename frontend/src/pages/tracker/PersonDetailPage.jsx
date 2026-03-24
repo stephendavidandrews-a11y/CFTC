@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
+import { useToastContext } from "../../contexts/ToastContext";
 import useApi from "../../hooks/useApi";
 import { getPerson, deletePerson, getPersonProfile, getContextNotesByEntity } from "../../api/tracker";
 import Badge from "../../components/shared/Badge";
@@ -142,6 +143,7 @@ function formatDate(d) {
 
 export default function PersonDetailPage() {
   const { id } = useParams();
+  const toast = useToastContext();
   const navigate = useNavigate();
   const { openDrawer } = useDrawer();
   const [deleting, setDeleting] = useState(false);
@@ -167,9 +169,9 @@ export default function PersonDetailPage() {
       navigate("/people");
     } catch (err) {
       if (err.status === 409) {
-        alert("This person was modified by someone else. Please refresh and review before deleting.");
+        toast.warning("This person was modified. Please refresh before deleting.");
       } else {
-        alert("Failed to delete: " + (err.message || String(err)));
+        toast.error("Failed to delete: " + (err.message || String(err)));
       }
       setDeleting(false);
       setShowDeleteConfirm(false);

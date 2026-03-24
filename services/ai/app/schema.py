@@ -390,6 +390,32 @@ TABLES = [
         updated_at TEXT DEFAULT (datetime('now'))
     )"""),
 
+
+    # ---- Table: meeting_intelligence ----
+    ("meeting_intelligence", """CREATE TABLE IF NOT EXISTS meeting_intelligence (
+        id TEXT PRIMARY KEY,
+        communication_id TEXT NOT NULL REFERENCES communications(id),
+        tracker_meeting_id TEXT,
+        summary TEXT,
+        key_decisions TEXT,
+        action_items TEXT,
+        relationship_dynamics TEXT,
+        strategic_context TEXT,
+        model_used TEXT,
+        prompt_version TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+    )"""),
+
+    # ---- Table: page_visits (telemetry) ----
+    ("page_visits", """CREATE TABLE IF NOT EXISTS page_visits (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        page_path TEXT NOT NULL,
+        entity_type TEXT,
+        entity_id TEXT,
+        visited_at TEXT DEFAULT (datetime('now'))
+    )"""),
+
 ]
 
 # ---------------------------------------------------------------------------

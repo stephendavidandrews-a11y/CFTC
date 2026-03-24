@@ -29,6 +29,8 @@ import BundleReviewQueuePage from "./pages/review/BundleReviewQueuePage";
 import BundleReviewDetailPage from "./pages/review/BundleReviewDetailPage";
 import CommitQueuePage from "./pages/review/CommitQueuePage";
 import CommunicationsArchivePage from "./pages/review/CommunicationsArchivePage";
+import ParticipantReviewQueuePage from "./pages/review/ParticipantReviewQueuePage";
+import ParticipantReviewDetailPage from "./pages/review/ParticipantReviewDetailPage";
 
 // -- Developer --
 import DeveloperPage from "./pages/developer/DeveloperPage";
@@ -43,13 +45,7 @@ import WeeklyBriefPage from "./pages/intelligence/WeeklyBriefPage";
 import DirectivesPage from "./pages/tracker/DirectivesPage";
 import DirectiveDetailPage from "./pages/tracker/DirectiveDetailPage";
 
-// -- Intelligence / Settings stubs --
-const AIPlaceholder = ({ title }) => (
-  <div style={{ padding: 40, color: "#94a3b8" }}>
-    <h2>{title}</h2>
-    <p>This page will be implemented in a later phase.</p>
-  </div>
-);
+
 
 export default function App() {
   return (
@@ -80,6 +76,8 @@ export default function App() {
           <Route path="/review/speakers/:id" element={<SpeakerReviewDetailPage />} />
           <Route path="/review/entities" element={<EntityReviewQueuePage />} />
           <Route path="/review/entities/:id" element={<EntityReviewDetailPage />} />
+          <Route path="/review/participants" element={<ParticipantReviewQueuePage />} />
+          <Route path="/review/participants/:id" element={<ParticipantReviewDetailPage />} />
           <Route path="/review/bundles" element={<BundleReviewQueuePage />} />
           <Route path="/review/bundles/:id" element={<BundleReviewDetailPage />} />
           <Route path="/review/commit" element={<CommitQueuePage />} />

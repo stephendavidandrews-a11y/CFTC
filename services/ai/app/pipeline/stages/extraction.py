@@ -33,6 +33,69 @@ PROMPT_DIR = PROMPT_BASE_DIR / "extraction"
 
 MAX_EXTRACTION_ATTEMPTS = 3
 
+CONTEXT_NOTE_CATEGORIES = {
+    "people_insight",
+    "process_note",
+    "policy_operating_rule",
+    "strategic_context",
+    "culture_climate",
+    "relationship_dynamic",
+}
+CONTEXT_NOTE_CATEGORY_ALIASES = {
+    "institutional_knowledge": "process_note",
+    "strategic_priorities": "strategic_context",
+    "process_change": "process_note",
+    "organizational_history": "culture_climate",
+    "interagency_relations": "relationship_dynamic",
+}
+CONTEXT_NOTE_POSTURES = {"factual", "attributed_view"}
+PERSON_PROFILE_FIELDS = {
+    "birthday",
+    "spouse_name",
+    "children_count",
+    "children_names",
+    "hometown",
+    "current_city",
+    "prior_roles_summary",
+    "education_summary",
+    "interests",
+    "personal_notes_summary",
+    "scheduling_notes",
+    "relationship_preferences",
+    "leadership_notes",
+}
+PERSON_PEOPLE_FIELDS = {
+    "relationship_category",
+    "email",
+    "phone",
+    "assistant_name",
+    "assistant_contact",
+    "substantive_areas",
+    "manager_person_id",
+}
+PERSON_DETAIL_FIELDS = PERSON_PROFILE_FIELDS | PERSON_PEOPLE_FIELDS
+CURRENT_ROLE_MARKERS = (
+    "key contact",
+    "contact for",
+    "go-between",
+    "go between",
+    "go to",
+    "liaison",
+    "coordinator",
+    "serves as",
+    "acts as",
+)
+PRIOR_ROLE_MARKERS = (
+    "previously",
+    "before this",
+    "former",
+    "spent",
+    "worked at",
+    "worked in",
+    "years at",
+    "came from",
+)
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 1. System prompt loading
@@ -49,6 +112,158 @@ def _load_system_prompt(version: str) -> str:
     if not prompt_path.exists():
         raise FileNotFoundError(f"Extraction prompt not found: {prompt_path}")
     return prompt_path.read_text(encoding="utf-8")
+
+
+def _first_source_speaker(item) -> Optional[str]:
+    """Return the first speaker named in source evidence, if any."""
+    for ev in getattr(item, "source_evidence", []) or []:
+        speaker = getattr(ev, "speaker", None)
+        if speaker is None and isinstance(ev, dict):
+            speaker = ev.get("speaker")
+        if speaker:
+            return speaker
+    return None
+
+
+def _choose_context_note_category(title: str, body: str, raw_category: Optional[str]) -> str:
+    """Map model-emitted context note categories into the canonical set."""
+    if raw_category in CONTEXT_NOTE_CATEGORIES:
+        return raw_category
+    if raw_category in CONTEXT_NOTE_CATEGORY_ALIASES:
+        return CONTEXT_NOTE_CATEGORY_ALIASES[raw_category]
+
+    text = f"{title} {body}".lower()
+    if any(token in text for token in ("priority", "priorities", "strategic", "agenda")):
+        return "strategic_context"
+    if any(token in text for token in ("culture", "morale", "toxic", "collaborative")):
+        return "culture_climate"
+    if any(token in text for token in ("oira", "sec", "treasury", "harmonization", "coordination", "relationship")):
+        return "relationship_dynamic"
+    if any(token in text for token in ("draft", "hold the pen", "lead on rule", "operating rule", "expects")):
+        return "policy_operating_rule"
+    if any(token in text for token in ("process", "workflow", "how the office works")):
+        return "process_note"
+    return "process_note"
+
+
+def _choose_context_note_posture(raw_posture: Optional[str], speaker_attribution: Optional[str]) -> str:
+    """Map posture drift into the canonical posture set."""
+    if raw_posture in CONTEXT_NOTE_POSTURES:
+        return raw_posture
+    return "attributed_view" if speaker_attribution else "factual"
+
+
+def _normalize_context_note_item(item, repair_log: list[dict]):
+    """Repair common context_note shape drift into contract-safe form."""
+    data = item.proposed_data
+    title = data.get("title", "")
+
+    if "body" not in data and data.get("content"):
+        data["body"] = data.pop("content")
+        repair_log.append({
+            "item_type": "context_note",
+            "title": title,
+            "repair": "content_to_body",
+        })
+
+    if "tags" in data:
+        data.pop("tags", None)
+        repair_log.append({
+            "item_type": "context_note",
+            "title": title,
+            "repair": "removed_tags",
+        })
+
+    body = data.get("body", "")
+    mapped_category = _choose_context_note_category(title, body, data.get("category"))
+    if mapped_category != data.get("category"):
+        repair_log.append({
+            "item_type": "context_note",
+            "title": title,
+            "repair": "category_normalized",
+            "from": data.get("category"),
+            "to": mapped_category,
+        })
+        data["category"] = mapped_category
+
+    speaker_attribution = data.get("speaker_attribution") or _first_source_speaker(item)
+    mapped_posture = _choose_context_note_posture(data.get("posture"), speaker_attribution)
+    if mapped_posture != data.get("posture"):
+        repair_log.append({
+            "item_type": "context_note",
+            "title": title,
+            "repair": "posture_normalized",
+            "from": data.get("posture"),
+            "to": mapped_posture,
+        })
+        data["posture"] = mapped_posture
+
+    if mapped_posture == "attributed_view" and speaker_attribution and not data.get("speaker_attribution"):
+        data["speaker_attribution"] = speaker_attribution
+        repair_log.append({
+            "item_type": "context_note",
+            "title": title,
+            "repair": "speaker_attribution_filled",
+            "value": speaker_attribution,
+        })
+
+    if data.get("sensitivity") == "medium":
+        data["sensitivity"] = "moderate"
+        repair_log.append({
+            "item_type": "context_note",
+            "title": title,
+            "repair": "sensitivity_normalized",
+            "from": "medium",
+            "to": "moderate",
+        })
+
+
+def _looks_like_current_role_note(text: str) -> bool:
+    """Return True when the text looks like a current liaison/contact note, not career history."""
+    lowered = (text or "").lower()
+    if not lowered:
+        return False
+    has_current_role_markers = any(marker in lowered for marker in CURRENT_ROLE_MARKERS)
+    has_prior_role_markers = any(marker in lowered for marker in PRIOR_ROLE_MARKERS)
+    return has_current_role_markers and not has_prior_role_markers
+
+
+def _normalize_person_detail_update_item(item, repair_log: list[dict]):
+    """Repair person_detail_update payloads into the writeback shape."""
+    data = item.proposed_data
+    person_name = data.get("person_name") or data.get("person_id")
+    fields = data.get("fields", {})
+    if not isinstance(fields, dict):
+        fields = {}
+
+    moved_fields = []
+    for key in list(data.keys()):
+        if key in PERSON_DETAIL_FIELDS:
+            fields.setdefault(key, data.pop(key))
+            moved_fields.append(key)
+
+    if moved_fields:
+        repair_log.append({
+            "item_type": "person_detail_update",
+            "person": person_name,
+            "repair": "moved_top_level_fields_into_fields",
+            "fields": moved_fields,
+        })
+
+    prior_roles = fields.get("prior_roles_summary")
+    if isinstance(prior_roles, str) and _looks_like_current_role_note(prior_roles):
+        existing_notes = fields.get("personal_notes_summary")
+        fields["personal_notes_summary"] = (
+            f"{existing_notes}\n{prior_roles}" if existing_notes else prior_roles
+        )
+        fields.pop("prior_roles_summary", None)
+        repair_log.append({
+            "item_type": "person_detail_update",
+            "person": person_name,
+            "repair": "current_role_note_moved_out_of_prior_roles",
+        })
+
+    data["fields"] = fields
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -191,7 +406,9 @@ def _tier_context(full_context: dict, signals: dict) -> dict:
             for stk in m.get("stakeholders", []):
                 # stakeholder data from ai-context uses full_name, we need
                 # to check by person_id in the matter_people join
-                pass
+                if stk.get("person_id") in all_person_ids and stk.get("person_id"):
+                    is_tier_1 = True
+                    break
 
         # Linked entity org is one of the matter's org roles
         if not is_tier_1 and eo_ids:
@@ -208,7 +425,9 @@ def _tier_context(full_context: dict, signals: dict) -> dict:
             for org in m.get("organizations", []):
                 # org data from ai-context doesn't include organization_id
                 # directly — it has 'name' and 'organization_role'
-                pass
+                if org.get("organization_id") in eo_ids and org.get("organization_id"):
+                    is_tier_1 = True
+                    break
 
         # RIN match
         if not is_tier_1 and id_hits["rin"]:
@@ -469,7 +688,7 @@ def _build_user_prompt(
     else:
         segments = db.execute("""
             SELECT id, speaker_label, start_time, end_time,
-                   cleaned_text, raw_text
+                   reviewed_text, cleaned_text, raw_text
             FROM transcripts
             WHERE communication_id = ?
             ORDER BY start_time
@@ -488,7 +707,12 @@ def _build_user_prompt(
                 "speaker_name": speaker_names.get(seg["speaker_label"], seg["speaker_label"]),
                 "start": seg["start_time"],
                 "end": seg["end_time"],
-                "text": seg["cleaned_text"] or seg["raw_text"] or "",
+                "text": (
+                    seg["reviewed_text"]
+                    or seg["cleaned_text"]
+                    or seg["raw_text"]
+                    or ""
+                ),
             })
         sections.append(_wrap("transcript", f"```json\n{json.dumps(transcript_data, indent=2)}\n```"))
 
@@ -894,6 +1118,7 @@ def _post_process(
         "dedup_warnings": [],
         "invalid_references_cleaned": [],
         "name_resolutions": [],
+        "shape_repairs": [],
         "update_validation_warnings": [],
         "ref_validation_warnings": [],
         "legacy_follow_up_conversions": 0,
@@ -907,6 +1132,12 @@ def _post_process(
 
     # ── Step 1.5: Resolve entity names to UUIDs ──
     log["name_resolutions"] = _resolve_entity_names(extraction, full_context)
+    for bundle in extraction.bundles:
+        for item in bundle.items:
+            if item.item_type == "context_note":
+                _normalize_context_note_item(item, log["shape_repairs"])
+            elif item.item_type == "person_detail_update":
+                _normalize_person_detail_update_item(item, log["shape_repairs"])
 
     # ── Step 1.7: Validate $ref: references between items ──
     log["ref_validation_warnings"] = _validate_tracks_task_refs(extraction)

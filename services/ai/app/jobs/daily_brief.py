@@ -1,14 +1,18 @@
 """Daily brief data assembly and generation.
 
-Queries tracker and AI databases to assemble the 5-section daily brief:
+Queries tracker and AI databases to assemble the 7-section daily brief:
 1. What Changed Overnight (system_events delta)
 2. Today's Action List (merged priority: boss, deadline, blocked, overdue, review)
 3. Today's Meetings (with Haiku prep narratives)
 4. Follow-Ups Due (people + uncommitted action items)
 5. Team Pulse (overdue by assignee, waiting, overload)
+6. Comment Deadlines (comment periods closing within 30 days + topic progress)
+7. Directives Watch (new or approaching-deadline directives)
 
 Cost: ~$0.02/day (one Haiku call for meeting prep narratives).
 """
+from __future__ import annotations
+
 import json
 import logging
 import os
@@ -16,13 +20,6 @@ import uuid
 from datetime import date, datetime, timedelta
 
 import httpx
-
-try:
-    from dotenv import load_dotenv
-    import os as _os
-    load_dotenv(_os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))), ".env"))
-except ImportError:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -143,22 +140,18 @@ def _assemble_action_list(db) -> list[dict]:
 
     # Review-pending communications
     rows = db.execute(
-        "SELECT id, title, processing_status, source_type, created_at FROM communications WHERE processing_status LIKE 'awaiting%'"
+        "SELECT id, title, status, source_type, created_at FROM communications WHERE status LIKE 'awaiting%'"
     ).fetchall()
     for row in rows:
         created = row["created_at"] or ""
-        p_status = row["processing_status"]
-        s_type = row["source_type"]
-        r_title = row["title"] or (s_type + " communication")
-        r_id = row["id"]
         actions.append({
             "tag": "REVIEW",
             "priority": 4,
-            "title": r_title,
+            "title": row["title"] or f"{row['source_type']} communication",
             "matter": "",
-            "detail": f"Stage: {p_status}, Since: {created[:10]}",
+            "detail": f"Stage: {row['status']}, Since: {created[:10]}",
             "entity_type": "communication",
-            "entity_id": r_id,
+            "entity_id": row["id"],
             "sort_key": created,
         })
 
@@ -197,29 +190,22 @@ def _assemble_meetings() -> list[dict]:
 def _assemble_followups() -> list[dict]:
     """Section 4: people needing follow-up + uncommitted action items."""
     cutoff = (date.today() + timedelta(days=3)).isoformat()
-    # Get all active people and filter client-side for next_interaction
-    people = _tracker_get("/people")
+    people = _tracker_get("/people", {"next_interaction_before": cutoff, "sort": "next_interaction_needed_date"})
     if isinstance(people, dict):
         people = people.get("items", [])
 
     followups = []
     for p in people:
-        next_date = p.get("next_interaction_needed_date")
-        if not next_date:
-            continue
-        if next_date > cutoff:
-            continue
         followups.append({
             "person_id": p.get("id"),
             "name": p.get("full_name", ""),
             "organization": p.get("org_name", ""),
             "category": p.get("relationship_category", ""),
-            "lane": p.get("relationship_lane", ""),
-            "next_date": next_date,
+            "lane": p.get("relationship_category", ""),
+            "next_date": p.get("next_interaction_needed_date", ""),
             "interaction_type": p.get("next_interaction_type", ""),
             "purpose": p.get("next_interaction_purpose", ""),
         })
-    followups.sort(key=lambda x: x["next_date"])
     return followups
 
 
@@ -250,8 +236,114 @@ def _assemble_team_pulse(intel_data: dict | None = None) -> dict:
     }
 
 
+def _assemble_comment_deadlines() -> list[dict]:
+    """Section 6: Comment periods closing within 30 days with topic progress."""
+    today = date.today()
+    horizon = (today + timedelta(days=30)).isoformat()
+    matters = _tracker_get("/matters", {"limit": "200"})
+    if isinstance(matters, dict):
+        matters = matters.get("items", [])
+
+    results = []
+    for m in matters:
+        status = m.get("status", "")
+        if status in ("closed", "archived", "withdrawn"):
+            continue
+        deadline = m.get("external_deadline")
+        if not deadline:
+            continue
+        # Include if:
+        # - deadline in future and within 60 days (upcoming)
+        # - OR deadline in past but within 30 days (recently expired, may still need work)
+        past_cutoff = (today - timedelta(days=30)).isoformat()
+        future_cutoff = (today + timedelta(days=60)).isoformat()
+        if deadline < past_cutoff or deadline > future_cutoff:
+            continue
+
+        try:
+            dl_date = date.fromisoformat(deadline)
+            days_remaining = (dl_date - today).days
+        except (ValueError, TypeError):
+            continue
+
+        # Fetch comment topics for this matter
+        topics_resp = _tracker_get(f"/matters/{m['id']}/comment-topics")
+        topics = topics_resp.get("items", []) if isinstance(topics_resp, dict) else []
+
+        total_topics = len(topics)
+        total_questions = 0
+        status_counts = {}
+        for t in topics:
+            ps = t.get("position_status", "open")
+            status_counts[ps] = status_counts.get(ps, 0) + 1
+            # Count questions from nested list if present
+            questions = t.get("questions", [])
+            total_questions += len(questions)
+
+        results.append({
+            "matter_id": m.get("id"),
+            "matter_title": m.get("title", ""),
+            "comment_deadline": deadline,
+            "days_remaining": days_remaining,
+            "total_topics": total_topics,
+            "total_questions": total_questions,
+            "status_counts": status_counts,
+            "position_taken": status_counts.get("position_taken", 0),
+            "owner": m.get("next_step_owner_name") or m.get("owner_name", ""),
+            "priority": m.get("priority", ""),
+        })
+
+    results.sort(key=lambda x: x["days_remaining"])
+    return results
+
+
+def _assemble_directives_watch() -> list[dict]:
+    """Section 7: Policy directives with approaching deadlines or recent additions."""
+    today = date.today()
+    horizon = (today + timedelta(days=14)).isoformat()
+    directives_resp = _tracker_get("/policy-directives", {"limit": "50"})
+    directives = directives_resp.get("items", []) if isinstance(directives_resp, dict) else []
+
+    watch_items = []
+    for d in directives:
+        impl_status = d.get("implementation_status", "")
+        if impl_status in ("implemented", "superseded"):
+            continue
+
+        deadline = d.get("compliance_deadline")
+        days_remaining = None
+        if deadline:
+            try:
+                dl_date = date.fromisoformat(deadline)
+                days_remaining = (dl_date - today).days
+            except (ValueError, TypeError):
+                pass
+
+        # Include if deadline within 14 days or recently created (within 7 days)
+        created = d.get("created_at", "")[:10]
+        is_recent = created >= (today - timedelta(days=7)).isoformat() if created else False
+        is_approaching = days_remaining is not None and 0 <= days_remaining <= 14
+
+        if is_recent or is_approaching:
+            watch_items.append({
+                "id": d.get("id"),
+                "title": d.get("directive_title", ""),
+                "source_type": d.get("source_document_type", ""),
+                "issued_by": d.get("issuing_authority", ""),
+                "compliance_deadline": deadline,
+                "days_remaining": days_remaining,
+                "implementation_status": impl_status,
+                "priority_level": d.get("priority_level", ""),
+                "is_recent": is_recent,
+            })
+
+    # Sort: approaching deadlines first, then recent additions
+    watch_items.sort(key=lambda x: (x["days_remaining"] if x["days_remaining"] is not None else 999))
+    return watch_items
+
+
 def assemble_daily_data(db) -> dict:
-    """Assemble all 5 sections of the daily brief.
+    """Assemble all 7 sections of the daily brief.
 
     Args:
         db: AI service database connection (sqlite3).
@@ -272,14 +364,18 @@ def assemble_daily_data(db) -> dict:
         "meetings": _assemble_meetings(),
         "followups": _assemble_followups(),
         "team_pulse": _assemble_team_pulse(),
+        "comment_deadlines": _assemble_comment_deadlines(),
+        "directives_watch": _assemble_directives_watch(),
     }
 
     logger.info(
-        "Daily data: %d changes, %d actions, %d meetings, %d follow-ups",
+        "Daily data: %d changes, %d actions, %d meetings, %d follow-ups, %d comment deadlines, %d directives",
         len(data["what_changed"]),
         len(data["action_list"]),
         len(data["meetings"]),
         len(data["followups"]),
+        len(data["comment_deadlines"]),
+        len(data["directives_watch"]),
     )
     return data
 

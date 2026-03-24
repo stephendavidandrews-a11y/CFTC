@@ -29,7 +29,6 @@ const ACTION_LABELS = {
   new_matter: "New Matters",
   new_person: "New People",
   new_organization: "New Organizations",
-  follow_up: "Follow-ups",
   document: "Documents",
 };
 
@@ -46,7 +45,6 @@ const EXTRACTION_LABELS = {
   propose_meeting_records: "Meeting Records",
   propose_new_matters: "New Matters",
   propose_stakeholders: "Stakeholders",
-  propose_follow_ups: "Follow-ups",
   propose_new_people: "New People",
   propose_new_organizations: "New Organizations",
   propose_status_changes: "Status Changes",

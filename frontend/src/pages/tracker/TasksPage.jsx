@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
+import { useToastContext } from "../../contexts/ToastContext";
 import useApi from "../../hooks/useApi";
 import { listTasks, listPeople, getEnums, updateTask, deleteTask } from "../../api/tracker";
 import DataTable from "../../components/shared/DataTable";
@@ -334,6 +335,7 @@ function taskTitleColumn() {
 
 export default function TasksPage() {
   const navigate = useNavigate();
+  const toast = useToastContext();
   const { openDrawer } = useDrawer();
   const { ownerId } = useOwner();
   const [search, setSearch] = useState("");
@@ -383,7 +385,7 @@ export default function TasksPage() {
         refetch();
       } catch (err) {
         console.error(`Task ${action} failed:`, err);
-        alert(`Failed to ${action} task: ${err.message || err}`);
+        toast.error(`Failed to ${action} task: ${err.message || err}`);
       } finally {
         setActionBusy((prev) => ({ ...prev, [id]: false }));
       }

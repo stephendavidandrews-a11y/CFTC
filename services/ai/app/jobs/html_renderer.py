@@ -111,7 +111,7 @@ def _render_meeting_item(m):
     location = m.get("location", "")
 
     detail_parts = [p for p in [start, mtype, location] if p]
-    detail_line = " • ".join(detail_parts)
+    detail_line = " \u2022 ".join(detail_parts)
 
     parts = [
         f'<div style="padding:10px 0;border-bottom:1px solid {CARD_BORDER};">',
@@ -149,8 +149,8 @@ def _render_followup_item(f_item):
         org_html = f'<span style="color:{TEXT_MUTED};font-size:12px;margin-left:6px;">{org}</span>'
 
     detail_parts = [p for p in [itype, purpose] if p]
-    detail = " • ".join(detail_parts)
-    detail_str = f' • {detail}' if detail else ""
+    detail = " \u2022 ".join(detail_parts)
+    detail_str = f' \u2022 {detail}' if detail else ""
 
     return (
         f'<div style="padding:6px 0;border-bottom:1px solid {CARD_BORDER};font-size:13px;">'
@@ -177,33 +177,33 @@ def render_daily_html(data):
     changes = data.get("what_changed", [])
     if changes:
         items = [_render_change_item(c) for c in changes[:20]]
-        sections.append(_section(f"What Changed ({len(changes)})", "\n".join(items), ""))
+        sections.append(_section(f"What Changed ({len(changes)})", "\n".join(items), "\U0001F504"))
     else:
-        sections.append(_section("What Changed", _empty("No changes since last brief."), ""))
+        sections.append(_section("What Changed", _empty("No changes since last brief."), "\U0001F504"))
 
     # Section 2: Action List
     actions = data.get("action_list", [])
     if actions:
         items = [_render_action_item(a) for a in actions[:15]]
-        sections.append(_section(f"Action List ({len(actions)})", "\n".join(items), ""))
+        sections.append(_section(f"Action List ({len(actions)})", "\n".join(items), "\U0001F4CB"))
     else:
-        sections.append(_section("Action List", _empty("No action items today."), ""))
+        sections.append(_section("Action List", _empty("No action items today."), "\U0001F4CB"))
 
     # Section 3: Meetings
     meetings = data.get("meetings", [])
     if meetings:
         items = [_render_meeting_item(m) for m in meetings]
-        sections.append(_section(f"Today\u2019s Meetings ({len(meetings)})", "\n".join(items), ""))
+        sections.append(_section(f"Today\u2019s Meetings ({len(meetings)})", "\n".join(items), "\U0001F4C5"))
     else:
-        sections.append(_section("Today\u2019s Meetings", _empty("No meetings today."), ""))
+        sections.append(_section("Today\u2019s Meetings", _empty("No meetings today."), "\U0001F4C5"))
 
     # Section 4: Follow-Ups
     followups = data.get("followups", [])
     if followups:
         items = [_render_followup_item(f_item) for f_item in followups[:10]]
-        sections.append(_section(f"Follow-Ups Due ({len(followups)})", "\n".join(items), ""))
+        sections.append(_section(f"Follow-Ups Due ({len(followups)})", "\n".join(items), "\U0001F4DE"))
     else:
-        sections.append(_section("Follow-Ups Due", _empty("No follow-ups due in the next 3 days."), ""))
+        sections.append(_section("Follow-Ups Due", _empty("No follow-ups due in the next 3 days."), "\U0001F4DE"))
 
     # Section 5: Team Pulse
     pulse = data.get("team_pulse", {})
@@ -227,19 +227,75 @@ def render_daily_html(data):
     if not pulse_lines:
         pulse_lines.append(f'<div style="font-size:13px;color:{GREEN};">No team execution risks today.</div>')
 
-    sections.append(_section("Team Pulse", "\n".join(pulse_lines), ""))
+    sections.append(_section("Team Pulse", "\n".join(pulse_lines), "\U0001F465"))
+
+    # Section 6: Comment Deadlines
+    comment_dls = data.get("comment_deadlines", [])
+    if comment_dls:
+        cd_items = []
+        for cd in comment_dls:
+            days = cd.get("days_remaining", 0)
+            urgency = RED if days <= 7 else ORANGE if days <= 14 else ACCENT
+            status_counts = cd.get("status_counts", {})
+            taken = status_counts.get("position_taken", 0)
+            total = cd.get("total_topics", 0)
+            pct = round(taken / total * 100) if total else 0
+
+            # Progress bar
+            bar_color = GREEN if pct >= 75 else ORANGE if pct >= 25 else RED
+            progress_bar = (
+                f'<div style="display:inline-block;width:80px;height:6px;background:{CARD_BORDER};'
+                f'border-radius:3px;overflow:hidden;vertical-align:middle;margin-left:8px;">'
+                f'<div style="width:{pct}%;height:100%;background:{bar_color};border-radius:3px;"></div></div>'
+                f'<span style="font-size:11px;color:{TEXT_MUTED};margin-left:4px;">{taken}/{total}</span>'
+            )
+
+            cd_items.append(
+                f'<div style="padding:8px 0;border-bottom:1px solid {CARD_BORDER};">'
+                f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+                f'<span style="font-size:14px;font-weight:500;">{cd.get("matter_title", "")[:60]}</span>'
+                f'<span style="color:{urgency};font-size:12px;font-weight:600;">{days}d</span></div>'
+                f'<div style="font-size:12px;color:{TEXT_MUTED};margin-top:4px;">'
+                f'Deadline: {cd.get("comment_deadline", "")} \u2022 '
+                f'{cd.get("total_questions", 0)} questions \u2022 '
+                f'Progress: {progress_bar}</div></div>'
+            )
+        sections.append(_section(f"Comment Deadlines ({len(comment_dls)})", "\n".join(cd_items), "\U0001F4AC"))
+    else:
+        sections.append(_section("Comment Deadlines", _empty("No comment periods closing in the next 30 days."), "\U0001F4AC"))
+
+    # Section 7: Directives Watch
+    dir_watch = data.get("directives_watch", [])
+    if dir_watch:
+        dw_items = []
+        for dw in dir_watch:
+            days = dw.get("days_remaining")
+            if days is not None:
+                urgency = RED if days <= 3 else ORANGE if days <= 7 else ACCENT
+                deadline_str = f'<span style="color:{urgency};font-weight:600;">{days}d to deadline</span>'
+            else:
+                deadline_str = '<span style="color:{};font-size:11px;">NEW</span>'.format(GREEN)
+            dw_items.append(
+                f'<div style="padding:6px 0;border-bottom:1px solid {CARD_BORDER};font-size:13px;">'
+                f'<div style="font-weight:500;">{dw.get("title", "")}</div>'
+                f'<div style="font-size:12px;color:{TEXT_MUTED};margin-top:2px;">'
+                f'{dw.get("source_type", "")} \u2022 {dw.get("issued_by", "")} \u2022 '
+                f'{dw.get("implementation_status", "")} \u2022 {deadline_str}</div></div>'
+            )
+        sections.append(_section(f"Directives Watch ({len(dir_watch)})", "\n".join(dw_items), "\U0001F3AF"))
+    else:
+        sections.append(_section("Directives Watch", _empty("No directives requiring attention."), "\U0001F3AF"))
 
     # Footer
     footer = (
         f'<div style="text-align:center;padding:16px 0;font-size:11px;color:{TEXT_FAINT};">'
-        f'Generated by CFTC AI Layer • '
+        f'Generated by CFTC AI Layer \u2022 '
         f'<a href="https://cftc.stephenandrews.org" style="color:{ACCENT};text-decoration:none;">Open Dashboard</a>'
         f'</div>'
     )
     sections.append(footer)
 
-    return _wrap(f"CFTC Daily Brief — {d}", "\n".join(sections))
-
+    return _wrap(f"CFTC Daily Brief \u2014 {d}", "\n".join(sections))
 
 
 # ── Weekly Brief ─────────────────────────────────────────────────────────
@@ -273,17 +329,17 @@ def render_weekly_html(data):
             f'<div><span style="color:{ORANGE};font-weight:600;">{cal.get("wrong", 0)}</span> wrong</div>'
             f'</div>'
         )
-        sections.append(_section("What I Got Wrong", cal_html, ""))
+        sections.append(_section("What I Got Wrong", cal_html, "\U0001F3AF"))
     else:
         msg = cal.get("message", "No calibration data available.")
-        sections.append(_section("What I Got Wrong", _empty(msg), ""))
+        sections.append(_section("What I Got Wrong", _empty(msg), "\U0001F3AF"))
 
     # Section 1: Executive Summary
     summary = data.get("executive_summary")
     if summary:
-        sections.append(_section("Executive Summary", f'<div style="font-size:14px;line-height:1.6;color:{TEXT};">{summary}</div>', ""))
+        sections.append(_section("Executive Summary", f'<div style="font-size:14px;line-height:1.6;color:{TEXT};">{summary}</div>', "\U0001F4DD"))
     else:
-        sections.append(_section("Executive Summary", _empty("Executive summary not generated."), ""))
+        sections.append(_section("Executive Summary", _empty("Executive summary not generated."), "\U0001F4DD"))
 
     # Section 2: Portfolio Health
     portfolio = data.get("portfolio", {})
@@ -309,23 +365,23 @@ def render_weekly_html(data):
                 f'<div style="padding:6px 0;border-bottom:1px solid {CARD_BORDER};font-size:13px;">'
                 f'<span style="font-weight:500;">{m.get("title", "")}</span>'
                 f'<div style="font-size:11px;color:{TEXT_MUTED};margin-top:2px;">'
-                f'{m.get("status", "")} • {dl} • {owner}</div></div>'
+                f'{m.get("status", "")} \u2022 {dl} \u2022 {owner}</div></div>'
             )
         portfolio_html.append('</div>')
-    sections.append(_section(f'Portfolio Health ({portfolio.get("total_active", 0)})', "\n".join(portfolio_html) or _empty("No active matters."), ""))
+    sections.append(_section(f'Portfolio Health ({portfolio.get("total_active", 0)})', "\n".join(portfolio_html) or _empty("No active matters."), "\U0001F4CA"))
 
     # Section 3: Decision Docket
     decisions = data.get("decisions", [])
     if decisions:
         dec_items = []
-        for d in decisions:
-            due = d.get("due_date") or "no date"
-            owner = d.get("decision_owner") or "unassigned"
+        for dec in decisions:
+            due = dec.get("due_date") or "no date"
+            owner = dec.get("decision_owner") or "unassigned"
             dec_items.append(
                 f'<div style="padding:6px 0;border-bottom:1px solid {CARD_BORDER};font-size:13px;">'
-                f'<span style="font-weight:500;">{d.get("title", "")}</span>'
+                f'<span style="font-weight:500;">{dec.get("title", "")}</span>'
                 f'<div style="font-size:11px;color:{TEXT_MUTED};margin-top:2px;">'
-                f'{d.get("matter_title", "")} • {owner} • Due: {due} • {d.get("status", "")}</div></div>'
+                f'{dec.get("matter_title", "")} \u2022 {owner} \u2022 Due: {due} \u2022 {dec.get("status", "")}</div></div>'
             )
         sections.append(_section(f"Decision Docket ({len(decisions)})", "\n".join(dec_items), "\u2696\uFE0F"))
     else:
@@ -344,7 +400,9 @@ def render_weekly_html(data):
             team_html.append(
                 f'<div style="padding:4px 0;font-size:13px;">'
                 f'<span style="font-weight:500;">{w.get("name", "")}</span>'
-                f' — {w.get("open_tasks", 0)} tasks, {w.get("open_matters", 0)} matters{overdue_badge}</div>'
+                f' \u2014 {w.get("open_tasks", 0)} tasks, {w.get("open_matters", 0)} matters'
+                + (f', {w.get("open_topics", 0)} topics' if w.get("open_topics") else '')
+                + f'{overdue_badge}</div>'
             )
         team_html.append('</div>')
     drifting = team.get("drifting_matters", [])
@@ -353,9 +411,9 @@ def render_weekly_html(data):
         for dm in drifting:
             team_html.append(
                 f'<div style="padding:3px 0;font-size:12px;color:{TEXT_MUTED};">'
-                f'{dm.get("title", "")} — {dm.get("days_stale", 0)}d stale — {dm.get("owner", "")}</div>'
+                f'{dm.get("title", "")} \u2014 {dm.get("days_stale", 0)}d stale \u2014 {dm.get("owner", "")}</div>'
             )
-    sections.append(_section("Team View", "\n".join(team_html) or _empty("No team data."), ""))
+    sections.append(_section("Team View", "\n".join(team_html) or _empty("No team data."), "\U0001F465"))
 
     # Section 5: Stakeholders
     stak = data.get("stakeholders", {})
@@ -368,7 +426,7 @@ def render_weekly_html(data):
                 f'<div style="padding:4px 0;font-size:13px;border-bottom:1px solid {CARD_BORDER};">'
                 f'<span style="font-weight:500;">{tp.get("name", "")}</span>'
                 f' <span style="color:{TEXT_MUTED};font-size:12px;">{tp.get("organization", "")}</span>'
-                f'<div style="font-size:11px;color:{TEXT_MUTED};">{tp.get("next_date", "")} • {tp.get("purpose", "")}</div></div>'
+                f'<div style="font-size:11px;color:{TEXT_MUTED};">{tp.get("next_date", "")} \u2022 {tp.get("purpose", "")}</div></div>'
             )
     neglected = stak.get("neglected", [])
     if neglected:
@@ -376,9 +434,9 @@ def render_weekly_html(data):
         for n in neglected:
             stak_html.append(
                 f'<div style="padding:3px 0;font-size:12px;color:{TEXT_MUTED};">'
-                f'{n.get("name", "")} ({n.get("category", "")}) — {n.get("days_since", 0)} days since last contact</div>'
+                f'{n.get("name", "")} ({n.get("category", "")}) \u2014 {n.get("days_since", 0)} days since last contact</div>'
             )
-    sections.append(_section("Stakeholders", "\n".join(stak_html) or _empty("No stakeholder actions needed."), ""))
+    sections.append(_section("Stakeholders", "\n".join(stak_html) or _empty("No stakeholder actions needed."), "\U0001F91D"))
 
     # Section 6: Deadlines
     dl_data = data.get("deadlines", {})
@@ -390,9 +448,9 @@ def render_weekly_html(data):
             for item in items:
                 dl_html.append(
                     f'<div style="padding:3px 0;font-size:12px;color:{TEXT_MUTED};">'
-                    f'{item.get("date", "")} • {item.get("deadline_type", "")} • {item.get("matter_title", "")} • {item.get("owner", "")}</div>'
+                    f'{item.get("date", "")} \u2022 {item.get("deadline_type", "")} \u2022 {item.get("matter_title", "")} \u2022 {item.get("owner", "")}</div>'
                 )
-    sections.append(_section("Deadlines & Horizon", "\n".join(dl_html) or _empty("No upcoming deadlines."), ""))
+    sections.append(_section("Deadlines & Horizon", "\n".join(dl_html) or _empty("No upcoming deadlines."), "\U0001F4C6"))
 
     # Section 7: Documents
     docs = data.get("documents", {})
@@ -400,11 +458,11 @@ def render_weekly_html(data):
         doc_html = []
         for status, items in docs.items():
             doc_html.append(f'<div style="font-size:12px;font-weight:600;color:{TEXT_MUTED};margin:6px 0 3px;">{status} ({len(items)})</div>')
-            for d in items:
-                doc_html.append(f'<div style="padding:2px 0;font-size:12px;color:{TEXT_MUTED};">{d.get("title", "")}</div>')
-        sections.append(_section("Documents Pipeline", "\n".join(doc_html), ""))
+            for doc in items:
+                doc_html.append(f'<div style="padding:2px 0;font-size:12px;color:{TEXT_MUTED};">{doc.get("title", "")}</div>')
+        sections.append(_section("Documents Pipeline", "\n".join(doc_html), "\U0001F4C4"))
     else:
-        sections.append(_section("Documents Pipeline", _empty("No documents tracked."), ""))
+        sections.append(_section("Documents Pipeline", _empty("No documents tracked."), "\U0001F4C4"))
 
     # Section 8: Risks
     risks = data.get("risks", {})
@@ -415,7 +473,7 @@ def render_weekly_html(data):
             risk_html.append(
                 f'<div style="padding:4px 0;font-size:13px;border-bottom:1px solid {CARD_BORDER};">'
                 f'<span style="font-weight:500;">{r.get("title", "")}</span>'
-                f'<div style="font-size:11px;color:{TEXT_MUTED};">{r.get("sensitivity", "")} • {r.get("status", "")} • Boss: {r.get("boss_involvement", "none")}</div></div>'
+                f'<div style="font-size:11px;color:{TEXT_MUTED};">{r.get("sensitivity", "")} \u2022 {r.get("status", "")} \u2022 Boss: {r.get("boss_involvement", "none")}</div></div>'
             )
         sections.append(_section(f"Risk Register ({len(high)})", "\n".join(risk_html), "\u26A0\uFE0F"))
     else:
@@ -435,7 +493,7 @@ def render_weekly_html(data):
         hyg_html += '<div style="font-size:12px;">'
         for c in sorted(checks, key=lambda x: x.get("pct", 0)):
             bar_color = GREEN if c["pct"] >= 80 else ORANGE if c["pct"] >= 50 else RED
-            field = c.get("field", "").replace(".", " → ")
+            field = c.get("field", "").replace(".", " \u2192 ")
             hyg_html += (
                 f'<div style="display:flex;align-items:center;gap:8px;padding:3px 0;">'
                 f'<span style="width:180px;color:{TEXT_MUTED};">{field}</span>'
@@ -445,142 +503,91 @@ def render_weekly_html(data):
                 f'</div>'
             )
         hyg_html += '</div>'
-    sections.append(_section("Data Hygiene", hyg_html, ""))
+    sections.append(_section("Data Hygiene", hyg_html, "\U0001F9F9"))
+
+    # Section 10: Rulemaking Comment Progress
+    cp = data.get("comment_progress", {})
+    cp_matters = cp.get("matters", [])
+    cp_totals = cp.get("totals", {})
+    if cp_matters:
+        cp_html = []
+        # Summary header
+        sb = cp_totals.get("status_breakdown", {})
+        cp_html.append(
+            f'<div style="display:flex;justify-content:center;gap:16px;margin-bottom:16px;font-size:13px;">'
+            f'<div><span style="font-weight:600;color:{GREEN};">{sb.get("position_taken", 0)}</span> positions taken</div>'
+            f'<div><span style="font-weight:600;color:{ACCENT};">{sb.get("drafting", 0) + sb.get("final_review", 0)}</span> in progress</div>'
+            f'<div><span style="font-weight:600;color:{ORANGE};">{sb.get("open", 0) + sb.get("not_started", 0)}</span> not started</div>'
+            f'</div>'
+        )
+        for cm in cp_matters:
+            pct = cm.get("completion_pct", 0)
+            bar_color = GREEN if pct >= 75 else ORANGE if pct >= 25 else RED
+            dr = cm.get("days_remaining")
+            deadline_str = f'{dr}d remaining' if dr is not None else "no deadline"
+            deadline_color = RED if dr is not None and dr <= 14 else TEXT_MUTED
+
+            cp_html.append(
+                f'<div style="padding:10px 0;border-bottom:1px solid {CARD_BORDER};">'
+                f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+                f'<span style="font-size:14px;font-weight:500;">{cm.get("matter_title", "")[:55]}</span>'
+                f'<span style="color:{deadline_color};font-size:12px;">{deadline_str}</span></div>'
+                f'<div style="display:flex;align-items:center;gap:8px;margin-top:6px;">'
+                f'<span style="font-size:12px;color:{TEXT_MUTED};">{cm["total_topics"]} topics, {cm["total_questions"]} questions</span>'
+                f'<div style="flex:1;height:8px;background:{CARD_BORDER};border-radius:4px;overflow:hidden;">'
+                f'<div style="width:{pct}%;height:100%;background:{bar_color};border-radius:4px;"></div></div>'
+                f'<span style="font-size:12px;font-weight:600;color:{bar_color};">{pct}%</span>'
+                f'</div></div>'
+            )
+        sections.append(_section(
+            f"Rulemaking Comment Progress ({cp_totals.get('total_topics', 0)} topics)",
+            "\n".join(cp_html), "\U0001F4AC"
+        ))
+    else:
+        sections.append(_section("Rulemaking Comment Progress", _empty("No comment topics tracked."), "\U0001F4AC"))
+
+    # Section 11: Policy Directives Status
+    dir_status = data.get("directives_status", {})
+    if dir_status.get("has_data"):
+        ds_html = []
+        by_st = dir_status.get("by_status", {})
+        ds_html.append(
+            '<div style="display:flex;justify-content:center;gap:16px;margin-bottom:12px;font-size:13px;">'
+        )
+        for st, count in by_st.items():
+            label = st.replace("_", " ").title()
+            ds_html.append(f'<div><span style="font-weight:600;">{count}</span> {label}</div>')
+        ds_html.append('</div>')
+
+        overdue_dir = dir_status.get("overdue", [])
+        if overdue_dir:
+            ds_html.append(f'<div style="font-size:12px;font-weight:600;color:{RED};margin:8px 0 4px;">Overdue ({len(overdue_dir)})</div>')
+            for od in overdue_dir:
+                ds_html.append(
+                    f'<div style="padding:4px 0;font-size:12px;color:{TEXT_MUTED};">'
+                    f'{od.get("title", "")} \u2022 {od.get("deadline", "")} \u2022 {abs(od.get("days_remaining", 0))}d overdue</div>'
+                )
+        upcoming_dir = dir_status.get("upcoming", [])
+        if upcoming_dir:
+            ds_html.append(f'<div style="font-size:12px;font-weight:600;color:{ORANGE};margin:8px 0 4px;">Approaching ({len(upcoming_dir)})</div>')
+            for ud in upcoming_dir:
+                ds_html.append(
+                    f'<div style="padding:4px 0;font-size:12px;color:{TEXT_MUTED};">'
+                    f'{ud.get("title", "")} \u2022 {ud.get("deadline", "")} \u2022 {ud.get("days_remaining", 0)}d</div>'
+                )
+        if not overdue_dir and not upcoming_dir:
+            ds_html.append(f'<div style="font-size:13px;color:{GREEN};">All directives on track.</div>')
+        sections.append(_section(f"Policy Directives ({dir_status.get('total', 0)})", "\n".join(ds_html), "\U0001F4DC"))
+    else:
+        sections.append(_section("Policy Directives", _empty("No policy directives tracked."), "\U0001F4DC"))
 
     # Footer
     footer = (
         f'<div style="text-align:center;padding:16px 0;font-size:11px;color:{TEXT_FAINT};">'
-        f'Generated by CFTC AI Layer • '
+        f'Generated by CFTC AI Layer \u2022 '
         f'<a href="https://cftc.stephenandrews.org" style="color:{ACCENT};text-decoration:none;">Open Dashboard</a>'
         f'</div>'
     )
     sections.append(footer)
 
-    return _wrap(f"CFTC Weekly Brief — {d}", "\n".join(sections))
-
-
-
-# ── Dev Report ───────────────────────────────────────────────────────────
-
-def render_dev_report_html(data):
-    """Render weekly dev report as HTML email."""
-    d = data.get("date_display", "Dev Report")
-    overall = data.get("overall_score", 0)
-    overall_color = GREEN if overall >= 80 else ORANGE if overall >= 60 else RED
-
-    header = (
-        f'<div style="text-align:center;padding:24px 0 16px;">'
-        f'<div style="font-size:11px;text-transform:uppercase;letter-spacing:2px;'
-        f'color:{TEXT_FAINT};margin-bottom:4px;">CFTC App Health</div>'
-        f'<div style="font-size:20px;font-weight:600;color:{TEXT};">{d}</div>'
-        f'<div style="font-size:48px;font-weight:700;color:{overall_color};margin-top:12px;">{overall}%</div>'
-        f'<div style="font-size:12px;color:{TEXT_MUTED};">Overall Data Completeness</div></div>'
-    )
-
-    sections = [header]
-
-    # Entity analyses (verbose format)
-    for entity_key in ["matters", "tasks", "people", "meetings", "decisions"]:
-        analysis = data.get("entity_analyses", {}).get(entity_key, {})
-        entity_name = analysis.get("entity", entity_key).title()
-        total = analysis.get("total", 0)
-        fields = analysis.get("fields", [])
-
-        if not fields:
-            sections.append(_section(f"{entity_name} ({total})", _empty(f"No {entity_key} to analyze."), ""))
-            continue
-
-        field_html = []
-        for f in fields:
-            pct = f.get("pct", 0)
-            bar_color = GREEN if pct >= 80 else ORANGE if pct >= 50 else RED
-            source_badge = ""
-            if f.get("source") == "ai":
-                source_badge = ' <span style="background:#1e3a5f;color:#60a5fa;padding:1px 5px;border-radius:3px;font-size:9px;">AI</span>'
-            elif f.get("source") == "manual":
-                source_badge = ' <span style="background:#1f2937;color:#9ca3af;padding:1px 5px;border-radius:3px;font-size:9px;">MANUAL</span>'
-
-            field_html.append(
-                f'<div style="padding:8px 0;border-bottom:1px solid {CARD_BORDER};">'
-                f'<div style="display:flex;align-items:center;justify-content:space-between;">'
-                f'<div><span style="font-weight:500;font-size:13px;">{f.get("field", "")}</span>{source_badge}</div>'
-                f'<span style="font-size:12px;color:{TEXT_MUTED};">{f.get("populated", 0)}/{f.get("total", 0)} ({pct}%)</span></div>'
-                f'<div style="height:4px;background:{CARD_BORDER};border-radius:2px;margin:6px 0;overflow:hidden;">'
-                f'<div style="width:{pct}%;height:100%;background:{bar_color};border-radius:2px;"></div></div>'
-                f'<div style="font-size:11px;color:{TEXT_FAINT};font-style:italic;">'
-                f'Purpose: {f.get("purpose", "")}. If empty: {f.get("impact", "")}</div>'
-            )
-
-            # Enum distribution
-            dist = f.get("distribution")
-            if dist:
-                dist_parts = []
-                for val, count in dist.items():
-                    is_empty = val == "NOT SET"
-                    style = f"color:{RED};font-weight:600;" if is_empty else f"color:{TEXT_MUTED};"
-                    dist_parts.append(f'<span style="{style}">{val}: {count}</span>')
-                field_html.append(
-                    f'<div style="font-size:11px;margin-top:4px;">{" • ".join(dist_parts)}</div>'
-                )
-
-            field_html.append('</div>')
-
-        sections.append(_section(f"{entity_name} ({total} records)", "\n".join(field_html), ""))
-
-    # Context Notes
-    cn = data.get("context_notes", {})
-    if cn.get("total", 0) > 0:
-        cn_html = f'<div style="font-size:13px;">Total: {cn["total"]}</div>'
-        if cn.get("by_source"):
-            cn_html += f'<div style="font-size:12px;color:{TEXT_MUTED};margin-top:4px;">Sources: {", ".join(f"{k}: {v}" for k, v in cn["by_source"].items())}</div>'
-        if cn.get("by_category"):
-            cn_html += f'<div style="font-size:12px;color:{TEXT_MUTED};margin-top:4px;">Categories: {", ".join(f"{k}: {v}" for k, v in cn["by_category"].items())}</div>'
-        cn_html += f'<div style="font-size:12px;color:{TEXT_MUTED};margin-top:4px;">Avg entity links per note: {cn.get("avg_links", 0)}</div>'
-        sections.append(_section("Context Notes", cn_html, ""))
-    else:
-        sections.append(_section("Context Notes", _empty("No context notes exist yet."), ""))
-
-    # Pipeline Quality
-    pipe = data.get("pipeline", {})
-    pipe_html = (
-        f'<div style="display:flex;gap:24px;justify-content:center;margin-bottom:12px;font-size:13px;">'
-        f'<div style="text-align:center;"><div style="font-size:24px;font-weight:700;color:{GREEN};">{pipe.get("accept_rate", 0)}%</div>Accept</div>'
-        f'<div style="text-align:center;"><div style="font-size:24px;font-weight:700;color:{ORANGE};">{pipe.get("edit_rate", 0)}%</div>Edit</div>'
-        f'<div style="text-align:center;"><div style="font-size:24px;font-weight:700;color:{RED};">{pipe.get("reject_rate", 0)}%</div>Reject</div>'
-        f'</div>'
-        f'<div style="font-size:12px;color:{TEXT_MUTED};text-align:center;">'
-        f'{pipe.get("communications_processed", 0)} communications • '
-        f'{pipe.get("total_review_actions", 0)} review actions • '
-        f'${pipe.get("total_spend", 0):.2f} LLM spend</div>'
-    )
-    sections.append(_section("Pipeline Quality", pipe_html, ""))
-
-    # Page Visits
-    visits = data.get("page_visits", [])
-    if visits:
-        visit_html = []
-        for pv in visits[:15]:
-            visit_html.append(
-                f'<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;">'
-                f'<span style="color:{TEXT_MUTED};">{pv.get("page", "")}</span>'
-                f'<span style="font-weight:500;">{pv.get("visits", 0)}x</span></div>'
-            )
-        sections.append(_section("Page Visits This Week", "\n".join(visit_html), ""))
-    else:
-        sections.append(_section("Page Visits", _empty("No page visits recorded yet."), ""))
-
-    # Suggestions
-    suggestions = data.get("suggestions", [])
-    if suggestions:
-        sug_html = []
-        for s in suggestions:
-            sug_html.append(f'<div style="padding:4px 0;font-size:13px;color:{TEXT};">• {s}</div>')
-        sections.append(_section("Suggestions", "\n".join(sug_html), ""))
-
-    footer = (
-        f'<div style="text-align:center;padding:16px 0;font-size:11px;color:{TEXT_FAINT};">'
-        f'Generated by CFTC AI Layer • Zero LLM cost</div>'
-    )
-    sections.append(footer)
-
-    return _wrap(f"CFTC App Health — {d}", "\n".join(sections))
+    return _wrap(f"CFTC Weekly Brief \u2014 {d}", "\n".join(sections))
