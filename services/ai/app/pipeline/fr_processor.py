@@ -52,8 +52,131 @@ RE_FOOTNOTE_BLOCK = re.compile(
 RE_SECTION_HEADING = re.compile(r"^([A-Z])\.\s+(.+?)$", re.MULTILINE)
 
 
+def _strip_html(text: str) -> str:
+    """Strip HTML tags from FR text. Handles <pre>-wrapped content."""
+    if not text or "<" not in text:
+        return text
+    # Extract content from <pre> blocks (most common FR HTML format)
+    pre_match = re.search(r"<pre[^>]*>(.*?)</pre>", text, re.DOTALL | re.IGNORECASE)
+    if pre_match:
+        text = pre_match.group(1)
+    else:
+        # Generic HTML tag stripping
+        text = re.sub(r"<[^>]+>", "", text)
+    # Decode common HTML entities
+    text = text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+    text = text.replace("&quot;", '"').replace("&#39;", "'").replace("&nbsp;", " ")
+    return text
+
+
+def _find_comment_section(text: str) -> str:
+    """Extract the portion of FR text that contains comment questions.
+
+    Strategy (priority order):
+    1. Look for "Question N:" patterns — most reliable for NPRMs
+    2. Look for explicit section headers ("Questions and Request for Comment")
+    3. Look for "The Commission requests comment" near numbered paragraphs
+    4. If none found, return empty (no questions in this document)
+
+    For documents with questions scattered throughout, returns everything
+    from slightly before the first question to the last question.
+    """
+    # Phase 1: Look for numbered question patterns first (most reliable)
+    q_label_matches = list(re.finditer(
+        r"\n\s{0,8}Question\s+(\d+[a-z]?)\s*:", text, re.IGNORECASE
+    ))
+    if q_label_matches:
+        # Found "Question N:" patterns — return from first to last + buffer
+        first = q_label_matches[0].start()
+        last = q_label_matches[-1].start()
+        # Back up 500 chars before first to capture any preamble
+        start = max(0, first - 500)
+        # Forward 3000 chars after last question start to capture full text
+        end = min(len(text), last + 3000)
+        # But try to find a real end marker
+        tail = text[last:]
+        for pat in [
+            r"\nList\s+of\s+Subjects",
+            r"\nRegulatory\s+Flexibility\s+Act",
+            r"\nSection\s+15\(a\)",
+            r"\nConsideration\s+of\s+the\s+Costs",
+            r"\nCost.Benefit\s+Consideration",
+            r"\nAppendix\s+[A-Z]",
+            r"\nAuthority:",
+            r"\nPART\s+\d+",
+            r"\nIssued\s+in\s+Washington",
+            r"\nDated:",
+        ]:
+            m = re.search(pat, tail[200:], re.IGNORECASE)
+            if m:
+                end = last + 200 + m.start()
+                break
+        return text[start:end]
+
+    # Phase 2: Try explicit section headers (ANPRM style)
+    header_patterns = [
+        r"(?:II|III|IV|V|VI)\.\s*Questions?\s+(?:and\s+)?Request\s+for\s+Comment",
+        r"Solicitation\s+of\s+Comments?",
+        r"Questions?\s+for\s+(?:Public\s+)?Comment",
+    ]
+
+    best_start = -1
+    for pat in header_patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            if best_start == -1 or m.start() < best_start:
+                best_start = m.start()
+
+    if best_start != -1:
+        section_text = text[best_start:]
+        for pat in [
+            r"\nList\s+of\s+Subjects",
+            r"\nRegulatory\s+Flexibility\s+Act",
+            r"\nSection\s+15\(a\)",
+            r"\nConsideration\s+of\s+the\s+Costs",
+            r"\nCost.Benefit\s+Consideration",
+            r"\nAppendix\s+[A-Z]",
+            r"\nAuthority:",
+            r"\nPART\s+\d+",
+            r"\nIssued\s+in\s+Washington",
+            r"\nDated:",
+        ]:
+            m = re.search(pat, section_text[500:], re.IGNORECASE)
+            if m:
+                section_text = section_text[:500 + m.start()]
+                break
+        return section_text
+
+    # Phase 3: Look for numbered paragraph patterns near "Commission requests comment"
+    m = re.search(
+        r"The\s+Commission\s+(?:is\s+)?request(?:s|ing)\s+comment",
+        text, re.IGNORECASE
+    )
+    if m:
+        nearby = text[m.start():m.start() + 10000]
+        if re.search(r"^\s{4,}\d+[a-z]?\.\s+\w", nearby, re.MULTILINE):
+            start = m.start()
+            section_text = text[start:]
+            for pat in [
+                r"\nList\s+of\s+Subjects",
+                r"\nRegulatory\s+Flexibility",
+                r"\nConsideration\s+of\s+the\s+Costs",
+                r"\nAuthority:",
+                r"\nIssued\s+in\s+Washington",
+                r"\nDated:",
+            ]:
+                m2 = re.search(pat, section_text[500:], re.IGNORECASE)
+                if m2:
+                    section_text = section_text[:500 + m2.start()]
+                    break
+            return section_text
+
+    return ""
+
+
 def _clean_text(text: str) -> str:
     """Remove FR formatting artifacts from text."""
+    text = _strip_html(text)
     text = RE_PAGE_BREAK.sub("", text)
     text = RE_FOOTNOTE_REF.sub("", text)
     # Remove footnote blocks (dashed lines + footnote text)
@@ -78,12 +201,23 @@ def extract_questions(full_text: str) -> list[dict]:
     """
     Extract numbered questions from FR document full text.
 
+    Only extracts from "Request for Comment" / "Questions" sections.
     Returns list of {question_number, question_text, section_heading, sort_order}.
     """
     if not full_text:
         return []
 
-    cleaned = _clean_text(full_text)
+    # Strip HTML first
+    stripped = _strip_html(full_text)
+
+    # Try to scope to comment/question sections only
+    comment_section = _find_comment_section(stripped)
+    if comment_section:
+        cleaned = _clean_text(comment_section)
+    else:
+        # No comment section found — this doc probably doesn't have questions
+        # (e.g., final rules, corrections, fee schedules)
+        return []
     lines = cleaned.split("\n")
 
     questions = []
