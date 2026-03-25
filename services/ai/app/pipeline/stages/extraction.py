@@ -1,6 +1,6 @@
 """Sonnet extraction stage — matter-centered intelligence extraction.
 
-Pipeline position: entities_confirmed → **extracting** → awaiting_bundle_review
+Pipeline position: associations_confirmed → **extracting** → awaiting_bundle_review
 
 Takes confirmed speakers, cleaned transcript, enrichment data, and reviewed
 entities. Fetches tracker context, builds a tiered prompt, calls Sonnet 4.6,
@@ -33,9 +33,7 @@ from app.pipeline.stages.extraction_models import (
 # All implementations now live in focused submodules.
 from app.pipeline.stages.extraction_context import (  # noqa: F401
     _fetch_tracker_context,
-    _gather_tiering_signals,
-    _scan_for_identifiers,
-    _tier_context,
+    build_extraction_context,
 )
 from app.pipeline.stages.extraction_prompts import (  # noqa: F401
     _load_system_prompt,
@@ -364,20 +362,24 @@ async def run_extraction_stage(db, communication_id: str) -> dict:
     # Load system prompt
     system_prompt = _load_system_prompt(prompt_version)
 
-    # Fetch full tracker context
-    full_context = await _fetch_tracker_context()
+    # Build extraction context using confirmed enrichment associations
+    tiered = await build_extraction_context(db, communication_id)
+
+    # Extract full context for snapshot storage
+    full_context = tiered.pop("_full_context", {})
     full_context_json = json.dumps(full_context, ensure_ascii=False, default=str)
 
-    # Gather tiering signals and build tiered context
-    signals = _gather_tiering_signals(db, communication_id)
-    tiered = _tier_context(full_context, signals)
-
     logger.info(
-        "[%s] Context tiered: %d T1 matters, %d T2 matters, %d meetings",
+        "[%s] Context built: %d T1 matters, %d T2 matters, %d T1 directives, "
+        "%d T1 people, %d T1 meetings, %d intents, %d intel flags",
         communication_id[:8],
         tiered["tier_stats"]["tier_1_matter_count"],
         tiered["tier_stats"]["tier_2_matter_count"],
+        tiered["tier_stats"].get("tier_1_directive_count", 0),
+        tiered["tier_stats"].get("tier_1_people_count", 0),
         tiered["tier_stats"]["tier_1_meeting_count"],
+        len(tiered.get("segment_intents", [])),
+        len(tiered.get("intelligence_flags", [])),
     )
 
     # Build user prompt
