@@ -19,6 +19,7 @@ lint:
 	$(TRACKER_VENV)/ruff check services/tracker/
 	$(AI_VENV)/ruff check services/ai/
 	$(INTAKE_VENV)/ruff check services/intake/
+	@scripts/lint-jsx-unicode.sh
 
 format:
 	$(TRACKER_VENV)/ruff format services/tracker/
