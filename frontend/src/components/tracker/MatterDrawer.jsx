@@ -244,53 +244,71 @@ export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
 
   return (
     <DrawerShell isOpen={isOpen} onClose={onClose} title={matter ? "Edit Matter" : "New Matter"}>
+      {/* Core — always visible, no section wrapper */}
       {renderInput("Title *", "title", "text", { required: true })}
       {renderSelect("Matter Type *", "matter_type", enums.matter_type)}
-      <div style={{ marginBottom: 14 }}>
-        <label style={LABEL_STYLE}>Description</label>
-        <textarea style={{ ...INPUT_STYLE, minHeight: 80, resize: "vertical" }} value={form.description} onChange={set("description")} />
-      </div>
-      <div style={{ marginBottom: 14 }}>
-        <label style={LABEL_STYLE}>Problem Statement</label>
-        <textarea style={{ ...INPUT_STYLE, minHeight: 80, resize: "vertical" }} value={form.problem_statement} onChange={set("problem_statement")} />
-      </div>
-      <div style={{ marginBottom: 14 }}>
-        <label style={LABEL_STYLE}>Why It Matters</label>
-        <textarea style={{ ...INPUT_STYLE, minHeight: 80, resize: "vertical" }} value={form.why_it_matters} onChange={set("why_it_matters")} />
-      </div>
       {renderSelect("Status", "status", enums.status)}
       {renderSelect("Priority", "priority", enums.priority)}
-      {renderSelect("Sensitivity", "sensitivity", enums.sensitivity)}
-      {renderSelect("Boss Involvement", "boss_involvement_level", enums.boss_involvement)}
-      {renderSelect("Risk Level", "risk_level", enums.risk_level)}
       {renderSelect("Owner", "assigned_to_person_id", personOpts)}
-      {renderSelect("Supervisor", "supervisor_person_id", personOpts)}
-      {renderSelect("Client Organization", "client_organization_id", orgOpts)}
-      {renderSelect("Requesting Organization", "requesting_organization_id", orgOpts)}
-      {renderSelect("Reviewing Organization", "reviewing_organization_id", orgOpts)}
-      {renderSelect("Lead External Organization", "lead_external_org_id", orgOpts)}
-      {renderInput("Work Deadline", "work_deadline", "date")}
-      {renderInput("External Deadline", "external_deadline", "date")}
-      {renderInput("Revisit Date", "revisit_date", "date")}
-      {renderInput("Decision Deadline", "decision_deadline", "date")}
-      {renderInput("Opened Date", "opened_date", "date")}
-      {renderInput("Next Step", "next_step")}
-      {renderSelect("Next Step Owner", "next_step_assigned_to_person_id", personOpts)}
-      {form.status && form.status !== "closed" && !form.next_step_assigned_to_person_id && (
-        <div style={{ color: theme.accent.yellow, fontSize: 11, marginTop: -10, marginBottom: 10 }}>Consider assigning a next step owner</div>
-      )}
-      <div style={{ marginBottom: 14 }}>
-        <label style={LABEL_STYLE}>Pending Decision</label>
-        <textarea style={{ ...INPUT_STYLE, minHeight: 60, resize: "vertical" }} value={form.pending_decision} onChange={set("pending_decision")} placeholder="What decision is pending?" />
-      </div>
-      {isRulemaking && renderInput("RIN", "rin")}
-      {isRulemaking && renderSelect("Regulatory Stage", "regulatory_stage", enums.regulatory_stage)}
-      {isRulemaking && renderInput("FR Citation", "federal_register_citation")}
-      {isRulemaking && renderSelect("Unified Agenda Priority", "unified_agenda_priority", enums.unified_agenda_priority)}
-      {isRulemaking && renderInput("Docket Number", "docket_number")}
-      {isRulemaking && renderInput("CFR Citation", "cfr_citation")}
-      {isRulemaking && renderInput("FR Document Number", "fr_doc_number")}
 
+      {/* Workflow section */}
+      <FieldSection title="Workflow" defaultOpen={true}>
+        {renderInput("Next Step", "next_step")}
+        {renderSelect("Next Step Owner", "next_step_assigned_to_person_id", personOpts)}
+        {form.status && form.status !== "closed" && !form.next_step_assigned_to_person_id && (
+          <div style={{ color: theme.accent.yellow, fontSize: 11, marginTop: -10, marginBottom: 10 }}>Consider assigning a next step owner</div>
+        )}
+        <div style={{ marginBottom: 14 }}>
+          <label style={LABEL_STYLE}>Pending Decision</label>
+          <textarea style={{ ...INPUT_STYLE, minHeight: 60, resize: "vertical" }} value={form.pending_decision} onChange={set("pending_decision")} placeholder="What decision is pending?" />
+        </div>
+        {renderInput("Work Deadline", "work_deadline", "date")}
+        {renderInput("Decision Deadline", "decision_deadline", "date")}
+        {renderInput("External Deadline", "external_deadline", "date")}
+        {renderInput("Revisit Date", "revisit_date", "date")}
+        {renderInput("Opened Date", "opened_date", "date")}
+      </FieldSection>
+
+      {/* Context section */}
+      <FieldSection title="Context" defaultOpen={true}>
+        <div style={{ marginBottom: 14 }}>
+          <label style={LABEL_STYLE}>Description</label>
+          <textarea style={{ ...INPUT_STYLE, minHeight: 80, resize: "vertical" }} value={form.description} onChange={set("description")} />
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <label style={LABEL_STYLE}>Problem Statement</label>
+          <textarea style={{ ...INPUT_STYLE, minHeight: 80, resize: "vertical" }} value={form.problem_statement} onChange={set("problem_statement")} />
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <label style={LABEL_STYLE}>Why It Matters</label>
+          <textarea style={{ ...INPUT_STYLE, minHeight: 80, resize: "vertical" }} value={form.why_it_matters} onChange={set("why_it_matters")} />
+        </div>
+        {renderSelect("Sensitivity", "sensitivity", enums.sensitivity)}
+        {renderSelect("Boss Involvement", "boss_involvement_level", enums.boss_involvement)}
+        {renderSelect("Risk Level", "risk_level", enums.risk_level)}
+        {renderSelect("Supervisor", "supervisor_person_id", personOpts)}
+      </FieldSection>
+
+      {/* Organizations section */}
+      <FieldSection title="Organizations" defaultOpen={false}>
+        {renderSelect("Client Organization", "client_organization_id", orgOpts)}
+        {renderSelect("Requesting Organization", "requesting_organization_id", orgOpts)}
+        {renderSelect("Reviewing Organization", "reviewing_organization_id", orgOpts)}
+        {renderSelect("Lead External Organization", "lead_external_org_id", orgOpts)}
+      </FieldSection>
+
+      {/* Rulemaking section — only visible when matter_type === rulemaking */}
+      <FieldSection title="Rulemaking" defaultOpen={false} visible={isRulemaking}>
+        {renderInput("RIN", "rin")}
+        {renderSelect("Regulatory Stage", "regulatory_stage", enums.regulatory_stage)}
+        {renderInput("FR Citation", "federal_register_citation")}
+        {renderSelect("Unified Agenda Priority", "unified_agenda_priority", enums.unified_agenda_priority)}
+        {renderInput("Docket Number", "docket_number")}
+        {renderInput("CFR Citation", "cfr_citation")}
+        {renderInput("FR Document Number", "fr_doc_number")}
+      </FieldSection>
+
+      {/* Conditional banners and closed fields — no section wrapper */}
       {form.status === "parked / monitoring" && !form.revisit_date && (
         <div style={{ color: theme.accent.yellow, fontSize: 12, marginBottom: 10, padding: "6px 10px", background: "#422006", borderRadius: 6, border: "1px solid #854d0e" }}>Revisit date is recommended for parked/monitoring matters</div>
       )}
