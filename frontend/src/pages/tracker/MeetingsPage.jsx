@@ -9,38 +9,7 @@ import EmptyState from "../../components/shared/EmptyState";
 import { useDrawer } from "../../contexts/DrawerContext";
 import { formatDateTime } from "../../utils/dateUtils";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
-
-const cardStyle = {
-  background: theme.bg.card,
-  borderRadius: 10,
-  border: `1px solid ${theme.border.default}`,
-  padding: 24,
-};
-
-const titleStyle = { fontSize: 22, fontWeight: 700, color: theme.text.primary, marginBottom: 4 };
-const subtitleStyle = { fontSize: 13, color: theme.text.dim, marginBottom: 24 };
-
-const inputStyle = {
-  background: theme.bg.input,
-  border: `1px solid ${theme.border.default}`,
-  borderRadius: 6,
-  padding: "7px 12px",
-  fontSize: 13,
-  color: theme.text.secondary,
-  outline: "none",
-  minWidth: 140,
-};
-
-const btnPrimary = {
-  padding: "8px 18px",
-  borderRadius: 6,
-  fontSize: 13,
-  fontWeight: 600,
-  background: theme.accent.blue,
-  color: "#fff",
-  border: "none",
-  cursor: "pointer",
-};
+import { titleStyle, subtitleStyle, inputStyle, btnPrimary, cardStyle } from "../../styles/pageStyles";
 
 const actionBtnStyle = {
   background: "transparent",
@@ -52,7 +21,6 @@ const actionBtnStyle = {
   lineHeight: 1,
   transition: "background 0.15s",
 };
-
 
 function defaultDateRange() {
   const today = new Date();
