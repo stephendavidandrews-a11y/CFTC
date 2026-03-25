@@ -6,7 +6,6 @@ import AppShell from "./components/layout/AppShell";
 import CommandPalette from "./components/shared/CommandPalette";
 
 // -- Tracker (Operations) --
-import TrackerDashboardPage from "./pages/tracker/TrackerDashboardPage";
 import MattersPage from "./pages/tracker/MattersPage";
 import MatterDetailPage from "./pages/tracker/MatterDetailPage";
 import TrackerTasksPage from "./pages/tracker/TasksPage";
@@ -58,7 +57,6 @@ export default function App() {
         <Route element={<AppShell />}>
           {/* -- Operations (Tracker) -- */}
           <Route index element={<TodayPage />} />
-          <Route path="/dashboard" element={<TrackerDashboardPage />} />
           <Route path="/today" element={<TodayPage />} />
           <Route path="/matters" element={<MattersPage />} />
           <Route path="/matters/:id" element={<MatterDetailPage />} />
