@@ -1,55 +1,42 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import theme from "../../styles/theme";
+import useReviewCounts from "../../hooks/useReviewCounts";
 
 const SECTIONS = [
-  // -- Operations --
   { separator: true, label: "Operations" },
-  { path: "/", label: "Today", icon: "\u25eb" },
-  { path: "/matters", label: "Matters", icon: "\u25a4" },
-  { path: "/people", label: "People", icon: "\u22a1" },
-  { path: "/organizations", label: "Organizations", icon: "\u2b21" },
+  { path: "/", label: "Today", icon: "\u25EB" },
+  { path: "/matters", label: "Matters", icon: "\u25A4" },
   { path: "/tasks", label: "Tasks", icon: "\u2611" },
-  { path: "/team-workload", label: "Team Workload", icon: "\u2630" },
-  { path: "/directives", label: "Directives", icon: "\u25b7" },
-    { path: "/meetings", label: "Meetings", icon: "\u229e" },
+  { path: "/people", label: "People", icon: "\u22A1" },
+  { path: "/organizations", label: "Organizations", icon: "\u229E" },
+  { path: "/meetings", label: "Meetings", icon: "\u229E" },
   { path: "/decisions", label: "Decisions", icon: "\u2696" },
-  { path: "/documents", label: "Documents", icon: "\u2b1a" },
-  { path: "/context-notes", label: "Context", icon: "\u2261" },
+  { path: "/documents", label: "Documents", icon: "\u25DA" },
 
-  // -- AI Review --
-  { separator: true, label: "AI Review" },
-  { path: "/review/communications", label: "Communications", icon: "◎" },
-  { path: "/review/speakers", label: "Speaker Review", icon: "\u25ce" },
-  { path: "/review/participants", label: "Participant Review", icon: "\u2461" },
-  { path: "/review/entities", label: "Entity Review", icon: "\u22a1" },
-  { path: "/review/bundles", label: "Bundle Review", icon: "\u25a4" },
-  { path: "/review/commit", label: "Ready to Commit", icon: "\u2611" },
+  { separator: true, label: "Review Pipeline" },
+  { path: "/review/communications", label: "Communications", icon: "\u25CE" },
+  { path: "/review/speakers", label: "Speaker Review", icon: "\u2460", countKey: "speakers" },
+  { path: "/review/participants", label: "Participant & Entity", icon: "\u2461", countKey: "participants" },
+  { path: "/review/bundles", label: "Bundle Review", icon: "\u25A4", countKey: "bundles" },
+  { path: "/review/commit", label: "Ready to Commit", icon: "\u2611", countKey: "commit" },
 
-  // -- Intelligence --
-  { separator: true, label: "Intelligence" },
-  { path: "/intelligence/daily", label: "Daily Brief", icon: "\u25cb" },
-  { path: "/intelligence/weekly", label: "Weekly Brief", icon: "\u25eb" },
-
-  // -- Settings --
-  { separator: true, label: "Settings" },
+  { separator: true, label: "Reference" },
+  { path: "/directives", label: "Directives", icon: "\u25B7" },
+  { path: "/context-notes", label: "Context Notes", icon: "\u2261" },
+  { path: "/intelligence/weekly", label: "Weekly Brief", icon: "\u25EB" },
   { path: "/settings/ai", label: "AI Configuration", icon: "\u2699" },
 
-  // -- Tools --
-  { separator: true, label: "Tools" },
-  { path: "https://cftctools.stephenandrews.org", label: "CFTC Tools", icon: "\u2b21", external: true },
-
-  // -- Developer --
   { separator: true, label: "Developer" },
-  { path: "/dashboard", label: "Dashboard (old)", icon: "\u25eb" },
   { path: "/developer", label: "Dev Console", icon: "\u2699" },
+  { path: "https://cftctools.stephenandrews.org", label: "CFTC Tools", icon: "\u229E", external: true },
 ];
 
 export default function Sidebar({ isMobile = false, onNavigate }) {
   // Collapsible sections — remember state in localStorage
   const [collapsed, setCollapsed] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem("sidebar-collapsed") || '{}');
+      return JSON.parse(localStorage.getItem("sidebar-collapsed") || "{}");
     } catch { return {}; }
   });
 
@@ -60,8 +47,10 @@ export default function Sidebar({ isMobile = false, onNavigate }) {
       return next;
     });
   };
+
   const navigate = useNavigate();
   const location = useLocation();
+  const reviewCounts = useReviewCounts();
 
   const handleClick = (path) => {
     navigate(path);
@@ -100,75 +89,90 @@ export default function Sidebar({ isMobile = false, onNavigate }) {
           let currentSection = "Operations";
           return SECTIONS.map((s, idx) => {
             if (s.separator) currentSection = s.label || currentSection;
-          if (s.separator) {
+            if (s.separator) {
+              return (
+                <div key={"sep-" + idx} style={{ margin: "8px 12px" }}>
+                  <div style={{ height: 1, background: theme.border.subtle }} />
+                  {s.label && (
+                    <div
+                      onClick={() => s.label !== "Operations" && toggleSection(s.label)}
+                      style={{
+                        fontSize: 9, fontWeight: 700, color: theme.text.faint,
+                        textTransform: "uppercase", letterSpacing: "0.08em",
+                        marginTop: 10, marginBottom: 2, paddingLeft: 4,
+                        cursor: s.label !== "Operations" ? "pointer" : "default",
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        userSelect: "none",
+                      }}
+                    >
+                      {s.label}
+                      {s.label !== "Operations" && (
+                        <span style={{ fontSize: 8, transition: "transform 0.2s", transform: collapsed[s.label] ? "rotate(-90deg)" : "rotate(0)" }}>
+                          &#x25BC;
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            // Hide items in collapsed sections
+            if (collapsed[currentSection]) return null;
+
+            const isActive = s.path.includes("?")
+              ? (location.pathname + location.search) === s.path
+              : location.pathname === s.path ||
+                (s.path !== "/" && location.pathname.startsWith(s.path));
+
+            const handleItemClick = s.external
+              ? () => { window.open(s.path, "_blank"); }
+              : () => handleClick(s.path);
+
             return (
-              <div key={"sep-" + idx} style={{ margin: "8px 12px" }}>
-                <div style={{ height: 1, background: theme.border.subtle }} />
-                {s.label && (
-                  <div
-                    onClick={() => s.label !== "Operations" && toggleSection(s.label)}
-                    style={{
-                      fontSize: 9, fontWeight: 700, color: theme.text.faint,
-                      textTransform: "uppercase", letterSpacing: "0.08em",
-                      marginTop: 10, marginBottom: 2, paddingLeft: 4,
-                      cursor: s.label !== "Operations" ? "pointer" : "default",
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      userSelect: "none",
-                    }}
-                  >
-                    {s.label}
-                    {s.label !== "Operations" && (
-                      <span style={{ fontSize: 8, transition: "transform 0.2s", transform: collapsed[s.label] ? "rotate(-90deg)" : "rotate(0)" }}>
-                        \u25BC
-                      </span>
-                    )}
-                  </div>
+              <button
+                key={s.path}
+                onClick={handleItemClick}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  width: "100%", padding: "9px 12px", borderRadius: 8,
+                  background: isActive ? "rgba(59,130,246,0.12)" : "transparent",
+                  color: isActive ? theme.accent.blueLight : theme.text.dim,
+                  border: isActive ? "1px solid rgba(59,130,246,0.2)" : "1px solid transparent",
+                  cursor: "pointer", fontSize: 13,
+                  fontWeight: isActive ? 600 : 500, marginBottom: 2,
+                  transition: "all 0.15s ease", textAlign: "left",
+                }}
+              >
+                <span style={{ fontSize: 14, width: 20, textAlign: "center" }}>{s.icon}</span>
+                <span style={{ flex: 1 }}>{s.label}</span>
+                {s.countKey && reviewCounts?.[s.countKey] > 0 && (
+                  <span style={{
+                    marginLeft: "auto",
+                    background: "rgba(59,130,246,0.15)",
+                    color: "#60a5fa",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: "2px 7px",
+                    borderRadius: 8,
+                    minWidth: 18,
+                    textAlign: "center",
+                  }}>
+                    {reviewCounts[s.countKey]}
+                  </span>
                 )}
-              </div>
+                {s.external && (
+                  <span style={{ fontSize: 10, color: theme.text.faint, opacity: 0.6 }}>&nearr;</span>
+                )}
+              </button>
             );
-          }
-
-          // Hide items in collapsed sections
-          if (collapsed[currentSection]) return null;
-
-          const isActive = s.path.includes("?")
-            ? (location.pathname + location.search) === s.path
-            : location.pathname === s.path ||
-              (s.path !== "/" && location.pathname.startsWith(s.path));
-
-          const handleItemClick = s.external
-            ? () => { window.open(s.path, "_blank"); }
-            : () => handleClick(s.path);
-
-          return (
-            <button
-              key={s.path}
-              onClick={handleItemClick}
-              style={{
-                display: "flex", alignItems: "center", gap: 10,
-                width: "100%", padding: "9px 12px", borderRadius: 8,
-                background: isActive ? "rgba(59,130,246,0.12)" : "transparent",
-                color: isActive ? theme.accent.blueLight : theme.text.dim,
-                border: isActive ? "1px solid rgba(59,130,246,0.2)" : "1px solid transparent",
-                cursor: "pointer", fontSize: 13,
-                fontWeight: isActive ? 600 : 500, marginBottom: 2,
-                transition: "all 0.15s ease", textAlign: "left",
-              }}
-            >
-              <span style={{ fontSize: 14, width: 20, textAlign: "center" }}>{s.icon}</span>
-              <span style={{ flex: 1 }}>{s.label}</span>
-              {s.external && (
-                <span style={{ fontSize: 10, color: theme.text.faint, opacity: 0.6 }}>&nearr;</span>
-              )}
-            </button>
-          );
           });
         })()}
       </nav>
 
       {/* Cmd+K hint */}
       <div style={{ padding: "4px 16px 0", fontSize: 10, color: theme.text.ghost }}>
-        ⌘K to search anywhere
+        &#x2318;K to search anywhere
       </div>
 
       {/* User */}
