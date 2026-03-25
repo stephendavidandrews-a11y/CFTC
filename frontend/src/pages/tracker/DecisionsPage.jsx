@@ -153,7 +153,7 @@ export default function DecisionsPage() {
           <DataTable
             columns={columns}
             data={filtered}
-            onRowClick={(row) => openDrawer("decision", row, refetch)}
+            onRowClick={(row) => navigate(`/decisions/${row.id}`)}
           />
         )}
       </div>

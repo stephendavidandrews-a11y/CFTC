@@ -109,7 +109,7 @@ export default function DocumentsPage() {
           <DataTable
             columns={columns}
             data={documents}
-            onRowClick={(row) => openDrawer("document", row, refetch)}
+            onRowClick={(row) => navigate(`/documents/${row.id}`)}
           />
         )}
       </div>
