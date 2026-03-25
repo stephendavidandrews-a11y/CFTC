@@ -15,6 +15,7 @@ import ConfirmDialog from "../../components/shared/ConfirmDialog";
 import { useDrawer } from "../../contexts/DrawerContext";
 import { useToastContext } from "../../contexts/ToastContext";
 import Breadcrumb from "../../components/shared/Breadcrumb";
+import { formatDate } from "../../utils/dateUtils";
 
 const STATUS_COLORS = {
   not_started: { bg: theme.bg.input, text: theme.text.dim },
@@ -44,7 +45,6 @@ const REL_COLORS = {
 };
 
 function fmt(val) { return val ? val.replace(/_/g, " ") : ""; }
-function formatDate(d) { return d ? new Date(d).toLocaleDateString() : "--"; }
 
 const cardStyle = {
   background: theme.bg.card, borderRadius: 10,
