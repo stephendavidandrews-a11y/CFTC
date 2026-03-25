@@ -20,6 +20,7 @@ import DataTable from "../../components/shared/DataTable";
 import EmptyState from "../../components/shared/EmptyState";
 import Breadcrumb from "../../components/shared/Breadcrumb";
 import { formatDate } from "../../utils/dateUtils";
+import ConfirmDialog from "../../components/shared/ConfirmDialog";
 
 const cardStyle = {
   background: theme.bg.card,
@@ -72,6 +73,8 @@ const POSITION_STATUS_COLORS = {
 };
 
 function CommentTopicsTab({ matterId }) {
+  const toast = useToastContext();
+  const [confirmDialog, setConfirmDialog] = React.useState({ open: false, title: "", message: "", onConfirm: null, danger: false });
   const [expandedId, setExpandedId] = React.useState(null);
   const [addingQuestion, setAddingQuestion] = React.useState(null);
   const [newQ, setNewQ] = React.useState({ question_number: "", question_text: "" });
@@ -83,12 +86,19 @@ function CommentTopicsTab({ matterId }) {
 
   const topics = topicsData?.items || [];
 
-  const handleDeleteTopic = async (topicId) => {
-    if (!window.confirm("Delete this topic and all its questions?")) return;
-    try {
-      await deleteCommentTopic(topicId);
-      refetch();
-    } catch (err) { toast.error(err.detail || "Delete failed"); }
+  const handleDeleteTopic = (topicId) => {
+    setConfirmDialog({
+      open: true,
+      title: "Delete Topic",
+      message: "Delete this topic and all its questions? This cannot be undone.",
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await deleteCommentTopic(topicId);
+          refetch();
+        } catch (err) { toast.error(err.detail || "Delete failed"); }
+      },
+    });
   };
 
   const handleAddQuestion = async (topicId) => {
@@ -265,6 +275,15 @@ function CommentTopicsTab({ matterId }) {
           })}
         </div>
       )}
+      <ConfirmDialog
+        isOpen={confirmDialog.open}
+        onClose={() => setConfirmDialog(d => ({ ...d, open: false }))}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmLabel="Delete"
+        danger={confirmDialog.danger}
+      />
     </div>
   );
 }
@@ -299,6 +318,7 @@ export default function MatterDetailPage() {
   const { openDrawer } = useDrawer();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("Updates");
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: "", message: "", onConfirm: null, danger: false });
   const [ctxNotes, setCtxNotes] = useState([]);
 
   useEffect(() => {
@@ -377,20 +397,34 @@ export default function MatterDetailPage() {
     } catch (e) { console.error(e); toast.error(e.message || "Operation failed"); }
   }, [id, stakeholderForm, refetch]);
 
-  const handleRemoveStakeholder = useCallback(async (mpId) => {
-    if (!window.confirm("Remove this stakeholder from the matter?")) return;
-    try {
-      await removeMatterPerson(id, mpId);
-      refetch();
-    } catch (e) { console.error(e); toast.error(e.message || "Operation failed"); }
+  const handleRemoveStakeholder = useCallback((mpId) => {
+    setConfirmDialog({
+      open: true,
+      title: "Remove Stakeholder",
+      message: "Remove this stakeholder from the matter?",
+      danger: false,
+      onConfirm: async () => {
+        try {
+          await removeMatterPerson(id, mpId);
+          refetch();
+        } catch (e) { console.error(e); toast.error(e.message || "Operation failed"); }
+      },
+    });
   }, [id, refetch]);
 
-  const handleRemoveOrg = useCallback(async (moId) => {
-    if (!window.confirm("Remove this organization from the matter?")) return;
-    try {
-      await removeMatterOrg(id, moId);
-      refetch();
-    } catch (e) { console.error(e); toast.error(e.message || "Operation failed"); }
+  const handleRemoveOrg = useCallback((moId) => {
+    setConfirmDialog({
+      open: true,
+      title: "Remove Organization",
+      message: "Remove this organization from the matter?",
+      danger: false,
+      onConfirm: async () => {
+        try {
+          await removeMatterOrg(id, moId);
+          refetch();
+        } catch (e) { console.error(e); toast.error(e.message || "Operation failed"); }
+      },
+    });
   }, [id, refetch]);
 
   const handleAddOrg = useCallback(async () => {
@@ -456,12 +490,19 @@ export default function MatterDetailPage() {
     } catch (e) { console.error(e); toast.error(e.message || "Operation failed"); }
   }, [id, depForm, refetch]);
 
-  const handleRemoveDep = useCallback(async (depId) => {
-    if (!window.confirm("Remove this dependency?")) return;
-    try {
-      await removeMatterDependency(id, depId);
-      refetch();
-    } catch (e) { console.error(e); toast.error(e.message || "Operation failed"); }
+  const handleRemoveDep = useCallback((depId) => {
+    setConfirmDialog({
+      open: true,
+      title: "Remove Dependency",
+      message: "Remove this dependency?",
+      danger: false,
+      onConfirm: async () => {
+        try {
+          await removeMatterDependency(id, depId);
+          refetch();
+        } catch (e) { console.error(e); toast.error(e.message || "Operation failed"); }
+      },
+    });
   }, [id, refetch]);
 
   if (loading) {
@@ -551,14 +592,21 @@ export default function MatterDetailPage() {
             background: "rgba(239,68,68,0.1)", color: "#f87171",
             border: "1px solid rgba(239,68,68,0.25)", cursor: "pointer",
           }}
-          onClick={async () => {
-            if (!window.confirm(`Delete "${matter.title}"? This will close the matter.`)) return;
-            try {
-              await deleteMatter(matter.id);
-              navigate("/matters");
-            } catch (e) {
-              toast.error(e.message || "Operation failed");
-            }
+          onClick={() => {
+            setConfirmDialog({
+              open: true,
+              title: "Delete Matter",
+              message: `Delete "${matter.title}"? This will close the matter.`,
+              danger: true,
+              onConfirm: async () => {
+                try {
+                  await deleteMatter(matter.id);
+                  navigate("/matters");
+                } catch (e) {
+                  toast.error(e.message || "Operation failed");
+                }
+              },
+            });
           }}
         >
           Delete
@@ -1166,6 +1214,15 @@ export default function MatterDetailPage() {
         )}
 
       </div>
+      <ConfirmDialog
+        isOpen={confirmDialog.open}
+        onClose={() => setConfirmDialog(d => ({ ...d, open: false }))}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmLabel={confirmDialog.danger ? "Delete" : "Remove"}
+        danger={confirmDialog.danger}
+      />
     </div>
   );
 }
