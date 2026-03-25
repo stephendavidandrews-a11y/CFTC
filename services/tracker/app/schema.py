@@ -541,6 +541,27 @@ TABLES = [
         updated_at TEXT DEFAULT (datetime('now'))
     )"""),
 
+    ("directive_research_notes", """CREATE TABLE IF NOT EXISTS directive_research_notes (
+        id TEXT PRIMARY KEY,
+        directive_id TEXT NOT NULL REFERENCES policy_directives(id),
+        fr_citation TEXT,
+        rule_title TEXT,
+        cfr_parts TEXT,
+        statutory_authority TEXT,
+        action_category TEXT,
+        composite_score REAL,
+        relationship_basis TEXT,
+        analysis_summary TEXT,
+        regulation_text_excerpt TEXT,
+        needs_reg_reading INTEGER DEFAULT 0,
+        reg_reading_done INTEGER DEFAULT 0,
+        reg_reading_notes TEXT,
+        promote_to_matter INTEGER DEFAULT 0,
+        matter_id TEXT REFERENCES matters(id),
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+    )"""),
+
     ("directive_matters", """CREATE TABLE IF NOT EXISTS directive_matters (
         id TEXT PRIMARY KEY,
         directive_id TEXT NOT NULL REFERENCES policy_directives(id),
@@ -840,6 +861,7 @@ MIGRATIONS = [
             created_at TEXT DEFAULT (datetime('now')),
             updated_at TEXT DEFAULT (datetime('now'))
         )""",
+
         """CREATE TABLE IF NOT EXISTS comment_questions (
             id TEXT PRIMARY KEY,
             comment_topic_id TEXT NOT NULL REFERENCES comment_topics(id),
@@ -904,8 +926,22 @@ MIGRATIONS = [
         "CREATE INDEX IF NOT EXISTS idx_dir_matters_directive ON directive_matters(directive_id)",
         "CREATE INDEX IF NOT EXISTS idx_dir_matters_matter ON directive_matters(matter_id)",
     ]),
-    # Version 3: comment topics, policy directives tables and indexes
-    ]
+
+    # Version 4: directive_documents join table (links directives to documents)
+    (4, "directive_documents", [
+        """CREATE TABLE IF NOT EXISTS directive_documents (
+            id TEXT PRIMARY KEY,
+            directive_id TEXT NOT NULL REFERENCES policy_directives(id),
+            document_id TEXT NOT NULL REFERENCES documents(id),
+            relationship_type TEXT NOT NULL DEFAULT 'references',
+            notes TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(directive_id, document_id)
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_directive_documents_directive ON directive_documents(directive_id)",
+        "CREATE INDEX IF NOT EXISTS idx_directive_documents_document ON directive_documents(document_id)",
+    ]),
+]
 
 
 def _get_current_version(conn: sqlite3.Connection) -> int:

@@ -66,7 +66,7 @@ ENUMS = {
     "document_type": [
         "rulemaking_text", "legal_memo", "options_memo", "comment_letter",
         "testimony", "talking_points", "briefing_paper", "correspondence",
-        "report", "other",
+        "report", "no_action_letter", "other",
     ],
     "document_status": [
         "not started", "drafting", "internal_review", "client_review",
@@ -155,7 +155,7 @@ ENUMS = {
     "directive_source_document_type": [
         "executive_order", "pwg_report", "congressional_mandate",
         "statutory_requirement", "gao_recommendation", "ig_finding",
-        "fsoc_recommendation", "interagency_agreement", "chairman_directive", "testimony_commitment", "other",
+        "fsoc_recommendation", "interagency_agreement", "chairman_directive", "testimony_commitment", "chairman_speech", "other",
     ],
     "directive_priority_tier": [
         "immediate_action", "priority_guidance", "possible_regulation",
@@ -174,7 +174,10 @@ ENUMS = {
         "deferred", "not_applicable",
     ],
     "directive_matter_relationship_type": [
-        "implements", "partially_addresses", "related_to",
+        "implements", "partially_addresses", "related_to", "supersedes",
+    ],
+    "directive_document_relationship_type": [
+        "references", "implements", "supersedes", "withdraws", "amends",
     ],
 }
 
@@ -207,6 +210,7 @@ AI_WRITABLE_TABLES = (
     "comment_questions",
     "rulemaking_comment_periods",
     "rulemaking_publication_status",
+    "directive_research_notes",
 )
 
 
@@ -219,7 +223,8 @@ BATCH_DELETE_ALLOWED_TABLES = (
     "context_note_links",
     "comment_topics",
     "comment_questions",
-    "directive_matters",
+    "directive_matters", "directive_documents",
+    "directive_research_notes",
 )
 
 

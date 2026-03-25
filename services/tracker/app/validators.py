@@ -794,3 +794,52 @@ class CreateDirectiveMatter(EnumValidatedModel):
     matter_id: str = Field(..., description="Required matter ID")
     relationship_type: str = "implements"
     notes: Optional[str] = None
+
+
+# ── Directive Research Notes ─────────────────────────────────────────────────
+
+class CreateDirectiveDocument(EnumValidatedModel):
+    __enum_fields__ = {
+        "relationship_type": "directive_document_relationship_type",
+    }
+
+    directive_id: str = Field(..., description="Required directive ID")
+    document_id: str = Field(..., description="Required document ID")
+    relationship_type: str = "references"
+    notes: Optional[str] = None
+
+
+
+class CreateDirectiveResearchNote(BaseModel):
+    directive_id: str = Field(..., description="Required directive ID")
+    fr_citation: Optional[str] = None
+    rule_title: Optional[str] = None
+    cfr_parts: Optional[str] = None
+    statutory_authority: Optional[str] = None
+    action_category: Optional[str] = None
+    composite_score: Optional[float] = None
+    relationship_basis: Optional[str] = None
+    analysis_summary: Optional[str] = None
+    regulation_text_excerpt: Optional[str] = None
+    needs_reg_reading: int = 0
+    reg_reading_done: int = 0
+    reg_reading_notes: Optional[str] = None
+    promote_to_matter: int = 0
+    matter_id: Optional[str] = None
+
+
+class UpdateDirectiveResearchNote(BaseModel):
+    fr_citation: Optional[str] = None
+    rule_title: Optional[str] = None
+    cfr_parts: Optional[str] = None
+    statutory_authority: Optional[str] = None
+    action_category: Optional[str] = None
+    composite_score: Optional[float] = None
+    relationship_basis: Optional[str] = None
+    analysis_summary: Optional[str] = None
+    regulation_text_excerpt: Optional[str] = None
+    needs_reg_reading: Optional[int] = None
+    reg_reading_done: Optional[int] = None
+    reg_reading_notes: Optional[str] = None
+    promote_to_matter: Optional[int] = None
+    matter_id: Optional[str] = None

@@ -435,3 +435,21 @@ export function createDirectiveMatter(data) {
 export function deleteDirectiveMatter(linkId) {
   return fetchJSON(`${P}/directive-matters/${linkId}`, { method: "DELETE" });
 }
+// ── Directive-Document Links ────────────────────────────────────────────────
+
+export function listDirectiveDocuments(directiveId) {
+  return fetchJSON(`${P}/policy-directives/${directiveId}/documents`);
+}
+
+export function listDocumentDirectives(documentId) {
+  return fetchJSON(`${P}/documents/${documentId}/directives`);
+}
+
+export function createDirectiveDocument(data) {
+  return fetchJSON(`${P}/directive-documents`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export function deleteDirectiveDocument(linkId) {
+  return fetchJSON(`${P}/directive-documents/${linkId}`, { method: "DELETE" });
+}
+

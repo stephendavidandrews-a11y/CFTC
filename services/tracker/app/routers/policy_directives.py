@@ -159,6 +159,32 @@ async def get_policy_directive(directive_id: str, db=Depends(get_db)):
     """, (directive_id,)).fetchall()
     directive["linked_matters"] = [dict(lnk) for lnk in links]
 
+    # Fetch research notes (regulation analysis)
+    try:
+        notes = db.execute("""
+            SELECT * FROM directive_research_notes
+            WHERE directive_id = ?
+            ORDER BY composite_score DESC, fr_citation
+        """, (directive_id,)).fetchall()
+        directive["research_notes"] = [dict(n) for n in notes]
+    except Exception:
+        directive["research_notes"] = []
+
+    # Fetch linked documents
+    try:
+        docs = db.execute("""
+            SELECT dd.id as link_id, dd.relationship_type, dd.notes as link_notes,
+                   d.id as document_id, d.title, d.document_type, d.status,
+                   d.current_file_id, d.external_refs
+            FROM directive_documents dd
+            JOIN documents d ON dd.document_id = d.id
+            WHERE dd.directive_id = ?
+            ORDER BY d.document_type, d.title
+        """, (directive_id,)).fetchall()
+        directive["linked_documents"] = [dict(doc) for doc in docs]
+    except Exception:
+        directive["linked_documents"] = []
+
     return JSONResponse(content=directive, headers={"ETag": get_etag(row)})
 
 
@@ -218,3 +244,6 @@ async def delete_policy_directive(
               new_data={"cascade_deleted_links": link_count})
     db.commit()
     return {"id": directive_id, "deleted": True, "links_deleted": link_count}
+
+from app.routers.research_notes import register_research_notes
+register_research_notes(router)
