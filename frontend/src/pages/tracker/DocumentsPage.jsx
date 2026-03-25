@@ -113,6 +113,10 @@ export default function DocumentsPage() {
           />
         )}
       </div>
+
+      <div style={{ fontSize: 12, color: theme.text.dim, marginTop: 8, textAlign: "right" }}>
+        Showing {documents.length} documents
+      </div>
     </div>
   );
 }

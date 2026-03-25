@@ -127,6 +127,10 @@ export default function DirectivesPage() {
             onRowClick={(row) => navigate(`/directives/${row.id}`)} />
         )}
       </div>
+
+      <div style={{ fontSize: 12, color: theme.text.dim, marginTop: 8, textAlign: "right" }}>
+        Showing {directives.length} directives
+      </div>
     </div>
   );
 }
