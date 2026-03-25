@@ -57,7 +57,8 @@ export default function App() {
       <Routes>
         <Route element={<AppShell />}>
           {/* -- Operations (Tracker) -- */}
-          <Route index element={<TrackerDashboardPage />} />
+          <Route index element={<TodayPage />} />
+          <Route path="/dashboard" element={<TrackerDashboardPage />} />
           <Route path="/today" element={<TodayPage />} />
           <Route path="/matters" element={<MattersPage />} />
           <Route path="/matters/:id" element={<MatterDetailPage />} />

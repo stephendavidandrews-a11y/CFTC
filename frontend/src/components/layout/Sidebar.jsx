@@ -5,7 +5,7 @@ import theme from "../../styles/theme";
 const SECTIONS = [
   // -- Operations --
   { separator: true, label: "Operations" },
-  { path: "/", label: "Dashboard", icon: "\u25eb" },
+  { path: "/", label: "Today", icon: "\u25eb" },
   { path: "/matters", label: "Matters", icon: "\u25a4" },
   { path: "/people", label: "People", icon: "\u22a1" },
   { path: "/organizations", label: "Organizations", icon: "\u2b21" },
@@ -41,6 +41,7 @@ const SECTIONS = [
 
   // -- Developer --
   { separator: true, label: "Developer" },
+  { path: "/dashboard", label: "Dashboard (old)", icon: "\u25eb" },
   { path: "/developer", label: "Dev Console", icon: "\u2699" },
 ];
 
