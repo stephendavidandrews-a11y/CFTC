@@ -23,11 +23,23 @@ const actionBtnStyle = {
 };
 
 function defaultDateRange() {
-  const today = new Date();
+  const past7 = new Date(Date.now() - 7 * 86400000);
   const future = new Date(Date.now() + 30 * 86400000);
   const fmt = (d) => d.toISOString().split("T")[0];
-  return { from: fmt(today), to: fmt(future) };
+  return { from: fmt(past7), to: fmt(future) };
 }
+
+const SAVED_VIEWS = [
+  { label: "Upcoming", filter: (m) => new Date(m.date_time_start) >= new Date(new Date().setHours(0,0,0,0)) },
+  { label: "Past 30 Days", filter: (m) => {
+    const d = new Date(m.date_time_start);
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const past30 = new Date(Date.now() - 30 * 86400000);
+    return d >= past30 && d < today;
+  }},
+  { label: "All", filter: () => true },
+];
 
 export default function MeetingsPage() {
   useEffect(() => { document.title = "Meetings | Command Center"; }, []);
@@ -38,6 +50,7 @@ export default function MeetingsPage() {
   const [filters, setFilters] = useState({ search: "", date_from: defaults.from, date_to: defaults.to, matter_id: "" });
   const [confirmAction, setConfirmAction] = useState(null); // { id, action, title }
   const [actionBusy, setActionBusy] = useState({});
+  const [activeView, setActiveView] = useState(0);
 
   const { data: mattersData } = useApi(() => listMatters({ limit: 500 }), []);
   const { data, loading, error, refetch } = useApi(
@@ -72,6 +85,8 @@ export default function MeetingsPage() {
 
   const meetings = data?.items || data || [];
   const matters = mattersData?.items || mattersData || [];
+
+  const filtered = meetings.filter(SAVED_VIEWS[activeView].filter);
 
   const columns = [
     { key: "title", label: "Title" },
@@ -152,7 +167,7 @@ export default function MeetingsPage() {
       <div style={subtitleStyle}>All scheduled meetings</div>
 
       {/* Filters */}
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
         <input
           style={{ ...inputStyle, minWidth: 280 }}
           placeholder="Search meetings by title or purpose..."
@@ -183,13 +198,37 @@ export default function MeetingsPage() {
         </select>
       </div>
 
+      {/* Saved View Pills */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20, alignItems: "center" }}>
+        {SAVED_VIEWS.map((view, i) => (
+          <div
+            key={view.label}
+            onClick={() => setActiveView(i)}
+            style={{
+              padding: "5px 12px",
+              borderRadius: 16,
+              fontSize: 12,
+              cursor: "pointer",
+              background: i === activeView ? "#1e3a5f" : theme.bg.input,
+              color: i === activeView ? theme.accent.blueLight : theme.text.muted,
+              border: `1px solid ${i === activeView ? theme.accent.blue : theme.border.default}`,
+              fontWeight: i === activeView ? 600 : 400,
+              transition: "all 0.15s",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {view.label}
+          </div>
+        ))}
+      </div>
+
       {/* Table */}
       <div style={cardStyle}>
         {loading ? (
           <div style={{ textAlign: "center", padding: 40, color: theme.text.faint, fontSize: 13 }}>Loading...</div>
         ) : error ? (
           <div style={{ color: theme.accent.red, fontSize: 13 }}>Error: {error.message || String(error)}</div>
-        ) : meetings.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <EmptyState
             title="No meetings found"
             message="Adjust filters or schedule a new meeting."
@@ -199,10 +238,14 @@ export default function MeetingsPage() {
         ) : (
           <DataTable
             columns={columns}
-            data={meetings}
+            data={filtered}
             onRowClick={(row) => navigate(`/meetings/${row.id}`)}
           />
         )}
+      </div>
+
+      <div style={{ fontSize: 12, color: theme.text.dim, marginTop: 8, textAlign: "right" }}>
+        Showing {filtered.length} meetings
       </div>
 
       <ConfirmDialog
