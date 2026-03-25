@@ -9,6 +9,7 @@ import DataTable from "../../components/shared/DataTable";
 import EmptyState from "../../components/shared/EmptyState";
 import { useDrawer } from "../../contexts/DrawerContext";
 import { formatDate } from "../../utils/dateUtils";
+import { matterRankScore } from "../../utils/ranking";
 
 
 
@@ -50,31 +51,6 @@ const SAVED_VIEWS = [
   { label: "Parked / Monitoring", filter: (m) => isOpen(m) && m.status === "parked / monitoring" },
 ];
 
-// Smart hybrid ranking: priority score + deadline proximity + pending decision + staleness
-function matterRankScore(m) {
-  let score = 0;
-  // Priority weight
-  if (m.priority === "critical this week") score += 100;
-  else if (m.priority === "important this month") score += 60;
-  else if (m.priority === "strategic / slow burn") score += 30;
-  // Pending decision
-  if (m.pending_decision && m.pending_decision.trim()) score += 25;
-  // Deadline proximity (next 7 days = high, next 14 = medium)
-  const deadline = m.work_deadline || m.external_deadline || m.decision_deadline;
-  if (deadline) {
-    const daysUntil = (new Date(deadline) - Date.now()) / (1000 * 60 * 60 * 24);
-    if (daysUntil < 0) score += 50; // overdue
-    else if (daysUntil <= 3) score += 40;
-    else if (daysUntil <= 7) score += 25;
-    else if (daysUntil <= 14) score += 10;
-  }
-  // Staleness penalty (newer = higher)
-  if (m.updated_at) {
-    const daysSinceUpdate = (Date.now() - new Date(m.updated_at).getTime()) / (1000 * 60 * 60 * 24);
-    if (daysSinceUpdate > 14) score += 15; // stale matters need attention
-  }
-  return score;
-}
 
 export default function MattersPage() {
   useEffect(() => { document.title = "Matters | Command Center"; }, []);
