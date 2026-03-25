@@ -239,7 +239,7 @@ export default function TodayPage() {
         {/* AI Daily Brief Preview */}
         <div style={cardStyle}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={sectionTitle}>Today\u2019s Brief</div>
+            <div style={sectionTitle}>Today's Brief</div>
             <span
               onClick={() => navigate("/intelligence/daily")}
               style={{ fontSize: 12, color: theme.accent.blueLight, cursor: "pointer" }}
