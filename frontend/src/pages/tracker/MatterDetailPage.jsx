@@ -3,23 +3,25 @@ import { useParams, useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
 import { useToastContext } from "../../contexts/ToastContext";
 import useApi from "../../hooks/useApi";
+import useTabState from "../../hooks/useTabState";
 import {
-  getMatter, addMatterUpdate, listTasks,
+  getMatter,
   listPeople, listOrganizations, listMatters,
-  addMatterDependency, removeMatterDependency,
   getMatterTags, addMatterTag, removeMatterTag, listTags, createTag,
   getEnums, deleteMatter
 } from "../../api/tracker";
 import { useDrawer } from "../../contexts/DrawerContext";
 import Badge from "../../components/shared/Badge";
-import DataTable from "../../components/shared/DataTable";
-import EmptyState from "../../components/shared/EmptyState";
 import Breadcrumb from "../../components/shared/Breadcrumb";
+import EmptyState from "../../components/shared/EmptyState";
 import { formatDate } from "../../utils/dateUtils";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
+import ActivityTab from "./matter-detail/ActivityTab";
+import WorkTab from "./matter-detail/WorkTab";
 import StakeholdersTab from "./matter-detail/StakeholdersTab";
-import RulemakingTab from "./matter-detail/RulemakingTab";
 import IntelligenceTab from "./matter-detail/IntelligenceTab";
+import DependenciesTab from "./matter-detail/DependenciesTab";
+import RulemakingTab from "./matter-detail/RulemakingTab";
 
 const cardStyle = {
   background: theme.bg.card,
@@ -57,72 +59,35 @@ const labelStyle = { fontSize: 11, fontWeight: 700, color: theme.text.faint, tex
 const valStyle = { fontSize: 13, color: theme.text.secondary, marginTop: 2 };
 
 
-const TABS = ["Updates", "Tasks", "Stakeholders", "Intelligence", "Dependencies", "Rulemaking"];
-
-
 export default function MatterDetailPage() {
   const { id } = useParams();
   const toast = useToastContext();
   const { openDrawer } = useDrawer();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("Updates");
+  const [activeTab, setActiveTab] = useTabState("Activity");
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: "", message: "", onConfirm: null, danger: false });
 
   const { data: matter, loading, error, refetch } = useApi(() => getMatter(id), [id]);
 
-  // Tab data
-  const { data: tasksData, refetch: refetchTasks } = useApi(() => listTasks({ matter_id: id }), [id]);
-
-  // For inline add forms
   const { data: allPeople } = useApi(() => listPeople({ limit: 500 }), []);
   const { data: allOrgs } = useApi(() => listOrganizations({ limit: 500 }), []);
-
-  // Update form state
-  const [showUpdateForm, setShowUpdateForm] = useState(false);
-  const [updateType, setUpdateType] = useState("status update");
-  const [updateSummary, setUpdateSummary] = useState("");
-  const [savingUpdate, setSavingUpdate] = useState(false);
-
-
-  // Dependencies
   const { data: allMatters } = useApi(() => listMatters({ limit: 500 }), []);
 
-  React.useEffect(() => { if (matter?.title) document.title = matter?.title + " | Command Center"; }, [matter?.title]);
-  const [depForm, setDepForm] = useState({ depends_on_matter_id: "", dependency_type: "" });
-  const [showDepAdd, setShowDepAdd] = useState(false);
-
-  // Tags
   const [tags, setTags] = useState([]);
   const [allTags, setAllTags] = useState([]);
   const [selectedTagId, setSelectedTagId] = useState("");
   const [showNewTag, setShowNewTag] = useState(false);
   const [newTagName, setNewTagName] = useState("");
+  const [enums, setLoadedEnums] = useState({});
 
-  const handleSaveUpdate = useCallback(async () => {
-    if (!updateSummary.trim()) return;
-    setSavingUpdate(true);
-    try {
-      await addMatterUpdate(id, { update_type: updateType, summary: updateSummary });
-      setUpdateSummary("");
-      setShowUpdateForm(false);
-      refetch();
-    } catch (e) {
-      console.error("Failed to save update:", e);
-      toast.error("Failed to save update: " + (e.message || "Unknown error"));
-    } finally {
-      setSavingUpdate(false);
-    }
-  }, [id, updateType, updateSummary, refetch]);
+  React.useEffect(() => { if (matter?.title) document.title = matter?.title + " | Command Center"; }, [matter?.title]);
 
-  // Fetch tags
   useEffect(() => {
     if (!id) return;
     getMatterTags(id).then((res) => setTags(Array.isArray(res) ? res : (res?.items || res || []))).catch(() => {});
     listTags("matter").then((res) => setAllTags(res?.items || res || [])).catch(() => {});
   }, [id]);
 
-  // Fetch enums for inline forms
-  const [enums, setLoadedEnums] = useState({});
   useEffect(() => {
     getEnums().then((data) => setLoadedEnums(data || {})).catch(() => {});
   }, []);
@@ -155,41 +120,15 @@ export default function MatterDetailPage() {
     } catch (e) { console.error(e); toast.error(e.message || "Operation failed"); }
   }, [newTagName]);
 
-  // Dependencies handlers
-  const handleAddDep = useCallback(async () => {
-    if (!depForm.depends_on_matter_id || !depForm.dependency_type) return;
-    try {
-      await addMatterDependency(id, depForm);
-      setDepForm({ depends_on_matter_id: "", dependency_type: "" });
-      setShowDepAdd(false);
-      refetch();
-    } catch (e) { console.error(e); toast.error(e.message || "Operation failed"); }
-  }, [id, depForm, refetch]);
-
-  const handleRemoveDep = useCallback((depId) => {
-    setConfirmDialog({
-      open: true,
-      title: "Remove Dependency",
-      message: "Remove this dependency?",
-      danger: false,
-      onConfirm: async () => {
-        try {
-          await removeMatterDependency(id, depId);
-          refetch();
-        } catch (e) { console.error(e); toast.error(e.message || "Operation failed"); }
-      },
-    });
-  }, [id, refetch]);
-
   if (loading) {
     return <div style={{ padding: "60px 32px", textAlign: "center", color: theme.text.faint }}>Loading matter...</div>;
   }
   if (error) {
     return (
       <div style={{ padding: "24px 32px" }}>
-      <Breadcrumb items={[{ label: "Matters", path: "/matters" }, { label: matter?.title || 'Matter' }]} />
+        <Breadcrumb items={[{ label: "Matters", path: "/matters" }, { label: matter?.title || "Matter" }]} />
         <EmptyState
-          icon="⚠"
+          icon="&#9888;"
           title="Matter not found"
           message="This matter may have been archived or deleted, or the ID may be invalid."
           actionLabel="Go to Matters"
@@ -203,10 +142,6 @@ export default function MatterDetailPage() {
   const st = theme.status[matter.status] || { bg: theme.bg.input, text: theme.text.faint, label: matter.status };
   const pr = theme.priority[matter.priority] || { bg: theme.bg.input, text: theme.text.faint, label: matter.priority };
 
-  const tasks = tasksData?.items || tasksData || [];
-  const updates = matter.updates || [];
-  const mattersList = (allMatters?.items || allMatters || []).filter((m) => m.id !== id);
-  const dependencies = matter.dependencies || [];
   const assignedTagIds = new Set((tags || []).map((t) => t.id || t.tag_id));
   const availableTags = (allTags || []).filter((t) => !assignedTagIds.has(t.id));
 
@@ -232,22 +167,32 @@ export default function MatterDetailPage() {
     { label: "Work Deadline", value: formatDate(matter.work_deadline) },
     { label: "External Deadline", value: formatDate(matter.external_deadline) },
     { label: "Decision Deadline", value: formatDate(matter.decision_deadline) },
-    { label: "Next Step", value: matter.next_step },
+  ];
+
+  const tabs = [
+    { key: "Activity", label: "Activity" },
+    { key: "Work", label: "Work" },
+    { key: "Stakeholders", label: "Stakeholders" },
+    { key: "Intelligence", label: "Intelligence" },
+    { key: "Dependencies", label: "Dependencies" },
+    ...(matter?.matter_type === "rulemaking" ? [{ key: "Rulemaking", label: "Rulemaking" }] : []),
   ];
 
   return (
     <div style={{ padding: "24px 32px", maxWidth: 1200 }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-        <button onClick={() => navigate("/matters")} style={{ ...btnSecondary, padding: "5px 10px", fontSize: 11 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 20 }}>
+        <button onClick={() => navigate("/matters")} style={{ ...btnSecondary, padding: "5px 10px", fontSize: 11, marginTop: 4 }}>
           &larr; Back
         </button>
         <div style={{ flex: 1 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={titleStyle}>{matter.title}</span>
-            <Badge bg={st.bg} text={st.text} label={st.label || matter.status} />
-            <Badge bg={pr.bg} text={pr.text} label={pr.label || matter.priority} />
+          {/* Status + Priority badges above title */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+            {matter.status && <Badge bg={st.bg} text={st.text} label={st.label || matter.status} />}
+            {matter.priority && <Badge bg={pr.bg} text={pr.text} label={pr.label || matter.priority} />}
           </div>
+          {/* Title */}
+          <h1 style={titleStyle}>{matter.title}</h1>
           {matter.matter_number && (
             <div style={{ fontSize: 12, color: theme.text.faint, marginTop: 2 }}>#{matter.matter_number}</div>
           )}
@@ -302,9 +247,8 @@ export default function MatterDetailPage() {
         </div>
       </div>
 
-
       {/* Context Section */}
-      {(matter.problem_statement || matter.why_it_matters || matter.description || matter.pending_decision || matter.outcome_summary) && (
+      {(matter.problem_statement || matter.why_it_matters || matter.description || matter.outcome_summary) && (
         <div style={{ ...cardStyle, marginBottom: 24 }}>
           <div style={sectionTitle}>Context</div>
           {matter.description && (
@@ -325,18 +269,39 @@ export default function MatterDetailPage() {
               <div style={{ ...valStyle, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{matter.why_it_matters}</div>
             </div>
           )}
-          {matter.pending_decision && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={labelStyle}>Pending Decision</div>
-              <div style={{ ...valStyle, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{matter.pending_decision}</div>
-            </div>
-          )}
           {matter.outcome_summary && (
             <div style={{ marginBottom: 12 }}>
               <div style={labelStyle}>Outcome Summary</div>
               <div style={{ ...valStyle, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{matter.outcome_summary}</div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Current State Card */}
+      {(matter.next_step || matter.pending_decision) && (
+        <div style={{ ...cardStyle, marginBottom: 24, background: theme.bg.cardHover, borderLeft: `3px solid ${theme.accent.blue}` }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: theme.text.primary, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.02em" }}>Current State</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {matter.next_step && (
+              <div>
+                <div style={labelStyle}>Next Step</div>
+                <div style={valStyle}>{matter.next_step}</div>
+              </div>
+            )}
+            {matter.next_step_owner_name && (
+              <div>
+                <div style={labelStyle}>Next Step Owner</div>
+                <div style={valStyle}>{matter.next_step_owner_name}</div>
+              </div>
+            )}
+            {matter.pending_decision && (
+              <div style={{ gridColumn: "1 / -1" }}>
+                <div style={labelStyle}>Pending Decision</div>
+                <div style={{ ...valStyle, whiteSpace: "pre-wrap" }}>{matter.pending_decision}</div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -405,215 +370,31 @@ export default function MatterDetailPage() {
         </div>
       </div>
 
-      {/* Tabs */}
-      
-      <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: `1px solid ${theme.border.default}`, paddingBottom: 0 }}>
-        {TABS.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
+      {/* Tab Bar */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: `1px solid ${theme.border.default}`, paddingBottom: 0, flexWrap: "wrap" }}>
+        {tabs.map((tab) => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
             style={{
               padding: "10px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer",
               background: "transparent", border: "none",
-              color: activeTab === tab ? theme.accent.blue : theme.text.faint,
-              borderBottom: activeTab === tab ? `2px solid ${theme.accent.blue}` : "2px solid transparent",
+              color: activeTab === tab.key ? theme.accent.blue : theme.text.faint,
+              borderBottom: activeTab === tab.key ? `2px solid ${theme.accent.blue}` : "2px solid transparent",
               marginBottom: -1,
             }}
-          >{tab}</button>
+          >{tab.label}</button>
         ))}
       </div>
 
       {/* Tab Content */}
       <div style={cardStyle}>
-        {/* UPDATES TAB */}
-        {activeTab === "Updates" && (
-          <div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <div style={sectionTitle}>Updates</div>
-              <button style={btnPrimary} onClick={() => setShowUpdateForm(!showUpdateForm)}>
-                {showUpdateForm ? "Cancel" : "+ Add Update"}
-              </button>
-            </div>
-            {showUpdateForm && (
-              <div style={{
-                background: theme.bg.input, borderRadius: 8, padding: 16,
-                border: `1px solid ${theme.border.default}`, marginBottom: 16,
-              }}>
-                <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-                  <select style={{ ...inputStyle, width: 160 }} value={updateType} onChange={(e) => setUpdateType(e.target.value)}>
-                    {(enums.update_type || ["status update", "meeting readout", "document milestone", "decision made", "blocker identified", "deadline changed", "escalation", "closure note"]).map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                </div>
-                <textarea
-                  style={{ ...inputStyle, height: 80, resize: "vertical", fontFamily: theme.font.family }}
-                  placeholder="Update summary..."
-                  value={updateSummary}
-                  onChange={(e) => setUpdateSummary(e.target.value)}
-                />
-                <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-                  <button style={btnPrimary} onClick={handleSaveUpdate} disabled={savingUpdate}>
-                    {savingUpdate ? "Saving..." : "Save Update"}
-                  </button>
-                </div>
-              </div>
-            )}
-            {updates.length === 0 ? (
-              <div style={{ fontSize: 13, color: theme.text.faint }}>No updates yet</div>
-            ) : (
-              updates.map((u, i) => (
-                <div key={u.id || i} style={{ padding: "12px 0", borderBottom: `1px solid ${theme.border.subtle}` }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    {u.update_type && (
-                      <span style={{
-                        fontSize: 10, fontWeight: 600, color: theme.accent.blue,
-                        background: "rgba(59,130,246,0.12)", padding: "2px 7px", borderRadius: 3,
-                      }}>{u.update_type}</span>
-                    )}
-                    <span style={{ fontSize: 11, color: theme.text.faint }}>{u.author || ""}</span>
-                    <span style={{ fontSize: 11, color: theme.text.ghost, marginLeft: "auto" }}>{formatDate(u.created_at || u.date)}</span>
-                  </div>
-                  <div style={{ fontSize: 13, color: theme.text.muted, lineHeight: 1.5 }}>{u.summary}</div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {/* TASKS TAB */}
-        {activeTab === "Tasks" && (
-          <div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <div style={sectionTitle}>Tasks</div>
-              <button style={btnPrimary} onClick={() => openDrawer("task", { matter_id: id }, refetchTasks)}>
-                + Add Task
-              </button>
-            </div>
-            {tasks.length === 0 ? (
-              <EmptyState title="No tasks" message="Add tasks to track work on this matter." />
-            ) : (
-              <DataTable
-                columns={[
-                  { key: "title", label: "Title" },
-                  {
-                    key: "status", label: "Status", width: 110,
-                    render: (val) => {
-                      const s = theme.status[val] || { bg: theme.bg.input, text: theme.text.faint, label: val };
-                      return <Badge bg={s.bg} text={s.text} label={s.label || val || "\u2014"} />;
-                    },
-                  },
-                  { key: "owner_name", label: "Assignee", width: 130 },
-                  { key: "due_date", label: "Due Date", width: 120, render: (v) => formatDate(v) },
-                  {
-                    key: "priority", label: "Priority", width: 100,
-                    render: (val) => {
-                      const p = theme.priority[val] || { bg: theme.bg.input, text: theme.text.faint, label: val };
-                      return <Badge bg={p.bg} text={p.text} label={p.label || val || "\u2014"} />;
-                    },
-                  },
-                ]}
-                data={tasks}
-                onRowClick={(row) => openDrawer("task", row, refetchTasks)}
-              />
-            )}
-          </div>
-        )}
-
-        {/* STAKEHOLDERS TAB */}
-        {activeTab === "Stakeholders" && (
-          <StakeholdersTab
-            matterId={id}
-            matter={matter}
-            refetch={refetch}
-            toast={toast}
-            allPeople={allPeople}
-            allOrgs={allOrgs}
-          />
-        )}
-
-
-
-
-        {/* DEPENDENCIES TAB */}
-        {activeTab === "Dependencies" && (
-          <div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <div style={sectionTitle}>Dependencies</div>
-              <button style={btnPrimary} onClick={() => setShowDepAdd(!showDepAdd)}>
-                {showDepAdd ? "Cancel" : "+ Add Dependency"}
-              </button>
-            </div>
-            {showDepAdd && (
-              <div style={{
-                display: "flex", gap: 8, alignItems: "center", marginBottom: 14,
-                background: theme.bg.input, padding: 12, borderRadius: 8, border: `1px solid ${theme.border.default}`,
-              }}>
-                <select style={{ ...inputStyle, width: 280 }}
-                  value={depForm.depends_on_matter_id}
-                  onChange={(e) => setDepForm((p) => ({ ...p, depends_on_matter_id: e.target.value }))}
-                >
-                  <option value="">Select matter...</option>
-                  {mattersList.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.matter_number ? `#${m.matter_number} - ` : ""}{m.title}
-                    </option>
-                  ))}
-                </select>
-                <select style={{ ...inputStyle, width: 180 }}
-                  value={depForm.dependency_type}
-                  onChange={(e) => setDepForm((p) => ({ ...p, dependency_type: e.target.value }))}
-                >
-                  <option value="">Type...</option>
-                  {["legal dependency", "policy dependency", "sequencing dependency", "approval dependency", "external dependency", "shared deadline", "related risk"].map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-                <button style={btnPrimary} onClick={handleAddDep}>Add</button>
-              </div>
-            )}
-            {dependencies.length === 0 ? (
-              <EmptyState title="No dependencies" message="Add dependencies to track related matters." />
-            ) : (
-              <DataTable
-                columns={[
-                  {
-                    key: "depends_on_title", label: "Related Matter",
-                    render: (v, row) => row.depends_on_title || row.depends_on_matter_title || `Matter #${row.depends_on_matter_id}`,
-                  },
-                  { key: "dependency_type", label: "Type", width: 170 },
-                  { key: "notes", label: "Notes", width: 200, render: (v) => v || "\u2014" },
-                  {
-                    key: "_remove", label: "", width: 60, sortable: false,
-                    render: (_, row) => (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleRemoveDep(row.id); }}
-                        style={{
-                          background: "transparent", border: "none", cursor: "pointer",
-                          color: "#ef4444", fontSize: 11, fontWeight: 600, padding: "2px 8px",
-                          borderRadius: 4, opacity: 0.7,
-                        }}
-                        onMouseEnter={(e) => e.target.style.opacity = "1"}
-                        onMouseLeave={(e) => e.target.style.opacity = "0.7"}
-                        title="Remove dependency"
-                      >Remove</button>
-                    ),
-                  },
-                ]}
-                data={dependencies}
-              />
-            )}
-          </div>
-        )}
-
-        
-      {activeTab === "Intelligence" && <IntelligenceTab matterId={id} activeTab={activeTab} />}
-
-      {activeTab === "Rulemaking" && <RulemakingTab matterId={id} />}
-
-
-
+        {activeTab === "Activity" && <ActivityTab matterId={id} matter={matter} refetch={refetch} toast={toast} enums={enums} />}
+        {activeTab === "Work" && <WorkTab matterId={id} activeTab={activeTab} />}
+        {activeTab === "Stakeholders" && <StakeholdersTab matterId={id} matter={matter} refetch={refetch} toast={toast} allPeople={allPeople} allOrgs={allOrgs} />}
+        {activeTab === "Intelligence" && <IntelligenceTab matterId={id} activeTab={activeTab} />}
+        {activeTab === "Dependencies" && <DependenciesTab matterId={id} matter={matter} refetch={refetch} toast={toast} allMatters={allMatters} enums={enums} />}
+        {activeTab === "Rulemaking" && <RulemakingTab matterId={id} />}
       </div>
+
       <ConfirmDialog
         isOpen={confirmDialog.open}
         onClose={() => setConfirmDialog(d => ({ ...d, open: false }))}
