@@ -9,20 +9,16 @@ import {
   getMatter,
 } from "../../api/tracker";
 import { validate } from "../../utils/validation";
+import theme from "../../styles/theme";
 
 const INPUT_STYLE = {
-  width: "100%",
-  padding: "8px 12px",
-  borderRadius: 6,
-  border: "1px solid #1f2937",
-  background: "#0f172a",
-  color: "#f1f5f9",
-  fontSize: 13,
-  boxSizing: "border-box",
+  width: "100%", padding: "8px 12px", borderRadius: 6,
+  border: `1px solid ${theme.border.default}`, background: theme.bg.input,
+  color: theme.text.primary, fontSize: 13, boxSizing: "border-box",
 };
-const LABEL_STYLE = { display: "block", fontSize: 12, fontWeight: 600, color: "#94a3b8", marginBottom: 4 };
-const SAVE_BTN = { background: "#1e40af", color: "#fff", padding: "8px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" };
-const CANCEL_BTN = { background: "transparent", color: "#64748b", padding: "8px 20px", borderRadius: 8, fontSize: 13, border: "1px solid #1f2937", cursor: "pointer" };
+const LABEL_STYLE = { display: "block", fontSize: 12, fontWeight: 600, color: theme.text.muted, marginBottom: 4 };
+const SAVE_BTN = { background: theme.accent.blue, color: "#fff", padding: "8px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" };
+const CANCEL_BTN = { background: "transparent", color: theme.text.dim, padding: "8px 20px", borderRadius: 8, fontSize: 13, border: `1px solid ${theme.border.default}`, cursor: "pointer" };
 
 const EMPTY = {
   title: "",
@@ -255,7 +251,7 @@ export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
       {renderInput("Next Step", "next_step")}
       {renderSelect("Next Step Owner", "next_step_assigned_to_person_id", personOpts)}
       {form.status && form.status !== "closed" && !form.next_step_assigned_to_person_id && (
-        <div style={{ color: "#f59e0b", fontSize: 11, marginTop: -10, marginBottom: 10 }}>Consider assigning a next step owner</div>
+        <div style={{ color: theme.accent.yellow, fontSize: 11, marginTop: -10, marginBottom: 10 }}>Consider assigning a next step owner</div>
       )}
       <div style={{ marginBottom: 14 }}>
         <label style={LABEL_STYLE}>Pending Decision</label>
@@ -270,21 +266,21 @@ export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
       {isRulemaking && renderInput("FR Document Number", "fr_doc_number")}
 
       {form.status === "parked / monitoring" && !form.revisit_date && (
-        <div style={{ color: "#f59e0b", fontSize: 12, marginBottom: 10, padding: "6px 10px", background: "#422006", borderRadius: 6, border: "1px solid #854d0e" }}>Revisit date is recommended for parked/monitoring matters</div>
+        <div style={{ color: theme.accent.yellow, fontSize: 12, marginBottom: 10, padding: "6px 10px", background: "#422006", borderRadius: 6, border: "1px solid #854d0e" }}>Revisit date is recommended for parked/monitoring matters</div>
       )}
       {form.status === "closed" && (
         <>
           <div style={{ marginBottom: 14 }}>
-            <label style={{ ...LABEL_STYLE, color: form.status === "closed" && !form.outcome_summary ? "#f59e0b" : "#94a3b8" }}>Outcome Summary *</label>
-            <textarea style={{ ...INPUT_STYLE, minHeight: 60, resize: "vertical", borderColor: form.status === "closed" && !form.outcome_summary ? "#854d0e" : "#1f2937" }} value={form.outcome_summary} onChange={set("outcome_summary")} placeholder="Summarize the outcome of this matter" />
+            <label style={{ ...LABEL_STYLE, color: form.status === "closed" && !form.outcome_summary ? theme.accent.yellow : theme.text.muted }}>Outcome Summary *</label>
+            <textarea style={{ ...INPUT_STYLE, minHeight: 60, resize: "vertical", borderColor: form.status === "closed" && !form.outcome_summary ? "#854d0e" : theme.border.default }} value={form.outcome_summary} onChange={set("outcome_summary")} placeholder="Summarize the outcome of this matter" />
           </div>
           {renderInput("Closed At", "closed_at", "date")}
         </>
       )}
 
-      {error && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 10 }}>{error}</div>}
+      {error && <div style={{ color: theme.accent.red, fontSize: 12, marginBottom: 10 }}>{error}</div>}
 
-      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", paddingTop: 16, borderTop: "1px solid #1f2937", marginTop: 10 }}>
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", paddingTop: 16, borderTop: `1px solid ${theme.border.default}`, marginTop: 10 }}>
         <button style={CANCEL_BTN} onClick={onClose}>Cancel</button>
         <button style={{ ...SAVE_BTN, opacity: saving ? 0.6 : 1 }} onClick={handleSave} disabled={saving}>
           {saving ? "Saving..." : (matter ? "Save Changes" : "Create Matter")}
