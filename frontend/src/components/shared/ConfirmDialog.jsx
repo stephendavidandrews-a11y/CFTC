@@ -32,7 +32,7 @@ export default function ConfirmDialog({
           onClick={() => { onConfirm(); onClose(); }}
           style={{
             padding: "9px 18px", borderRadius: 8, fontSize: 13, fontWeight: 600,
-            background: danger ? "#991b1b" : "#1e40af",
+            background: danger ? theme.accent.red : theme.accent.blue,
             color: "#fff", border: "none", cursor: "pointer",
           }}
         >
