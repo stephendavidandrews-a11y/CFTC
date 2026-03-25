@@ -15,18 +15,26 @@ function isOverdue(dateStr) {
   return new Date(dateStr) < new Date();
 }
 
+const SAVED_VIEWS = [
+  { label: "Pending", filter: (d) => d.status === "pending" || d.status === "under consideration" },
+  { label: "Overdue", filter: (d) => d.decision_due_date && new Date(d.decision_due_date) < new Date() && d.status !== "made" && d.status !== "deferred" && d.status !== "no longer needed" },
+  { label: "All", filter: () => true },
+];
+
 export default function DecisionsPage() {
   useEffect(() => { document.title = "Decisions | Command Center"; }, []);
   const navigate = useNavigate();
   const { openDrawer } = useDrawer();
   const [filters, setFilters] = useState({ status: "", matter_id: "", search: "" });
+  const [search, setSearch] = useState("");
+  const [activeView, setActiveView] = useState(0);
 
   const { data: enums } = useApi(() => getEnums(), []);
   const { data: mattersData } = useApi(() => listMatters({ limit: 500 }), []);
 
   const { data, loading, error, refetch } = useApi(
     () => listDecisions(filters),
-    [filters.status, filters.matter_id, filters.search]
+    [filters.status, filters.matter_id]
   );
 
   const handleFilter = useCallback((key, val) => {
@@ -36,6 +44,12 @@ export default function DecisionsPage() {
   const decisions = data?.items || data || [];
   const matters = mattersData?.items || mattersData || [];
   const statusOpts = enums?.decision_status || ["pending", "under consideration", "made", "deferred", "no longer needed"];
+
+  const searchFiltered = decisions.filter((d) =>
+    !search || d.title?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const filtered = searchFiltered.filter(SAVED_VIEWS[activeView].filter);
 
   const columns = [
     { key: "title", label: "Title" },
@@ -80,7 +94,14 @@ export default function DecisionsPage() {
       <div style={subtitleStyle}>All decisions across matters</div>
 
       {/* Filters */}
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+        <input
+          type="text"
+          placeholder="Search decisions..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ ...inputStyle, flex: 1, minWidth: 180 }}
+        />
         <select style={inputStyle} value={filters.status} onChange={(e) => handleFilter("status", e.target.value)}>
           <option value="">All Statuses</option>
           {statusOpts.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -91,13 +112,37 @@ export default function DecisionsPage() {
         </select>
       </div>
 
+      {/* Saved View Pills */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20, alignItems: "center" }}>
+        {SAVED_VIEWS.map((view, i) => (
+          <div
+            key={view.label}
+            onClick={() => setActiveView(i)}
+            style={{
+              padding: "5px 12px",
+              borderRadius: 16,
+              fontSize: 12,
+              cursor: "pointer",
+              background: i === activeView ? "#1e3a5f" : theme.bg.input,
+              color: i === activeView ? theme.accent.blueLight : theme.text.muted,
+              border: `1px solid ${i === activeView ? theme.accent.blue : theme.border.default}`,
+              fontWeight: i === activeView ? 600 : 400,
+              transition: "all 0.15s",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {view.label}
+          </div>
+        ))}
+      </div>
+
       {/* Table */}
       <div style={cardStyle}>
         {loading ? (
           <div style={{ textAlign: "center", padding: 40, color: theme.text.faint, fontSize: 13 }}>Loading...</div>
         ) : error ? (
           <div style={{ color: theme.accent.red, fontSize: 13 }}>Error: {error.message || String(error)}</div>
-        ) : decisions.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <EmptyState
             title="No decisions found"
             message="Adjust filters or create a new decision."
@@ -107,10 +152,14 @@ export default function DecisionsPage() {
         ) : (
           <DataTable
             columns={columns}
-            data={decisions}
+            data={filtered}
             onRowClick={(row) => openDrawer("decision", row, refetch)}
           />
         )}
+      </div>
+
+      <div style={{ fontSize: 12, color: theme.text.dim, marginTop: 8, textAlign: "right" }}>
+        Showing {filtered.length} decisions
       </div>
     </div>
   );
