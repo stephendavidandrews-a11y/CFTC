@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo , useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
+import { titleStyle, subtitleStyle, inputStyle, btnPrimary } from "../../styles/pageStyles";
 import { useToastContext } from "../../contexts/ToastContext";
 import useApi from "../../hooks/useApi";
 import { listTasks, listPeople, getEnums, updateTask, deleteTask } from "../../api/tracker";
@@ -19,39 +20,6 @@ const cardStyle = {
   marginBottom: 20,
 };
 
-const titleStyle = {
-  fontSize: 22,
-  fontWeight: 700,
-  color: theme.text.primary,
-  marginBottom: 4,
-};
-const subtitleStyle = {
-  fontSize: 13,
-  color: theme.text.dim,
-  marginBottom: 20,
-};
-
-const inputStyle = {
-  background: theme.bg.input,
-  border: `1px solid ${theme.border.default}`,
-  borderRadius: 6,
-  padding: "7px 12px",
-  fontSize: 13,
-  color: theme.text.secondary,
-  outline: "none",
-  minWidth: 140,
-};
-
-const btnPrimary = {
-  padding: "8px 18px",
-  borderRadius: 6,
-  fontSize: 13,
-  fontWeight: 600,
-  background: theme.accent.blue,
-  color: "#fff",
-  border: "none",
-  cursor: "pointer",
-};
 
 const sectionHeaderStyle = {
   display: "flex",
