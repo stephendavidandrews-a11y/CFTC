@@ -8,6 +8,7 @@ import DataTable from "../../components/shared/DataTable";
 import EmptyState from "../../components/shared/EmptyState";
 import { useDrawer } from "../../contexts/DrawerContext";
 import { formatDateTime } from "../../utils/dateUtils";
+import ConfirmDialog from "../../components/shared/ConfirmDialog";
 
 const cardStyle = {
   background: theme.bg.card,
@@ -236,103 +237,19 @@ export default function MeetingsPage() {
         )}
       </div>
 
-      {/* Confirm dialog */}
-      {confirmAction && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 9999,
-          }}
-          onClick={() => setConfirmAction(null)}
-        >
-          <div
-            style={{
-              background: theme.bg.card,
-              border: `1px solid ${theme.border.default}`,
-              borderRadius: 10,
-              padding: 24,
-              minWidth: 340,
-              maxWidth: 440,
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              style={{
-                fontSize: 15,
-                fontWeight: 700,
-                color: theme.text.primary,
-                marginBottom: 12,
-              }}
-            >
-              {confirmAction.action === "archive"
-                ? "Archive Meeting?"
-                : "Delete Meeting?"}
-            </div>
-            <div
-              style={{
-                fontSize: 13,
-                color: theme.text.muted,
-                marginBottom: 20,
-                lineHeight: 1.5,
-              }}
-            >
-              {confirmAction.action === "archive" ? (
-                <>
-                  This will archive{" "}
-                  <strong style={{ color: theme.text.secondary }}>
-                    {confirmAction.title}
-                  </strong>
-                  . It will be hidden from the main list but can be restored later.
-                </>
-              ) : (
-                <>
-                  This will permanently delete{" "}
-                  <strong style={{ color: theme.text.secondary }}>
-                    {confirmAction.title}
-                  </strong>
-                  . This cannot be undone.
-                </>
-              )}
-            </div>
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button
-                style={{
-                  ...btnPrimary,
-                  background: theme.bg.input,
-                  color: theme.text.muted,
-                }}
-                onClick={() => setConfirmAction(null)}
-              >
-                Cancel
-              </button>
-              <button
-                style={{
-                  ...btnPrimary,
-                  background:
-                    confirmAction.action === "delete"
-                      ? theme.accent.red
-                      : theme.accent.blue,
-                }}
-                disabled={actionBusy[confirmAction.id]}
-                onClick={() =>
-                  handleMeetingAction(confirmAction.id, confirmAction.action)
-                }
-              >
-                {actionBusy[confirmAction.id]
-                  ? "..."
-                  : confirmAction.action === "archive"
-                    ? "Archive"
-                    : "Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={async () => {
+          await handleMeetingAction(confirmAction.id, confirmAction.action);
+        }}
+        title={confirmAction?.action === "archive" ? "Archive Meeting" : "Delete Meeting"}
+        message={confirmAction?.action === "archive"
+          ? `Archive "${confirmAction?.title}"? It will be hidden from the default list but can be restored.`
+          : `Permanently delete "${confirmAction?.title}"? This cannot be undone.`}
+        confirmLabel={confirmAction?.action === "archive" ? "Archive" : "Delete"}
+        danger={confirmAction?.action === "delete"}
+      />
     </div>
   );
 }

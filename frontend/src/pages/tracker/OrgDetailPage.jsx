@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
 import { useToastContext } from "../../contexts/ToastContext";
@@ -8,6 +8,7 @@ import Badge from "../../components/shared/Badge";
 import { useDrawer } from "../../contexts/DrawerContext";
 import EmptyState from "../../components/shared/EmptyState";
 import { formatDate } from "../../utils/dateUtils";
+import ConfirmDialog from "../../components/shared/ConfirmDialog";
 
 /* ── Styles ─────────────────────────────────────────────────────── */
 
@@ -99,6 +100,7 @@ export default function OrgDetailPage() {
   const toast = useToastContext();
   const navigate = useNavigate();
   const { openDrawer } = useDrawer();
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: "", message: "", onConfirm: null, danger: false });
 
   const { data: org, loading, error, refetch } = useApi(() => getOrganization(id), [id]);
 
@@ -169,12 +171,19 @@ export default function OrgDetailPage() {
           <button style={btnEdit} onClick={() => openDrawer("organization", org, refetch)}>
             Edit Organization
           </button>
-          <button style={btnDelete} onClick={async () => {
-            if (!window.confirm(`Deactivate "${org.name}"? This will mark the organization as inactive.`)) return;
-            try {
-              await deleteOrganization(id);
-              navigate("/organizations");
-            } catch (e) { toast.error(e.message || "Operation failed"); }
+          <button style={btnDelete} onClick={() => {
+            setConfirmDialog({
+              open: true,
+              title: "Deactivate Organization",
+              message: `Deactivate "${org.name}"? This will mark the organization as inactive.`,
+              danger: true,
+              onConfirm: async () => {
+                try {
+                  await deleteOrganization(id);
+                  navigate("/organizations");
+                } catch (e) { toast.error(e.message || "Operation failed"); }
+              },
+            });
           }}>
             Delete
           </button>
@@ -354,6 +363,15 @@ export default function OrgDetailPage() {
           </SectionCard>
         </div>
       </div>
+      <ConfirmDialog
+        isOpen={confirmDialog.open}
+        onClose={() => setConfirmDialog(d => ({ ...d, open: false }))}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmLabel="Deactivate"
+        danger={confirmDialog.danger}
+      />
     </div>
   );
 }
