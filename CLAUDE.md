@@ -76,3 +76,13 @@ Before completing any code modification task, verify:
 - Generate docs: `npx gitnexus wiki`
 
 <!-- gitnexus:end -->
+## Frontend Code Rules
+
+- **In JSX text content, always use literal ASCII characters.** Never write `\uXXXX` escape sequences in bare JSX text — they render as literal characters, not Unicode. Use straight apostrophes (`'`) and quotes (`"`), not smart quotes.
+  - ❌ `<div>Today\u2019s Brief</div>` — renders as "Today\u2019s Brief"
+  - ✅ `<div>Today's Brief</div>` — renders as "Today's Brief"
+  - ✅ `<div>{"Today\u2019s Brief"}</div>` — renders correctly (JS string expression)
+- **Em-dashes and special characters in JSX** must be inside JS expressions: `{"\u2014"}` not bare `\u2014`.
+- **All frontend source uses inline styles with theme tokens** from `styles/theme.js`. Never hardcode hex color values.
+- **Shared page styles** live in `styles/pageStyles.js`. Import from there instead of redefining.
+- **Date formatting** uses `utils/dateUtils.js`. Never define local formatDate/formatDateTime functions.
