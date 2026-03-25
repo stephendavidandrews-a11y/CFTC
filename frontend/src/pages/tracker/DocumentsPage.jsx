@@ -76,9 +76,9 @@ export default function DocumentsPage() {
       ),
     },
     { key: "document_type", label: "Type", width: 120 },
-    { key: "notes", label: "Notes", flex: 1,
-      render: (val) => <span style={{ fontSize: 12, color: theme.text.dim }} title={val}>
-        {val && val.length > 50 ? val.slice(0, 50) + "…" : (val || "—")}
+    { key: "notes", label: "Notes", flex: 2,
+      render: (val) => <span style={{ fontSize: 12, color: theme.text.dim, whiteSpace: "normal", lineHeight: 1.4 }}>
+        {val || "—"}
       </span> },
     {
       key: "status", label: "Status", width: 120,
