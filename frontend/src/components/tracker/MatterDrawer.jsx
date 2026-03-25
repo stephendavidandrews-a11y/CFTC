@@ -56,6 +56,32 @@ const EMPTY = {
   lead_external_org_id: "",
 };
 
+function FieldSection({ title, defaultOpen = true, children, visible = true }) {
+  const [open, setOpen] = React.useState(defaultOpen);
+  if (!visible) return null;
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          width: "100%", padding: "8px 0", background: "none", border: "none",
+          cursor: "pointer", color: theme.text.primary, fontSize: 13,
+          fontWeight: 700, letterSpacing: "0.02em", textTransform: "uppercase",
+          borderBottom: `1px solid ${theme.border.default}`, marginBottom: 8,
+        }}
+      >
+        {title}
+        <span style={{ fontSize: 11, color: theme.text.dim, transition: "transform 0.15s" }}>
+          {open ? "▾" : "▸"}
+        </span>
+      </button>
+      {open && <div style={{ paddingTop: 4 }}>{children}</div>}
+    </div>
+  );
+}
+
 export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
   const [form, setForm] = React.useState({ ...EMPTY });
   const [enums, setEnums] = React.useState({});
