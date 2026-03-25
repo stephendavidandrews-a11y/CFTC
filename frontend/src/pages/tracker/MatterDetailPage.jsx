@@ -19,6 +19,7 @@ import Badge from "../../components/shared/Badge";
 import DataTable from "../../components/shared/DataTable";
 import EmptyState from "../../components/shared/EmptyState";
 import Breadcrumb from "../../components/shared/Breadcrumb";
+import { formatDate } from "../../utils/dateUtils";
 
 const cardStyle = {
   background: theme.bg.card,
@@ -55,11 +56,6 @@ const btnSecondary = {
 const labelStyle = { fontSize: 11, fontWeight: 700, color: theme.text.faint, textTransform: "uppercase", letterSpacing: "0.05em" };
 const valStyle = { fontSize: 13, color: theme.text.secondary, marginTop: 2 };
 
-function formatDate(d) {
-  if (!d) return "\u2014";
-  const val = typeof d === "string" && d.length === 10 ? d + "T12:00:00" : d;
-  return new Date(val).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
 
 const TABS = ["Updates", "Tasks", "Stakeholders", "Organizations", "Meetings", "Documents", "Decisions", "Dependencies", "Comment Topics", "Context Notes"];
 

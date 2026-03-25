@@ -12,6 +12,7 @@ import {
   listPeople,
 } from "../../api/tracker";
 import { getMeetingIntelligence } from "../../api/ai";
+import { formatDate, formatDateTime } from "../../utils/dateUtils";
 import Badge from "../../components/shared/Badge";
 import DataTable from "../../components/shared/DataTable";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
@@ -71,28 +72,7 @@ function renderObjectCards(obj) {
   );
 }
 
-function formatDateTime(d) {
-  if (!d) return "\u2014";
-  const val = typeof d === "string" && d.length === 10 ? d + "T12:00:00" : d;
-  return new Date(val).toLocaleString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
 
-function formatDate(d) {
-  if (!d) return "\u2014";
-  const val = typeof d === "string" && d.length === 10 ? d + "T12:00:00" : d;
-  return new Date(val).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
 
 function getDuration(start, end) {
   if (!start || !end) return null;

@@ -10,6 +10,7 @@ import DataTable from "../../components/shared/DataTable";
 import Badge from "../../components/shared/Badge";
 import Modal from "../../components/shared/Modal";
 import EmptyState from "../../components/shared/EmptyState";
+import { formatDate, formatDateTime } from "../../utils/dateUtils";
 import UploadAudioModal from "../../components/shared/UploadAudioModal";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -24,20 +25,7 @@ function formatDuration(seconds) {
   return `${h}:${String(m % 60).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-function formatDate(dateStr) {
-  if (!dateStr) return "\u2014";
-  const d = new Date(dateStr);
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
 
-function formatDateTime(dateStr) {
-  if (!dateStr) return "\u2014";
-  const d = new Date(dateStr);
-  return d.toLocaleString(undefined, {
-    month: "short", day: "numeric", year: "numeric",
-    hour: "numeric", minute: "2-digit",
-  });
-}
 
 const ALL_STATUSES = [
   { value: "", label: "All Statuses" },

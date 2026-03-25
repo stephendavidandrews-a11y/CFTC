@@ -8,6 +8,7 @@ import Badge from "../../components/shared/Badge";
 import { useDrawer } from "../../contexts/DrawerContext";
 import EmptyState from "../../components/shared/EmptyState";
 import Breadcrumb from "../../components/shared/Breadcrumb";
+import { formatDateShort, timeAgo } from "../../utils/dateUtils";
 
 /* ── Styles ──────────────────────────────────────────────────── */
 
@@ -110,17 +111,6 @@ function SmallBadge({ label, colorMap }) {
   );
 }
 
-function timeAgo(d) {
-  if (!d) return "\u2014";
-  const now = new Date();
-  const then = new Date(d);
-  const diffDays = Math.floor((now - then) / (1000 * 60 * 60 * 24));
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return `${diffDays} days ago`;
-  if (diffDays < 14) return "1 week ago";
-  return `${Math.floor(diffDays / 7)} weeks ago`;
-}
 
 function nextNeededLabel(d) {
   if (!d) return "\u2014";
@@ -135,11 +125,6 @@ function nextNeededLabel(d) {
   return new Date(val).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function formatDate(d) {
-  if (!d) return "\u2014";
-  const val = typeof d === "string" && d.length === 10 ? d + "T12:00:00" : d;
-  return new Date(val).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
 
 /* ── Component ───────────────────────────────────────────────── */
 
@@ -454,7 +439,7 @@ export default function PersonDetailPage() {
                             color: new Date(t.due_date) < new Date() ? "#f87171" : theme.text.muted,
                             fontWeight: new Date(t.due_date) < new Date() ? 600 : 400,
                           }}>
-                            Due {formatDate(t.due_date)}
+                            Due {formatDateShort(t.due_date)}
                           </span>
                         </>
                       )}
@@ -506,7 +491,7 @@ export default function PersonDetailPage() {
                       {mtg.title}
                     </div>
                     <div style={{ marginTop: 4, display: "flex", gap: 6, alignItems: "center", fontSize: 11, color: theme.text.muted }}>
-                      <span>{formatDate(mtg.date_time_start)}</span>
+                      <span>{formatDateShort(mtg.date_time_start)}</span>
                       {mtg.meeting_type && (
                         <>
                           <span style={{ color: theme.text.faint }}>&#8226;</span>

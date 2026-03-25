@@ -7,6 +7,7 @@ import { getOrganization, deleteOrganization } from "../../api/tracker";
 import Badge from "../../components/shared/Badge";
 import { useDrawer } from "../../contexts/DrawerContext";
 import EmptyState from "../../components/shared/EmptyState";
+import { formatDate } from "../../utils/dateUtils";
 
 /* ── Styles ─────────────────────────────────────────────────────── */
 
@@ -56,11 +57,6 @@ const ROLE_COLORS = {
 
 /* ── Helpers ────────────────────────────────────────────────────── */
 
-function formatDate(d) {
-  if (!d) return "\u2014";
-  const val = typeof d === "string" && d.length === 10 ? d + "T12:00:00" : d;
-  return new Date(val).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
 
 function SmallBadge({ label, colors }) {
   const c = colors || { bg: theme.bg.input, text: theme.text.faint };

@@ -7,6 +7,7 @@ import { listMeetings, listMatters, updateMeeting, deleteMeeting } from "../../a
 import DataTable from "../../components/shared/DataTable";
 import EmptyState from "../../components/shared/EmptyState";
 import { useDrawer } from "../../contexts/DrawerContext";
+import { formatDateTime } from "../../utils/dateUtils";
 
 const cardStyle = {
   background: theme.bg.card,
@@ -51,13 +52,6 @@ const actionBtnStyle = {
   transition: "background 0.15s",
 };
 
-function formatDateTime(d) {
-  if (!d) return "\u2014";
-  return new Date(d).toLocaleString("en-US", {
-    month: "short", day: "numeric", year: "numeric",
-    hour: "numeric", minute: "2-digit",
-  });
-}
 
 function defaultDateRange() {
   const today = new Date();
