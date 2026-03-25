@@ -45,6 +45,7 @@ import DailyBriefPage from "./pages/intelligence/DailyBriefPage";
 import WeeklyBriefPage from "./pages/intelligence/WeeklyBriefPage";
 import DirectivesPage from "./pages/tracker/DirectivesPage";
 import DirectiveDetailPage from "./pages/tracker/DirectiveDetailPage";
+import TodayPage from "./pages/tracker/TodayPage";
 
 
 
@@ -57,6 +58,7 @@ export default function App() {
         <Route element={<AppShell />}>
           {/* -- Operations (Tracker) -- */}
           <Route index element={<TrackerDashboardPage />} />
+          <Route path="/today" element={<TodayPage />} />
           <Route path="/matters" element={<MattersPage />} />
           <Route path="/matters/:id" element={<MatterDetailPage />} />
             <Route path="/directives" element={<DirectivesPage />} />
