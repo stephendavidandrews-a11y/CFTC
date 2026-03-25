@@ -18,6 +18,8 @@ import MeetingDetailPage from "./pages/tracker/MeetingDetailPage";
 import TeamWorkloadPage from "./pages/tracker/TeamWorkloadPage";
 import DecisionsPage from "./pages/tracker/DecisionsPage";
 import DocumentsPage from "./pages/tracker/DocumentsPage";
+import DecisionDetailPage from "./pages/tracker/DecisionDetailPage";
+import DocumentDetailPage from "./pages/tracker/DocumentDetailPage";
 import ContextNotesPage from "./pages/tracker/ContextNotesPage";
 
 // -- AI Review (Phase 3 + Phase 6) --
@@ -71,7 +73,9 @@ export default function App() {
           <Route path="/meetings/:id" element={<MeetingDetailPage />} />
           <Route path="/team-workload" element={<TeamWorkloadPage />} />
           <Route path="/decisions" element={<DecisionsPage />} />
+          <Route path="/decisions/:id" element={<DecisionDetailPage />} />
           <Route path="/documents" element={<DocumentsPage />} />
+          <Route path="/documents/:id" element={<DocumentDetailPage />} />
           <Route path="/context-notes" element={<ContextNotesPage />} />
 
           {/* -- AI Review (Phase 3 + Phase 6) -- */}
