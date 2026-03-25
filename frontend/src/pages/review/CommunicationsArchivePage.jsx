@@ -12,6 +12,7 @@ import Modal from "../../components/shared/Modal";
 import EmptyState from "../../components/shared/EmptyState";
 import { formatDate, formatDateTime } from "../../utils/dateUtils";
 import UploadAudioModal from "../../components/shared/UploadAudioModal";
+import ConfirmDialog from "../../components/shared/ConfirmDialog";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -136,6 +137,7 @@ export default function CommunicationsArchivePage() {
   const [showArchived, setShowArchived] = useState(false);
   const [detailItem, setDetailItem] = useState(null);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: "", message: "", onConfirm: null, danger: false });
 
   const params = useMemo(() => {
     const p = {};
@@ -300,14 +302,21 @@ export default function CommunicationsArchivePage() {
                 refetch();
               } catch (e) { toast.error(e.message); }
             }}
-            onDelete={async () => {
-              if (!window.confirm("Permanently delete this communication and all its data? This cannot be undone.")) return;
-              try {
-                await deleteCommunication(detailItem.id);
-                toast.success("Communication deleted");
-                setDetailItem(null);
-                refetch();
-              } catch (e) { toast.error(e.message); }
+            onDelete={() => {
+              setConfirmDialog({
+                open: true,
+                title: "Delete Communication",
+                message: "Permanently delete this communication and all its data? This cannot be undone.",
+                danger: true,
+                onConfirm: async () => {
+                  try {
+                    await deleteCommunication(detailItem.id);
+                    toast.success("Communication deleted");
+                    setDetailItem(null);
+                    refetch();
+                  } catch (e) { toast.error(e.message); }
+                },
+              });
             }}
           />
         )}
@@ -322,6 +331,16 @@ export default function CommunicationsArchivePage() {
           toast.success("Upload started \u2014 processing will begin automatically");
           refetch();
         }}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmDialog.open}
+        onClose={() => setConfirmDialog(d => ({ ...d, open: false }))}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmLabel="Delete"
+        danger={confirmDialog.danger}
       />
     </div>
   );
