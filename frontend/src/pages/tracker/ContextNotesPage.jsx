@@ -131,6 +131,13 @@ export default function ContextNotesPage() {
           <option value="moderate">Moderate</option>
           <option value="high">High</option>
         </select>
+        <select value={filters.durability} onChange={e => handleFilter("durability", e.target.value)}
+          style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid " + theme.border.default,
+            background: theme.bg.input, color: theme.text.primary, fontSize: 11 }}>
+          <option value="">All durabilities</option>
+          <option value="durable">Durable</option>
+          <option value="volatile">Volatile</option>
+        </select>
       </div>
 
       {/* Content */}
