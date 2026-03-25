@@ -322,27 +322,6 @@ export default function PersonDetailPage() {
             );
           })()}
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div style={sidebarCardStyle}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: theme.text.faint, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                Last interaction
-              </div>
-              <div style={{ fontSize: 16, fontWeight: 600, color: theme.text.primary, marginTop: 4 }}>
-                {timeAgo(person.last_interaction_date)}
-              </div>
-            </div>
-            <div style={sidebarCardStyle}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: theme.text.faint, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                Next needed
-              </div>
-              <div style={{
-                fontSize: 16, fontWeight: 600, marginTop: 4,
-                color: nextIsUrgent ? theme.accent.yellowLight : theme.text.primary,
-              }}>
-                {nextLabel}
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* ── Main content ── */}
