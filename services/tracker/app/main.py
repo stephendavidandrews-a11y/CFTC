@@ -36,6 +36,7 @@ from app.routers import (
     comment_topics,
     policy_directives,
     directive_matters,
+    directive_documents,
 )
 from app.routers import config as config_router
 
@@ -139,6 +140,7 @@ app.include_router(context_notes.router, prefix=router_prefix, dependencies=[Dep
 app.include_router(comment_topics.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 app.include_router(policy_directives.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 app.include_router(directive_matters.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
+app.include_router(directive_documents.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 app.include_router(config_router.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
 
 
