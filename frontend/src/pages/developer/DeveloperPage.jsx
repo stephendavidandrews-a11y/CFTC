@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+import React, { useMemo } from "react";
+import { Tabs } from "../../components/radix/StyledTabs";
 import theme from "../../styles/theme";
 import manifest from "../../data/schema-manifest.json";
 
@@ -688,7 +689,6 @@ function ServicesTab() {
 // ═══════════════════════════════════════════════════════════════════════
 
 export default function DeveloperPage() {
-  const [activeTab, setActiveTab] = useState("schema");
 
   return (
     <div style={{
@@ -724,23 +724,19 @@ export default function DeveloperPage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: "flex", gap: 0, borderBottom: `1px solid ${theme.border.default}`, marginBottom: 20 }}>
-        {TABS.map(t => (
-          <button key={t.key} onClick={() => setActiveTab(t.key)} style={{
-            padding: "10px 20px", fontSize: 12, fontWeight: 600,
-            border: "none", cursor: "pointer", background: "transparent",
-            color: activeTab === t.key ? theme.accent.blueLight : theme.text.dim,
-            borderBottom: activeTab === t.key ? `2px solid ${theme.accent.blue}` : "2px solid transparent",
-            transition: "all 0.15s ease",
-          }}>{t.label}</button>
-        ))}
-      </div>
-
-      {/* Tab content */}
-      {activeTab === "schema" && <SchemaTab />}
-      {activeTab === "api" && <ApiTab />}
-      {activeTab === "enums" && <EnumsTab />}
-      {activeTab === "services" && <ServicesTab />}
+      <Tabs.Root defaultValue="schema">
+        <Tabs.List>
+          {TABS.map(t => (
+            <Tabs.Trigger key={t.key} value={t.key} style={{ padding: "10px 20px", fontSize: 12 }}>
+              {t.label}
+            </Tabs.Trigger>
+          ))}
+        </Tabs.List>
+        <Tabs.Content value="schema"><SchemaTab /></Tabs.Content>
+        <Tabs.Content value="api"><ApiTab /></Tabs.Content>
+        <Tabs.Content value="enums"><EnumsTab /></Tabs.Content>
+        <Tabs.Content value="services"><ServicesTab /></Tabs.Content>
+      </Tabs.Root>
     </div>
   );
 }

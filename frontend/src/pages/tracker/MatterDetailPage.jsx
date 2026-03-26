@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
+import { Tabs } from "../../components/radix/StyledTabs";
 import { useToastContext } from "../../contexts/ToastContext";
 import useApi from "../../hooks/useApi";
 import useTabState from "../../hooks/useTabState";
@@ -496,29 +497,23 @@ export default function MatterDetailPage() {
       </div>
 
       {/* Tab Bar */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: `1px solid ${theme.border.default}`, paddingBottom: 0, flexWrap: "wrap" }}>
+      <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
+      <Tabs.List style={{ marginBottom: 16 }}>
         {tabs.map((tab) => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-            style={{
-              padding: "10px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer",
-              background: "transparent", border: "none",
-              color: activeTab === tab.key ? theme.accent.blue : theme.text.faint,
-              borderBottom: activeTab === tab.key ? `2px solid ${theme.accent.blue}` : "2px solid transparent",
-              marginBottom: -1,
-            }}
-          >{tab.label}</button>
+          <Tabs.Trigger key={tab.key} value={tab.key}>{tab.label}</Tabs.Trigger>
         ))}
-      </div>
+      </Tabs.List>
 
       {/* Tab Content */}
       <div style={cardStyle}>
-        {activeTab === "Activity" && <ActivityTab matterId={id} matter={matter} refetch={refetch} toast={toast} enums={enums} />}
-        {activeTab === "Work" && <WorkTab matterId={id} activeTab={activeTab} />}
-        {activeTab === "Stakeholders" && <StakeholdersTab matterId={id} matter={matter} refetch={refetch} toast={toast} allPeople={allPeople} allOrgs={allOrgs} />}
-        {activeTab === "Intelligence" && <IntelligenceTab matterId={id} activeTab={activeTab} />}
-        {activeTab === "Dependencies" && <DependenciesTab matterId={id} matter={matter} refetch={refetch} toast={toast} allMatters={allMatters} enums={enums} />}
-        {activeTab === "Rulemaking" && <RulemakingTab matterId={id} />}
+        <Tabs.Content value="Activity" forceMount><ActivityTab matterId={id} matter={matter} refetch={refetch} toast={toast} enums={enums} /></Tabs.Content>
+        <Tabs.Content value="Work" forceMount><WorkTab matterId={id} activeTab={activeTab} /></Tabs.Content>
+        <Tabs.Content value="Stakeholders" forceMount><StakeholdersTab matterId={id} matter={matter} refetch={refetch} toast={toast} allPeople={allPeople} allOrgs={allOrgs} /></Tabs.Content>
+        <Tabs.Content value="Intelligence" forceMount><IntelligenceTab matterId={id} activeTab={activeTab} /></Tabs.Content>
+        <Tabs.Content value="Dependencies" forceMount><DependenciesTab matterId={id} matter={matter} refetch={refetch} toast={toast} allMatters={allMatters} enums={enums} /></Tabs.Content>
+        <Tabs.Content value="Rulemaking" forceMount><RulemakingTab matterId={id} /></Tabs.Content>
       </div>
+      </Tabs.Root>
 
       <ConfirmDialog
         isOpen={confirmDialog.open}
