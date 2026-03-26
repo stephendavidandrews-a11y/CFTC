@@ -2,10 +2,10 @@
  * API client wrapper for the CFTC Pipeline backend.
  *
  * Uses the proxy configured in package.json for development,
- * or REACT_APP_API_URL in production.
+ * or VITE_API_URL in production.
  */
 
-const BASE = process.env.REACT_APP_API_URL || "";
+const BASE = import.meta.env.VITE_API_URL || "";
 
 /** Generate a short unique request ID for tracing. */
 function generateRequestId() {
