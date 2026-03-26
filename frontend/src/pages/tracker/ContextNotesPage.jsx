@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
 import { titleStyle, subtitleStyle, inputStyle } from "../../styles/pageStyles";
 import { timeAgo } from "../../utils/dateUtils";
@@ -54,9 +55,9 @@ export default function ContextNotesPage() {
   const [filters, setFilters] = useState({
     search: "", category: "", posture: "", sensitivity: "", durability: "",
   });
-  const [expanded, setExpanded] = useState(null);
   const [sortBy, setSortBy] = useState("created_at_desc");
   const [activeView, setActiveView] = useState(0);
+  const navigate = useNavigate();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -193,13 +194,12 @@ export default function ContextNotesPage() {
           {filtered.map(note => {
             const catColor = CATEGORY_COLORS[note.category] || CATEGORY_COLORS.institutional_knowledge;
             const posColor = POSTURE_COLORS[note.posture] || POSTURE_COLORS.factual;
-            const isExpanded = expanded === note.id;
             const isStale = note.stale_after && new Date(note.stale_after) <= new Date();
 
             return (
               <div
                 key={note.id}
-                onClick={() => setExpanded(isExpanded ? null : note.id)}
+                onClick={() => navigate(`/context-notes/${note.id}`)}
                 style={{
                   background: theme.bg.card,
                   border: "1px solid " + theme.border.subtle,
@@ -241,67 +241,14 @@ export default function ContextNotesPage() {
                 </div>
 
                 {/* Body preview */}
-                {!isExpanded && (
-                  <div style={{
+                <div style={{
                     fontSize: 12, color: theme.text.dim, lineHeight: 1.5,
                     overflow: "hidden", textOverflow: "ellipsis",
                     display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
                   }}>
                     {note.body}
-                  </div>
-                )}
+                </div>
 
-                {/* Expanded detail */}
-                {isExpanded && (
-                  <div style={{ marginTop: 8 }}>
-                    <div style={{ fontSize: 12, color: theme.text.secondary, lineHeight: 1.6, marginBottom: 12 }}>
-                      {note.body}
-                    </div>
-
-                    {note.speaker_attribution && (
-                      <div style={{ fontSize: 11, color: theme.text.dim, marginBottom: 6 }}>
-                        <strong>Speaker:</strong> {note.speaker_attribution}
-                      </div>
-                    )}
-
-                    {note.source_excerpt && (
-                      <div style={{
-                        borderLeft: "3px solid " + theme.accent.blue,
-                        paddingLeft: 12, marginBottom: 8,
-                        fontStyle: "italic", fontSize: 12, color: theme.text.muted, lineHeight: 1.6,
-                      }}>
-                        {"\u201c"}{note.source_excerpt}{"\u201d"}
-                      </div>
-                    )}
-
-                    {/* Linked entities */}
-                    {note.links && note.links.length > 0 && (
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
-                        {note.links.map((link, i) => (
-                          <span key={i} style={{
-                            display: "inline-flex", alignItems: "center", gap: 4,
-                            padding: "2px 8px", borderRadius: 4, fontSize: 10,
-                            background: "rgba(59,130,246,0.1)", color: theme.accent.blueLight,
-                            border: "1px solid rgba(59,130,246,0.2)",
-                          }}>
-                            <span style={{ textTransform: "capitalize" }}>{link.entity_type}</span>
-                            {link.entity_name && <span>· {link.entity_name}</span>}
-                            <span style={{ color: theme.text.faint }}>({link.relationship_role})</span>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Metadata */}
-                    <div style={{
-                      display: "flex", gap: 16, marginTop: 10, fontSize: 10, color: theme.text.faint,
-                    }}>
-                      <span>Durability: {note.durability}</span>
-                      <span>Source: {note.source}</span>
-                      {note.ai_confidence != null && <span>Confidence: {(note.ai_confidence * 100).toFixed(0)}%</span>}
-                    </div>
-                  </div>
-                )}
               </div>
             );
           })}
