@@ -11,38 +11,11 @@ TRACKER_SCHEMA_VERSION = "1.2.0"
 
 ENUMS = {
     "matter_type": [
-        "rulemaking",
-        "interpretive guidance",
-        "no-action letter",
-        "exemptive letter",
-        "staff advisory",
-        "other letter",
-        "interagency coordination",
-        "enforcement support",
-        "congressional response",
-        "speech / testimony / briefing prep",
-        "litigation-sensitive issue",
-        "personnel / management",
-        "administrative / ethics / process",
-        "industry inquiry",
-        "international matter",
-        "regulatory review",
-        "prospective policy",
-        "other",
+        "rulemaking", "guidance", "enforcement", "congressional",
+        "briefing", "administrative", "inquiry", "other",
     ],
     "matter_status": [
-        "new intake",
-        "framing issue",
-        "research in progress",
-        "draft in progress",
-        "internal review",
-        "client review",
-        "leadership review",
-        "external coordination",
-        "awaiting decision",
-        "awaiting comments",
-        "parked / monitoring",
-        "closed",
+        "active", "paused", "closed",
     ],
     "matter_priority": [
         "critical this week",
@@ -58,14 +31,8 @@ ENUMS = {
         "enforcement-sensitive",
         "congressional-sensitive",
     ],
-    "risk_level": ["low", "medium", "high", "critical"],
-    "boss_involvement_level": [
-        "no boss involvement needed",
-        "keep boss informed",
-        "boss review required",
-        "boss decision required",
-        "boss will present / speak",
-    ],
+
+
     "regulatory_stage": [
         "concept",
         "drafting",
@@ -477,7 +444,6 @@ ENUMS = {
 ENUM_ALIASES = {
     "priority": "matter_priority",
     "sensitivity": "matter_sensitivity",
-    "boss_involvement": "boss_involvement_level",
 }
 
 
@@ -566,10 +532,6 @@ AI_WRITABLE_ENUM_COLUMNS = {
         "status": "matter_status",
         "priority": "matter_priority",
         "sensitivity": "matter_sensitivity",
-        "risk_level": "risk_level",
-        "boss_involvement_level": "boss_involvement_level",
-        "regulatory_stage": "regulatory_stage",
-        "unified_agenda_priority": "unified_agenda_priority",
         "source": "source",
     },
     "tasks": {
@@ -642,9 +604,7 @@ AI_WRITABLE_ENUM_COLUMNS = {
     },
 
     "matter_rulemaking": {
-        "regulatory_stage": "regulatory_stage",
         "workflow_status": "rulemaking_workflow_status",
-        "unified_agenda_priority": "unified_agenda_priority",
         "interagency_role": "interagency_role",
         "petition_disposition": "petition_disposition",
         "review_trigger": "review_trigger",
