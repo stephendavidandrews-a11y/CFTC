@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
 import { listMatters, listPeople, listOrganizations } from "../../api/tracker";
@@ -125,9 +126,8 @@ export default function CommandPalette() {
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === "Escape") {
-      setOpen(false);
-    } else if (e.key === "ArrowDown") {
+    // Escape is handled by Radix Dialog
+    if (e.key === "ArrowDown") {
       e.preventDefault();
       setSelected((prev) => Math.min(prev + 1, results.length - 1));
     } else if (e.key === "ArrowUp") {
@@ -138,30 +138,37 @@ export default function CommandPalette() {
     }
   };
 
-  if (!open) return null;
-
   return (
-    <>
-      <div
-        onClick={() => setOpen(false)}
-        style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
-          zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center",
-          paddingTop: "15vh",
-        }}
-      >
-        <div
-          onClick={(e) => e.stopPropagation()}
+    <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay
           style={{
-            width: 560, maxHeight: "60vh",
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+            zIndex: 1000,
+          }}
+        />
+        <DialogPrimitive.Content
+          aria-label="Command palette"
+          style={{
+            position: "fixed",
+            top: "15vh",
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: 560,
+            maxHeight: "60vh",
             background: theme.bg.card,
             border: `1px solid ${theme.border.default}`,
             borderRadius: 12,
             boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
-            display: "flex", flexDirection: "column",
+            display: "flex",
+            flexDirection: "column",
             overflow: "hidden",
+            zIndex: 1001,
+            outline: "none",
           }}
         >
+          <DialogPrimitive.Title className="sr-only">Command Palette</DialogPrimitive.Title>
+
           <div style={{
             display: "flex", alignItems: "center", gap: 10,
             padding: "14px 16px",
@@ -174,6 +181,12 @@ export default function CommandPalette() {
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
               placeholder="Search pages, matters, people, organizations..."
+              role="combobox"
+              aria-expanded={results.length > 0}
+              aria-activedescendant={results[selected] ? `cmd-option-${selected}` : undefined}
+              aria-autocomplete="list"
+              aria-controls="cmd-results"
+              aria-label="Command palette search"
               style={{
                 flex: 1, background: "transparent", border: "none",
                 fontSize: 15, color: theme.text.primary, outline: "none",
@@ -186,7 +199,7 @@ export default function CommandPalette() {
             }}>ESC</kbd>
           </div>
 
-          <div style={{ overflowY: "auto", maxHeight: "50vh" }}>
+          <div id="cmd-results" role="listbox" aria-label="Search results" style={{ overflowY: "auto", maxHeight: "50vh" }}>
             {results.length === 0 ? (
               <div style={{ padding: "24px 16px", textAlign: "center", color: theme.text.faint, fontSize: 13 }}>
                 No results found
@@ -195,6 +208,9 @@ export default function CommandPalette() {
               results.map((item, i) => (
                 <div
                   key={item.path + i}
+                  id={`cmd-option-${i}`}
+                  role="option"
+                  aria-selected={i === selected}
                   onClick={() => handleSelect(item)}
                   onMouseEnter={() => setSelected(i)}
                   style={{
@@ -240,8 +256,8 @@ export default function CommandPalette() {
             <span><kbd style={{ background: theme.bg.input, padding: "1px 4px", borderRadius: 2, border: `1px solid ${theme.border.subtle}` }}>&crarr;</kbd> select</span>
             <span><kbd style={{ background: theme.bg.input, padding: "1px 4px", borderRadius: 2, border: `1px solid ${theme.border.subtle}` }}>esc</kbd> close</span>
           </div>
-        </div>
-      </div>
-    </>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }
