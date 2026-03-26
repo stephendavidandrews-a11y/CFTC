@@ -17,6 +17,7 @@ import Badge from "../../components/shared/Badge";
 import DataTable from "../../components/shared/DataTable";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
 import Breadcrumb from "../../components/shared/Breadcrumb";
+import { Tabs } from "../../components/radix/StyledTabs";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -821,9 +822,6 @@ export default function MeetingDetailPage() {
     }
   }, [id, navigate, addToast]);
 
-  // ---- Tabs ----
-  const [activeTab, setActiveTab] = useState("matters");
-
   // ---- Loading / Error states ----
   if (meetingLoading) {
     return (
@@ -1165,34 +1163,18 @@ export default function MeetingDetailPage() {
       {/* Section 4: Tabbed Section                                        */}
       {/* ================================================================ */}
       <div style={{ ...cardStyle, padding: 0 }}>
-        {/* Tab bar */}
-        <div
-          style={{
-            display: "flex",
-            borderBottom: `1px solid ${theme.border.default}`,
-            padding: "0 8px",
-          }}
-        >
-          {[
-            { key: "matters", label: "Matters" },
-            { key: "tasks", label: "Tasks" },
-            { key: "decisions", label: "Decisions" },
-            { key: "notes", label: "Notes & Readout" },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              style={tabButtonStyle(activeTab === tab.key)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        <Tabs.Root defaultValue="matters">
+        <Tabs.List>
+          <Tabs.Trigger value="matters">Matters</Tabs.Trigger>
+          <Tabs.Trigger value="tasks">Tasks</Tabs.Trigger>
+          <Tabs.Trigger value="decisions">Decisions</Tabs.Trigger>
+          <Tabs.Trigger value="notes">Notes &amp; Readout</Tabs.Trigger>
+        </Tabs.List>
 
         {/* Tab content */}
         <div style={{ padding: 24 }}>
           {/* ---- Matters tab ---- */}
-          {activeTab === "matters" && (
+          <Tabs.Content value="matters">
             <>
               {matters.length > 0 ? (
                 <DataTable
@@ -1232,10 +1214,10 @@ export default function MeetingDetailPage() {
                 <EmptyState message="No matters linked to this meeting." />
               )}
             </>
-          )}
+          </Tabs.Content>
 
           {/* ---- Tasks tab ---- */}
-          {activeTab === "tasks" && (
+          <Tabs.Content value="tasks">
             <>
               {(meetingTasks && meetingTasks.length > 0) || matterTasks.length > 0 ? (
                 <>
@@ -1300,10 +1282,10 @@ export default function MeetingDetailPage() {
                 <EmptyState message="No tasks associated with this meeting or its matters." />
               )}
             </>
-          )}
+          </Tabs.Content>
 
           {/* ---- Decisions tab ---- */}
-          {activeTab === "decisions" && (
+          <Tabs.Content value="decisions">
             <>
               {matterDecisions.length > 0 ? (
                 <DataTable
@@ -1333,10 +1315,10 @@ export default function MeetingDetailPage() {
                 <EmptyState message="No decisions from linked matters." />
               )}
             </>
-          )}
+          </Tabs.Content>
 
           {/* ---- Notes & Readout tab ---- */}
-          {activeTab === "notes" && (
+          <Tabs.Content value="notes">
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               {meeting.notes && (
                 <div>
@@ -1406,8 +1388,9 @@ export default function MeetingDetailPage() {
                 <EmptyState message="No notes or readout recorded." />
               )}
             </div>
-          )}
+          </Tabs.Content>
         </div>
+        </Tabs.Root>
       </div>
     </div>
   );
