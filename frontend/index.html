@@ -19,6 +19,8 @@
     ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: #334155; }
     @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.4; } 50% { transform: scale(2.2); opacity: 0; } }
+    @keyframes sheet-slide-in { from { transform: translateX(110%); } to { transform: translateX(0); } }
+    @keyframes sheet-slide-out { from { transform: translateX(0); } to { transform: translateX(110%); } }
 
     /* ── Mobile responsiveness ── */
     @media (max-width: 768px) {
