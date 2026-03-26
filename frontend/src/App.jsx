@@ -21,6 +21,7 @@ import DocumentsPage from "./pages/tracker/DocumentsPage";
 import DecisionDetailPage from "./pages/tracker/DecisionDetailPage";
 import DocumentDetailPage from "./pages/tracker/DocumentDetailPage";
 import ContextNotesPage from "./pages/tracker/ContextNotesPage";
+import ContextNoteDetailPage from "./pages/tracker/ContextNoteDetailPage";
 
 // -- AI Review (Phase 3 + Phase 6) --
 import SpeakerReviewQueuePage from "./pages/review/SpeakerReviewQueuePage";
@@ -77,6 +78,7 @@ export default function App() {
           <Route path="/documents" element={<DocumentsPage />} />
           <Route path="/documents/:id" element={<DocumentDetailPage />} />
           <Route path="/context-notes" element={<ContextNotesPage />} />
+          <Route path="/context-notes/:id" element={<ContextNoteDetailPage />} />
 
           {/* -- AI Review (Phase 3 + Phase 6) -- */}
           <Route path="/review/speakers" element={<SpeakerReviewQueuePage />} />
