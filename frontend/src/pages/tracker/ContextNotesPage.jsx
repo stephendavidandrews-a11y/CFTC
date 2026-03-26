@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import theme from "../../styles/theme";
+import { titleStyle, subtitleStyle, inputStyle } from "../../styles/pageStyles";
+import { timeAgo } from "../../utils/dateUtils";
 import { listContextNotes, deleteContextNote } from "../../api/tracker";
 
 const CATEGORY_COLORS = {
@@ -34,6 +36,16 @@ function formatLabel(s) {
   return (s || "").replace(/_/g, " ");
 }
 
+const SAVED_VIEWS = [
+  { label: "All Notes", filter: () => true },
+  { label: "High Sensitivity", filter: (n) => n.sensitivity === "high" || n.sensitivity === "moderate" },
+  { label: "Stale / Expiring", filter: (n) => n.stale_after && new Date(n.stale_after) <= new Date() },
+  { label: "Recent", filter: (n) => {
+    const d = new Date(n.created_at);
+    return d >= new Date(Date.now() - 7 * 86400000);
+  }},
+];
+
 export default function ContextNotesPage() {
   useEffect(() => { document.title = "Context Notes | Command Center"; }, []);
   const [data, setData] = useState(null);
@@ -43,6 +55,8 @@ export default function ContextNotesPage() {
     search: "", category: "", posture: "", sensitivity: "", durability: "",
   });
   const [expanded, setExpanded] = useState(null);
+  const [sortBy, setSortBy] = useState("created_at_desc");
+  const [activeView, setActiveView] = useState(0);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -55,6 +69,13 @@ export default function ContextNotesPage() {
       if (filters.sensitivity) params.sensitivity = filters.sensitivity;
       if (filters.durability) params.durability = filters.durability;
       params.limit = 200;
+      const [field, dir] = sortBy.includes("_asc")
+        ? [sortBy.replace("_asc", ""), "asc"]
+        : sortBy.includes("_desc")
+          ? [sortBy.replace("_desc", ""), "desc"]
+          : [sortBy, "asc"];
+      params.sort_by = field;
+      params.sort_dir = dir;
       const result = await listContextNotes(params);
       setData(result);
     } catch (e) {
@@ -62,7 +83,7 @@ export default function ContextNotesPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, sortBy]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -71,24 +92,12 @@ export default function ContextNotesPage() {
   };
 
   const items = data?.items || [];
+  const filtered = items.filter(SAVED_VIEWS[activeView].filter);
 
   return (
     <div style={{ padding: 24, maxWidth: 1200, margin: "0 auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: theme.text.primary, margin: 0 }}>
-            Context Notes
-          </h1>
-          <p style={{ fontSize: 12, color: theme.text.dim, margin: "4px 0 0" }}>
-            Operational intelligence, institutional knowledge, and attributed observations
-          </p>
-        </div>
-        {data && (
-          <span style={{ fontSize: 12, color: theme.text.faint }}>
-            {data.total} note{data.total !== 1 ? "s" : ""}
-          </span>
-        )}
-      </div>
+      <div style={titleStyle}>Context Notes</div>
+      <div style={subtitleStyle}>Operational intelligence, institutional knowledge, and attributed observations</div>
 
       {/* Filters */}
       <div style={{
@@ -101,43 +110,64 @@ export default function ContextNotesPage() {
           placeholder="Search notes..."
           value={filters.search}
           onChange={e => handleFilter("search", e.target.value)}
-          style={{
-            flex: 1, minWidth: 180, padding: "6px 10px", borderRadius: 6,
-            border: "1px solid " + theme.border.default,
-            background: theme.bg.input, color: theme.text.primary, fontSize: 12,
-          }}
+          style={{ ...inputStyle, flex: 1, minWidth: 180 }}
         />
         <select value={filters.category} onChange={e => handleFilter("category", e.target.value)}
-          style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid " + theme.border.default,
-            background: theme.bg.input, color: theme.text.primary, fontSize: 11 }}>
+          style={{ ...inputStyle, minWidth: 0, flex: "none" }}>
           <option value="">All categories</option>
           {Object.keys(CATEGORY_COLORS).map(c => (
             <option key={c} value={c}>{formatLabel(c)}</option>
           ))}
         </select>
         <select value={filters.posture} onChange={e => handleFilter("posture", e.target.value)}
-          style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid " + theme.border.default,
-            background: theme.bg.input, color: theme.text.primary, fontSize: 11 }}>
+          style={{ ...inputStyle, minWidth: 0, flex: "none" }}>
           <option value="">All postures</option>
           {Object.keys(POSTURE_COLORS).map(p => (
             <option key={p} value={p}>{formatLabel(p)}</option>
           ))}
         </select>
         <select value={filters.sensitivity} onChange={e => handleFilter("sensitivity", e.target.value)}
-          style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid " + theme.border.default,
-            background: theme.bg.input, color: theme.text.primary, fontSize: 11 }}>
+          style={{ ...inputStyle, minWidth: 0, flex: "none" }}>
           <option value="">All sensitivity</option>
           <option value="low">Low</option>
           <option value="moderate">Moderate</option>
           <option value="high">High</option>
         </select>
         <select value={filters.durability} onChange={e => handleFilter("durability", e.target.value)}
-          style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid " + theme.border.default,
-            background: theme.bg.input, color: theme.text.primary, fontSize: 11 }}>
+          style={{ ...inputStyle, minWidth: 0, flex: "none" }}>
           <option value="">All durabilities</option>
           <option value="durable">Durable</option>
           <option value="volatile">Volatile</option>
         </select>
+        <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+          style={{ ...inputStyle, minWidth: 0, flex: "none" }}>
+          <option value="created_at_desc">Newest first</option>
+          <option value="created_at_asc">Oldest first</option>
+          <option value="sensitivity">By sensitivity</option>
+          <option value="category">By category</option>
+        </select>
+      </div>
+
+      {/* Saved view pills */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        {SAVED_VIEWS.map((view, i) => (
+          <div
+            key={view.label}
+            onClick={() => setActiveView(i)}
+            style={{
+              padding: "5px 14px", borderRadius: 20, fontSize: 12,
+              cursor: "pointer", userSelect: "none",
+              background: i === activeView ? "#1e3a5f" : theme.bg.input,
+              color: i === activeView ? theme.accent.blueLight : theme.text.muted,
+              border: `1px solid ${i === activeView ? theme.accent.blue : theme.border.default}`,
+              fontWeight: i === activeView ? 600 : 400,
+              transition: "all 0.15s",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {view.label}
+          </div>
+        ))}
       </div>
 
       {/* Content */}
@@ -147,9 +177,9 @@ export default function ContextNotesPage() {
       {error && (
         <div style={{ textAlign: "center", padding: 40, color: theme.accent.red }}>{error}</div>
       )}
-      {!loading && !error && items.length === 0 && (
+      {!loading && !error && filtered.length === 0 && (
         <div style={{ textAlign: "center", padding: 60, color: theme.text.faint }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>\u2261</div>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>{"\u2261"}</div>
           <div style={{ fontSize: 14 }}>No context notes yet</div>
           <div style={{ fontSize: 12, marginTop: 4 }}>
             Context notes will appear here as they are extracted from conversations.
@@ -158,9 +188,9 @@ export default function ContextNotesPage() {
       )}
 
       {/* Notes list */}
-      {!loading && !error && items.length > 0 && (
+      {!loading && !error && filtered.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {items.map(note => {
+          {filtered.map(note => {
             const catColor = CATEGORY_COLORS[note.category] || CATEGORY_COLORS.institutional_knowledge;
             const posColor = POSTURE_COLORS[note.posture] || POSTURE_COLORS.factual;
             const isExpanded = expanded === note.id;
@@ -190,8 +220,18 @@ export default function ContextNotesPage() {
                     <Badge bg="#78350f" text="#fbbf24" label="stale" />
                   )}
                   <span style={{ flex: 1 }} />
+                  {note.speaker_attribution && (
+                    <span style={{ fontSize: 10, color: theme.text.muted, fontStyle: "italic" }}>
+                      {note.speaker_attribution}
+                    </span>
+                  )}
+                  {note.ai_confidence != null && (
+                    <span style={{ fontSize: 10, color: theme.text.faint }}>
+                      {(note.ai_confidence * 100).toFixed(0)}%
+                    </span>
+                  )}
                   <span style={{ fontSize: 10, color: theme.text.faint }}>
-                    {note.created_at?.slice(0, 10)}
+                    {timeAgo(note.created_at)}
                   </span>
                 </div>
 
@@ -230,7 +270,7 @@ export default function ContextNotesPage() {
                         paddingLeft: 12, marginBottom: 8,
                         fontStyle: "italic", fontSize: 12, color: theme.text.muted, lineHeight: 1.6,
                       }}>
-                        \u201c{note.source_excerpt}\u201d
+                        {"\u201c"}{note.source_excerpt}{"\u201d"}
                       </div>
                     )}
 
@@ -265,6 +305,13 @@ export default function ContextNotesPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Footer count */}
+      {!loading && !error && filtered.length > 0 && (
+        <div style={{ fontSize: 12, color: theme.text.dim, marginTop: 8 }}>
+          Showing {filtered.length} of {data?.total || 0} notes
         </div>
       )}
     </div>
