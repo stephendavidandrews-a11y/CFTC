@@ -24,10 +24,13 @@ function Content({ children, width = 520, style, ...props }) {
           background: theme.bg.card,
           borderLeft: `1px solid ${theme.border.default}`,
           zIndex: 501,
-          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
           outline: "none",
+          animation: "var(--sheet-animation, sheet-slide-in 0.28s cubic-bezier(.4,0,.2,1) forwards)",
           ...style,
         }}
+        onCloseAutoFocus={(e) => e.preventDefault()}
         {...props}
       >
         {children}
