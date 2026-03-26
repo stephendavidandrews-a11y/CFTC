@@ -1,4 +1,5 @@
 """Tag CRUD endpoints."""
+
 import uuid
 from typing import Optional
 from fastapi import APIRouter, Depends
@@ -31,8 +32,10 @@ async def list_tags(tag_type: Optional[str] = None, db=Depends(get_db)):
 async def create_tag(body: CreateTag, db=Depends(get_db)):
     """Create a new tag."""
     tag_id = str(uuid.uuid4())
-    db.execute("INSERT INTO tags (id, name, tag_type) VALUES (?, ?, ?)",
-               (tag_id, body.name, body.tag_type))
+    db.execute(
+        "INSERT INTO tags (id, name, tag_type) VALUES (?, ?, ?)",
+        (tag_id, body.name, body.tag_type),
+    )
     db.commit()
     return {"id": tag_id}
 

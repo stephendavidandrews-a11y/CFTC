@@ -3,6 +3,7 @@
 Part 1: Unit tests for _review_helpers.py
 Part 2: Route-level smoke tests proving wrapper wiring works
 """
+
 import os
 import sys
 import sqlite3
@@ -42,16 +43,18 @@ class FakeDB:
 
 # ---- Part 1: Unit tests ----
 
-class TestCheckReviewState:
 
+class TestCheckReviewState:
     def test_valid_state_does_not_raise(self):
         from app.routers._review_helpers import check_review_state
+
         db = FakeDB(rows=[{"processing_status": "awaiting_speaker_review"}])
         valid = {"awaiting_speaker_review", "speaker_review_in_progress"}
         check_review_state(db, "comm-123", valid, "speaker review")
 
     def test_missing_communication_raises_404(self):
         from app.routers._review_helpers import check_review_state
+
         db = FakeDB(rows=None)
         with pytest.raises(HTTPException) as exc_info:
             check_review_state(db, "nonexistent", {"x"}, "test")
@@ -59,14 +62,18 @@ class TestCheckReviewState:
 
     def test_invalid_state_raises_400(self):
         from app.routers._review_helpers import check_review_state
+
         db = FakeDB(rows=[{"processing_status": "extracting"}])
         with pytest.raises(HTTPException) as exc_info:
-            check_review_state(db, "comm-123", {"awaiting_speaker_review"}, "speaker review")
+            check_review_state(
+                db, "comm-123", {"awaiting_speaker_review"}, "speaker review"
+            )
         assert exc_info.value.status_code == 400
         assert "speaker review" in str(exc_info.value.detail)
 
     def test_error_message_contains_stage_name(self):
         from app.routers._review_helpers import check_review_state
+
         db = FakeDB(rows=[{"processing_status": "done"}])
         with pytest.raises(HTTPException) as exc_info:
             check_review_state(db, "c", {"awaiting_entity_review"}, "entity review")
@@ -74,35 +81,43 @@ class TestCheckReviewState:
 
 
 class TestEnsureInProgress:
-
     @patch("app.routers._review_helpers.cas_transition")
     def test_calls_cas_transition_with_correct_args(self, mock_cas):
         from app.routers._review_helpers import ensure_in_progress
+
         db = MagicMock()
-        ensure_in_progress(db, "comm-456", "awaiting_speaker_review", "speaker_review_in_progress")
+        ensure_in_progress(
+            db, "comm-456", "awaiting_speaker_review", "speaker_review_in_progress"
+        )
         mock_cas.assert_called_once_with(
             db, "comm-456", "awaiting_speaker_review", "speaker_review_in_progress"
         )
 
 
 class TestResumePipeline:
-
     @pytest.mark.asyncio
     async def test_calls_process_communication(self):
-        with patch("app.pipeline.orchestrator.process_communication", new_callable=AsyncMock) as mock_proc:
+        with patch(
+            "app.pipeline.orchestrator.process_communication", new_callable=AsyncMock
+        ) as mock_proc:
             from app.routers._review_helpers import resume_pipeline
+
             await resume_pipeline("comm-789")
             mock_proc.assert_called_once_with("comm-789")
 
     @pytest.mark.asyncio
     async def test_swallows_exceptions_and_logs(self):
-        with patch("app.pipeline.orchestrator.process_communication", new_callable=AsyncMock) as mock_proc:
+        with patch(
+            "app.pipeline.orchestrator.process_communication", new_callable=AsyncMock
+        ) as mock_proc:
             mock_proc.side_effect = RuntimeError("Pipeline failed")
             from app.routers._review_helpers import resume_pipeline
+
             await resume_pipeline("comm-err")
 
 
 # ---- Part 2: Route-level smoke tests ----
+
 
 @pytest.fixture()
 def review_db():
@@ -110,8 +125,13 @@ def review_db():
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys=ON")
     from app.schema import init_schema
+
     init_schema(conn)
-    for state in ["awaiting_speaker_review", "awaiting_entity_review", "awaiting_participant_review"]:
+    for state in [
+        "awaiting_speaker_review",
+        "awaiting_entity_review",
+        "awaiting_participant_review",
+    ]:
         comm_id = "test-" + state
         conn.execute(
             "INSERT INTO communications (id, source_type, processing_status, original_filename, created_at, updated_at) "
@@ -145,7 +165,6 @@ def review_client(review_db):
 
 
 class TestSpeakerReviewWiring:
-
     def test_queue_returns_200(self, review_client):
         r = review_client.get("/ai/api/speaker-review/queue")
         assert r.status_code == 200
@@ -160,7 +179,6 @@ class TestSpeakerReviewWiring:
 
 
 class TestEntityReviewWiring:
-
     def test_queue_returns_200(self, review_client):
         r = review_client.get("/ai/api/entity-review/queue")
         assert r.status_code == 200
@@ -175,7 +193,6 @@ class TestEntityReviewWiring:
 
 
 class TestParticipantReviewWiring:
-
     def test_queue_returns_200(self, review_client):
         r = review_client.get("/ai/api/participant-review/queue")
         assert r.status_code == 200

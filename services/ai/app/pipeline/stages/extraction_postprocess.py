@@ -3,6 +3,7 @@
 Pure-logic functions: parsing LLM response, resolving entity names,
 validating references, normalizing items, and the 7-step post-process pass.
 """
+
 import json
 import logging
 from typing import Optional
@@ -80,6 +81,7 @@ PRIOR_ROLE_MARKERS = (
     "came from",
 )
 
+
 def _first_source_speaker(item) -> Optional[str]:
     """Return the first speaker named in source evidence, if any."""
     for ev in getattr(item, "source_evidence", []) or []:
@@ -91,7 +93,9 @@ def _first_source_speaker(item) -> Optional[str]:
     return None
 
 
-def _choose_context_note_category(title: str, body: str, raw_category: Optional[str]) -> str:
+def _choose_context_note_category(
+    title: str, body: str, raw_category: Optional[str]
+) -> str:
     """Map model-emitted context note categories into the canonical set."""
     if raw_category in CONTEXT_NOTE_CATEGORIES:
         return raw_category
@@ -99,20 +103,43 @@ def _choose_context_note_category(title: str, body: str, raw_category: Optional[
         return CONTEXT_NOTE_CATEGORY_ALIASES[raw_category]
 
     text = f"{title} {body}".lower()
-    if any(token in text for token in ("priority", "priorities", "strategic", "agenda")):
+    if any(
+        token in text for token in ("priority", "priorities", "strategic", "agenda")
+    ):
         return "strategic_context"
     if any(token in text for token in ("culture", "morale", "toxic", "collaborative")):
         return "culture_climate"
-    if any(token in text for token in ("oira", "sec", "treasury", "harmonization", "coordination", "relationship")):
+    if any(
+        token in text
+        for token in (
+            "oira",
+            "sec",
+            "treasury",
+            "harmonization",
+            "coordination",
+            "relationship",
+        )
+    ):
         return "relationship_dynamic"
-    if any(token in text for token in ("draft", "hold the pen", "lead on rule", "operating rule", "expects")):
+    if any(
+        token in text
+        for token in (
+            "draft",
+            "hold the pen",
+            "lead on rule",
+            "operating rule",
+            "expects",
+        )
+    ):
         return "policy_operating_rule"
     if any(token in text for token in ("process", "workflow", "how the office works")):
         return "process_note"
     return "process_note"
 
 
-def _choose_context_note_posture(raw_posture: Optional[str], speaker_attribution: Optional[str]) -> str:
+def _choose_context_note_posture(
+    raw_posture: Optional[str], speaker_attribution: Optional[str]
+) -> str:
     """Map posture drift into the canonical posture set."""
     if raw_posture in CONTEXT_NOTE_POSTURES:
         return raw_posture
@@ -126,62 +153,80 @@ def _normalize_context_note_item(item, repair_log: list[dict]):
 
     if "body" not in data and data.get("content"):
         data["body"] = data.pop("content")
-        repair_log.append({
-            "item_type": "context_note",
-            "title": title,
-            "repair": "content_to_body",
-        })
+        repair_log.append(
+            {
+                "item_type": "context_note",
+                "title": title,
+                "repair": "content_to_body",
+            }
+        )
 
     if "tags" in data:
         data.pop("tags", None)
-        repair_log.append({
-            "item_type": "context_note",
-            "title": title,
-            "repair": "removed_tags",
-        })
+        repair_log.append(
+            {
+                "item_type": "context_note",
+                "title": title,
+                "repair": "removed_tags",
+            }
+        )
 
     body = data.get("body", "")
     mapped_category = _choose_context_note_category(title, body, data.get("category"))
     if mapped_category != data.get("category"):
-        repair_log.append({
-            "item_type": "context_note",
-            "title": title,
-            "repair": "category_normalized",
-            "from": data.get("category"),
-            "to": mapped_category,
-        })
+        repair_log.append(
+            {
+                "item_type": "context_note",
+                "title": title,
+                "repair": "category_normalized",
+                "from": data.get("category"),
+                "to": mapped_category,
+            }
+        )
         data["category"] = mapped_category
 
     speaker_attribution = data.get("speaker_attribution") or _first_source_speaker(item)
-    mapped_posture = _choose_context_note_posture(data.get("posture"), speaker_attribution)
+    mapped_posture = _choose_context_note_posture(
+        data.get("posture"), speaker_attribution
+    )
     if mapped_posture != data.get("posture"):
-        repair_log.append({
-            "item_type": "context_note",
-            "title": title,
-            "repair": "posture_normalized",
-            "from": data.get("posture"),
-            "to": mapped_posture,
-        })
+        repair_log.append(
+            {
+                "item_type": "context_note",
+                "title": title,
+                "repair": "posture_normalized",
+                "from": data.get("posture"),
+                "to": mapped_posture,
+            }
+        )
         data["posture"] = mapped_posture
 
-    if mapped_posture == "attributed_view" and speaker_attribution and not data.get("speaker_attribution"):
+    if (
+        mapped_posture == "attributed_view"
+        and speaker_attribution
+        and not data.get("speaker_attribution")
+    ):
         data["speaker_attribution"] = speaker_attribution
-        repair_log.append({
-            "item_type": "context_note",
-            "title": title,
-            "repair": "speaker_attribution_filled",
-            "value": speaker_attribution,
-        })
+        repair_log.append(
+            {
+                "item_type": "context_note",
+                "title": title,
+                "repair": "speaker_attribution_filled",
+                "value": speaker_attribution,
+            }
+        )
 
     if data.get("sensitivity") == "medium":
         data["sensitivity"] = "moderate"
-        repair_log.append({
-            "item_type": "context_note",
-            "title": title,
-            "repair": "sensitivity_normalized",
-            "from": "medium",
-            "to": "moderate",
-        })
+        repair_log.append(
+            {
+                "item_type": "context_note",
+                "title": title,
+                "repair": "sensitivity_normalized",
+                "from": "medium",
+                "to": "moderate",
+            }
+        )
 
 
 def _looks_like_current_role_note(text: str) -> bool:
@@ -209,12 +254,14 @@ def _normalize_person_detail_update_item(item, repair_log: list[dict]):
             moved_fields.append(key)
 
     if moved_fields:
-        repair_log.append({
-            "item_type": "person_detail_update",
-            "person": person_name,
-            "repair": "moved_top_level_fields_into_fields",
-            "fields": moved_fields,
-        })
+        repair_log.append(
+            {
+                "item_type": "person_detail_update",
+                "person": person_name,
+                "repair": "moved_top_level_fields_into_fields",
+                "fields": moved_fields,
+            }
+        )
 
     prior_roles = fields.get("prior_roles_summary")
     if isinstance(prior_roles, str) and _looks_like_current_role_note(prior_roles):
@@ -223,17 +270,19 @@ def _normalize_person_detail_update_item(item, repair_log: list[dict]):
             f"{existing_notes}\n{prior_roles}" if existing_notes else prior_roles
         )
         fields.pop("prior_roles_summary", None)
-        repair_log.append({
-            "item_type": "person_detail_update",
-            "person": person_name,
-            "repair": "current_role_note_moved_out_of_prior_roles",
-        })
+        repair_log.append(
+            {
+                "item_type": "person_detail_update",
+                "person": person_name,
+                "repair": "current_role_note_moved_out_of_prior_roles",
+            }
+        )
 
     data["fields"] = fields
 
 
-
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def _parse_extraction_response(text: str) -> dict:
     """Parse Sonnet's extraction response, tolerating markdown fencing."""
@@ -253,7 +302,10 @@ def _parse_extraction_response(text: str) -> dict:
 # 6. Post-processing (7-step pass)
 # ═══════════════════════════════════════════════════════════════════════════
 
-def _resolve_name_to_id(name: str, registry: list, name_field: str, id_field: str = "id") -> str | None:
+
+def _resolve_name_to_id(
+    name: str, registry: list, name_field: str, id_field: str = "id"
+) -> str | None:
     """Case-insensitive exact match of name against a registry list.
 
     Returns the id if exactly one match, else None.
@@ -262,7 +314,8 @@ def _resolve_name_to_id(name: str, registry: list, name_field: str, id_field: st
         return None
     name_lower = name.strip().lower()
     matches = [
-        entry[id_field] for entry in registry
+        entry[id_field]
+        for entry in registry
         if (entry.get(name_field) or "").strip().lower() == name_lower
     ]
     if len(matches) == 1:
@@ -270,7 +323,9 @@ def _resolve_name_to_id(name: str, registry: list, name_field: str, id_field: st
     return None
 
 
-def _resolve_entity_names(extraction: "ExtractionOutput", full_context: dict) -> list[str]:
+def _resolve_entity_names(
+    extraction: "ExtractionOutput", full_context: dict
+) -> list[str]:
     """Step 1.5: Resolve name-based references to UUIDs.
 
     Checks item-level name fallbacks AND proposed_data name companions.
@@ -323,8 +378,12 @@ def _resolve_entity_names(extraction: "ExtractionOutput", full_context: dict) ->
                     resolved = _resolve_name_to_id(name_val, people, "full_name")
                     if resolved:
                         pd[id_field] = resolved
-                        item.rationale += f" [Name resolved: {name_field} '{name_val}' -> UUID]"
-                        resolution_log.append(f"Person resolved: '{name_val}' -> {resolved[:8]}")
+                        item.rationale += (
+                            f" [Name resolved: {name_field} '{name_val}' -> UUID]"
+                        )
+                        resolution_log.append(
+                            f"Person resolved: '{name_val}' -> {resolved[:8]}"
+                        )
                     else:
                         item.rationale += f" [Name unresolved: {name_field} '{name_val}' — no match in context]"
                         resolution_log.append(f"Person unresolved: '{name_val}'")
@@ -337,7 +396,9 @@ def _resolve_entity_names(extraction: "ExtractionOutput", full_context: dict) ->
                     if resolved:
                         pd[id_field] = resolved
                         item.rationale += f" [Org resolved: '{name_val}' -> UUID]"
-                        resolution_log.append(f"Org resolved: '{name_val}' -> {resolved[:8]}")
+                        resolution_log.append(
+                            f"Org resolved: '{name_val}' -> {resolved[:8]}"
+                        )
                     else:
                         resolution_log.append(f"Org unresolved: '{name_val}'")
 
@@ -383,9 +444,7 @@ def _validate_tracks_task_refs(extraction: "ExtractionOutput") -> list[str]:
     warnings = []
     for bundle in extraction.bundles:
         # Build client_id index for this bundle
-        client_ids = {
-            item.client_id for item in bundle.items if item.client_id
-        }
+        client_ids = {item.client_id for item in bundle.items if item.client_id}
         for item in bundle.items:
             ref = item.proposed_data.get("tracks_task_ref")
             if ref and isinstance(ref, str) and ref.startswith("$ref:"):
@@ -400,7 +459,8 @@ def _validate_tracks_task_refs(extraction: "ExtractionOutput") -> list[str]:
 
 
 def _validate_update_items(
-    extraction: "ExtractionOutput", full_context: dict,
+    extraction: "ExtractionOutput",
+    full_context: dict,
 ) -> list[str]:
     """Validate task_update, decision_update, and org_detail_update items.
 
@@ -595,14 +655,17 @@ def _post_process(
     for bundle in extraction.bundles:
         # ── Step 2: Validate entity references ──
         if bundle.target_matter_id and bundle.target_matter_id not in valid_matter_ids:
-            log["invalid_references_cleaned"].append({
-                "type": "matter_id",
-                "value": bundle.target_matter_id,
-                "bundle_title": bundle.target_matter_title,
-            })
+            log["invalid_references_cleaned"].append(
+                {
+                    "type": "matter_id",
+                    "value": bundle.target_matter_id,
+                    "bundle_title": bundle.target_matter_title,
+                }
+            )
             logger.warning(
                 "[%s] Invalid target_matter_id %s — clearing",
-                communication_id[:8], bundle.target_matter_id,
+                communication_id[:8],
+                bundle.target_matter_id,
             )
             bundle.target_matter_id = None
             bundle.bundle_type = "standalone"
@@ -614,27 +677,39 @@ def _post_process(
             cleaned_refs = False
 
             # Check person_id references
-            for field in ("assigned_to_person_id", "person_id",
-                          "decision_assigned_to_person_id",
-                          "waiting_on_person_id"):
+            for field in (
+                "assigned_to_person_id",
+                "person_id",
+                "decision_assigned_to_person_id",
+                "waiting_on_person_id",
+            ):
                 val = pd.get(field)
                 if val and val not in valid_person_ids:
-                    log["invalid_references_cleaned"].append({
-                        "type": field, "value": val,
-                        "item_type": item.item_type,
-                    })
+                    log["invalid_references_cleaned"].append(
+                        {
+                            "type": field,
+                            "value": val,
+                            "item_type": item.item_type,
+                        }
+                    )
                     pd[field] = None
                     cleaned_refs = True
 
             # Check org_id references
-            for field in ("organization_id", "waiting_on_org_id",
-                          "requesting_organization_id"):
+            for field in (
+                "organization_id",
+                "waiting_on_org_id",
+                "requesting_organization_id",
+            ):
                 val = pd.get(field)
                 if val and val not in valid_org_ids:
-                    log["invalid_references_cleaned"].append({
-                        "type": field, "value": val,
-                        "item_type": item.item_type,
-                    })
+                    log["invalid_references_cleaned"].append(
+                        {
+                            "type": field,
+                            "value": val,
+                            "item_type": item.item_type,
+                        }
+                    )
                     pd[field] = None
                     cleaned_refs = True
 
@@ -642,10 +717,13 @@ def _post_process(
             for field in ("matter_id",):
                 val = pd.get(field)
                 if val and val not in valid_matter_ids:
-                    log["invalid_references_cleaned"].append({
-                        "type": field, "value": val,
-                        "item_type": item.item_type,
-                    })
+                    log["invalid_references_cleaned"].append(
+                        {
+                            "type": field,
+                            "value": val,
+                            "item_type": item.item_type,
+                        }
+                    )
                     pd[field] = None
                     cleaned_refs = True
 
@@ -654,31 +732,39 @@ def _post_process(
                 for part in pd.get("participants", []):
                     pid = part.get("person_id")
                     if pid and pid not in valid_person_ids:
-                        log["invalid_references_cleaned"].append({
-                            "type": "meeting_participant.person_id",
-                            "value": pid,
-                        })
+                        log["invalid_references_cleaned"].append(
+                            {
+                                "type": "meeting_participant.person_id",
+                                "value": pid,
+                            }
+                        )
                         part["person_id"] = None
                 for ml in pd.get("matter_links", []):
                     mid = ml.get("matter_id")
                     if mid and mid not in valid_matter_ids:
-                        log["invalid_references_cleaned"].append({
-                            "type": "meeting_link.matter_id",
-                            "value": mid,
-                        })
+                        log["invalid_references_cleaned"].append(
+                            {
+                                "type": "meeting_link.matter_id",
+                                "value": mid,
+                            }
+                        )
                         ml["matter_id"] = None
 
             if cleaned_refs:
-                item.rationale += " [Note: some references were cleaned by post-processing.]"
+                item.rationale += (
+                    " [Note: some references were cleaned by post-processing.]"
+                )
 
             # ── Step 3: Apply extraction_policy suppression ──
             if item.item_type in disabled_types:
-                log["code_suppressed_items"].append({
-                    "item_type": item.item_type,
-                    "reason": f"propose_{item.item_type}s disabled in extraction_policy",
-                    "confidence": item.confidence,
-                    "source_excerpt": item.source_excerpt[:200],
-                })
+                log["code_suppressed_items"].append(
+                    {
+                        "item_type": item.item_type,
+                        "reason": f"propose_{item.item_type}s disabled in extraction_policy",
+                        "confidence": item.confidence,
+                        "source_excerpt": item.source_excerpt[:200],
+                    }
+                )
                 continue  # Skip this item
 
             valid_items.append(item)
@@ -689,12 +775,14 @@ def _post_process(
             pass  # It's enabled, proceed
         elif bundle.bundle_type == "new_matter":
             # new_matters disabled — redistribute items to standalone
-            log["code_suppressed_items"].append({
-                "item_type": "new_matter",
-                "reason": "propose_new_matters disabled in extraction_policy",
-                "items_redistributed_to": "standalone",
-                "proposed_matter_title": bundle.target_matter_title,
-            })
+            log["code_suppressed_items"].append(
+                {
+                    "item_type": "new_matter",
+                    "reason": "propose_new_matters disabled in extraction_policy",
+                    "items_redistributed_to": "standalone",
+                    "proposed_matter_title": bundle.target_matter_title,
+                }
+            )
             bundle.bundle_type = "standalone"
             bundle.proposed_matter = None
             bundle.target_matter_id = None
@@ -707,23 +795,29 @@ def _post_process(
 
         # ── Step 4: Apply routing_policy filters ──
         min_confidence = routing_policy.get("match_confidence_minimum", 0.7)
-        if (bundle.bundle_type == "matter"
-                and bundle.confidence < min_confidence
-                and bundle.target_matter_id):
+        if (
+            bundle.bundle_type == "matter"
+            and bundle.confidence < min_confidence
+            and bundle.target_matter_id
+        ):
             logger.info(
-                "[%s] Bundle confidence %.2f < threshold %.2f — "
-                "demoting to standalone",
-                communication_id[:8], bundle.confidence, min_confidence,
+                "[%s] Bundle confidence %.2f < threshold %.2f — demoting to standalone",
+                communication_id[:8],
+                bundle.confidence,
+                min_confidence,
             )
             bundle.bundle_type = "standalone"
             bundle.target_matter_id = None
 
-        if (bundle.bundle_type == "standalone"
-                and not routing_policy.get("standalone_items_enabled", True)):
-            log["code_suppressed_items"].append({
-                "item_type": "standalone_bundle",
-                "reason": "standalone_items_enabled is false",
-            })
+        if bundle.bundle_type == "standalone" and not routing_policy.get(
+            "standalone_items_enabled", True
+        ):
+            log["code_suppressed_items"].append(
+                {
+                    "item_type": "standalone_bundle",
+                    "reason": "standalone_items_enabled is false",
+                }
+            )
             continue
 
         processed_bundles.append(bundle)
@@ -733,13 +827,17 @@ def _post_process(
     new_matter_bundles = [b for b in processed_bundles if b.bundle_type == "new_matter"]
     if len(new_matter_bundles) > max_new:
         # Keep highest confidence, suppress the rest
-        sorted_new = sorted(new_matter_bundles, key=lambda b: b.confidence, reverse=True)
+        sorted_new = sorted(
+            new_matter_bundles, key=lambda b: b.confidence, reverse=True
+        )
         for excess in sorted_new[max_new:]:
-            log["code_suppressed_items"].append({
-                "item_type": "new_matter",
-                "reason": f"Exceeds max_new_matters_per_communication ({max_new})",
-                "proposed_matter_title": excess.target_matter_title,
-            })
+            log["code_suppressed_items"].append(
+                {
+                    "item_type": "new_matter",
+                    "reason": f"Exceeds max_new_matters_per_communication ({max_new})",
+                    "proposed_matter_title": excess.target_matter_title,
+                }
+            )
             processed_bundles.remove(excess)
 
     # ── Step 5: Deduplication warnings ──
@@ -760,8 +858,7 @@ def _post_process(
         existing_tasks = matter_ctx.get("open_tasks", [])
         existing_updates = matter_ctx.get("recent_updates", [])
         existing_stakeholders = [
-            s.get("full_name", "").lower()
-            for s in matter_ctx.get("stakeholders", [])
+            s.get("full_name", "").lower() for s in matter_ctx.get("stakeholders", [])
         ]
 
         for item in bundle.items:
@@ -769,12 +866,14 @@ def _post_process(
                 item_title = item.proposed_data.get("title", "").lower()
                 for et in existing_tasks:
                     if _fuzzy_title_match(item_title, et.get("title", "").lower()):
-                        log["dedup_warnings"].append({
-                            "item_type": item.item_type,
-                            "proposed_title": item.proposed_data.get("title"),
-                            "existing_title": et.get("title"),
-                            "matter_id": bundle.target_matter_id,
-                        })
+                        log["dedup_warnings"].append(
+                            {
+                                "item_type": item.item_type,
+                                "proposed_title": item.proposed_data.get("title"),
+                                "existing_title": et.get("title"),
+                                "matter_id": bundle.target_matter_id,
+                            }
+                        )
                         item.rationale += (
                             f" [DEDUP WARNING: similar to existing task "
                             f"'{et.get('title')}']"
@@ -784,22 +883,30 @@ def _post_process(
             elif item.item_type == "matter_update" and existing_updates:
                 item_summary = item.proposed_data.get("summary", "").lower()
                 for eu in existing_updates:
-                    if _fuzzy_title_match(item_summary[:80], eu.get("summary", "").lower()[:80]):
-                        log["dedup_warnings"].append({
-                            "item_type": "matter_update",
-                            "proposed_summary": item.proposed_data.get("summary", "")[:100],
-                            "existing_summary": eu.get("summary", "")[:100],
-                        })
+                    if _fuzzy_title_match(
+                        item_summary[:80], eu.get("summary", "").lower()[:80]
+                    ):
+                        log["dedup_warnings"].append(
+                            {
+                                "item_type": "matter_update",
+                                "proposed_summary": item.proposed_data.get(
+                                    "summary", ""
+                                )[:100],
+                                "existing_summary": eu.get("summary", "")[:100],
+                            }
+                        )
                         item.rationale += " [DEDUP WARNING: similar to recent update]"
                         break
 
             elif item.item_type == "stakeholder_addition":
                 person_name = item.proposed_data.get("person_name", "").lower()
                 if person_name and person_name in existing_stakeholders:
-                    log["code_suppressed_items"].append({
-                        "item_type": "stakeholder_addition",
-                        "reason": f"Person '{person_name}' already a stakeholder",
-                    })
+                    log["code_suppressed_items"].append(
+                        {
+                            "item_type": "stakeholder_addition",
+                            "reason": f"Person '{person_name}' already a stakeholder",
+                        }
+                    )
                     bundle.items.remove(item)
 
     # Remove bundles that became empty after dedup suppression

@@ -3,6 +3,7 @@ Schema/version handshake endpoints for contract verification.
 
 Allows the AI service and frontend to verify compatibility with the tracker.
 """
+
 from fastapi import APIRouter, Depends
 from app.db import get_db
 from app.contracts import AI_WRITABLE_TABLES, ENUMS, TRACKER_SCHEMA_VERSION
@@ -58,14 +59,25 @@ async def get_capabilities():
         },
         "ai_context": {
             "endpoint": "GET /tracker/ai-context",
-            "includes": ["matters", "people", "organizations",
-                         "recent_meetings", "standalone_tasks"],
+            "includes": [
+                "matters",
+                "people",
+                "organizations",
+                "recent_meetings",
+                "standalone_tasks",
+            ],
         },
         "intelligence_data": {
             "endpoint": "GET /tracker/ai-context/intelligence-data",
-            "includes": ["deadline_warnings", "overdue_tasks", "upcoming_tasks",
-                         "missed_followups", "stale_matters", "pending_decisions",
-                         "workload"],
+            "includes": [
+                "deadline_warnings",
+                "overdue_tasks",
+                "upcoming_tasks",
+                "missed_followups",
+                "stale_matters",
+                "pending_decisions",
+                "workload",
+            ],
         },
     }
 
@@ -79,11 +91,13 @@ async def get_table_columns(table_name: str, db=Depends(get_db)):
     rows = db.execute(f"PRAGMA table_info({table_name})").fetchall()
     columns = []
     for row in rows:
-        columns.append({
-            "name": row["name"],
-            "type": row["type"],
-            "notnull": bool(row["notnull"]),
-            "default_value": row["dflt_value"],
-            "pk": bool(row["pk"]),
-        })
+        columns.append(
+            {
+                "name": row["name"],
+                "type": row["type"],
+                "notnull": bool(row["notnull"]),
+                "default_value": row["dflt_value"],
+                "pk": bool(row["pk"]),
+            }
+        )
     return {"table": table_name, "columns": columns}

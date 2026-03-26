@@ -36,7 +36,9 @@ def auto_suggest_speakers(
     ).fetchall()
 
     if not profiles:
-        logger.info(f"[{conversation_id[:8]}] No voice profiles — skipping auto-suggest")
+        logger.info(
+            f"[{conversation_id[:8]}] No voice profiles — skipping auto-suggest"
+        )
         return {}
 
     # Build profile embeddings
@@ -44,11 +46,13 @@ def auto_suggest_speakers(
     for p in profiles:
         emb = np.frombuffer(p["embedding"], dtype=np.float32)
         if np.linalg.norm(emb) > 0:
-            profile_data.append({
-                "profile_id": p["profile_id"],
-                "tracker_person_id": p["tracker_person_id"],
-                "embedding": emb,
-            })
+            profile_data.append(
+                {
+                    "profile_id": p["profile_id"],
+                    "tracker_person_id": p["tracker_person_id"],
+                    "embedding": emb,
+                }
+            )
 
     suggestions = {}
     for label, emb in speaker_embeddings.items():
@@ -71,8 +75,15 @@ def auto_suggest_speakers(
                    (id, conversation_id, speaker_label, tracker_person_id,
                     confidence, method, confirmed)
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (str(uuid.uuid4()), conversation_id, label,
-                 best_match["tracker_person_id"], best_sim, method, confirmed),
+                (
+                    str(uuid.uuid4()),
+                    conversation_id,
+                    label,
+                    best_match["tracker_person_id"],
+                    best_sim,
+                    method,
+                    confirmed,
+                ),
             )
 
             # If auto-matched, also update transcript speaker_id
@@ -119,12 +130,14 @@ def get_suggestions_for_conversation(conversation_id: str) -> dict:
             label = m["speaker_label"]
             if label not in result:
                 result[label] = []
-            result[label].append({
-                "tracker_person_id": m["tracker_person_id"],
-                "confidence": m["confidence"],
-                "method": m["method"],
-                "confirmed": bool(m["confirmed"]),
-            })
+            result[label].append(
+                {
+                    "tracker_person_id": m["tracker_person_id"],
+                    "confidence": m["confidence"],
+                    "method": m["method"],
+                    "confirmed": bool(m["confirmed"]),
+                }
+            )
 
         # For unmapped speakers, try fresh comparison
         mapped_labels = {m["speaker_label"] for m in mappings}
@@ -141,10 +154,12 @@ def get_suggestions_for_conversation(conversation_id: str) -> dict:
         for p in profiles:
             emb = np.frombuffer(p["embedding"], dtype=np.float32)
             if np.linalg.norm(emb) > 0:
-                profile_data.append({
-                    "tracker_person_id": p["tracker_person_id"],
-                    "embedding": emb,
-                })
+                profile_data.append(
+                    {
+                        "tracker_person_id": p["tracker_person_id"],
+                        "embedding": emb,
+                    }
+                )
 
         for sample in samples:
             label = sample["speaker_label"]
@@ -160,12 +175,14 @@ def get_suggestions_for_conversation(conversation_id: str) -> dict:
             for profile in profile_data:
                 sim = _cosine_similarity(emb, profile["embedding"])
                 if sim >= VOICEPRINT_SUGGEST_THRESHOLD:
-                    matches.append({
-                        "tracker_person_id": profile["tracker_person_id"],
-                        "confidence": sim,
-                        "method": "suggested",
-                        "confirmed": False,
-                    })
+                    matches.append(
+                        {
+                            "tracker_person_id": profile["tracker_person_id"],
+                            "confidence": sim,
+                            "method": "suggested",
+                            "confirmed": False,
+                        }
+                    )
 
             matches.sort(key=lambda x: x["confidence"], reverse=True)
             if matches:
@@ -176,7 +193,9 @@ def get_suggestions_for_conversation(conversation_id: str) -> dict:
         conn.close()
 
 
-def promote_voice_sample(conn, conversation_id: str, speaker_label: str, tracker_person_id: str):
+def promote_voice_sample(
+    conn, conversation_id: str, speaker_label: str, tracker_person_id: str
+):
     """Promote a confirmed speaker embedding into a voice profile.
 
     Called after speaker assignment is confirmed in the review UI.
@@ -208,7 +227,9 @@ def promote_voice_sample(conn, conversation_id: str, speaker_label: str, tracker
     total_speech = speech_dur["total"] if speech_dur and speech_dur["total"] else 0
 
     if total_speech < 5.0:
-        logger.info(f"Skipping voice profile for {speaker_label}: only {total_speech:.1f}s speech (min 5s)")
+        logger.info(
+            f"Skipping voice profile for {speaker_label}: only {total_speech:.1f}s speech (min 5s)"
+        )
         return
 
     # Check if this person already has a profile
@@ -240,7 +261,13 @@ def promote_voice_sample(conn, conversation_id: str, speaker_label: str, tracker
         conn.execute(
             """INSERT INTO speaker_voice_profiles (id, tracker_person_id, embedding, source_conversation_id, quality_score)
                VALUES (?, ?, ?, ?, ?)""",
-            (str(uuid.uuid4()), tracker_person_id, embedding.tobytes(), conversation_id, quality_score),
+            (
+                str(uuid.uuid4()),
+                tracker_person_id,
+                embedding.tobytes(),
+                conversation_id,
+                quality_score,
+            ),
         )
         logger.info(f"Created voice profile for person {tracker_person_id[:8]}")
 

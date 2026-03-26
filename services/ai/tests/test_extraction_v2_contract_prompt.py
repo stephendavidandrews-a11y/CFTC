@@ -19,12 +19,21 @@ def test_v2_0_1_prompt_is_contract_aligned():
 
     assert "services/tracker/app/contracts.py" in prompt
     assert "services/tracker/app/schema.py" in prompt
-    assert "engagement_level` (lead | core | consulted | informed | escalation only, people only)" in prompt
-    assert "category` (people_insight | process_note | policy_operating_rule | strategic_context | culture_climate | relationship_dynamic)" in prompt
+    assert (
+        "engagement_level` (lead | core | consulted | informed | escalation only, people only)"
+        in prompt
+    )
+    assert (
+        "category` (people_insight | process_note | policy_operating_rule | strategic_context | culture_climate | relationship_dynamic)"
+        in prompt
+    )
     assert "posture` (factual | attributed_view)" in prompt
     assert "Use `body`, not `content`. Do not include `tags`." in prompt
     assert "All person profile writes must live under `proposed_data.fields`." in prompt
-    assert "Use `prior_roles_summary` only for actual prior jobs or career history." in prompt
+    assert (
+        "Use `prior_roles_summary` only for actual prior jobs or career history."
+        in prompt
+    )
     assert 'Set `"extraction_version": "2.0.1"` on every response.' in prompt
     assert "institutional_knowledge" not in prompt
     assert "tentative, interpretive, sensitive" not in prompt

@@ -34,6 +34,7 @@ class EnumValidatedModel(BaseModel):
 
 # People
 
+
 class CreatePerson(EnumValidatedModel):
     __enum_fields__ = {
         "relationship_category": "relationship_category",
@@ -103,6 +104,7 @@ class UpdatePerson(EnumValidatedModel):
 
 # Organizations
 
+
 class CreateOrganization(EnumValidatedModel):
     __enum_fields__ = {
         "organization_type": "organization_type",
@@ -140,6 +142,7 @@ class UpdateOrganization(EnumValidatedModel):
 
 
 # Meetings
+
 
 class MeetingParticipant(EnumValidatedModel):
     __enum_fields__ = {
@@ -206,6 +209,7 @@ class UpdateMeeting(EnumValidatedModel):
 
 
 # Tasks
+
 
 class CreateTask(EnumValidatedModel):
     __enum_fields__ = {
@@ -294,50 +298,30 @@ class UpdateTask(EnumValidatedModel):
 
 # Matters
 
+
 class CreateMatter(EnumValidatedModel):
     __enum_fields__ = {
         "matter_type": "matter_type",
         "status": "matter_status",
         "priority": "matter_priority",
         "sensitivity": "matter_sensitivity",
-        "risk_level": "risk_level",
-        "boss_involvement_level": "boss_involvement_level",
-        "regulatory_stage": "regulatory_stage",
-        "unified_agenda_priority": "unified_agenda_priority",
         "source": "source",
     }
 
     title: str = Field(..., min_length=1, description="Required matter title")
     matter_type: str = Field(..., description="Required matter type")
     description: Optional[str] = None
-    problem_statement: Optional[str] = None
-    why_it_matters: Optional[str] = None
-    status: str = "new intake"
+    status: str = "active"
     priority: str = "important this month"
     sensitivity: str = "routine"
-    risk_level: Optional[str] = None
-    boss_involvement_level: str = "keep boss informed"
     assigned_to_person_id: Optional[str] = None
-    supervisor_person_id: Optional[str] = None
-    requesting_organization_id: Optional[str] = None
     client_organization_id: Optional[str] = None
-    reviewing_organization_id: Optional[str] = None
-    lead_external_org_id: Optional[str] = None
     opened_date: Optional[str] = None
     work_deadline: Optional[str] = None
-    decision_deadline: Optional[str] = None
     external_deadline: Optional[str] = None
-    revisit_date: Optional[str] = None
     next_step: str = "Determine next steps"
-    next_step_assigned_to_person_id: Optional[str] = None
-    pending_decision: Optional[str] = None
-    rin: Optional[str] = None
-    regulatory_stage: Optional[str] = None
-    federal_register_citation: Optional[str] = None
-    unified_agenda_priority: Optional[str] = None
-    cfr_citation: Optional[str] = None
-    docket_number: Optional[str] = None
-    fr_doc_number: Optional[str] = None
+    outcome_summary: Optional[str] = None
+    blocker: Optional[str] = None
     source: str = "manual"
     source_id: Optional[str] = None
     ai_confidence: Optional[float] = None
@@ -352,47 +336,25 @@ class UpdateMatter(EnumValidatedModel):
         "status": "matter_status",
         "priority": "matter_priority",
         "sensitivity": "matter_sensitivity",
-        "risk_level": "risk_level",
-        "boss_involvement_level": "boss_involvement_level",
-        "regulatory_stage": "regulatory_stage",
-        "unified_agenda_priority": "unified_agenda_priority",
         "source": "source",
     }
 
     title: Optional[str] = None
     matter_type: Optional[str] = None
     description: Optional[str] = None
-    problem_statement: Optional[str] = None
-    why_it_matters: Optional[str] = None
     status: Optional[str] = None
     priority: Optional[str] = None
     sensitivity: Optional[str] = None
-    risk_level: Optional[str] = None
-    boss_involvement_level: Optional[str] = None
     assigned_to_person_id: Optional[str] = None
-    supervisor_person_id: Optional[str] = None
-    requesting_organization_id: Optional[str] = None
     client_organization_id: Optional[str] = None
-    reviewing_organization_id: Optional[str] = None
-    lead_external_org_id: Optional[str] = None
     opened_date: Optional[str] = None
     work_deadline: Optional[str] = None
-    decision_deadline: Optional[str] = None
     external_deadline: Optional[str] = None
-    revisit_date: Optional[str] = None
     next_step: Optional[str] = None
-    next_step_assigned_to_person_id: Optional[str] = None
-    pending_decision: Optional[str] = None
     outcome_summary: Optional[str] = None
+    blocker: Optional[str] = None
     closed_at: Optional[str] = None
     is_stale_override: Optional[int] = None
-    rin: Optional[str] = None
-    regulatory_stage: Optional[str] = None
-    federal_register_citation: Optional[str] = None
-    unified_agenda_priority: Optional[str] = None
-    cfr_citation: Optional[str] = None
-    docket_number: Optional[str] = None
-    fr_doc_number: Optional[str] = None
     source: Optional[str] = None
     source_id: Optional[str] = None
     ai_confidence: Optional[float] = None
@@ -408,7 +370,120 @@ class UpdateMatter(EnumValidatedModel):
         return values
 
 
+# Matter extension tables
+
+
+class CreateMatterRulemaking(BaseModel):
+    regulatory_stage: Optional[str] = None
+    workflow_status: Optional[str] = None
+    rin: Optional[str] = None
+    current_comment_period_closes: Optional[str] = None
+    federal_register_citation: Optional[str] = None
+    unified_agenda_priority: Optional[str] = None
+    cfr_citation: Optional[str] = None
+    docket_number: Optional[str] = None
+    fr_doc_number: Optional[str] = None
+    interagency_role: Optional[str] = None
+    is_petition: int = 0
+    petition_disposition: Optional[str] = None
+    review_trigger: Optional[str] = None
+
+
+class UpdateMatterRulemaking(BaseModel):
+    regulatory_stage: Optional[str] = None
+    workflow_status: Optional[str] = None
+    rin: Optional[str] = None
+    current_comment_period_closes: Optional[str] = None
+    federal_register_citation: Optional[str] = None
+    unified_agenda_priority: Optional[str] = None
+    cfr_citation: Optional[str] = None
+    docket_number: Optional[str] = None
+    fr_doc_number: Optional[str] = None
+    interagency_role: Optional[str] = None
+    is_petition: Optional[int] = None
+    petition_disposition: Optional[str] = None
+    review_trigger: Optional[str] = None
+
+
+class CreateMatterGuidance(BaseModel):
+    instrument_type: Optional[str] = None
+    published_in_fr: int = 0
+    cftc_letter_number: Optional[str] = None
+    request_date: Optional[str] = None
+    requestor_name: Optional[str] = None
+    requestor_organization_id: Optional[str] = None
+    requestor_counsel: Optional[str] = None
+    issuing_office_id: Optional[str] = None
+    signatory_person_id: Optional[str] = None
+    staff_contact_person_id: Optional[str] = None
+    cea_provisions: Optional[str] = None
+    cfr_provisions: Optional[str] = None
+    legal_question: Optional[str] = None
+    conditions_summary: Optional[str] = None
+    amends_matter_id: Optional[str] = None
+    prior_letter_number: Optional[str] = None
+    workflow_status: Optional[str] = None
+    issuance_date: Optional[str] = None
+    expiration_date: Optional[str] = None
+
+
+class UpdateMatterGuidance(BaseModel):
+    instrument_type: Optional[str] = None
+    published_in_fr: Optional[int] = None
+    cftc_letter_number: Optional[str] = None
+    request_date: Optional[str] = None
+    requestor_name: Optional[str] = None
+    requestor_organization_id: Optional[str] = None
+    requestor_counsel: Optional[str] = None
+    issuing_office_id: Optional[str] = None
+    signatory_person_id: Optional[str] = None
+    staff_contact_person_id: Optional[str] = None
+    cea_provisions: Optional[str] = None
+    cfr_provisions: Optional[str] = None
+    legal_question: Optional[str] = None
+    conditions_summary: Optional[str] = None
+    amends_matter_id: Optional[str] = None
+    prior_letter_number: Optional[str] = None
+    workflow_status: Optional[str] = None
+    issuance_date: Optional[str] = None
+    expiration_date: Optional[str] = None
+
+
+class CreateMatterEnforcement(BaseModel):
+    requesting_division_id: Optional[str] = None
+    enforcement_reference: Optional[str] = None
+    legal_issue_type: Optional[str] = None
+    support_type: Optional[str] = None
+    litigation_stage: Optional[str] = None
+    court_or_forum: Optional[str] = None
+    deadline_source: Optional[str] = None
+    workflow_status: Optional[str] = None
+    privilege_flags: Optional[str] = None
+    is_confidential: int = 1
+
+
+class UpdateMatterEnforcement(BaseModel):
+    requesting_division_id: Optional[str] = None
+    enforcement_reference: Optional[str] = None
+    legal_issue_type: Optional[str] = None
+    support_type: Optional[str] = None
+    litigation_stage: Optional[str] = None
+    court_or_forum: Optional[str] = None
+    deadline_source: Optional[str] = None
+    workflow_status: Optional[str] = None
+    privilege_flags: Optional[str] = None
+    is_confidential: Optional[int] = None
+
+
+class CreateMatterRegulatoryId(BaseModel):
+    id_type: str = Field(..., min_length=1, description="Required ID type")
+    id_value: str = Field(..., min_length=1, description="Required ID value")
+    relationship: str = "primary"
+    notes: Optional[str] = None
+
+
 # Matter sub-resources
+
 
 class AddMatterPerson(EnumValidatedModel):
     __enum_fields__ = {
@@ -443,6 +518,7 @@ class AddMatterUpdate(EnumValidatedModel):
 
 
 # Decisions
+
 
 class CreateDecision(EnumValidatedModel):
     __enum_fields__ = {
@@ -496,6 +572,7 @@ class UpdateDecision(EnumValidatedModel):
 
 
 # Documents
+
 
 class CreateDocument(EnumValidatedModel):
     __enum_fields__ = {
@@ -553,6 +630,7 @@ class UpdateDocument(EnumValidatedModel):
 
 # Context Notes
 
+
 class CreateContextNote(EnumValidatedModel):
     __enum_fields__ = {
         "source": "source",
@@ -609,10 +687,13 @@ class UpdateContextNote(BaseModel):
 class CreateContextNoteLink(BaseModel):
     entity_type: str = Field(..., min_length=1, description="Required entity type")
     entity_id: str = Field(..., min_length=1, description="Required entity ID")
-    relationship_role: str = Field(..., min_length=1, description="Required relationship role")
+    relationship_role: str = Field(
+        ..., min_length=1, description="Required relationship role"
+    )
 
 
 # Person Profiles
+
 
 class UpdatePersonProfile(BaseModel):
     birthday: Optional[str] = None
@@ -631,6 +712,7 @@ class UpdatePersonProfile(BaseModel):
 
 
 # Comment Topics
+
 
 class CreateCommentTopic(EnumValidatedModel):
     __enum_fields__ = {
@@ -691,8 +773,11 @@ class UpdateCommentTopic(EnumValidatedModel):
 
 # Comment Questions
 
+
 class CreateCommentQuestion(BaseModel):
-    question_number: str = Field(..., min_length=1, description="Required question number")
+    question_number: str = Field(
+        ..., min_length=1, description="Required question number"
+    )
     question_text: str = Field(..., min_length=1, description="Required question text")
     sort_order: Optional[int] = None
     source: str = "manual"
@@ -712,6 +797,7 @@ class MoveCommentQuestion(BaseModel):
 
 # Policy Directives
 
+
 class CreatePolicyDirective(EnumValidatedModel):
     __enum_fields__ = {
         "source_document_type": "directive_source_document_type",
@@ -722,11 +808,17 @@ class CreatePolicyDirective(EnumValidatedModel):
         "source": "source",
     }
 
-    source_document: str = Field(..., min_length=1, description="Required source document citation")
-    source_document_type: str = Field(..., min_length=1, description="Required document type")
+    source_document: str = Field(
+        ..., min_length=1, description="Required source document citation"
+    )
+    source_document_type: str = Field(
+        ..., min_length=1, description="Required document type"
+    )
     source_document_url: Optional[str] = None
     source_date: Optional[str] = None
-    directive_label: str = Field(..., min_length=1, description="Required directive label")
+    directive_label: str = Field(
+        ..., min_length=1, description="Required directive label"
+    )
     directive_text: Optional[str] = None
     section_reference: Optional[str] = None
     chapter: Optional[str] = None
@@ -777,13 +869,17 @@ class UpdatePolicyDirective(EnumValidatedModel):
     @classmethod
     def auto_fill_completed(cls, values):
         if isinstance(values, dict):
-            if values.get("implementation_status") == "implemented" and not values.get("completed_date"):
+            if values.get("implementation_status") == "implemented" and not values.get(
+                "completed_date"
+            ):
                 from datetime import datetime as dt
+
                 values["completed_date"] = dt.now().isoformat()
         return values
 
 
 # Directive-Matter Links
+
 
 class CreateDirectiveMatter(EnumValidatedModel):
     __enum_fields__ = {
@@ -798,6 +894,7 @@ class CreateDirectiveMatter(EnumValidatedModel):
 
 # ── Directive Research Notes ─────────────────────────────────────────────────
 
+
 class CreateDirectiveDocument(EnumValidatedModel):
     __enum_fields__ = {
         "relationship_type": "directive_document_relationship_type",
@@ -807,7 +904,6 @@ class CreateDirectiveDocument(EnumValidatedModel):
     document_id: str = Field(..., description="Required document ID")
     relationship_type: str = "references"
     notes: Optional[str] = None
-
 
 
 class CreateDirectiveResearchNote(BaseModel):

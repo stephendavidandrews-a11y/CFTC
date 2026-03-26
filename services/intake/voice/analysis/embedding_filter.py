@@ -33,6 +33,7 @@ def _get_embedding_model():
     global _embedding_model, _embedding_inference
     if _embedding_model is None:
         from pyannote.audio import Model, Inference
+
         logger.info("Loading wespeaker embedding model for quality-filtered extraction")
         _embedding_model = Model.from_pretrained(
             "pyannote/wespeaker-voxceleb-resnet34-LM", token=False
@@ -91,20 +92,25 @@ def compute_filtered_embeddings(
             # Find matching features
             seg_feats = {}
             for f in feats:
-                if abs(f["start"] - seg["start"]) < 0.1 and abs(f["end"] - seg["end"]) < 0.1:
+                if (
+                    abs(f["start"] - seg["start"]) < 0.1
+                    and abs(f["end"] - seg["end"]) < 0.1
+                ):
                     seg_feats = f.get("features", {})
                     break
 
             # Score the segment
             score, issues = _score_segment(seg_feats)
-            scored.append({
-                "start": seg["start"],
-                "end": seg["end"],
-                "duration": duration,
-                "score": score,
-                "issues": issues,
-                "hnr": seg_feats.get("hnr"),
-            })
+            scored.append(
+                {
+                    "start": seg["start"],
+                    "end": seg["end"],
+                    "duration": duration,
+                    "score": score,
+                    "issues": issues,
+                    "hnr": seg_feats.get("hnr"),
+                }
+            )
 
         # Sort by quality score descending, then select best up to TARGET_DURATION
         scored.sort(key=lambda s: s["score"], reverse=True)
@@ -168,7 +174,9 @@ def compute_filtered_embeddings(
                 "segments_total": len(segs),
                 "filtered": False,
             }
-            logger.warning(f"[{speaker_label}] Filtered embedding failed ({e}). Using raw.")
+            logger.warning(
+                f"[{speaker_label}] Filtered embedding failed ({e}). Using raw."
+            )
 
     return results
 

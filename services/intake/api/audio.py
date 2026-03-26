@@ -40,7 +40,9 @@ def _get_audio_path(conversation_id: str) -> Path:
             (conversation_id,),
         ).fetchone()
         if not row:
-            raise HTTPException(404, f"No audio file for conversation {conversation_id}")
+            raise HTTPException(
+                404, f"No audio file for conversation {conversation_id}"
+            )
         path = Path(row["file_path"])
         if not path.exists():
             raise HTTPException(404, f"Audio file not found on disk: {path}")
@@ -52,8 +54,12 @@ def _get_audio_path(conversation_id: str) -> Path:
 def _detect_media_type(path: Path) -> str:
     ext = path.suffix.lower()
     return {
-        ".wav": "audio/wav", ".flac": "audio/flac", ".mp3": "audio/mpeg",
-        ".m4a": "audio/mp4", ".ogg": "audio/ogg", ".opus": "audio/opus",
+        ".wav": "audio/wav",
+        ".flac": "audio/flac",
+        ".mp3": "audio/mpeg",
+        ".m4a": "audio/mp4",
+        ".ogg": "audio/ogg",
+        ".opus": "audio/opus",
     }.get(ext, "audio/octet-stream")
 
 
@@ -61,7 +67,9 @@ def _detect_media_type(path: Path) -> str:
 def serve_full_audio(conversation_id: str):
     """Serve the full audio file."""
     path = _get_audio_path(conversation_id)
-    return FileResponse(path=str(path), media_type=_detect_media_type(path), filename=path.name)
+    return FileResponse(
+        path=str(path), media_type=_detect_media_type(path), filename=path.name
+    )
 
 
 @router.get("/{conversation_id}/clip")
@@ -83,9 +91,21 @@ def serve_audio_clip(conversation_id: str, start: float, end: float):
     try:
         ffmpeg = _find_ffmpeg()
         cmd = [
-            ffmpeg, "-i", str(audio_path),
-            "-ss", str(start), "-to", str(end),
-            "-ac", "1", "-ar", "16000", "-f", "wav", "-y", str(cache_path),
+            ffmpeg,
+            "-i",
+            str(audio_path),
+            "-ss",
+            str(start),
+            "-to",
+            str(end),
+            "-ac",
+            "1",
+            "-ar",
+            "16000",
+            "-f",
+            "wav",
+            "-y",
+            str(cache_path),
         ]
         result = subprocess.run(cmd, capture_output=True, timeout=30)
         if result.returncode != 0:
@@ -126,7 +146,9 @@ def serve_speaker_sample(conversation_id: str, speaker_label: str):
             ).fetchone()
 
         if not segments:
-            raise HTTPException(404, f"No suitable audio segment for speaker {speaker_label}")
+            raise HTTPException(
+                404, f"No suitable audio segment for speaker {speaker_label}"
+            )
 
         start = float(segments["start_time"])
         end = float(segments["end_time"])

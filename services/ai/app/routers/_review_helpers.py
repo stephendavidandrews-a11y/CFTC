@@ -4,6 +4,7 @@ Used by speaker_review.py, entity_review.py, and participant_review.py.
 Each review stage has the same check-state / ensure-in-progress / resume
 pattern, parameterized by the stage's valid states and transition names.
 """
+
 import logging
 
 from fastapi import HTTPException
@@ -25,10 +26,13 @@ def check_review_state(db, communication_id: str, valid_states: set, stage_name:
     if not row:
         raise HTTPException(404, detail={"error_type": "not_found"})
     if row["processing_status"] not in valid_states:
-        raise HTTPException(400, detail={
-            "error_type": "invalid_state",
-            "message": f"Communication not in {stage_name} (current: {row['processing_status']})",
-        })
+        raise HTTPException(
+            400,
+            detail={
+                "error_type": "invalid_state",
+                "message": f"Communication not in {stage_name} (current: {row['processing_status']})",
+            },
+        )
 
 
 def ensure_in_progress(db, communication_id: str, from_state: str, to_state: str):
@@ -39,6 +43,7 @@ def ensure_in_progress(db, communication_id: str, from_state: str, to_state: str
 async def resume_pipeline(communication_id: str):
     """Resume pipeline processing after human gate completion."""
     from app.pipeline.orchestrator import process_communication
+
     try:
         await process_communication(communication_id)
     except Exception as e:

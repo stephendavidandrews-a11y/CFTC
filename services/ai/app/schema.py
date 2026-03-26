@@ -7,6 +7,7 @@ Provenance locator is on review_bundle_items (source_locator_json).
 
 Idempotent: CREATE TABLE/INDEX IF NOT EXISTS.
 """
+
 import sqlite3
 import logging
 
@@ -18,7 +19,9 @@ logger = logging.getLogger(__name__)
 
 TABLES = [
     # ---- Table 1: communications ----
-    ("communications", """CREATE TABLE IF NOT EXISTS communications (
+    (
+        "communications",
+        """CREATE TABLE IF NOT EXISTS communications (
         id TEXT PRIMARY KEY,
         source_type TEXT NOT NULL,
         source_path TEXT,
@@ -37,10 +40,12 @@ TABLES = [
         archived_at TEXT,
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
-    )"""),
-
+    )""",
+    ),
     # ---- Table 2: audio_files ----
-    ("audio_files", """CREATE TABLE IF NOT EXISTS audio_files (
+    (
+        "audio_files",
+        """CREATE TABLE IF NOT EXISTS audio_files (
         id TEXT PRIMARY KEY,
         communication_id TEXT NOT NULL REFERENCES communications(id),
         file_path TEXT NOT NULL,
@@ -50,10 +55,12 @@ TABLES = [
         file_size_bytes INTEGER,
         captured_at TEXT,
         created_at TEXT DEFAULT (datetime('now'))
-    )"""),
-
+    )""",
+    ),
     # ---- Table 3: communication_participants ----
-    ("communication_participants", """CREATE TABLE IF NOT EXISTS communication_participants (
+    (
+        "communication_participants",
+        """CREATE TABLE IF NOT EXISTS communication_participants (
         id TEXT PRIMARY KEY,
         communication_id TEXT NOT NULL REFERENCES communications(id),
         speaker_label TEXT,
@@ -71,10 +78,12 @@ TABLES = [
         voiceprint_method TEXT,
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
-    )"""),
-
+    )""",
+    ),
     # ---- Table 4: transcripts ----
-    ("transcripts", """CREATE TABLE IF NOT EXISTS transcripts (
+    (
+        "transcripts",
+        """CREATE TABLE IF NOT EXISTS transcripts (
         id TEXT PRIMARY KEY,
         communication_id TEXT NOT NULL REFERENCES communications(id),
         speaker_label TEXT,
@@ -87,10 +96,12 @@ TABLES = [
         word_timestamps TEXT,
         confidence REAL,
         created_at TEXT DEFAULT (datetime('now'))
-    )"""),
-
+    )""",
+    ),
     # ---- Table 5: communication_entities ----
-    ("communication_entities", """CREATE TABLE IF NOT EXISTS communication_entities (
+    (
+        "communication_entities",
+        """CREATE TABLE IF NOT EXISTS communication_entities (
         id TEXT PRIMARY KEY,
         communication_id TEXT NOT NULL REFERENCES communications(id),
         mention_text TEXT NOT NULL,
@@ -107,10 +118,12 @@ TABLES = [
         context_snippet TEXT,
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
-    )"""),
-
+    )""",
+    ),
     # ---- Table 6: communication_messages (email) ----
-    ("communication_messages", """CREATE TABLE IF NOT EXISTS communication_messages (
+    (
+        "communication_messages",
+        """CREATE TABLE IF NOT EXISTS communication_messages (
         id TEXT PRIMARY KEY,
         communication_id TEXT NOT NULL REFERENCES communications(id),
         message_index INTEGER NOT NULL,
@@ -126,10 +139,12 @@ TABLES = [
         is_new INTEGER DEFAULT 1,
         is_from_user INTEGER DEFAULT 0,
         created_at TEXT DEFAULT (datetime('now'))
-    )"""),
-
+    )""",
+    ),
     # ---- Table 7: communication_artifacts (email attachments) ----
-    ("communication_artifacts", """CREATE TABLE IF NOT EXISTS communication_artifacts (
+    (
+        "communication_artifacts",
+        """CREATE TABLE IF NOT EXISTS communication_artifacts (
         id TEXT PRIMARY KEY,
         communication_id TEXT NOT NULL REFERENCES communications(id),
         message_id TEXT REFERENCES communication_messages(id),
@@ -145,19 +160,23 @@ TABLES = [
         tracker_document_file_id TEXT,
         quarantine_reason TEXT,
         created_at TEXT DEFAULT (datetime('now'))
-    )"""),
-
+    )""",
+    ),
     # ---- Table 8: voice_samples ----
-    ("voice_samples", """CREATE TABLE IF NOT EXISTS voice_samples (
+    (
+        "voice_samples",
+        """CREATE TABLE IF NOT EXISTS voice_samples (
         id TEXT PRIMARY KEY,
         communication_id TEXT REFERENCES communications(id),
         speaker_label TEXT,
         embedding BLOB,
         created_at TEXT DEFAULT (datetime('now'))
-    )"""),
-
+    )""",
+    ),
     # ---- Table 9: speaker_voice_profiles ----
-    ("speaker_voice_profiles", """CREATE TABLE IF NOT EXISTS speaker_voice_profiles (
+    (
+        "speaker_voice_profiles",
+        """CREATE TABLE IF NOT EXISTS speaker_voice_profiles (
         id TEXT PRIMARY KEY,
         tracker_person_id TEXT NOT NULL,
         embedding BLOB NOT NULL,
@@ -170,10 +189,12 @@ TABLES = [
         created_from TEXT DEFAULT 'manual',
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
-    )"""),
-
+    )""",
+    ),
     # ---- Table 9b: voiceprint_match_log ----
-    ("voiceprint_match_log", """CREATE TABLE IF NOT EXISTS voiceprint_match_log (
+    (
+        "voiceprint_match_log",
+        """CREATE TABLE IF NOT EXISTS voiceprint_match_log (
         id TEXT PRIMARY KEY,
         communication_id TEXT NOT NULL REFERENCES communications(id),
         speaker_label TEXT NOT NULL,
@@ -188,10 +209,12 @@ TABLES = [
         confirmed_person_id TEXT,
         created_at TEXT DEFAULT (datetime('now')),
         reviewed_at TEXT
-    )"""),
-
+    )""",
+    ),
     # ---- Table 10: ai_extractions ----
-    ("ai_extractions", """CREATE TABLE IF NOT EXISTS ai_extractions (
+    (
+        "ai_extractions",
+        """CREATE TABLE IF NOT EXISTS ai_extractions (
         id TEXT PRIMARY KEY,
         communication_id TEXT NOT NULL REFERENCES communications(id),
         attempt_number INTEGER DEFAULT 1,
@@ -207,10 +230,12 @@ TABLES = [
         escalation_reason TEXT,
         success INTEGER DEFAULT 1,
         extracted_at TEXT DEFAULT (datetime('now'))
-    )"""),
-
+    )""",
+    ),
     # ---- Table 11: review_bundles ----
-    ("review_bundles", """CREATE TABLE IF NOT EXISTS review_bundles (
+    (
+        "review_bundles",
+        """CREATE TABLE IF NOT EXISTS review_bundles (
         id TEXT PRIMARY KEY,
         communication_id TEXT NOT NULL REFERENCES communications(id),
         bundle_type TEXT NOT NULL,
@@ -226,10 +251,12 @@ TABLES = [
         reviewed_at TEXT,
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
-    )"""),
-
+    )""",
+    ),
     # ---- Table 12: review_bundle_items ----
-    ("review_bundle_items", """CREATE TABLE IF NOT EXISTS review_bundle_items (
+    (
+        "review_bundle_items",
+        """CREATE TABLE IF NOT EXISTS review_bundle_items (
         id TEXT PRIMARY KEY,
         bundle_id TEXT NOT NULL REFERENCES review_bundles(id),
         item_type TEXT NOT NULL,
@@ -248,10 +275,12 @@ TABLES = [
         reviewed_at TEXT,
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
-    )"""),
-
+    )""",
+    ),
     # ---- Table 13: tracker_writebacks ----
-    ("tracker_writebacks", """CREATE TABLE IF NOT EXISTS tracker_writebacks (
+    (
+        "tracker_writebacks",
+        """CREATE TABLE IF NOT EXISTS tracker_writebacks (
         id TEXT PRIMARY KEY,
         communication_id TEXT NOT NULL REFERENCES communications(id),
         bundle_id TEXT NOT NULL REFERENCES review_bundles(id),
@@ -265,20 +294,24 @@ TABLES = [
         reversed INTEGER DEFAULT 0,
         reversed_at TEXT,
         written_at TEXT DEFAULT (datetime('now'))
-    )"""),
-
+    )""",
+    ),
     # ---- Table 14: config_audit_log ----
-    ("config_audit_log", """CREATE TABLE IF NOT EXISTS config_audit_log (
+    (
+        "config_audit_log",
+        """CREATE TABLE IF NOT EXISTS config_audit_log (
         id TEXT PRIMARY KEY,
         section TEXT NOT NULL,
         field TEXT NOT NULL,
         old_value TEXT,
         new_value TEXT NOT NULL,
         created_at TEXT DEFAULT (datetime('now'))
-    )"""),
-
+    )""",
+    ),
     # ---- Table 15: digests ----
-    ("digests", """CREATE TABLE IF NOT EXISTS digests (
+    (
+        "digests",
+        """CREATE TABLE IF NOT EXISTS digests (
         id TEXT PRIMARY KEY,
         digest_date TEXT NOT NULL,
         alert_data TEXT NOT NULL,
@@ -289,10 +322,12 @@ TABLES = [
         emailed INTEGER DEFAULT 0,
         emailed_at TEXT,
         created_at TEXT DEFAULT (datetime('now'))
-    )"""),
-
+    )""",
+    ),
     # ---- Table 16: intelligence_briefs ----
-    ("intelligence_briefs", """CREATE TABLE IF NOT EXISTS intelligence_briefs (
+    (
+        "intelligence_briefs",
+        """CREATE TABLE IF NOT EXISTS intelligence_briefs (
         id TEXT PRIMARY KEY,
         brief_type TEXT NOT NULL,
         brief_date TEXT NOT NULL,
@@ -303,19 +338,23 @@ TABLES = [
         is_auto_generated INTEGER DEFAULT 1,
         docx_file_path TEXT,
         created_at TEXT DEFAULT (datetime('now'))
-    )"""),
-
+    )""",
+    ),
     # ---- Table 17: alert_actions ----
-    ("alert_actions", """CREATE TABLE IF NOT EXISTS alert_actions (
+    (
+        "alert_actions",
+        """CREATE TABLE IF NOT EXISTS alert_actions (
         id TEXT PRIMARY KEY,
         alert_fingerprint TEXT NOT NULL,
         action TEXT NOT NULL,
         snooze_until TEXT,
         created_at TEXT DEFAULT (datetime('now'))
-    )"""),
-
+    )""",
+    ),
     # ---- Table 18: llm_usage ----
-    ("llm_usage", """CREATE TABLE IF NOT EXISTS llm_usage (
+    (
+        "llm_usage",
+        """CREATE TABLE IF NOT EXISTS llm_usage (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         communication_id TEXT REFERENCES communications(id),
         stage TEXT NOT NULL,
@@ -324,10 +363,12 @@ TABLES = [
         output_tokens INTEGER NOT NULL,
         cost_usd REAL NOT NULL,
         created_at TEXT DEFAULT (datetime('now'))
-    )"""),
-
+    )""",
+    ),
     # ---- Hardening: commit_batches (receipt tracking) ----
-    ("commit_batches", """CREATE TABLE IF NOT EXISTS commit_batches (
+    (
+        "commit_batches",
+        """CREATE TABLE IF NOT EXISTS commit_batches (
         id TEXT PRIMARY KEY,
         communication_id TEXT NOT NULL REFERENCES communications(id),
         idempotency_key TEXT,
@@ -339,10 +380,12 @@ TABLES = [
         completed_at TEXT,
         error_message TEXT,
         tracker_response TEXT
-    )"""),
-
+    )""",
+    ),
     # ---- Hardening: review_action_log (audit trail) ----
-    ("review_action_log", """CREATE TABLE IF NOT EXISTS review_action_log (
+    (
+        "review_action_log",
+        """CREATE TABLE IF NOT EXISTS review_action_log (
         id TEXT PRIMARY KEY,
         actor TEXT,
         communication_id TEXT REFERENCES communications(id),
@@ -353,18 +396,23 @@ TABLES = [
         new_state TEXT,
         details TEXT,
         created_at TEXT DEFAULT (datetime('now'))
-    )"""),
-
+    )""",
+    ),
     # ---- Hardening: communication_error_log (error history) ----
-    ("communication_error_log", """CREATE TABLE IF NOT EXISTS communication_error_log (
+    (
+        "communication_error_log",
+        """CREATE TABLE IF NOT EXISTS communication_error_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         communication_id TEXT NOT NULL REFERENCES communications(id),
         error_stage TEXT,
         error_message TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )"""),
+    )""",
+    ),
     # ---- Federal Register staging ----
-    ("fr_documents", """CREATE TABLE IF NOT EXISTS fr_documents (
+    (
+        "fr_documents",
+        """CREATE TABLE IF NOT EXISTS fr_documents (
         id TEXT PRIMARY KEY,
         document_number TEXT NOT NULL UNIQUE,
         title TEXT NOT NULL,
@@ -389,11 +437,12 @@ TABLES = [
         notes TEXT,
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
-    )"""),
-
-
+    )""",
+    ),
     # ---- Table: meeting_intelligence ----
-    ("meeting_intelligence", """CREATE TABLE IF NOT EXISTS meeting_intelligence (
+    (
+        "meeting_intelligence",
+        """CREATE TABLE IF NOT EXISTS meeting_intelligence (
         id TEXT PRIMARY KEY,
         communication_id TEXT NOT NULL REFERENCES communications(id),
         tracker_meeting_id TEXT,
@@ -406,17 +455,53 @@ TABLES = [
         prompt_version TEXT,
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
-    )"""),
-
+    )""",
+    ),
     # ---- Table: page_visits (telemetry) ----
-    ("page_visits", """CREATE TABLE IF NOT EXISTS page_visits (
+    (
+        "page_visits",
+        """CREATE TABLE IF NOT EXISTS page_visits (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         page_path TEXT NOT NULL,
         entity_type TEXT,
         entity_id TEXT,
         visited_at TEXT DEFAULT (datetime('now'))
-    )"""),
-
+    )""",
+    ),
+    # ---- Table: communication_matter_associations (Enrichment v2) ----
+    (
+        "communication_matter_associations",
+        """CREATE TABLE IF NOT EXISTS communication_matter_associations (
+        id TEXT PRIMARY KEY,
+        communication_id TEXT NOT NULL REFERENCES communications(id),
+        matter_id TEXT NOT NULL,
+        matter_title TEXT,
+        confidence REAL DEFAULT 0.0,
+        relevant_segments TEXT,
+        reasoning TEXT,
+        confirmed INTEGER DEFAULT 0,
+        confirmed_by TEXT,
+        confirmed_at TEXT,
+        created_at TEXT DEFAULT (datetime('now'))
+    )""",
+    ),
+    # ---- Table: communication_directive_associations (Enrichment v2) ----
+    (
+        "communication_directive_associations",
+        """CREATE TABLE IF NOT EXISTS communication_directive_associations (
+        id TEXT PRIMARY KEY,
+        communication_id TEXT NOT NULL REFERENCES communications(id),
+        directive_id TEXT NOT NULL,
+        directive_label TEXT,
+        confidence REAL DEFAULT 0.0,
+        relevant_segments TEXT,
+        reasoning TEXT,
+        confirmed INTEGER DEFAULT 0,
+        confirmed_by TEXT,
+        confirmed_at TEXT,
+        created_at TEXT DEFAULT (datetime('now'))
+    )""",
+    ),
 ]
 
 # ---------------------------------------------------------------------------
@@ -429,116 +514,100 @@ INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_comm_source_type ON communications(source_type);",
     "CREATE INDEX IF NOT EXISTS idx_comm_created ON communications(created_at);",
     "CREATE INDEX IF NOT EXISTS idx_comm_lock ON communications(processing_lock_token);",
-
     # -- audio_files --
     "CREATE INDEX IF NOT EXISTS idx_audio_comm ON audio_files(communication_id);",
-
     # -- communication_participants --
     "CREATE INDEX IF NOT EXISTS idx_comm_part_comm ON communication_participants(communication_id);",
     "CREATE INDEX IF NOT EXISTS idx_comm_part_person ON communication_participants(tracker_person_id);",
     "CREATE INDEX IF NOT EXISTS idx_comm_part_label ON communication_participants(communication_id, speaker_label);",
-
     # -- transcripts --
     "CREATE INDEX IF NOT EXISTS idx_transcripts_comm ON transcripts(communication_id);",
     "CREATE INDEX IF NOT EXISTS idx_transcripts_speaker ON transcripts(communication_id, speaker_label);",
     "CREATE INDEX IF NOT EXISTS idx_transcripts_time ON transcripts(communication_id, start_time);",
-
     # -- communication_entities --
     "CREATE INDEX IF NOT EXISTS idx_entity_comm ON communication_entities(communication_id);",
     "CREATE INDEX IF NOT EXISTS idx_entity_person ON communication_entities(tracker_person_id);",
     "CREATE INDEX IF NOT EXISTS idx_entity_org ON communication_entities(tracker_org_id);",
     "CREATE INDEX IF NOT EXISTS idx_entity_type ON communication_entities(entity_type);",
     "CREATE INDEX IF NOT EXISTS idx_entity_confirmed ON communication_entities(communication_id, confirmed);",
-
     # -- communication_messages --
     "CREATE INDEX IF NOT EXISTS idx_msg_comm ON communication_messages(communication_id);",
     "CREATE INDEX IF NOT EXISTS idx_msg_hash ON communication_messages(message_hash);",
     "CREATE INDEX IF NOT EXISTS idx_msg_new ON communication_messages(communication_id, is_new);",
     "CREATE INDEX IF NOT EXISTS idx_msg_sender ON communication_messages(sender_email);",
-
     # -- communication_artifacts --
     "CREATE INDEX IF NOT EXISTS idx_artifact_comm ON communication_artifacts(communication_id);",
     "CREATE INDEX IF NOT EXISTS idx_artifact_msg ON communication_artifacts(message_id);",
     "CREATE INDEX IF NOT EXISTS idx_artifact_proposable ON communication_artifacts(is_document_proposable);",
     "CREATE INDEX IF NOT EXISTS idx_artifact_tracker_doc ON communication_artifacts(tracker_document_id);",
-
     # -- voice_samples --
     "CREATE INDEX IF NOT EXISTS idx_voice_comm ON voice_samples(communication_id);",
     "CREATE INDEX IF NOT EXISTS idx_voice_label ON voice_samples(communication_id, speaker_label);",
-
     # -- speaker_voice_profiles --
     "CREATE INDEX IF NOT EXISTS idx_voice_profile_person ON speaker_voice_profiles(tracker_person_id);",
     "CREATE INDEX IF NOT EXISTS idx_voice_profile_status ON speaker_voice_profiles(status);",
-
     # -- voiceprint_match_log --
     "CREATE INDEX IF NOT EXISTS idx_vp_match_comm ON voiceprint_match_log(communication_id);",
     "CREATE INDEX IF NOT EXISTS idx_vp_match_outcome ON voiceprint_match_log(outcome);",
-
     # -- ai_extractions --
     "CREATE INDEX IF NOT EXISTS idx_extraction_comm ON ai_extractions(communication_id);",
-
     # -- review_bundles --
     "CREATE INDEX IF NOT EXISTS idx_bundle_comm ON review_bundles(communication_id);",
     "CREATE INDEX IF NOT EXISTS idx_bundle_status ON review_bundles(status);",
     "CREATE INDEX IF NOT EXISTS idx_bundle_matter ON review_bundles(target_matter_id);",
     "CREATE INDEX IF NOT EXISTS idx_bundle_type ON review_bundles(bundle_type);",
-
     # -- review_bundle_items --
     "CREATE INDEX IF NOT EXISTS idx_item_bundle ON review_bundle_items(bundle_id);",
     "CREATE INDEX IF NOT EXISTS idx_item_type ON review_bundle_items(item_type);",
     "CREATE INDEX IF NOT EXISTS idx_item_status ON review_bundle_items(status);",
     "CREATE INDEX IF NOT EXISTS idx_item_source_transcript ON review_bundle_items(source_transcript_id);",
-
     # -- tracker_writebacks --
     "CREATE INDEX IF NOT EXISTS idx_wb_comm ON tracker_writebacks(communication_id);",
     "CREATE INDEX IF NOT EXISTS idx_wb_bundle ON tracker_writebacks(bundle_id);",
     "CREATE INDEX IF NOT EXISTS idx_wb_item ON tracker_writebacks(bundle_item_id);",
     "CREATE INDEX IF NOT EXISTS idx_wb_target ON tracker_writebacks(target_table, target_record_id);",
     "CREATE INDEX IF NOT EXISTS idx_wb_reversed ON tracker_writebacks(reversed);",
-
     # -- config_audit_log --
     "CREATE INDEX IF NOT EXISTS idx_config_audit_created ON config_audit_log(created_at);",
     "CREATE INDEX IF NOT EXISTS idx_config_audit_section ON config_audit_log(section);",
-
     # -- digests --
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_digest_date ON digests(digest_date);",
-
     # -- intelligence_briefs --
     "CREATE INDEX IF NOT EXISTS idx_brief_type_date ON intelligence_briefs(brief_type, brief_date);",
-
     # -- alert_actions --
     "CREATE INDEX IF NOT EXISTS idx_alert_fp ON alert_actions(alert_fingerprint);",
     "CREATE INDEX IF NOT EXISTS idx_alert_snooze ON alert_actions(snooze_until);",
-
     # -- llm_usage --
     "CREATE INDEX IF NOT EXISTS idx_llm_usage_comm ON llm_usage(communication_id);",
     "CREATE INDEX IF NOT EXISTS idx_llm_usage_date ON llm_usage(created_at);",
-
     # -- commit_batches --
     "CREATE INDEX IF NOT EXISTS idx_commit_batch_comm ON commit_batches(communication_id);",
     "CREATE INDEX IF NOT EXISTS idx_commit_batch_idemp ON commit_batches(idempotency_key);",
-
     # -- review_action_log --
     "CREATE INDEX IF NOT EXISTS idx_review_action_comm ON review_action_log(communication_id);",
     "CREATE INDEX IF NOT EXISTS idx_review_action_type ON review_action_log(action_type);",
     "CREATE INDEX IF NOT EXISTS idx_review_action_created ON review_action_log(created_at);",
-
     # -- communication_error_log --
     "CREATE INDEX IF NOT EXISTS idx_error_log_comm ON communication_error_log(communication_id);",
     "CREATE INDEX IF NOT EXISTS idx_error_log_created ON communication_error_log(created_at);",
-
     # -- fr_documents --
     "CREATE INDEX IF NOT EXISTS idx_fr_docs_docnum ON fr_documents(document_number);",
     "CREATE INDEX IF NOT EXISTS idx_fr_docs_status ON fr_documents(processing_status);",
     "CREATE INDEX IF NOT EXISTS idx_fr_docs_tier ON fr_documents(routing_tier);",
     "CREATE INDEX IF NOT EXISTS idx_fr_docs_pub_date ON fr_documents(publication_date);",
-
+    # -- communication_matter_associations --
+    "CREATE INDEX IF NOT EXISTS idx_matter_assoc_comm ON communication_matter_associations(communication_id);",
+    "CREATE INDEX IF NOT EXISTS idx_matter_assoc_confirmed ON communication_matter_associations(communication_id, confirmed);",
+    # -- communication_directive_associations --
+    "CREATE INDEX IF NOT EXISTS idx_directive_assoc_comm ON communication_directive_associations(communication_id);",
+    "CREATE INDEX IF NOT EXISTS idx_directive_assoc_confirmed ON communication_directive_associations(communication_id, confirmed);",
 ]
 
 
 # ---------------------------------------------------------------------------
 # Schema initializer
 # ---------------------------------------------------------------------------
+
 
 def init_schema(conn: sqlite3.Connection) -> list[str]:
     """Create all tables and indexes. Idempotent.
@@ -547,9 +616,7 @@ def init_schema(conn: sqlite3.Connection) -> list[str]:
     cursor = conn.cursor()
     existing = {
         row[0]
-        for row in cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        )
+        for row in cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
     }
 
     created: list[str] = []
@@ -603,17 +670,13 @@ def _run_migrations(cursor):
     # Archive support: add archived_at to communications (2026-03-19)
     comm_cols = {row[1] for row in cursor.execute("PRAGMA table_info(communications)")}
     if "archived_at" not in comm_cols:
-        cursor.execute(
-            "ALTER TABLE communications ADD COLUMN archived_at TEXT"
-        )
+        cursor.execute("ALTER TABLE communications ADD COLUMN archived_at TEXT")
         logger.info("Migration: added communications.archived_at column")
 
     # Phase 7: content_hash for dedup on audio_files
     af_cols = {row[1] for row in cursor.execute("PRAGMA table_info(audio_files)")}
     if "content_hash" not in af_cols:
-        cursor.execute(
-            "ALTER TABLE audio_files ADD COLUMN content_hash TEXT"
-        )
+        cursor.execute("ALTER TABLE audio_files ADD COLUMN content_hash TEXT")
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_af_content_hash ON audio_files(content_hash)"
         )
@@ -622,7 +685,36 @@ def _run_migrations(cursor):
     # Transcript corrections: add reviewed_text column
     t_cols = {row[1] for row in cursor.execute("PRAGMA table_info(transcripts)")}
     if "reviewed_text" not in t_cols:
-        cursor.execute(
-            "ALTER TABLE transcripts ADD COLUMN reviewed_text TEXT"
-        )
+        cursor.execute("ALTER TABLE transcripts ADD COLUMN reviewed_text TEXT")
         logger.info("Migration: added transcripts.reviewed_text column")
+    # Enrichment v2: add intelligence_flags_json to communications
+    if "intelligence_flags_json" not in comm_cols:
+        cursor.execute(
+            "ALTER TABLE communications ADD COLUMN intelligence_flags_json TEXT"
+        )
+        logger.info("Migration: added communications.intelligence_flags_json column")
+
+    # Enrichment v2: add segment_metadata to transcripts
+    if "segment_metadata" not in t_cols:
+        cursor.execute("ALTER TABLE transcripts ADD COLUMN segment_metadata TEXT")
+        logger.info("Migration: added transcripts.segment_metadata column")
+
+    # Enrichment v2: rename pipeline states
+    state_renames = [
+        ("awaiting_entity_review", "awaiting_association_review"),
+        ("entity_review_in_progress", "association_review_in_progress"),
+        ("entities_confirmed", "associations_confirmed"),
+    ]
+    for old_state, new_state in state_renames:
+        cursor.execute(
+            "UPDATE communications SET processing_status = ? WHERE processing_status = ?",
+            (new_state, old_state),
+        )
+        count = cursor.rowcount
+        if count > 0:
+            logger.info(
+                "Migration: renamed %d communications from %s to %s",
+                count,
+                old_state,
+                new_state,
+            )

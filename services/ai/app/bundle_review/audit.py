@@ -8,8 +8,14 @@ import json
 import uuid as uuid_mod
 
 
-def write_audit(db, communication_id: str, bundle_id: str | None,
-                item_id: str | None, action_type: str, details: dict):
+def write_audit(
+    db,
+    communication_id: str,
+    bundle_id: str | None,
+    item_id: str | None,
+    action_type: str,
+    details: dict,
+):
     """Write a single review_action_log entry.
 
     Args:
@@ -20,9 +26,18 @@ def write_audit(db, communication_id: str, bundle_id: str | None,
         action_type: e.g. 'accept_item', 'move_item', 'complete_bundle_review'
         details: dict serialized to JSON (old_state, new_state, context)
     """
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO review_action_log
             (id, actor, communication_id, bundle_id, item_id, action_type, details)
         VALUES (?, 'user', ?, ?, ?, ?, ?)
-    """, (str(uuid_mod.uuid4()), communication_id, bundle_id, item_id,
-          action_type, json.dumps(details, default=str)))
+    """,
+        (
+            str(uuid_mod.uuid4()),
+            communication_id,
+            bundle_id,
+            item_id,
+            action_type,
+            json.dumps(details, default=str),
+        ),
+    )

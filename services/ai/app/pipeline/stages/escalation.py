@@ -29,8 +29,10 @@ logger = logging.getLogger(__name__)
 # Typed escalation triggers
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class EscalationTrigger(str, Enum):
     """Trigger conditions from 03_AI_BEHAVIOR.md §7B."""
+
     LOW_CONFIDENCE = "low_confidence"
     OVER_SPLITTING = "over_splitting"
     UNCERTAINTY_FLAGS = "uncertainty_flags"
@@ -42,8 +44,10 @@ class EscalationTrigger(str, Enum):
 # Typed extraction failures
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class ExtractionFailureType(str, Enum):
     """Typed failure categories for extraction attempts."""
+
     PARSE_FAILURE = "parse_failure"
     VALIDATION_FAILURE = "validation_failure"
     MODEL_API_FAILURE = "model_api_failure"
@@ -54,12 +58,13 @@ class ExtractionFailureType(str, Enum):
 @dataclass
 class ExtractionAttemptResult:
     """Result of a single extraction attempt (Sonnet or Opus)."""
+
     success: bool
     model: str
     attempt_number: int
     raw_output: Optional[str] = None
-    parsed_output: Optional[object] = None      # ExtractionOutput when success
-    processed: Optional[dict] = None             # post-processing result
+    parsed_output: Optional[object] = None  # ExtractionOutput when success
+    processed: Optional[dict] = None  # post-processing result
     failure_type: Optional[ExtractionFailureType] = None
     failure_detail: Optional[str] = None
     usage_data: Optional[dict] = None
@@ -70,6 +75,7 @@ class ExtractionAttemptResult:
 @dataclass
 class EscalationDecision:
     """Decision about whether to escalate to Opus."""
+
     should_escalate: bool
     triggers: list[EscalationTrigger]
     reason: str
@@ -117,44 +123,42 @@ def detect_triggers(
     # Any bundle has confidence < 0.5
     if trigger_config.get("low_confidence", True):
         low_conf_bundles = [
-            b for b in bundles
-            if b.confidence < LOW_CONFIDENCE_THRESHOLD
+            b for b in bundles if b.confidence < LOW_CONFIDENCE_THRESHOLD
         ]
         if low_conf_bundles:
             triggers.append(EscalationTrigger.LOW_CONFIDENCE)
             logger.info(
                 "[%s] Escalation trigger: low_confidence — %d bundles below %.1f",
-                communication_id[:8], len(low_conf_bundles),
+                communication_id[:8],
+                len(low_conf_bundles),
                 LOW_CONFIDENCE_THRESHOLD,
             )
 
     # ── Trigger 3: over_splitting ──
     # 4+ new_matter bundles from a single communication
     if trigger_config.get("over_splitting", True):
-        new_matter_count = sum(
-            1 for b in bundles if b.bundle_type == "new_matter"
-        )
+        new_matter_count = sum(1 for b in bundles if b.bundle_type == "new_matter")
         if new_matter_count >= OVER_SPLITTING_THRESHOLD:
             triggers.append(EscalationTrigger.OVER_SPLITTING)
             logger.info(
                 "[%s] Escalation trigger: over_splitting — %d new matters (>= %d)",
-                communication_id[:8], new_matter_count,
+                communication_id[:8],
+                new_matter_count,
                 OVER_SPLITTING_THRESHOLD,
             )
 
     # ── Trigger 4: uncertainty_flags ──
     # Sonnet self-reported uncertainty on any bundle
     if trigger_config.get("uncertainty_flags", True):
-        flagged_bundles = [
-            b for b in bundles
-            if b.uncertainty_flags
-        ]
+        flagged_bundles = [b for b in bundles if b.uncertainty_flags]
         if flagged_bundles:
             triggers.append(EscalationTrigger.UNCERTAINTY_FLAGS)
             total_flags = sum(len(b.uncertainty_flags) for b in flagged_bundles)
             logger.info(
                 "[%s] Escalation trigger: uncertainty_flags — %d flags across %d bundles",
-                communication_id[:8], total_flags, len(flagged_bundles),
+                communication_id[:8],
+                total_flags,
+                len(flagged_bundles),
             )
 
     # ── Safety net: empty_extraction ──
@@ -176,7 +180,9 @@ def detect_triggers(
             logger.info(
                 "[%s] Escalation trigger: empty_extraction — "
                 "0 bundles from %ds / %d segments",
-                communication_id[:8], duration, seg_count,
+                communication_id[:8],
+                duration,
+                seg_count,
             )
 
     return triggers
@@ -185,6 +191,7 @@ def detect_triggers(
 # ═══════════════════════════════════════════════════════════════════════════
 # Escalation decision — combine triggers with config and budget
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def decide_escalation(
     triggers: list[EscalationTrigger],
@@ -216,7 +223,8 @@ def decide_escalation(
     # Check all trigger flags — if ALL triggered flags are disabled, don't escalate
     trigger_config = model_config.get("opus_retry_triggers", {})
     enabled_triggers = [
-        t for t in triggers
+        t
+        for t in triggers
         if t == EscalationTrigger.EMPTY_EXTRACTION  # always enabled
         or trigger_config.get(t.value, True)
     ]
@@ -226,12 +234,13 @@ def decide_escalation(
             should_escalate=False,
             triggers=triggers,
             reason=f"Triggers detected ({', '.join(t.value for t in triggers)}) "
-                   f"but all disabled in config",
+            f"but all disabled in config",
             blocked_by_config=True,
         )
 
     # Check budget
     from app.llm.client import check_budget
+
     today_spend, daily_budget, is_over = check_budget(db)
     if is_over:
         return EscalationDecision(
@@ -252,6 +261,7 @@ def decide_escalation(
 # ═══════════════════════════════════════════════════════════════════════════
 # Opus meta-instruction — tell Opus what went wrong with Sonnet
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def build_opus_meta_instruction(
     triggers: list[EscalationTrigger],
@@ -313,21 +323,25 @@ def build_opus_meta_instruction(
         sonnet_text = sonnet_result.raw_output
         if len(sonnet_text) > 12000:
             sonnet_text = sonnet_text[:12000] + "\n... [truncated]"
-        sections.extend([
-            "",
-            "### Previous Attempt Output (Sonnet)",
-            "```json",
-            sonnet_text,
-            "```",
-        ])
+        sections.extend(
+            [
+                "",
+                "### Previous Attempt Output (Sonnet)",
+                "```json",
+                sonnet_text,
+                "```",
+            ]
+        )
 
-    sections.extend([
-        "",
-        "### Instructions",
-        "Re-extract from the same source material. Your output must use the "
-        "exact same JSON schema. Focus on correcting the specific issues "
-        "above. Prefer fewer, higher-quality proposals with well-justified "
-        "routing decisions.",
-    ])
+    sections.extend(
+        [
+            "",
+            "### Instructions",
+            "Re-extract from the same source material. Your output must use the "
+            "exact same JSON schema. Focus on correcting the specific issues "
+            "above. Prefer fewer, higher-quality proposals with well-justified "
+            "routing decisions.",
+        ]
+    )
 
     return "\n".join(sections)

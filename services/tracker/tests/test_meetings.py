@@ -1,6 +1,10 @@
 """Tests for meetings router — CRUD, participants, matter links."""
+
 from tests.conftest import (
-    seed_matter, seed_person, seed_meeting, make_id,
+    seed_matter,
+    seed_person,
+    seed_meeting,
+    make_id,
 )
 
 

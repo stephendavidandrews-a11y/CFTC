@@ -1,4 +1,5 @@
 """Idempotency key support for POST create operations."""
+
 import hashlib
 import json
 
@@ -26,11 +27,14 @@ def claim_idempotency_key(db, key, request_body, path):
     body_hash = _hash_body(request_body)
 
     # Attempt atomic claim via INSERT OR IGNORE
-    cursor = db.execute("""
+    cursor = db.execute(
+        """
         INSERT OR IGNORE INTO idempotency_keys
             (key, method, path, request_hash, status_code, response_body)
         VALUES (?, 'POST', ?, ?, NULL, NULL)
-    """, (key, path, body_hash))
+    """,
+        (key, path, body_hash),
+    )
 
     if cursor.rowcount == 1:
         return None  # we own it
@@ -38,7 +42,7 @@ def claim_idempotency_key(db, key, request_body, path):
     # Key exists - determine state
     row = db.execute(
         "SELECT request_hash, status_code, response_body FROM idempotency_keys WHERE key = ?",
-        (key,)
+        (key,),
     ).fetchone()
 
     if not row:
@@ -55,7 +59,10 @@ def finalize_idempotency_key(db, key, status_code, response_body):
     """Finalize a claimed key with the actual response. Called before commit."""
     if not key:
         return
-    db.execute("""
+    db.execute(
+        """
         UPDATE idempotency_keys SET status_code = ?, response_body = ?
         WHERE key = ? AND status_code IS NULL
-    """, (status_code, json.dumps(response_body, default=str), key))
+    """,
+        (status_code, json.dumps(response_body, default=str), key),
+    )

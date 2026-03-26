@@ -27,7 +27,8 @@
     "propose_person_details": true,
     "capture_stance_data": true,
     "capture_intelligence_notes": true,
-    "propose_follow_ups": true
+    "propose_follow_ups": true,
+    "propose_directive_updates": true
   },
   "sensitivity_policy": {
     "flag_enforcement_sensitive": true,
@@ -107,9 +108,9 @@
       "validation_failure": true
     },
     "active_prompt_versions": {
-      "extraction": "v2.0.1",
+      "extraction": "v3.0.0",
       "haiku_cleanup": "v1.0.0",
-      "haiku_enrichment": "v1.0.0"
+      "haiku_enrichment": "v2.0.0"
     },
     "daily_budget_usd": 10.0,
     "budget_warning_threshold": 0.8
@@ -118,7 +119,7 @@
     "daily_digest": {
       "enabled": true,
       "schedule_time": "06:00",
-      "email_digest": false
+      "email_digest": true
     },
     "weekly_brief": {
       "enabled": false,

@@ -4,6 +4,7 @@ Federal Register Watcher — polls for new CFTC publications.
 Fetches from the public Federal Register API, deduplicates against
 fr_documents, classifies into routing tiers, and stages for processing.
 """
+
 import uuid
 import json
 import logging
@@ -18,25 +19,46 @@ FR_API_BASE = "https://www.federalregister.gov/api/v1"
 
 # Fields to request from the API
 FR_FIELDS = [
-    "document_number", "title", "type", "action", "abstract",
-    "publication_date", "agencies", "comments_close_on",
-    "docket_ids", "regulation_id_numbers", "cfr_references",
-    "html_url", "pdf_url", "body_html_url", "raw_text_url",
-    "full_text_xml_url", "start_page", "end_page",
+    "document_number",
+    "title",
+    "type",
+    "action",
+    "abstract",
+    "publication_date",
+    "agencies",
+    "comments_close_on",
+    "docket_ids",
+    "regulation_id_numbers",
+    "cfr_references",
+    "html_url",
+    "pdf_url",
+    "body_html_url",
+    "raw_text_url",
+    "full_text_xml_url",
+    "start_page",
+    "end_page",
 ]
 
 # ── Routing classifier ──────────────────────────────────────────────────────
 
 # Tier 1: Create matter + extract comment topics
 TIER1_ACTIONS = [
-    "advance notice", "notice of proposed rulemaking", "proposed rule",
-    "proposed order", "concept release", "request for comment",
+    "advance notice",
+    "notice of proposed rulemaking",
+    "proposed rule",
+    "proposed order",
+    "concept release",
+    "request for comment",
 ]
 
 # Tier 2: Update existing matter or flag for review
 TIER2_ACTIONS = [
-    "final rule", "interpretation", "guidance", "withdrawal",
-    "exemptive order", "exemptive relief",
+    "final rule",
+    "interpretation",
+    "guidance",
+    "withdrawal",
+    "exemptive order",
+    "exemptive relief",
 ]
 
 # Default CFR parts OGC owns — Tier 3 docs referencing these get promoted to Tier 2
@@ -97,6 +119,7 @@ def classify_tier(
 
 # ── API poller ───────────────────────────────────────────────────────────────
 
+
 async def fetch_fr_documents(
     since_date: str,
     per_page: int = 100,
@@ -139,7 +162,9 @@ async def fetch_fr_documents(
 
             results = data.get("results", [])
             all_results.extend(results)
-            logger.info("Got %d documents (total so far: %d)", len(results), len(all_results))
+            logger.info(
+                "Got %d documents (total so far: %d)", len(results), len(all_results)
+            )
 
             url = data.get("next_page_url")
 
@@ -167,11 +192,15 @@ async def fetch_full_text(doc: dict) -> Optional[str]:
                 if text and len(text) > min_length:
                     return text
                 else:
-                    logger.info("raw_text_url returned only %d chars for %s, trying body_html_url",
-                                len(text) if text else 0, doc.get("document_number"))
+                    logger.info(
+                        "raw_text_url returned only %d chars for %s, trying body_html_url",
+                        len(text) if text else 0,
+                        doc.get("document_number"),
+                    )
             except Exception as e:
-                logger.warning("Failed to fetch raw text for %s: %s",
-                               doc.get("document_number"), e)
+                logger.warning(
+                    "Failed to fetch raw text for %s: %s", doc.get("document_number"), e
+                )
 
         # Fall back to HTML body
         if html_url:
@@ -182,16 +211,21 @@ async def fetch_full_text(doc: dict) -> Optional[str]:
                 if text and len(text) > min_length:
                     return text
                 else:
-                    logger.warning("body_html_url also short (%d chars) for %s",
-                                   len(text) if text else 0, doc.get("document_number"))
+                    logger.warning(
+                        "body_html_url also short (%d chars) for %s",
+                        len(text) if text else 0,
+                        doc.get("document_number"),
+                    )
             except Exception as e:
-                logger.warning("Failed to fetch HTML for %s: %s",
-                               doc.get("document_number"), e)
+                logger.warning(
+                    "Failed to fetch HTML for %s: %s", doc.get("document_number"), e
+                )
 
     return None
 
 
 # ── Database operations ──────────────────────────────────────────────────────
+
 
 def get_existing_doc_numbers(db) -> set:
     """Get all document_number values already in fr_documents."""
@@ -212,11 +246,14 @@ def get_last_poll_date(db) -> Optional[str]:
     return None
 
 
-def update_sync_state(db, items_created: int, status: str = "success", error: str = None):
+def update_sync_state(
+    db, items_created: int, status: str = "success", error: str = None
+):
     """Update sync_state if it exists (tracker db), or log to fr_documents metadata."""
     now = datetime.now().isoformat()
     try:
-        db.execute("""
+        db.execute(
+            """
             INSERT INTO sync_state (sync_type, last_run_at, last_status, last_error,
                                     items_created, items_updated, next_run_at)
             VALUES ('federal_register', ?, ?, ?, ?, 0, ?)
@@ -226,7 +263,9 @@ def update_sync_state(db, items_created: int, status: str = "success", error: st
                 last_error = excluded.last_error,
                 items_created = excluded.items_created,
                 next_run_at = excluded.next_run_at
-        """, (now, status, error, items_created, now))
+        """,
+            (now, status, error, items_created, now),
+        )
         db.commit()
     except Exception:
         # sync_state table may not exist in ai.db; that is fine
@@ -238,7 +277,8 @@ def stage_document(db, doc: dict, tier: int, full_text: Optional[str] = None) ->
     doc_id = str(uuid.uuid4())
     now = datetime.now().isoformat()
 
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO fr_documents (
             id, document_number, title, fr_type, action, abstract,
             publication_date, agencies_json, comments_close_on,
@@ -247,34 +287,37 @@ def stage_document(db, doc: dict, tier: int, full_text: Optional[str] = None) ->
             full_text, routing_tier, processing_status,
             created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        doc_id,
-        doc.get("document_number"),
-        doc.get("title"),
-        doc.get("type"),
-        doc.get("action"),
-        doc.get("abstract"),
-        doc.get("publication_date"),
-        json.dumps(doc.get("agencies", [])),
-        doc.get("comments_close_on"),
-        json.dumps(doc.get("docket_ids", [])),
-        json.dumps(doc.get("regulation_id_numbers", [])),
-        json.dumps(doc.get("cfr_references", [])),
-        doc.get("html_url"),
-        doc.get("pdf_url"),
-        doc.get("body_html_url"),
-        doc.get("raw_text_url"),
-        full_text,
-        tier,
-        "pending" if tier <= 2 else "skipped",
-        now,
-        now,
-    ))
+    """,
+        (
+            doc_id,
+            doc.get("document_number"),
+            doc.get("title"),
+            doc.get("type"),
+            doc.get("action"),
+            doc.get("abstract"),
+            doc.get("publication_date"),
+            json.dumps(doc.get("agencies", [])),
+            doc.get("comments_close_on"),
+            json.dumps(doc.get("docket_ids", [])),
+            json.dumps(doc.get("regulation_id_numbers", [])),
+            json.dumps(doc.get("cfr_references", [])),
+            doc.get("html_url"),
+            doc.get("pdf_url"),
+            doc.get("body_html_url"),
+            doc.get("raw_text_url"),
+            full_text,
+            tier,
+            "pending" if tier <= 2 else "skipped",
+            now,
+            now,
+        ),
+    )
     db.commit()
     return doc_id
 
 
 # ── Main watcher entry point ────────────────────────────────────────────────
+
 
 async def run_watcher(db, config: dict = None):
     """
@@ -315,17 +358,28 @@ async def run_watcher(db, config: dict = None):
     new_docs = [d for d in documents if d.get("document_number") not in existing]
     skipped = len(documents) - len(new_docs)
 
-    logger.info("FR poll: %d total, %d new, %d already seen",
-                len(documents), len(new_docs), skipped)
+    logger.info(
+        "FR poll: %d total, %d new, %d already seen",
+        len(documents),
+        len(new_docs),
+        skipped,
+    )
 
     # Classify and stage
-    counts = {"new": 0, "skipped_existing": skipped,
-              "tier_1": 0, "tier_2": 0, "tier_3": 0, "errors": 0}
+    counts = {
+        "new": 0,
+        "skipped_existing": skipped,
+        "tier_1": 0,
+        "tier_2": 0,
+        "tier_3": 0,
+        "errors": 0,
+    }
     for doc in new_docs:
         try:
             cfr_refs = doc.get("cfr_references", []) or []
-            tier = classify_tier(doc.get("type", ""), doc.get("action"),
-                                 cfr_refs, promote_cfr_parts)
+            tier = classify_tier(
+                doc.get("type", ""), doc.get("action"), cfr_refs, promote_cfr_parts
+            )
 
             # Fetch full text for Tier 1 and 2
             full_text = None
@@ -336,9 +390,12 @@ async def run_watcher(db, config: dict = None):
 
             counts["new"] += 1
             counts[f"tier_{tier}"] += 1
-            logger.info("Staged %s [Tier %d]: %s",
-                        doc.get("document_number"), tier,
-                        doc.get("title", "")[:60])
+            logger.info(
+                "Staged %s [Tier %d]: %s",
+                doc.get("document_number"),
+                tier,
+                doc.get("title", "")[:60],
+            )
         except Exception as e:
             logger.error("Failed to stage %s: %s", doc.get("document_number"), e)
             counts["errors"] += 1

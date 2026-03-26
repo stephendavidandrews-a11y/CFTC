@@ -28,7 +28,10 @@ def order_items(items: list[dict]) -> list[dict]:
 
     Within the same tier, items are sorted by sort_order (DB-assigned).
     """
-    return sorted(items, key=lambda i: (
-        ITEM_TYPE_ORDER.get(i["item_type"], 99),
-        i.get("sort_order", 0),
-    ))
+    return sorted(
+        items,
+        key=lambda i: (
+            ITEM_TYPE_ORDER.get(i["item_type"], 99),
+            i.get("sort_order", 0),
+        ),
+    )

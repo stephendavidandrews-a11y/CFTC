@@ -6,6 +6,7 @@ Sonnet extraction call. Response is stored in ai_extractions.tracker_context_sna
 
 All active people fields are included.
 """
+
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Query
 from app.db import get_db
@@ -24,8 +25,16 @@ async def get_ai_context(
     meetings_days: int = Query(30),
     matters_limit: int = Query(100, ge=1, le=500, description="Max matters to return"),
     people_limit: int = Query(500, ge=1, le=2000, description="Max people to return"),
-    organizations_limit: int = Query(200, ge=1, le=1000, description="Max organizations to return"),
-    tasks_limit: int = Query(200, ge=1, le=1000, description="Max standalone tasks to return"),
+    organizations_limit: int = Query(
+        200, ge=1, le=1000, description="Max organizations to return"
+    ),
+    tasks_limit: int = Query(
+        200, ge=1, le=1000, description="Max standalone tasks to return"
+    ),
+    include_directives: bool = Query(True),
+    directives_limit: int = Query(
+        200, ge=1, le=500, description="Max directives to return"
+    ),
 ):
     """Return the tracker context snapshot for AI extraction.
 
@@ -61,8 +70,31 @@ async def get_ai_context(
         meta["standalone_tasks_truncated"] = len(all_tasks) > tasks_limit
         result["standalone_tasks"] = all_tasks[:tasks_limit]
 
+    if include_directives:
+        all_directives = _get_active_directives(db)
+        meta["directives_total"] = len(all_directives)
+        meta["directives_truncated"] = len(all_directives) > directives_limit
+        result["policy_directives"] = all_directives[:directives_limit]
+
     result["_meta"] = meta
     return result
+
+
+def _get_active_directives(db):
+    """Return active policy directives in compact format for enrichment."""
+    rows = db.execute("""
+        SELECT pd.id, pd.directive_label, pd.source_document,
+               pd.source_document_type, pd.implementation_status,
+               pd.responsible_entity, pd.priority_tier,
+               pd.target_date, pd.ogc_role,
+               pd.assigned_to_person_id,
+               p.full_name AS assigned_to_name
+        FROM policy_directives pd
+        LEFT JOIN people p ON pd.assigned_to_person_id = p.id
+        WHERE pd.implementation_status NOT IN ('implemented', 'not_applicable')
+        ORDER BY pd.sort_order ASC NULLS LAST, pd.created_at ASC
+    """).fetchall()
+    return [dict(r) for r in rows]
 
 
 @router.get("/intelligence-data")
@@ -80,24 +112,30 @@ async def get_intelligence_data(
     Return intelligence data for daily digest / weekly brief generation.
     All threshold parameters come from ai_policy.json and are passed by the AI service.
     """
-    deadline_warnings = [dict(row) for row in db.execute("""
+    deadline_warnings = [
+        dict(row)
+        for row in db.execute(
+            """
         SELECT m.id, m.title, m.priority, m.status,
-               m.work_deadline, m.decision_deadline, m.external_deadline,
+               m.work_deadline, m.external_deadline, m.blocker,
                p.full_name as owner_name
         FROM matters m
         LEFT JOIN people p ON m.assigned_to_person_id = p.id
-        WHERE m.status != 'closed'
+        WHERE m.status IN ('active', 'paused')
         AND (
             m.work_deadline BETWEEN date('now') AND date('now', '+' || ? || ' days')
-            OR m.decision_deadline BETWEEN date('now') AND date('now', '+' || ? || ' days')
             OR m.external_deadline BETWEEN date('now') AND date('now', '+' || ? || ' days')
             OR m.work_deadline < date('now')
-            OR m.decision_deadline < date('now')
             OR m.external_deadline < date('now')
         )
-    """, (deadline_warning_days, deadline_warning_days, deadline_warning_days))]
+    """,
+            (deadline_warning_days, deadline_warning_days),
+        )
+    ]
 
-    overdue_tasks = [dict(row) for row in db.execute("""
+    overdue_tasks = [
+        dict(row)
+        for row in db.execute("""
         SELECT t.id, t.title, t.due_date, t.status, t.priority,
                m.title as matter_title, m.id as matter_id,
                p.full_name as owner_name
@@ -107,9 +145,13 @@ async def get_intelligence_data(
         WHERE t.status NOT IN ('done', 'deferred')
         AND t.due_date < date('now')
         ORDER BY t.due_date
-    """)]
+    """)
+    ]
 
-    upcoming_tasks = [dict(row) for row in db.execute("""
+    upcoming_tasks = [
+        dict(row)
+        for row in db.execute(
+            """
         SELECT t.id, t.title, t.due_date, t.status, t.priority, t.expected_output,
                m.title as matter_title, p.full_name as owner_name
         FROM tasks t
@@ -118,9 +160,14 @@ async def get_intelligence_data(
         WHERE t.status NOT IN ('done', 'deferred')
         AND t.due_date BETWEEN date('now') AND date('now', '+' || ? || ' days')
         ORDER BY t.due_date
-    """, (task_upcoming_days,))]
+    """,
+            (task_upcoming_days,),
+        )
+    ]
 
-    missed_followups = [dict(row) for row in db.execute("""
+    missed_followups = [
+        dict(row)
+        for row in db.execute("""
         SELECT p.id, p.full_name, p.title, p.next_interaction_needed_date,
                p.next_interaction_type, p.next_interaction_purpose,
                o.name as org_name
@@ -129,16 +176,20 @@ async def get_intelligence_data(
         WHERE p.next_interaction_needed_date <= date('now')
         AND p.is_active = 1
         ORDER BY p.next_interaction_needed_date
-    """)]
+    """)
+    ]
 
-    stale_matters = [dict(row) for row in db.execute("""
-        SELECT m.id, m.title, m.priority, m.status,
+    stale_matters = [
+        dict(row)
+        for row in db.execute(
+            """
+        SELECT m.id, m.title, m.priority, m.status, m.blocker,
                m.last_material_update_at,
                julianday('now') - julianday(m.last_material_update_at) as days_since_update,
                p.full_name as owner_name
         FROM matters m
         LEFT JOIN people p ON m.assigned_to_person_id = p.id
-        WHERE m.status != 'closed'
+        WHERE m.status IN ('active', 'paused')
         AND m.last_material_update_at IS NOT NULL
         AND (
             (m.priority = 'critical this week' AND julianday('now') - julianday(m.last_material_update_at) > ?)
@@ -147,9 +198,19 @@ async def get_intelligence_data(
             OR (m.priority = 'monitoring only' AND julianday('now') - julianday(m.last_material_update_at) > ?)
         )
         AND m.is_stale_override = 0
-    """, (critical_stale_days, important_stale_days, strategic_stale_days, monitoring_stale_days))]
+    """,
+            (
+                critical_stale_days,
+                important_stale_days,
+                strategic_stale_days,
+                monitoring_stale_days,
+            ),
+        )
+    ]
 
-    pending_decisions = [dict(row) for row in db.execute("""
+    pending_decisions = [
+        dict(row)
+        for row in db.execute("""
         SELECT d.id, d.title, d.decision_type, d.decision_due_date,
                m.title as matter_title, m.id as matter_id,
                p.full_name as decision_owner_name
@@ -158,9 +219,12 @@ async def get_intelligence_data(
         LEFT JOIN people p ON d.decision_assigned_to_person_id = p.id
         WHERE d.status IN ('pending', 'under consideration')
         ORDER BY d.decision_due_date
-    """)]
+    """)
+    ]
 
-    workload = [dict(row) for row in db.execute("""
+    workload = [
+        dict(row)
+        for row in db.execute("""
         SELECT p.id, p.full_name,
                COUNT(t.id) as open_task_count,
                COUNT(DISTINCT t.matter_id) as matter_count
@@ -170,7 +234,8 @@ async def get_intelligence_data(
         AND p.include_in_team_workload = 1
         GROUP BY p.id
         ORDER BY open_task_count DESC
-    """)]
+    """)
+    ]
 
     return {
         "generated_at": datetime.now().isoformat(),
@@ -188,6 +253,7 @@ async def get_intelligence_data(
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+
 def _get_matters_with_nested(db):
     """All open matters with stakeholders, updates, tasks, decisions.
 
@@ -198,28 +264,16 @@ def _get_matters_with_nested(db):
 
     rows = db.execute("""
         SELECT m.id, m.matter_number, m.title, m.matter_type, m.description,
-               m.problem_statement, m.why_it_matters, m.status, m.priority,
-               m.sensitivity, m.risk_level, m.boss_involvement_level,
+               m.status, m.priority, m.sensitivity,
                m.assigned_to_person_id, p_owner.full_name as owner_name,
-               m.supervisor_person_id, p_sup.full_name as supervisor_name,
-               m.next_step_assigned_to_person_id, p_ns.full_name as next_step_owner_name,
-               m.next_step, m.pending_decision,
-               m.requesting_organization_id, o_req.name as requesting_org_name,
                m.client_organization_id, o_cli.name as client_org_name,
-               m.reviewing_organization_id, o_rev.name as reviewing_org_name,
-               m.lead_external_org_id, o_lead.name as lead_external_org_name,
-               m.work_deadline, m.decision_deadline, m.external_deadline,
-               m.revisit_date, m.opened_date, m.last_material_update_at,
-               m.rin, m.regulatory_stage, m.docket_number
+               m.next_step, m.blocker,
+               m.work_deadline, m.external_deadline,
+               m.opened_date, m.last_material_update_at
         FROM matters m
         LEFT JOIN people p_owner ON m.assigned_to_person_id = p_owner.id
-        LEFT JOIN people p_sup ON m.supervisor_person_id = p_sup.id
-        LEFT JOIN people p_ns ON m.next_step_assigned_to_person_id = p_ns.id
-        LEFT JOIN organizations o_req ON m.requesting_organization_id = o_req.id
         LEFT JOIN organizations o_cli ON m.client_organization_id = o_cli.id
-        LEFT JOIN organizations o_rev ON m.reviewing_organization_id = o_rev.id
-        LEFT JOIN organizations o_lead ON m.lead_external_org_id = o_lead.id
-        WHERE m.status != 'closed'
+        WHERE m.status IN ('active', 'paused')
         ORDER BY m.priority, m.title
     """).fetchall()
 
@@ -231,47 +285,60 @@ def _get_matters_with_nested(db):
 
     # Batch query: tags
     tags_by_matter = defaultdict(list)
-    for row in db.execute(f"""
+    for row in db.execute(
+        f"""
         SELECT mt.matter_id, t.name
         FROM matter_tags mt JOIN tags t ON t.id = mt.tag_id
         WHERE mt.matter_id IN ({placeholders})
         ORDER BY t.name
-    """, matter_ids):
+    """,
+        matter_ids,
+    ):
         tags_by_matter[row["matter_id"]].append(row["name"])
 
     # Batch query: stakeholders
     stakeholders_by_matter = defaultdict(list)
-    for row in db.execute(f"""
+    for row in db.execute(
+        f"""
         SELECT mp.matter_id, mp.person_id, p.full_name, mp.matter_role, mp.engagement_level
         FROM matter_people mp JOIN people p ON mp.person_id = p.id
         WHERE mp.matter_id IN ({placeholders})
-    """, matter_ids):
+    """,
+        matter_ids,
+    ):
         stakeholders_by_matter[row["matter_id"]].append(dict(row))
 
     # Batch query: organizations
     orgs_by_matter = defaultdict(list)
-    for row in db.execute(f"""
+    for row in db.execute(
+        f"""
         SELECT mo.matter_id, mo.organization_id, o.name, mo.organization_role
         FROM matter_organizations mo JOIN organizations o ON mo.organization_id = o.id
         WHERE mo.matter_id IN ({placeholders})
-    """, matter_ids):
+    """,
+        matter_ids,
+    ):
         orgs_by_matter[row["matter_id"]].append(dict(row))
 
     # Batch query: recent updates (top 3 per matter via window function)
     updates_by_matter = defaultdict(list)
-    for row in db.execute(f"""
+    for row in db.execute(
+        f"""
         SELECT matter_id, update_type, summary, created_at
         FROM (
             SELECT *, ROW_NUMBER() OVER (PARTITION BY matter_id ORDER BY created_at DESC) as rn
             FROM matter_updates
             WHERE matter_id IN ({placeholders})
         ) WHERE rn <= 3
-    """, matter_ids):
+    """,
+        matter_ids,
+    ):
         updates_by_matter[row["matter_id"]].append(dict(row))
 
     # Batch query: open tasks
     tasks_by_matter = defaultdict(list)
-    for row in db.execute(f"""
+    for row in db.execute(
+        f"""
         SELECT t.matter_id, t.id, t.title, t.description, t.status, t.task_mode,
                t.priority, t.assigned_to_person_id, p.full_name as assigned_to_name,
                t.due_date, t.deadline_type,
@@ -282,25 +349,31 @@ def _get_matters_with_nested(db):
         LEFT JOIN people p ON t.assigned_to_person_id = p.id
         WHERE t.matter_id IN ({placeholders}) AND t.status NOT IN ('done', 'deferred')
         ORDER BY t.due_date
-    """, matter_ids):
+    """,
+        matter_ids,
+    ):
         tasks_by_matter[row["matter_id"]].append(dict(row))
 
     # Batch query: open decisions
     decisions_by_matter = defaultdict(list)
-    for row in db.execute(f"""
+    for row in db.execute(
+        f"""
         SELECT d.matter_id, d.id, d.title, d.decision_type, d.status,
                d.decision_assigned_to_person_id, p.full_name as decision_owner_name,
                d.decision_due_date, d.options_summary, d.recommended_option
         FROM decisions d
         LEFT JOIN people p ON d.decision_assigned_to_person_id = p.id
         WHERE d.matter_id IN ({placeholders}) AND d.status IN ('pending', 'under consideration')
-    """, matter_ids):
+    """,
+        matter_ids,
+    ):
         decisions_by_matter[row["matter_id"]].append(dict(row))
 
     # Batch query: comment topics with nested questions
     topics_by_matter = defaultdict(list)
     questions_by_topic = defaultdict(list)
-    for row in db.execute(f"""
+    for row in db.execute(
+        f"""
         SELECT ct.matter_id, ct.id, ct.topic_label, ct.topic_area,
                ct.position_status, ct.position_summary, ct.priority,
                ct.due_date, ct.assigned_to_person_id, p.full_name as assigned_to_name,
@@ -309,7 +382,9 @@ def _get_matters_with_nested(db):
         LEFT JOIN people p ON ct.assigned_to_person_id = p.id
         WHERE ct.matter_id IN ({placeholders})
         ORDER BY ct.sort_order ASC NULLS LAST
-    """, matter_ids):
+    """,
+        matter_ids,
+    ):
         topics_by_matter[row["matter_id"]].append(dict(row))
 
     # Fetch questions for all topics
@@ -318,12 +393,15 @@ def _get_matters_with_nested(db):
         topic_ids.extend(t["id"] for t in tlist)
     if topic_ids:
         q_placeholders = ",".join("?" * len(topic_ids))
-        for row in db.execute(f"""
+        for row in db.execute(
+            f"""
             SELECT comment_topic_id, id, question_number, question_text, sort_order
             FROM comment_questions
             WHERE comment_topic_id IN ({q_placeholders})
             ORDER BY sort_order ASC NULLS LAST, question_number ASC
-        """, topic_ids):
+        """,
+            topic_ids,
+        ):
             questions_by_topic[row["comment_topic_id"]].append(dict(row))
 
     # Nest questions into topics
@@ -333,7 +411,8 @@ def _get_matters_with_nested(db):
 
     # Batch query: linked directives
     directives_by_matter = defaultdict(list)
-    for row in db.execute(f"""
+    for row in db.execute(
+        f"""
         SELECT dm.matter_id, pd.id, pd.directive_label, pd.source_document,
                pd.implementation_status, pd.priority_tier, pd.responsible_entity,
                dm.relationship_type
@@ -341,8 +420,54 @@ def _get_matters_with_nested(db):
         JOIN policy_directives pd ON dm.directive_id = pd.id
         WHERE dm.matter_id IN ({placeholders})
         ORDER BY pd.sort_order ASC NULLS LAST
-    """, matter_ids):
+    """,
+        matter_ids,
+    ):
         directives_by_matter[row["matter_id"]].append(dict(row))
+
+    # Batch query: extension tables (rulemaking, guidance, enforcement)
+    rulemaking_by_matter = {}
+    for row in db.execute(
+        f"""
+        SELECT mr.matter_id, mr.regulatory_stage, mr.workflow_status, mr.rin,
+               mr.current_comment_period_closes, mr.federal_register_citation,
+               mr.unified_agenda_priority, mr.cfr_citation, mr.docket_number,
+               mr.fr_doc_number, mr.interagency_role, mr.is_petition,
+               mr.petition_disposition, mr.review_trigger
+        FROM matter_rulemaking mr
+        WHERE mr.matter_id IN ({placeholders})
+    """,
+        matter_ids,
+    ):
+        rulemaking_by_matter[row["matter_id"]] = dict(row)
+
+    guidance_by_matter = {}
+    for row in db.execute(
+        f"""
+        SELECT mg.matter_id, mg.instrument_type, mg.workflow_status,
+               mg.cftc_letter_number, mg.request_date, mg.requestor_name,
+               mg.cea_provisions, mg.cfr_provisions, mg.legal_question,
+               mg.conditions_summary, mg.issuance_date, mg.expiration_date
+        FROM matter_guidance mg
+        WHERE mg.matter_id IN ({placeholders})
+    """,
+        matter_ids,
+    ):
+        guidance_by_matter[row["matter_id"]] = dict(row)
+
+    enforcement_by_matter = {}
+    for row in db.execute(
+        f"""
+        SELECT me.matter_id, me.requesting_division_id, me.enforcement_reference,
+               me.legal_issue_type, me.support_type, me.litigation_stage,
+               me.court_or_forum, me.deadline_source, me.workflow_status,
+               me.is_confidential
+        FROM matter_enforcement me
+        WHERE me.matter_id IN ({placeholders})
+    """,
+        matter_ids,
+    ):
+        enforcement_by_matter[row["matter_id"]] = dict(row)
 
     # Assemble
     matters = []
@@ -357,30 +482,44 @@ def _get_matters_with_nested(db):
         matter["open_decisions"] = decisions_by_matter.get(mid, [])
         matter["comment_topics"] = topics_by_matter.get(mid, [])
         matter["linked_directives"] = directives_by_matter.get(mid, [])
+        # Extension data based on matter_type
+        mt = matter.get("matter_type")
+        if mt == "rulemaking" and mid in rulemaking_by_matter:
+            matter["rulemaking"] = rulemaking_by_matter[mid]
+        elif mt == "guidance" and mid in guidance_by_matter:
+            matter["guidance"] = guidance_by_matter[mid]
+        elif mt == "enforcement" and mid in enforcement_by_matter:
+            matter["enforcement"] = enforcement_by_matter[mid]
         matters.append(matter)
 
     return matters
 
 
 def _get_active_people(db):
-    return [dict(row) for row in db.execute("""
+    return [
+        dict(row)
+        for row in db.execute("""
         SELECT p.*, o.name as org_name
         FROM people p
         LEFT JOIN organizations o ON p.organization_id = o.id
         WHERE p.is_active = 1
         ORDER BY p.full_name
-    """)]
+    """)
+    ]
 
 
 def _get_active_organizations(db):
-    return [dict(row) for row in db.execute("""
+    return [
+        dict(row)
+        for row in db.execute("""
         SELECT o.id, o.name, o.short_name, o.organization_type,
                o.parent_organization_id, po.name as parent_name
         FROM organizations o
         LEFT JOIN organizations po ON o.parent_organization_id = po.id
         WHERE o.is_active = 1
         ORDER BY o.name
-    """)]
+    """)
+    ]
 
 
 def _get_recent_meetings(db, days):
@@ -388,11 +527,14 @@ def _get_recent_meetings(db, days):
     from collections import defaultdict
 
     cutoff = (datetime.now() - timedelta(days=days)).isoformat()
-    rows = db.execute("""
+    rows = db.execute(
+        """
         SELECT id, title, meeting_type, date_time_start
         FROM meetings WHERE date_time_start >= ?
         ORDER BY date_time_start DESC
-    """, (cutoff,)).fetchall()
+    """,
+        (cutoff,),
+    ).fetchall()
 
     meeting_ids = [row["id"] for row in rows]
     if not meeting_ids:
@@ -401,19 +543,25 @@ def _get_recent_meetings(db, days):
     placeholders = ",".join("?" * len(meeting_ids))
 
     matter_links_by_meeting = defaultdict(list)
-    for row in db.execute(f"""
+    for row in db.execute(
+        f"""
         SELECT mm.meeting_id, mm.matter_id, m.title as matter_title, mm.relationship_type
         FROM meeting_matters mm JOIN matters m ON mm.matter_id = m.id
         WHERE mm.meeting_id IN ({placeholders})
-    """, meeting_ids):
+    """,
+        meeting_ids,
+    ):
         matter_links_by_meeting[row["meeting_id"]].append(dict(row))
 
     participants_by_meeting = defaultdict(list)
-    for row in db.execute(f"""
+    for row in db.execute(
+        f"""
         SELECT mp.meeting_id, p.full_name, mp.meeting_role
         FROM meeting_participants mp JOIN people p ON mp.person_id = p.id
         WHERE mp.meeting_id IN ({placeholders})
-    """, meeting_ids):
+    """,
+        meeting_ids,
+    ):
         participants_by_meeting[row["meeting_id"]].append(dict(row))
 
     meetings = []
@@ -428,7 +576,9 @@ def _get_recent_meetings(db, days):
 
 
 def _get_standalone_tasks(db):
-    return [dict(row) for row in db.execute("""
+    return [
+        dict(row)
+        for row in db.execute("""
         SELECT t.id, t.title, t.description, t.status, t.task_mode,
                t.priority, t.assigned_to_person_id, p.full_name as assigned_to_name,
                t.due_date, t.deadline_type,
@@ -440,4 +590,5 @@ def _get_standalone_tasks(db):
         WHERE t.matter_id IS NULL
         AND t.status NOT IN ('done', 'deferred')
         ORDER BY t.due_date
-    """)]
+    """)
+    ]

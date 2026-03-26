@@ -9,6 +9,7 @@ Exercises the highest-risk control-flow branches in process_communication:
 6. Non-recoverable error -> error state
 7. Terminal state -> no-op
 """
+
 import os
 import sys
 import sqlite3
@@ -47,6 +48,7 @@ def orch_db():
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys=ON")
     from app.schema import init_schema
+
     init_schema(conn)
     yield conn
     conn.close()
@@ -79,17 +81,20 @@ def _get_status(db, cid):
 
 # ---------- Test 1: Normal flow to human gate ----------
 
-class TestNormalFlow:
 
+class TestNormalFlow:
     @pytest.mark.asyncio
     @patch("app.pipeline.orchestrator.publish_event", new_callable=AsyncMock)
     @patch("app.pipeline.orchestrator.run_stage", new_callable=AsyncMock)
     async def test_advances_to_human_gate(self, mock_stage, mock_pub, orch_db):
         from app.pipeline.orchestrator import process_communication
+
         cid = str(uuid.uuid4())
         _insert_comm(orch_db, cid, "pending", "audio")
         mock_stage.side_effect = [
-            "preprocessing", "transcribing", "cleaning",
+            "preprocessing",
+            "transcribing",
+            "cleaning",
             "awaiting_speaker_review",
         ]
         await process_communication(cid, db_factory=_db_factory(orch_db))
@@ -103,6 +108,7 @@ class TestNormalFlow:
     @patch("app.pipeline.orchestrator.run_stage", new_callable=AsyncMock)
     async def test_terminal_state_is_noop(self, mock_stage, mock_pub, orch_db):
         from app.pipeline.orchestrator import process_communication
+
         cid = str(uuid.uuid4())
         _insert_comm(orch_db, cid, "complete", "audio")
         await process_communication(cid, db_factory=_db_factory(orch_db))
@@ -111,14 +117,15 @@ class TestNormalFlow:
 
 # ---------- Test 2: Budget exhaustion -> paused_budget ----------
 
-class TestBudgetExhaustion:
 
+class TestBudgetExhaustion:
     @pytest.mark.asyncio
     @patch("app.pipeline.orchestrator.publish_event", new_callable=AsyncMock)
     @patch("app.pipeline.orchestrator.run_stage", new_callable=AsyncMock)
     async def test_budget_exceeded_pauses(self, mock_stage, mock_pub, orch_db):
         from app.pipeline.orchestrator import process_communication
         from app.llm.client import BudgetExceededError
+
         cid = str(uuid.uuid4())
         _insert_comm(orch_db, cid, "extracting", "audio")
         mock_stage.side_effect = BudgetExceededError(10.0, 10.0)
@@ -131,15 +138,18 @@ class TestBudgetExhaustion:
 
 # ---------- Test 3: Recoverable LLM error -> retry ----------
 
-class TestRecoverableRetry:
 
+class TestRecoverableRetry:
     @pytest.mark.asyncio
     @patch("app.pipeline.orchestrator.asyncio.sleep", new_callable=AsyncMock)
     @patch("app.pipeline.orchestrator.publish_event", new_callable=AsyncMock)
     @patch("app.pipeline.orchestrator.run_stage", new_callable=AsyncMock)
-    async def test_retries_then_succeeds(self, mock_stage, mock_pub, mock_sleep, orch_db):
+    async def test_retries_then_succeeds(
+        self, mock_stage, mock_pub, mock_sleep, orch_db
+    ):
         from app.pipeline.orchestrator import process_communication
         from app.llm.client import LLMError
+
         cid = str(uuid.uuid4())
         _insert_comm(orch_db, cid, "extracting", "audio")
         mock_stage.side_effect = [
@@ -156,9 +166,12 @@ class TestRecoverableRetry:
     @patch("app.pipeline.orchestrator.asyncio.sleep", new_callable=AsyncMock)
     @patch("app.pipeline.orchestrator.publish_event", new_callable=AsyncMock)
     @patch("app.pipeline.orchestrator.run_stage", new_callable=AsyncMock)
-    async def test_exhausts_retries_to_error(self, mock_stage, mock_pub, mock_sleep, orch_db):
+    async def test_exhausts_retries_to_error(
+        self, mock_stage, mock_pub, mock_sleep, orch_db
+    ):
         from app.pipeline.orchestrator import process_communication
         from app.llm.client import LLMError
+
         cid = str(uuid.uuid4())
         _insert_comm(orch_db, cid, "extracting", "audio")
         err = LLMError("overloaded", error_type="overloaded", recoverable=True)
@@ -171,18 +184,21 @@ class TestRecoverableRetry:
 
 # ---------- Test 4: Connection errors ----------
 
-class TestConnectionError:
 
+class TestConnectionError:
     @pytest.mark.asyncio
     @patch("app.pipeline.orchestrator.publish_event", new_callable=AsyncMock)
     @patch("app.pipeline.orchestrator.run_stage", new_callable=AsyncMock)
     async def test_llm_connection_to_waiting(self, mock_stage, mock_pub, orch_db):
         from app.pipeline.orchestrator import process_communication
         from app.llm.client import LLMError
+
         cid = str(uuid.uuid4())
         _insert_comm(orch_db, cid, "cleaning", "audio")
         mock_stage.side_effect = LLMError(
-            "refused", error_type="connection_error", recoverable=False,
+            "refused",
+            error_type="connection_error",
+            recoverable=False,
         )
         await process_communication(cid, db_factory=_db_factory(orch_db))
         state = _get_status(orch_db, cid)
@@ -195,10 +211,13 @@ class TestConnectionError:
     async def test_tracker_error_to_awaiting(self, mock_stage, mock_pub, orch_db):
         from app.pipeline.orchestrator import process_communication
         from app.writeback.tracker_client import TrackerBatchError
+
         cid = str(uuid.uuid4())
         _insert_comm(orch_db, cid, "committing", "audio")
         mock_stage.side_effect = TrackerBatchError(
-            0, "connection_error", "tracker down",
+            0,
+            "connection_error",
+            "tracker down",
         )
         await process_communication(cid, db_factory=_db_factory(orch_db))
         state = _get_status(orch_db, cid)
@@ -208,15 +227,17 @@ class TestConnectionError:
 
 # ---------- Test 5: Lock contention ----------
 
-class TestLockContention:
 
+class TestLockContention:
     @pytest.mark.asyncio
     @patch("app.pipeline.orchestrator.publish_event", new_callable=AsyncMock)
     @patch("app.pipeline.orchestrator.run_stage", new_callable=AsyncMock)
     async def test_locked_comm_is_skipped(self, mock_stage, mock_pub, orch_db):
         from app.pipeline.orchestrator import (
-            process_communication, acquire_processing_lock,
+            process_communication,
+            acquire_processing_lock,
         )
+
         cid = str(uuid.uuid4())
         _insert_comm(orch_db, cid, "pending", "audio")
         token = acquire_processing_lock(orch_db, cid)
@@ -227,13 +248,14 @@ class TestLockContention:
 
 # ---------- Test 6: Non-recoverable error ----------
 
-class TestNonRecoverableError:
 
+class TestNonRecoverableError:
     @pytest.mark.asyncio
     @patch("app.pipeline.orchestrator.publish_event", new_callable=AsyncMock)
     @patch("app.pipeline.orchestrator.run_stage", new_callable=AsyncMock)
     async def test_generic_exception_to_error(self, mock_stage, mock_pub, orch_db):
         from app.pipeline.orchestrator import process_communication
+
         cid = str(uuid.uuid4())
         _insert_comm(orch_db, cid, "preprocessing", "audio")
         mock_stage.side_effect = RuntimeError("Disk full")

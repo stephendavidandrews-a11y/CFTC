@@ -3,6 +3,7 @@
 Sends HTML email with optional .docx attachment.
 Uses same SMTP config pattern as Sauron morning email.
 """
+
 import logging
 import os
 import smtplib
@@ -10,7 +11,12 @@ import smtplib
 # Load .env file if present
 try:
     from dotenv import load_dotenv
-    load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env'))
+
+    load_dotenv(
+        os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"
+        )
+    )
 except ImportError:
     pass
 from email.mime.application import MIMEApplication
@@ -69,10 +75,17 @@ def send_email(
         docx_path = Path(docx_path)
         if docx_path.exists():
             with open(docx_path, "rb") as f:
-                att = MIMEApplication(f.read(), _subtype="vnd.openxmlformats-officedocument.wordprocessingml.document")
-                att.add_header("Content-Disposition", "attachment", filename=docx_path.name)
+                att = MIMEApplication(
+                    f.read(),
+                    _subtype="vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+                att.add_header(
+                    "Content-Disposition", "attachment", filename=docx_path.name
+                )
                 msg.attach(att)
-            logger.info("Attached %s (%d bytes)", docx_path.name, docx_path.stat().st_size)
+            logger.info(
+                "Attached %s (%d bytes)", docx_path.name, docx_path.stat().st_size
+            )
         else:
             logger.warning("DOCX not found: %s", docx_path)
 

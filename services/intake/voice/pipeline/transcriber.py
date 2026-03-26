@@ -18,8 +18,11 @@ def _get_model():
     if _whisper_model is None:
         from faster_whisper import WhisperModel
         from config import (
-            WHISPER_MODEL, WHISPER_DEVICE, WHISPER_COMPUTE_TYPE,
-            WHISPER_CPU_THREADS, MODELS_DIR,
+            WHISPER_MODEL,
+            WHISPER_DEVICE,
+            WHISPER_COMPUTE_TYPE,
+            WHISPER_CPU_THREADS,
+            MODELS_DIR,
         )
 
         download_root = MODELS_DIR / "faster-whisper"
@@ -65,7 +68,12 @@ class TranscriptionResult:
 
 def transcribe(audio_path: Path) -> TranscriptionResult:
     """Transcribe audio file using faster-whisper with Silero VAD."""
-    from config import WHISPER_BEAM_SIZE, VAD_THRESHOLD, VAD_MIN_SPEECH_MS, VAD_MIN_SILENCE_MS
+    from config import (
+        WHISPER_BEAM_SIZE,
+        VAD_THRESHOLD,
+        VAD_MIN_SPEECH_MS,
+        VAD_MIN_SILENCE_MS,
+    )
 
     model = _get_model()
 
@@ -90,18 +98,22 @@ def transcribe(audio_path: Path) -> TranscriptionResult:
         words = []
         if seg.words:
             for w in seg.words:
-                words.append(WordTimestamp(
-                    word=w.word.strip(),
-                    start=w.start,
-                    end=w.end,
-                    probability=w.probability,
-                ))
-        segments.append(TranscriptSegment(
-            start=seg.start,
-            end=seg.end,
-            text=seg.text.strip(),
-            words=words,
-        ))
+                words.append(
+                    WordTimestamp(
+                        word=w.word.strip(),
+                        start=w.start,
+                        end=w.end,
+                        probability=w.probability,
+                    )
+                )
+        segments.append(
+            TranscriptSegment(
+                start=seg.start,
+                end=seg.end,
+                text=seg.text.strip(),
+                words=words,
+            )
+        )
 
     duration = segments[-1].end if segments else 0.0
 

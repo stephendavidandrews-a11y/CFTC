@@ -7,6 +7,7 @@ Provides:
 Existing test files create their own DBs at module level, so these
 fixtures only activate when explicitly requested via function args.
 """
+
 import os
 import sys
 import sqlite3
@@ -34,6 +35,7 @@ def db():
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys=ON")
     from app.schema import init_schema
+
     init_schema(conn)
     yield conn
     conn.close()
@@ -73,6 +75,7 @@ def client(db):
     # Without this, any later test module using a shared TestClient
     # will see _ready=False and the readiness middleware will 503.
     import app.main as _main_mod
+
     _main_mod._ready = True
 
     # Restore previous dependency override state

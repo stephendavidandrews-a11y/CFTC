@@ -10,6 +10,7 @@ No LLM needed. Uses API metadata + regex to:
 
 Runs on fr_documents with processing_status = 'pending'.
 """
+
 import re
 import json
 import logging
@@ -82,9 +83,9 @@ def _find_comment_section(text: str) -> str:
     from slightly before the first question to the last question.
     """
     # Phase 1: Look for numbered question patterns first (most reliable)
-    q_label_matches = list(re.finditer(
-        r"\n\s{0,8}Question\s+(\d+[a-z]?)\s*:", text, re.IGNORECASE
-    ))
+    q_label_matches = list(
+        re.finditer(r"\n\s{0,8}Question\s+(\d+[a-z]?)\s*:", text, re.IGNORECASE)
+    )
     if q_label_matches:
         # Found "Question N:" patterns — return from first to last + buffer
         first = q_label_matches[0].start()
@@ -143,17 +144,16 @@ def _find_comment_section(text: str) -> str:
         ]:
             m = re.search(pat, section_text[500:], re.IGNORECASE)
             if m:
-                section_text = section_text[:500 + m.start()]
+                section_text = section_text[: 500 + m.start()]
                 break
         return section_text
 
     # Phase 3: Look for numbered paragraph patterns near "Commission requests comment"
     m = re.search(
-        r"The\s+Commission\s+(?:is\s+)?request(?:s|ing)\s+comment",
-        text, re.IGNORECASE
+        r"The\s+Commission\s+(?:is\s+)?request(?:s|ing)\s+comment", text, re.IGNORECASE
     )
     if m:
-        nearby = text[m.start():m.start() + 10000]
+        nearby = text[m.start() : m.start() + 10000]
         if re.search(r"^\s{4,}\d+[a-z]?\.\s+\w", nearby, re.MULTILINE):
             start = m.start()
             section_text = text[start:]
@@ -167,7 +167,7 @@ def _find_comment_section(text: str) -> str:
             ]:
                 m2 = re.search(pat, section_text[500:], re.IGNORECASE)
                 if m2:
-                    section_text = section_text[:500 + m2.start()]
+                    section_text = section_text[: 500 + m2.start()]
                     break
             return section_text
 
@@ -197,7 +197,9 @@ def _join_continuation_lines(lines: list[str]) -> str:
     return " ".join(parts)
 
 
-def extract_questions(full_text: str, fr_type: str = "", action: str = "") -> list[dict]:
+def extract_questions(
+    full_text: str, fr_type: str = "", action: str = ""
+) -> list[dict]:
     """
     Extract numbered questions from FR document full text.
 
@@ -244,13 +246,20 @@ def extract_questions(full_text: str, fr_type: str = "", action: str = "") -> li
         if current_q_num and current_q_lines:
             text = _join_continuation_lines(current_q_lines)
             # Only keep if it looks like a question (contains ? or "comment on" or "consider")
-            if "?" in text or "comment on" in text.lower() or "consider" in text.lower() or "request" in text.lower():
-                questions.append({
-                    "question_number": current_q_num,
-                    "question_text": text,
-                    "section_heading": current_section,
-                    "sort_order": len(questions) + 1,
-                })
+            if (
+                "?" in text
+                or "comment on" in text.lower()
+                or "consider" in text.lower()
+                or "request" in text.lower()
+            ):
+                questions.append(
+                    {
+                        "question_number": current_q_num,
+                        "question_text": text,
+                        "section_heading": current_section,
+                        "sort_order": len(questions) + 1,
+                    }
+                )
         current_q_num = None
         current_q_lines = []
 
@@ -278,7 +287,9 @@ def extract_questions(full_text: str, fr_type: str = "", action: str = "") -> li
             text_part = m_num.group(2)
             # Avoid matching section numbers that aren't questions
             # (e.g., "1. Background" in a non-question section)
-            if True:  # Inside a scoped comment section, numbered paragraphs are questions
+            if (
+                True
+            ):  # Inside a scoped comment section, numbered paragraphs are questions
                 flush_question()
                 current_q_num = num_part
                 current_q_lines = [text_part]
@@ -311,10 +322,12 @@ def extract_questions(full_text: str, fr_type: str = "", action: str = "") -> li
                 if lines[j].strip():
                     next_content = lines[j]
                     break
-            if next_content and (RE_QUESTION_LABEL.match(next_content) or
-                                  RE_NUMBERED.match(next_content) or
-                                  RE_SUBLETTER.match(next_content) or
-                                  RE_SECTION_HEADING.match(next_content)):
+            if next_content and (
+                RE_QUESTION_LABEL.match(next_content)
+                or RE_NUMBERED.match(next_content)
+                or RE_SUBLETTER.match(next_content)
+                or RE_SECTION_HEADING.match(next_content)
+            ):
                 flush_question()
             elif next_content and next_content.strip().startswith("---"):
                 # Footnote block — end of question
@@ -327,6 +340,7 @@ def extract_questions(full_text: str, fr_type: str = "", action: str = "") -> li
 
 
 # ── Matter matching ──────────────────────────────────────────────────────────
+
 
 async def find_matching_matter(tracker_client, doc: dict) -> Optional[dict]:
     """
@@ -344,7 +358,11 @@ async def find_matching_matter(tracker_client, doc: dict) -> Optional[dict]:
     # Try RIN match first
     if rins:
         for rin in rins:
-            rin_str = rin.get("regulation_id_number", rin) if isinstance(rin, dict) else str(rin)
+            rin_str = (
+                rin.get("regulation_id_number", rin)
+                if isinstance(rin, dict)
+                else str(rin)
+            )
             matters = await tracker_client.search_matters(rin=rin_str)
             if matters:
                 return matters[0]
@@ -368,6 +386,7 @@ async def find_matching_matter(tracker_client, doc: dict) -> Optional[dict]:
 
 # ── Tracker client helper ────────────────────────────────────────────────────
 
+
 class TrackerAPI:
     """Lightweight async client for the tracker API."""
 
@@ -375,8 +394,9 @@ class TrackerAPI:
         self.base_url = base_url.rstrip("/")
         self.auth = auth
 
-    async def search_matters(self, rin=None, docket_number=None, fr_doc_number=None,
-                             search=None) -> list:
+    async def search_matters(
+        self, rin=None, docket_number=None, fr_doc_number=None, search=None
+    ) -> list:
         params = {}
         if search:
             params["search"] = search
@@ -454,6 +474,7 @@ class TrackerAPI:
 
 # ── Document type mapping ────────────────────────────────────────────────────
 
+
 def _infer_matter_type(fr_type: str, action: str) -> str:
     return "rulemaking"
 
@@ -499,10 +520,10 @@ def _infer_comment_period_type(fr_type: str, action: str) -> str:
     return "original"
 
 
-
 def _infer_priority(fr_type: str, action: str, comments_close_on: str = None) -> str:
     """Determine matter priority based on FR document type and comment deadline."""
     from datetime import date
+
     action_lower = (action or "").lower()
     fr_type_lower = (fr_type or "").lower()
     today = date.today()
@@ -546,11 +567,14 @@ def _infer_topic_area(section_label: str) -> str:
     2. Expanded keyword matching against known regulatory concepts
     """
     import re as _re
+
     label_lower = section_label.lower()
 
     # Strategy 1: CFR section number lookup
     # CFTC Part 23 (Swap Dealer / MSP rules) subpart mapping
-    sec_match = _re.search(r"(?:sec(?:tion)?\.?\s*)(?:sec\.?\s*)?(\d+)\.(\d+)", label_lower)
+    sec_match = _re.search(
+        r"(?:sec(?:tion)?\.?\s*)(?:sec\.?\s*)?(\d+)\.(\d+)", label_lower
+    )
     if sec_match:
         part = sec_match.group(1)
         section = int(sec_match.group(2))
@@ -637,7 +661,9 @@ def _infer_topic_area(section_label: str) -> str:
 
     return "other"
 
+
 # ── Main processor ───────────────────────────────────────────────────────────
+
 
 async def process_fr_document(
     db,
@@ -671,8 +697,9 @@ async def process_fr_document(
         "topics_created": 0,
     }
 
-    logger.info("Processing FR doc %s [Tier %d]: %s", doc_num, tier,
-                doc_row["title"][:60])
+    logger.info(
+        "Processing FR doc %s [Tier %d]: %s", doc_num, tier, doc_row["title"][:60]
+    )
 
     # Detect if this is a withdrawal document
     is_withdrawal = "withdrawal" in action.lower()
@@ -687,24 +714,34 @@ async def process_fr_document(
         # If this is a withdrawal, update the existing matter stage/status
         if is_withdrawal:
             try:
-                await tracker_api.update_matter(existing["id"], {
-                    "regulatory_stage": "withdrawn",
-                    "status": "parked / monitoring",
-                })
+                await tracker_api.update_matter(
+                    existing["id"],
+                    {
+                        "regulatory_stage": "withdrawn",
+                        "status": "parked / monitoring",
+                    },
+                )
                 logger.info("Updated matter %s to withdrawn", existing["id"][:8])
             except Exception as e:
-                logger.warning("Failed to update matter %s to withdrawn: %s",
-                               existing["id"][:8], e)
+                logger.warning(
+                    "Failed to update matter %s to withdrawn: %s", existing["id"][:8], e
+                )
     elif is_withdrawal:
         # Withdrawal with no matching matter — log but do NOT create a new matter
-        logger.info("Withdrawal doc %s has no matching matter; skipping matter creation",
-                     doc_num)
+        logger.info(
+            "Withdrawal doc %s has no matching matter; skipping matter creation",
+            doc_num,
+        )
     elif tier == 1:
         # Create new matter from API metadata
         rins = json.loads(doc_row.get("regulation_id_numbers_json") or "[]")
         rin_str = None
         if rins:
-            rin_str = rins[0].get("regulation_id_number", rins[0]) if isinstance(rins[0], dict) else str(rins[0])
+            rin_str = (
+                rins[0].get("regulation_id_number", rins[0])
+                if isinstance(rins[0], dict)
+                else str(rins[0])
+            )
 
         # Build CFR citation string from stored JSON
         cfr_refs = json.loads(doc_row.get("cfr_references_json") or "[]")
@@ -726,7 +763,9 @@ async def process_fr_document(
         docket_number = docket_ids[0] if docket_ids else None
         # If no docket_ids, try regulations_dot_gov_info stored in external data
         if not docket_number:
-            regs_info = json.loads(doc_row.get("regulations_dot_gov_json") or "null") or {}
+            regs_info = (
+                json.loads(doc_row.get("regulations_dot_gov_json") or "null") or {}
+            )
             docket_number = regs_info.get("document_id")
 
         # Build external_refs JSON bag with FR metadata
@@ -754,7 +793,9 @@ async def process_fr_document(
             "title": doc_row["title"],
             "matter_type": _infer_matter_type(fr_type, action),
             "regulatory_stage": _infer_regulatory_stage(fr_type, action),
-            "status": "awaiting comments" if doc_row.get("comments_close_on") else "new intake",
+            "status": "awaiting comments"
+            if doc_row.get("comments_close_on")
+            else "new intake",
             "priority": priority,
             "sensitivity": "deliberative / predecisional",
             "boss_involvement_level": "keep boss informed",
@@ -785,41 +826,51 @@ async def process_fr_document(
 
         # Comment period record (if document has comment deadline)
         if doc_row.get("comments_close_on"):
-            batch_ops.append({
-                "table": "rulemaking_comment_periods",
+            batch_ops.append(
+                {
+                    "table": "rulemaking_comment_periods",
+                    "op": "insert",
+                    "data": {
+                        "matter_id": matter_id,
+                        "comment_period_type": _infer_comment_period_type(
+                            fr_type, action
+                        ),
+                        "opens_at": doc_row.get("publication_date"),
+                        "closes_at": doc_row["comments_close_on"],
+                        "fr_doc_number": doc_num,
+                        "notes": f"Auto-created from FR doc {doc_num}",
+                    },
+                }
+            )
+
+        # Publication status record
+        batch_ops.append(
+            {
+                "table": "rulemaking_publication_status",
                 "op": "insert",
                 "data": {
                     "matter_id": matter_id,
-                    "comment_period_type": _infer_comment_period_type(fr_type, action),
-                    "opens_at": doc_row.get("publication_date"),
-                    "closes_at": doc_row["comments_close_on"],
-                    "fr_doc_number": doc_num,
+                    "ofr_publication_date": doc_row.get("publication_date"),
+                    "ofr_doc_number": doc_num,
                     "notes": f"Auto-created from FR doc {doc_num}",
                 },
-            })
-
-        # Publication status record
-        batch_ops.append({
-            "table": "rulemaking_publication_status",
-            "op": "insert",
-            "data": {
-                "matter_id": matter_id,
-                "ofr_publication_date": doc_row.get("publication_date"),
-                "ofr_doc_number": doc_num,
-                "notes": f"Auto-created from FR doc {doc_num}",
-            },
-            "_meta": {"upsert_by": ["matter_id"]},
-        })
+                "_meta": {"upsert_by": ["matter_id"]},
+            }
+        )
 
         if batch_ops:
             try:
                 await tracker_api.batch_write(batch_ops)
-                logger.info("Created %d rulemaking records for matter %s",
-                            len(batch_ops), matter_id[:8])
+                logger.info(
+                    "Created %d rulemaking records for matter %s",
+                    len(batch_ops),
+                    matter_id[:8],
+                )
             except Exception as e:
                 # Non-fatal — matter and questions are more important
-                logger.warning("Failed to create rulemaking records for %s: %s",
-                               doc_num, e)
+                logger.warning(
+                    "Failed to create rulemaking records for %s: %s", doc_num, e
+                )
 
     # 3. Extract questions if we have full text and a matter
     if full_text and result["matter_id"]:
@@ -871,24 +922,38 @@ async def process_fr_document(
 
                     for q in section_qs:
                         try:
-                            await tracker_api.create_comment_question(topic_id, {
-                                "question_number": q["question_number"],
-                                "question_text": q["question_text"],
-                                "sort_order": q["sort_order"],
-                                "source": "federal_register",
-                            })
+                            await tracker_api.create_comment_question(
+                                topic_id,
+                                {
+                                    "question_number": q["question_number"],
+                                    "question_text": q["question_text"],
+                                    "sort_order": q["sort_order"],
+                                    "source": "federal_register",
+                                },
+                            )
                             total_qs_created += 1
                         except Exception as e:
-                            logger.warning("Failed to create question %s: %s",
-                                           q["question_number"], e)
+                            logger.warning(
+                                "Failed to create question %s: %s",
+                                q["question_number"],
+                                e,
+                            )
                 except Exception as e:
-                    logger.error("Failed to create topic '%s' for %s: %s",
-                                 section_label, doc_num, e)
+                    logger.error(
+                        "Failed to create topic '%s' for %s: %s",
+                        section_label,
+                        doc_num,
+                        e,
+                    )
 
             result["topics_created"] = topics_created
             result["topic_created"] = topics_created > 0
-            logger.info("Created %d topics with %d questions for matter %s",
-                        topics_created, total_qs_created, result["matter_id"][:8])
+            logger.info(
+                "Created %d topics with %d questions for matter %s",
+                topics_created,
+                total_qs_created,
+                result["matter_id"][:8],
+            )
 
     # 4. Update fr_documents status
     now = datetime.now().isoformat()
@@ -926,10 +991,12 @@ async def run_processor(db, tracker_api: TrackerAPI) -> list[dict]:
             results.append(result)
         except Exception as e:
             logger.error("Failed to process %s: %s", row["document_number"], e)
-            results.append({
-                "document_number": row["document_number"],
-                "error": str(e),
-            })
+            results.append(
+                {
+                    "document_number": row["document_number"],
+                    "error": str(e),
+                }
+            )
 
     logger.info("FR processor complete: %d documents processed", len(results))
     return results

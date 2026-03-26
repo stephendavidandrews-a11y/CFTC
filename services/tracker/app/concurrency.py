@@ -1,4 +1,5 @@
 """Optimistic concurrency control helpers."""
+
 from fastapi import HTTPException, Request
 
 
@@ -17,12 +18,12 @@ def check_etag(request: Request, current_record):
     # Strip W/ prefix — nginx adds it when gzip is applied to responses,
     # converting our strong ETag to a weak one.  The client echoes back
     # the weak form, so we must normalise before comparison.
-    if if_match.startswith('W/'):
+    if if_match.startswith("W/"):
         if_match = if_match[2:]
     expected = get_etag(current_record)
     if if_match != expected:
         raise HTTPException(
             status_code=409,
             detail="This record was modified since you last loaded it. "
-                   "Please reload the latest version and review before retrying."
+            "Please reload the latest version and review before retrying.",
         )

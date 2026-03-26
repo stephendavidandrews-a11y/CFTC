@@ -1,13 +1,16 @@
 """Comprehensive tests for the organizations router."""
+
 import uuid
 from tests.conftest import (
-    seed_organization, make_id,
+    seed_organization,
+    make_id,
 )
 
 
 # ---------------------------------------------------------------------------
 # List / filter / sort / paginate
 # ---------------------------------------------------------------------------
+
 
 def test_list_orgs_empty(client, auth_headers):
     """GET /tracker/organizations returns empty list when no orgs exist."""
@@ -41,7 +44,9 @@ def test_list_orgs_filter_type(client, auth_headers, db):
     """Filter by organization_type."""
     seed_organization(db, name="CFTC OGC", organization_type="CFTC office")
     seed_organization(db, name="CME Group", organization_type="Exchange")
-    resp = client.get("/tracker/organizations?organization_type=Exchange", headers=auth_headers)
+    resp = client.get(
+        "/tracker/organizations?organization_type=Exchange", headers=auth_headers
+    )
     data = resp.json()
     assert data["total"] == 1
     assert data["items"][0]["name"] == "CME Group"
@@ -72,6 +77,7 @@ def test_list_orgs_summary(client, auth_headers, db):
 # Get single organization
 # ---------------------------------------------------------------------------
 
+
 def test_get_org_success(client, auth_headers, db):
     """GET /tracker/organizations/{id} returns full detail with sub-resources."""
     org = seed_organization(db)
@@ -96,11 +102,12 @@ def test_get_org_not_found(client, auth_headers):
 # Create organization
 # ---------------------------------------------------------------------------
 
+
 def test_create_org_success(client, auth_headers):
     """POST /tracker/organizations creates a new org."""
-    resp = client.post("/tracker/organizations",
-                       json={"name": "New Agency"},
-                       headers=auth_headers)
+    resp = client.post(
+        "/tracker/organizations", json={"name": "New Agency"}, headers=auth_headers
+    )
     assert resp.status_code == 200
     assert "id" in resp.json()
 
@@ -125,28 +132,33 @@ def test_create_org_idempotency(client, auth_headers):
 # Update organization
 # ---------------------------------------------------------------------------
 
+
 def test_update_org_success(client, auth_headers, db):
     """PUT /tracker/organizations/{id} updates the org."""
     org = seed_organization(db)
-    resp = client.put(f"/tracker/organizations/{org['id']}",
-                      json={"short_name": "NEW"},
-                      headers=auth_headers)
+    resp = client.put(
+        f"/tracker/organizations/{org['id']}",
+        json={"short_name": "NEW"},
+        headers=auth_headers,
+    )
     assert resp.status_code == 200
     assert resp.json()["updated"] is True
 
 
 def test_update_org_not_found(client, auth_headers):
     """PUT /tracker/organizations/{id} returns 404 for missing org."""
-    resp = client.put(f"/tracker/organizations/{make_id()}",
-                      json={"name": "X"}, headers=auth_headers)
+    resp = client.put(
+        f"/tracker/organizations/{make_id()}", json={"name": "X"}, headers=auth_headers
+    )
     assert resp.status_code == 404
 
 
 def test_update_org_empty_body(client, auth_headers, db):
     """PUT /tracker/organizations/{id} with no fields returns 400."""
     org = seed_organization(db)
-    resp = client.put(f"/tracker/organizations/{org['id']}",
-                      json={}, headers=auth_headers)
+    resp = client.put(
+        f"/tracker/organizations/{org['id']}", json={}, headers=auth_headers
+    )
     assert resp.status_code == 400
 
 
@@ -154,14 +166,16 @@ def test_update_org_empty_body(client, auth_headers, db):
 # Delete (soft-deactivate) organization
 # ---------------------------------------------------------------------------
 
+
 def test_delete_org_success(client, auth_headers, db):
     """DELETE /tracker/organizations/{id} soft-deletes by setting is_active=0."""
     org = seed_organization(db)
     resp = client.delete(f"/tracker/organizations/{org['id']}", headers=auth_headers)
     assert resp.status_code == 200
     assert resp.json()["deleted"] is True
-    row = db.execute("SELECT is_active FROM organizations WHERE id = ?",
-                     (org["id"],)).fetchone()
+    row = db.execute(
+        "SELECT is_active FROM organizations WHERE id = ?", (org["id"],)
+    ).fetchone()
     assert row["is_active"] == 0
 
 
@@ -174,6 +188,7 @@ def test_delete_org_not_found(client, auth_headers):
 # ---------------------------------------------------------------------------
 # Auth required
 # ---------------------------------------------------------------------------
+
 
 def test_orgs_auth_required(client):
     """Organization endpoints reject unauthenticated requests."""

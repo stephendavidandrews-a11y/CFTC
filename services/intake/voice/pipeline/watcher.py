@@ -60,8 +60,17 @@ class AudioInboxHandler(FileSystemEventHandler):
                 """INSERT INTO audio_files (id, conversation_id, file_path, original_filename,
                    source, format, file_size_bytes, captured_at, created_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (audio_id, conversation_id, str(path), path.name,
-                 self.source, path.suffix.lstrip("."), file_size, now, now),
+                (
+                    audio_id,
+                    conversation_id,
+                    str(path),
+                    path.name,
+                    self.source,
+                    path.suffix.lstrip("."),
+                    file_size,
+                    now,
+                    now,
+                ),
             )
 
             conn.commit()

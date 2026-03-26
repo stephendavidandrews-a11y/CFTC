@@ -26,12 +26,17 @@ def _get_pipeline():
         logger.info(f"Loading pyannote pipeline: {PYANNOTE_PIPELINE}")
 
         import os
+
         hf_token = os.environ.get("HF_TOKEN")
         if hf_token:
-            _diarization_pipeline = Pipeline.from_pretrained(PYANNOTE_PIPELINE, token=hf_token)
+            _diarization_pipeline = Pipeline.from_pretrained(
+                PYANNOTE_PIPELINE, token=hf_token
+            )
         else:
             logger.info("HF_TOKEN not set — loading pyannote from local cache")
-            _diarization_pipeline = Pipeline.from_pretrained(PYANNOTE_PIPELINE, token=False)
+            _diarization_pipeline = Pipeline.from_pretrained(
+                PYANNOTE_PIPELINE, token=False
+            )
 
         if DIARIZATION_CLUSTERING_THRESHOLD is not None:
             try:
@@ -44,7 +49,9 @@ def _get_pipeline():
                     f"{DIARIZATION_CLUSTERING_THRESHOLD} (lower = more speakers)"
                 )
             except Exception as e:
-                logger.warning(f"Could not set clustering threshold: {e} — using pipeline default")
+                logger.warning(
+                    f"Could not set clustering threshold: {e} — using pipeline default"
+                )
 
         if torch.backends.mps.is_available():
             _diarization_pipeline.to(torch.device("mps"))
@@ -77,7 +84,11 @@ class DiarizationResult:
     def to_dataframe(self):
         """Convert to pandas DataFrame for whisperx speaker assignment."""
         import pandas as pd
-        rows = [{"start": s.start, "end": s.end, "speaker": s.speaker} for s in self.segments]
+
+        rows = [
+            {"start": s.start, "end": s.end, "speaker": s.speaker}
+            for s in self.segments
+        ]
         return pd.DataFrame(rows)
 
 
@@ -116,16 +127,20 @@ def diarize(
 
     segments = []
     for turn, _, speaker in annotation.itertracks(yield_label=True):
-        segments.append(SpeakerSegment(
-            speaker=speaker,
-            start=turn.start,
-            end=turn.end,
-        ))
+        segments.append(
+            SpeakerSegment(
+                speaker=speaker,
+                start=turn.start,
+                end=turn.end,
+            )
+        )
 
     embeddings = _extract_embeddings(result, segments)
 
     speakers = set(s.speaker for s in segments)
-    logger.info(f"Diarization complete: {len(speakers)} speakers, {len(segments)} segments")
+    logger.info(
+        f"Diarization complete: {len(speakers)} speakers, {len(segments)} segments"
+    )
 
     return DiarizationResult(
         segments=segments,
@@ -134,17 +149,24 @@ def diarize(
     )
 
 
-def _extract_embeddings(result, segments: list[SpeakerSegment]) -> dict[str, np.ndarray]:
+def _extract_embeddings(
+    result, segments: list[SpeakerSegment]
+) -> dict[str, np.ndarray]:
     """Extract per-speaker embeddings from diarization result."""
     try:
-        if hasattr(result, "speaker_embeddings") and result.speaker_embeddings is not None:
+        if (
+            hasattr(result, "speaker_embeddings")
+            and result.speaker_embeddings is not None
+        ):
             emb_array = result.speaker_embeddings
             speaker_labels = sorted(set(s.speaker for s in segments))
             embeddings = {}
             for i, label in enumerate(speaker_labels):
                 if i < len(emb_array):
                     embeddings[label] = emb_array[i]
-            logger.info(f"Speaker embeddings extracted: {len(embeddings)} speakers, dim={emb_array.shape[1]}")
+            logger.info(
+                f"Speaker embeddings extracted: {len(embeddings)} speakers, dim={emb_array.shape[1]}"
+            )
             return embeddings
         else:
             logger.warning("No speaker embeddings available from diarization result")

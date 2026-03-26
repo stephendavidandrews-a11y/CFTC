@@ -22,9 +22,13 @@ def log_auto_advance(conn, conversation_id: str, decisions: list[dict]):
                (id, conversation_id, speaker_label, tracker_person_id, confidence, method, created_at)
                VALUES (?, ?, ?, ?, ?, ?, ?)""",
             (
-                str(uuid.uuid4()), conversation_id,
-                d["speaker_label"], d["tracker_person_id"],
-                d["confidence"], d["method"], now,
+                str(uuid.uuid4()),
+                conversation_id,
+                d["speaker_label"],
+                d["tracker_person_id"],
+                d["confidence"],
+                d["method"],
+                now,
             ),
         )
     logger.info(

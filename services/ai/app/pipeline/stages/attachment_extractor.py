@@ -5,6 +5,7 @@ Pipeline position: parsing -> **processing_attachments** -> awaiting_participant
 Extracts text from PDF, DOCX, and plain text attachments.
 Skips unsupported types and quarantined files.
 """
+
 import logging
 from pathlib import Path
 
@@ -20,6 +21,7 @@ def _extract_pdf_text(file_path: Path) -> str:
     """Extract text from PDF file."""
     try:
         import PyPDF2
+
         text_parts = []
         with open(file_path, "rb") as f:
             reader = PyPDF2.PdfReader(f)
@@ -37,6 +39,7 @@ def _extract_docx_text(file_path: Path) -> str:
     """Extract text from DOCX file."""
     try:
         import docx
+
         doc = docx.Document(str(file_path))
         text_parts = []
         for para in doc.paragraphs:
@@ -73,21 +76,27 @@ async def run_attachment_extraction_stage(db, communication_id: str) -> dict:
     """
     from app.routers.events import publish_event
 
-    artifacts = db.execute("""
+    artifacts = db.execute(
+        """
         SELECT id, file_path, mime_type, original_filename, text_extraction_status
         FROM communication_artifacts
         WHERE communication_id = ? AND text_extraction_status = 'pending'
-    """, (communication_id,)).fetchall()
+    """,
+        (communication_id,),
+    ).fetchall()
 
     if not artifacts:
         logger.info("[%s] No pending attachments to extract", communication_id[:8])
         return {"extracted": 0, "failed": 0, "skipped": 0}
 
-    await publish_event("stage_progress", {
-        "communication_id": communication_id,
-        "stage": "processing_attachments",
-        "message": f"Extracting text from {len(artifacts)} attachments...",
-    })
+    await publish_event(
+        "stage_progress",
+        {
+            "communication_id": communication_id,
+            "stage": "processing_attachments",
+            "message": f"Extracting text from {len(artifacts)} attachments...",
+        },
+    )
 
     extracted = 0
     failed = 0
@@ -101,66 +110,97 @@ async def run_attachment_extraction_stage(db, communication_id: str) -> dict:
 
         if extractor is None and mime_type in EXTRACTORS:
             # Explicitly unsupported (like .doc)
-            db.execute("""
+            db.execute(
+                """
                 UPDATE communication_artifacts
                 SET text_extraction_status = 'not_supported',
                     quarantine_reason = ?
                 WHERE id = ?
-            """, (f"No extractor for {mime_type}", art["id"]))
+            """,
+                (f"No extractor for {mime_type}", art["id"]),
+            )
             skipped += 1
             continue
 
         if extractor is None:
             # Unknown type -- not applicable
-            db.execute("""
+            db.execute(
+                """
                 UPDATE communication_artifacts
                 SET text_extraction_status = 'not_applicable'
                 WHERE id = ?
-            """, (art["id"],))
+            """,
+                (art["id"],),
+            )
             skipped += 1
             continue
 
         if not file_path.exists():
-            db.execute("""
+            db.execute(
+                """
                 UPDATE communication_artifacts
                 SET text_extraction_status = 'failed',
                     quarantine_reason = 'File not found on disk'
                 WHERE id = ?
-            """, (art["id"],))
+            """,
+                (art["id"],),
+            )
             failed += 1
             continue
 
         try:
             text = extractor(file_path)
-            db.execute("""
+            db.execute(
+                """
                 UPDATE communication_artifacts
                 SET extracted_text = ?,
                     text_extraction_status = 'complete'
                 WHERE id = ?
-            """, (text, art["id"]))
+            """,
+                (text, art["id"]),
+            )
             extracted += 1
-            logger.info("[%s] Extracted %d chars from %s",
-                       communication_id[:8], len(text), art["original_filename"])
+            logger.info(
+                "[%s] Extracted %d chars from %s",
+                communication_id[:8],
+                len(text),
+                art["original_filename"],
+            )
         except Exception as e:
-            logger.warning("[%s] Extraction failed for %s: %s",
-                          communication_id[:8], art["original_filename"], e)
-            db.execute("""
+            logger.warning(
+                "[%s] Extraction failed for %s: %s",
+                communication_id[:8],
+                art["original_filename"],
+                e,
+            )
+            db.execute(
+                """
                 UPDATE communication_artifacts
                 SET text_extraction_status = 'failed',
                     quarantine_reason = ?
                 WHERE id = ?
-            """, (str(e)[:500], art["id"]))
+            """,
+                (str(e)[:500], art["id"]),
+            )
             failed += 1
 
     db.commit()
 
-    await publish_event("stage_progress", {
-        "communication_id": communication_id,
-        "stage": "processing_attachments",
-        "message": f"Attachment extraction: {extracted} extracted, {failed} failed, {skipped} skipped",
-    })
+    await publish_event(
+        "stage_progress",
+        {
+            "communication_id": communication_id,
+            "stage": "processing_attachments",
+            "message": f"Attachment extraction: {extracted} extracted, {failed} failed, {skipped} skipped",
+        },
+    )
 
-    logger.info("[%s] Attachment extraction: %d extracted, %d failed, %d skipped",
-               communication_id[:8], extracted, failed, skipped)
+    logger.info(
+        "[%s] Attachment extraction: %d extracted, %d failed, %d skipped",
+        communication_id[:8],
+        extracted,
+        failed,
+        skipped,
+    )
 
     return {"extracted": extracted, "failed": failed, "skipped": skipped}

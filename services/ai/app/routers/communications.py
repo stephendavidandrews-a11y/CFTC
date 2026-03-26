@@ -3,6 +3,7 @@
 Provides the core ingestion path for audio into the AI pipeline.
 Both file watcher and direct upload converge on the same create_communication() logic.
 """
+
 import json
 import logging
 import shutil
@@ -10,7 +11,16 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, BackgroundTasks
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+    BackgroundTasks,
+)
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -27,6 +37,7 @@ MAX_UPLOAD_BYTES = 200 * 1024 * 1024
 
 
 # ── Helpers ──
+
 
 def _parse_flags(d: dict) -> dict:
     """Deserialize JSON string fields before Pydantic model construction."""
@@ -46,6 +57,7 @@ def _parse_flags(d: dict) -> dict:
 
 
 # ── Response models ──
+
 
 class CommunicationSummary(BaseModel):
     id: str
@@ -92,6 +104,7 @@ class CommunicationListResponse(BaseModel):
 
 # ── Ingestion helpers ──
 
+
 def create_communication(
     db,
     original_path: Path,
@@ -124,33 +137,50 @@ def create_communication(
     meta = get_audio_metadata(original_path)
     duration = meta.get("duration_seconds")
 
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO communications
             (id, source_type, source_path, original_filename, title,
              processing_status, duration_seconds, sensitivity_flags,
              source_metadata, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, datetime('now'), datetime('now'))
-    """, (
-        comm_id, source_type, str(stored_path), original_filename,
-        title, duration, sensitivity_flags,
-        json.dumps(source_metadata) if source_metadata else json.dumps(meta),
-    ))
+    """,
+        (
+            comm_id,
+            source_type,
+            str(stored_path),
+            original_filename,
+            title,
+            duration,
+            sensitivity_flags,
+            json.dumps(source_metadata) if source_metadata else json.dumps(meta),
+        ),
+    )
 
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO audio_files
             (id, communication_id, file_path, original_filename,
              format, duration_seconds, file_size_bytes, captured_at, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-    """, (
-        audio_id, comm_id, str(stored_path), original_filename,
-        original_path.suffix.lstrip(".").lower(), duration, file_size,
-    ))
+    """,
+        (
+            audio_id,
+            comm_id,
+            str(stored_path),
+            original_filename,
+            original_path.suffix.lstrip(".").lower(),
+            duration,
+            file_size,
+        ),
+    )
 
     db.commit()
 
     logger.info(
         "Created communication %s from %s (%.1f MB, %s)",
-        comm_id[:8], original_filename,
+        comm_id[:8],
+        original_filename,
         (file_size or 0) / 1024 / 1024,
         source_type,
     )
@@ -158,6 +188,7 @@ def create_communication(
 
 
 # ── API endpoints ──
+
 
 @router.post("/audio-upload")
 async def upload_audio(
@@ -232,11 +263,14 @@ async def upload_audio(
     # Kick off pipeline processing in background
     background_tasks.add_task(_start_pipeline, comm_id)
 
-    await publish_event("communication_created", {
-        "communication_id": comm_id,
-        "source_type": source_type,
-        "filename": filename,
-    })
+    await publish_event(
+        "communication_created",
+        {
+            "communication_id": comm_id,
+            "source_type": source_type,
+            "filename": filename,
+        },
+    )
 
     return {
         "communication_id": comm_id,
@@ -299,34 +333,48 @@ async def upload_email(
     if not title and suffix == ".eml":
         try:
             import email as email_mod
+
             msg = email_mod.message_from_bytes(content, policy=email_mod.policy.default)
             title = str(msg.get("Subject", "")) or None
         except Exception:
             pass
 
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO communications
             (id, source_type, source_path, original_filename, title,
              processing_status, sensitivity_flags,
              source_metadata, created_at, updated_at)
         VALUES (?, 'email', ?, ?, ?, 'pending', ?, ?, datetime('now'), datetime('now'))
-    """, (
-        comm_id, str(stored_path), filename,
-        title, sensitivity_flags,
-        json.dumps({"upload_filename": filename, "upload_size": len(content)}),
-    ))
+    """,
+        (
+            comm_id,
+            str(stored_path),
+            filename,
+            title,
+            sensitivity_flags,
+            json.dumps({"upload_filename": filename, "upload_size": len(content)}),
+        ),
+    )
     db.commit()
 
-    logger.info("Created email communication %s from %s (%.1f KB)",
-               comm_id[:8], filename, len(content) / 1024)
+    logger.info(
+        "Created email communication %s from %s (%.1f KB)",
+        comm_id[:8],
+        filename,
+        len(content) / 1024,
+    )
 
     background_tasks.add_task(_start_pipeline, comm_id)
 
-    await publish_event("communication_created", {
-        "communication_id": comm_id,
-        "source_type": "email",
-        "filename": filename,
-    })
+    await publish_event(
+        "communication_created",
+        {
+            "communication_id": comm_id,
+            "source_type": "email",
+            "filename": filename,
+        },
+    )
 
     return {
         "communication_id": comm_id,
@@ -397,7 +445,10 @@ async def get_communication(communication_id: str, db=Depends(get_db)):
     ).fetchone()
 
     if not row:
-        raise HTTPException(404, detail={"error_type": "not_found", "message": "Communication not found"})
+        raise HTTPException(
+            404,
+            detail={"error_type": "not_found", "message": "Communication not found"},
+        )
 
     data = _parse_flags(dict(row))
 
@@ -482,23 +533,33 @@ async def retry_communication(
     # Reset to the stage that failed/paused
     retry_from = row["error_stage"] or "pending"
     previous_state = row["processing_status"]
-    db.execute("""
+    db.execute(
+        """
         UPDATE communications
         SET processing_status = ?, error_message = NULL, error_stage = NULL,
             updated_at = datetime('now')
         WHERE id = ?
-    """, (retry_from, communication_id))
+    """,
+        (retry_from, communication_id),
+    )
     db.commit()
 
     background_tasks.add_task(_start_pipeline, communication_id)
 
-    await publish_event("communication_retry", {
-        "communication_id": communication_id,
-        "retry_from": retry_from,
-        "previous_state": previous_state,
-    })
+    await publish_event(
+        "communication_retry",
+        {
+            "communication_id": communication_id,
+            "retry_from": retry_from,
+            "previous_state": previous_state,
+        },
+    )
 
-    return {"status": "retrying", "from_stage": retry_from, "previous_state": previous_state}
+    return {
+        "status": "retrying",
+        "from_stage": retry_from,
+        "previous_state": previous_state,
+    }
 
 
 @router.post("/{communication_id}/undo")
@@ -573,7 +634,9 @@ async def undo_communication_endpoint(
         raise HTTPException(
             status_code=500,
             detail={
-                "error_type": result.error_type.value if result.error_type else "partial_failure",
+                "error_type": result.error_type.value
+                if result.error_type
+                else "partial_failure",
                 "message": result.error,
                 "reversed_count": result.reversed_count,
                 "total_writebacks": result.total_writebacks,
@@ -581,12 +644,15 @@ async def undo_communication_endpoint(
         )
 
     # Success
-    await publish_event("communication_undo", {
-        "communication_id": communication_id,
-        "reversed_count": result.reversed_count,
-        "skipped_count": result.skipped_count,
-        "forced": result.forced,
-    })
+    await publish_event(
+        "communication_undo",
+        {
+            "communication_id": communication_id,
+            "reversed_count": result.reversed_count,
+            "skipped_count": result.skipped_count,
+            "forced": result.forced,
+        },
+    )
 
     return {
         "status": "undone",
@@ -618,7 +684,9 @@ async def archive_communication(communication_id: str, db=Depends(get_db)):
     db.commit()
     logger.info("Archived communication %s", communication_id[:8])
 
-    await publish_event("communication_archived", {"communication_id": communication_id})
+    await publish_event(
+        "communication_archived", {"communication_id": communication_id}
+    )
     return {"status": "archived", "communication_id": communication_id}
 
 
@@ -674,7 +742,9 @@ async def delete_communication(communication_id: str, db=Depends(get_db)):
     ]
     for table in child_tables:
         try:
-            db.execute(f"DELETE FROM {table} WHERE communication_id = ?", (communication_id,))
+            db.execute(
+                f"DELETE FROM {table} WHERE communication_id = ?", (communication_id,)
+            )
         except Exception:
             pass  # Table may not exist yet
 
@@ -686,16 +756,24 @@ async def delete_communication(communication_id: str, db=Depends(get_db)):
     if storage_dir.exists():
         shutil.rmtree(str(storage_dir), ignore_errors=True)
 
-    logger.info("Deleted communication %s and all associated data", communication_id[:8])
+    logger.info(
+        "Deleted communication %s and all associated data", communication_id[:8]
+    )
 
     await publish_event("communication_deleted", {"communication_id": communication_id})
     return {"status": "deleted", "communication_id": communication_id}
 
 
 MIME_MAP = {
-    ".wav": "audio/wav", ".flac": "audio/flac", ".mp3": "audio/mpeg",
-    ".m4a": "audio/mp4", ".mp4": "audio/mp4", ".aac": "audio/aac",
-    ".ogg": "audio/ogg", ".opus": "audio/opus", ".wma": "audio/x-ms-wma",
+    ".wav": "audio/wav",
+    ".flac": "audio/flac",
+    ".mp3": "audio/mpeg",
+    ".m4a": "audio/mp4",
+    ".mp4": "audio/mp4",
+    ".aac": "audio/aac",
+    ".ogg": "audio/ogg",
+    ".opus": "audio/opus",
+    ".wma": "audio/x-ms-wma",
     ".webm": "audio/webm",
 }
 
@@ -719,11 +797,19 @@ async def stream_audio(communication_id: str, request: Request, db=Depends(get_d
         ).fetchone()
 
     if not audio_row:
-        raise HTTPException(404, detail={"error_type": "not_found", "message": "No audio file found"})
+        raise HTTPException(
+            404, detail={"error_type": "not_found", "message": "No audio file found"}
+        )
 
     file_path = Path(audio_row["file_path"])
     if not file_path.exists():
-        raise HTTPException(404, detail={"error_type": "not_found", "message": "Audio file missing from disk"})
+        raise HTTPException(
+            404,
+            detail={
+                "error_type": "not_found",
+                "message": "Audio file missing from disk",
+            },
+        )
 
     file_size = file_path.stat().st_size
     suffix = file_path.suffix.lower()
@@ -794,7 +880,74 @@ async def stream_audio(communication_id: str, request: Request, db=Depends(get_d
 async def _start_pipeline(communication_id: str):
     """Start the pipeline processor for a communication."""
     from app.pipeline.orchestrator import process_communication
+
     try:
         await process_communication(communication_id)
     except Exception as e:
         logger.exception("Pipeline failed for %s: %s", communication_id, e)
+
+
+# ── Diagnostics ──────────────────────────────────────────────────────────────
+
+
+@router.get("/diagnostics/duplicate-ai-persons")
+async def get_duplicate_ai_persons(db=Depends(get_db)):
+    """List AI-created person stubs that may be duplicates of real records."""
+    import httpx
+    from app.config import TRACKER_BASE_URL, TRACKER_USER, TRACKER_PASS
+
+    auth = (TRACKER_USER, TRACKER_PASS) if TRACKER_USER else None
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(
+                f"{TRACKER_BASE_URL}/people?limit=500",
+                auth=auth,
+            )
+            resp.raise_for_status()
+            all_people = resp.json().get("items", [])
+    except Exception as e:
+        return {"error": f"Failed to fetch people: {e}", "duplicates": []}
+
+    # Find AI-created stubs
+    ai_stubs = [p for p in all_people if p.get("source") == "ai"]
+    non_ai = [p for p in all_people if p.get("source") != "ai"]
+    non_ai_names = {
+        p.get("full_name", "").lower() for p in non_ai if p.get("full_name")
+    }
+
+    duplicates = []
+    for stub in ai_stubs:
+        name = (stub.get("full_name") or "").lower()
+        if name and name in non_ai_names:
+            duplicates.append(
+                {
+                    "stub_id": stub["id"],
+                    "stub_name": stub.get("full_name"),
+                    "stub_source": stub.get("source"),
+                    "is_active": stub.get("is_active"),
+                    "matches_active_person": True,
+                }
+            )
+        else:
+            # Also flag duplicate AI stubs (same name, multiple records)
+            same_name_stubs = [
+                s
+                for s in ai_stubs
+                if (s.get("full_name") or "").lower() == name and s["id"] != stub["id"]
+            ]
+            if same_name_stubs:
+                duplicates.append(
+                    {
+                        "stub_id": stub["id"],
+                        "stub_name": stub.get("full_name"),
+                        "stub_source": stub.get("source"),
+                        "is_active": stub.get("is_active"),
+                        "duplicate_of_stub": same_name_stubs[0]["id"],
+                    }
+                )
+
+    return {
+        "total_ai_stubs": len(ai_stubs),
+        "duplicates_found": len(duplicates),
+        "duplicates": duplicates,
+    }

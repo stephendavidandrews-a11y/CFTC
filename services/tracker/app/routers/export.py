@@ -1,4 +1,5 @@
 """Data export endpoint — full JSON dump of all tracker tables."""
+
 import json
 import logging
 from datetime import datetime
@@ -49,6 +50,7 @@ async def export_all(db=Depends(get_db)):
     Response includes schema_version for forward compatibility.
     Streams the response to avoid loading everything into memory at once.
     """
+
     def generate():
         yield '{"schema_version":"1.0.0","exported_at":"%s","tables":{' % (
             datetime.utcnow().isoformat() + "Z"

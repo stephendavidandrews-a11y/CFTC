@@ -44,8 +44,14 @@ async def close_shared_client():
 
 class TrackerBatchError(Exception):
     """Raised when a tracker batch call fails."""
-    def __init__(self, status_code: int, error_type: str, message: str,
-                 operation_index: int | None = None):
+
+    def __init__(
+        self,
+        status_code: int,
+        error_type: str,
+        message: str,
+        operation_index: int | None = None,
+    ):
         self.status_code = status_code
         self.error_type = error_type
         self.message = message
@@ -55,13 +61,16 @@ class TrackerBatchError(Exception):
 
 class TrackerIdempotencyConflict(TrackerBatchError):
     """Same idempotency key used with different payload."""
+
     pass
 
 
-async def post_batch(operations: list[dict],
-                     source: str = "ai",
-                     source_metadata: dict | None = None,
-                     idempotency_key: str | None = None) -> dict:
+async def post_batch(
+    operations: list[dict],
+    source: str = "ai",
+    source_metadata: dict | None = None,
+    idempotency_key: str | None = None,
+) -> dict:
     """Send a batch of operations to POST /tracker/batch.
 
     Returns the tracker response dict on success.
@@ -101,21 +110,25 @@ async def post_batch(operations: list[dict],
 
             # 409 idempotency conflict — do not retry
             if resp.status_code == 409:
-                raise TrackerIdempotencyConflict(
-                    409, error_type, message, op_index)
+                raise TrackerIdempotencyConflict(409, error_type, message, op_index)
 
             # 4xx — do not retry (bad data)
             if 400 <= resp.status_code < 500:
-                raise TrackerBatchError(
-                    resp.status_code, error_type, message, op_index)
+                raise TrackerBatchError(resp.status_code, error_type, message, op_index)
 
             # 5xx — retry
             last_error = TrackerBatchError(
-                resp.status_code, error_type, message, op_index)
+                resp.status_code, error_type, message, op_index
+            )
             if attempt < MAX_RETRIES:
                 wait = RETRY_BACKOFF_SECONDS[attempt]
-                logger.warning("Tracker batch 5xx (attempt %d/%d), retrying in %.1fs: %s",
-                               attempt + 1, MAX_RETRIES + 1, wait, message)
+                logger.warning(
+                    "Tracker batch 5xx (attempt %d/%d), retrying in %.1fs: %s",
+                    attempt + 1,
+                    MAX_RETRIES + 1,
+                    wait,
+                    message,
+                )
                 await asyncio.sleep(wait)
                 continue
             raise last_error
@@ -124,8 +137,13 @@ async def post_batch(operations: list[dict],
             last_error = TrackerBatchError(0, "connection_error", str(e))
             if attempt < MAX_RETRIES:
                 wait = RETRY_BACKOFF_SECONDS[attempt]
-                logger.warning("Tracker unreachable (attempt %d/%d), retrying in %.1fs: %s",
-                               attempt + 1, MAX_RETRIES + 1, wait, e)
+                logger.warning(
+                    "Tracker unreachable (attempt %d/%d), retrying in %.1fs: %s",
+                    attempt + 1,
+                    MAX_RETRIES + 1,
+                    wait,
+                    e,
+                )
                 await asyncio.sleep(wait)
                 continue
             raise last_error

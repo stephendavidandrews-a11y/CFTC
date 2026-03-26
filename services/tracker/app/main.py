@@ -1,6 +1,7 @@
 """
 CFTC Regulatory Ops Tracker — FastAPI Application
 """
+
 import logging
 import sqlite3
 from contextlib import asynccontextmanager
@@ -12,8 +13,8 @@ import secrets
 
 from app.config import CORS_ORIGINS, AUTH_USER, AUTH_PASS, UPLOAD_DIR
 from app.db import get_connection
-from app.schema import init_schema
-from app.seed import seed_all
+from app.schema import init_schema, migrate_schema
+from app.seed import seed_all, seed_schema_v2_defaults
 
 # Import routers
 from app.routers import (
@@ -46,8 +47,12 @@ security = HTTPBasic()
 
 def verify_auth(credentials: HTTPBasicCredentials = Depends(security)):
     """HTTP Basic Auth dependency — validates credentials directly."""
-    correct_user = secrets.compare_digest(credentials.username.encode(), AUTH_USER.encode())
-    correct_pass = secrets.compare_digest(credentials.password.encode(), AUTH_PASS.encode())
+    correct_user = secrets.compare_digest(
+        credentials.username.encode(), AUTH_USER.encode()
+    )
+    correct_pass = secrets.compare_digest(
+        credentials.password.encode(), AUTH_PASS.encode()
+    )
     if not (correct_user and correct_pass):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -82,15 +87,20 @@ async def lifespan(app: FastAPI):
     conn = get_connection()
     try:
         created = init_schema(conn)
+        migrate_schema(conn)
         if created:
             logger.info(f"Schema: created {len(created)} new tables: {created}")
         seed_all(conn)
+        seed_schema_v2_defaults(conn)
         # Clean up expired idempotency keys (>24h)
-        conn.execute("DELETE FROM idempotency_keys WHERE created_at < datetime('now', '-24 hours')")
+        conn.execute(
+            "DELETE FROM idempotency_keys WHERE created_at < datetime('now', '-24 hours')"
+        )
         conn.commit()
 
         # Integrity check
         from app.config import TRACKER_DB_PATH
+
         _check_db_integrity(TRACKER_DB_PATH, "tracker.db")
 
         # WAL checkpoint — flush pending WAL frames to main DB
@@ -116,39 +126,89 @@ app.add_middleware(
     allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "X-Write-Source", "X-Request-ID", "If-Match"],
+    allow_headers=[
+        "Content-Type",
+        "Authorization",
+        "X-Write-Source",
+        "X-Request-ID",
+        "If-Match",
+    ],
 )
 
 # Mount routers — all under /tracker/ prefix, all require auth
 router_prefix = "/tracker"
-app.include_router(dashboard.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
-app.include_router(matters.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
-app.include_router(tasks.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
-app.include_router(people.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
-app.include_router(organizations.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
-app.include_router(meetings.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
-app.include_router(documents.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
-app.include_router(decisions.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
-app.include_router(updates.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
-app.include_router(lookups.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
-app.include_router(tags.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
-app.include_router(ai_context.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
-app.include_router(batch.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
-app.include_router(schema_version.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
-app.include_router(export.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
-app.include_router(context_notes.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
-app.include_router(comment_topics.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
-app.include_router(policy_directives.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
-app.include_router(directive_matters.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
-app.include_router(directive_documents.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
-app.include_router(config_router.router, prefix=router_prefix, dependencies=[Depends(verify_auth)])
-
+app.include_router(
+    dashboard.router, prefix=router_prefix, dependencies=[Depends(verify_auth)]
+)
+app.include_router(
+    matters.router, prefix=router_prefix, dependencies=[Depends(verify_auth)]
+)
+app.include_router(
+    tasks.router, prefix=router_prefix, dependencies=[Depends(verify_auth)]
+)
+app.include_router(
+    people.router, prefix=router_prefix, dependencies=[Depends(verify_auth)]
+)
+app.include_router(
+    organizations.router, prefix=router_prefix, dependencies=[Depends(verify_auth)]
+)
+app.include_router(
+    meetings.router, prefix=router_prefix, dependencies=[Depends(verify_auth)]
+)
+app.include_router(
+    documents.router, prefix=router_prefix, dependencies=[Depends(verify_auth)]
+)
+app.include_router(
+    decisions.router, prefix=router_prefix, dependencies=[Depends(verify_auth)]
+)
+app.include_router(
+    updates.router, prefix=router_prefix, dependencies=[Depends(verify_auth)]
+)
+app.include_router(
+    lookups.router, prefix=router_prefix, dependencies=[Depends(verify_auth)]
+)
+app.include_router(
+    tags.router, prefix=router_prefix, dependencies=[Depends(verify_auth)]
+)
+app.include_router(
+    ai_context.router, prefix=router_prefix, dependencies=[Depends(verify_auth)]
+)
+app.include_router(
+    batch.router, prefix=router_prefix, dependencies=[Depends(verify_auth)]
+)
+app.include_router(
+    schema_version.router, prefix=router_prefix, dependencies=[Depends(verify_auth)]
+)
+app.include_router(
+    export.router, prefix=router_prefix, dependencies=[Depends(verify_auth)]
+)
+app.include_router(
+    context_notes.router, prefix=router_prefix, dependencies=[Depends(verify_auth)]
+)
+app.include_router(
+    comment_topics.router, prefix=router_prefix, dependencies=[Depends(verify_auth)]
+)
+app.include_router(
+    policy_directives.router, prefix=router_prefix, dependencies=[Depends(verify_auth)]
+)
+app.include_router(
+    directive_matters.router, prefix=router_prefix, dependencies=[Depends(verify_auth)]
+)
+app.include_router(
+    directive_documents.router,
+    prefix=router_prefix,
+    dependencies=[Depends(verify_auth)],
+)
+app.include_router(
+    config_router.router, prefix=router_prefix, dependencies=[Depends(verify_auth)]
+)
 
 
 # -- Global exception handler --
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     import traceback
+
     logger.error("Unhandled exception: %s\n%s", exc, traceback.format_exc())
     request_id = request.headers.get("x-request-id", "unknown")
     return JSONResponse(
@@ -156,6 +216,7 @@ async def global_exception_handler(request, exc):
         content={"detail": "Internal server error", "request_id": request_id},
         headers={"X-Request-ID": request_id},
     )
+
 
 @app.get("/tracker/health")
 async def health():

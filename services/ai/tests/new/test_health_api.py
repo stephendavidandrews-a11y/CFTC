@@ -7,12 +7,14 @@ Covers:
 4. Spend / budget tracking from llm_usage
 5. Budget-paused flag when spend exceeds budget
 """
+
 import uuid
 
 PREFIX = "/ai/api"
 
 
 # ── 1. Basic health shape ──
+
 
 def test_health_returns_ok(client):
     resp = client.get(f"{PREFIX}/health")
@@ -28,6 +30,7 @@ def test_health_returns_ok(client):
 
 # ── 2. Empty DB: queue is empty dict, spend is zero ──
 
+
 def test_health_empty_db(client):
     data = client.get(f"{PREFIX}/health").json()
     assert data["queue"] == {}
@@ -36,6 +39,7 @@ def test_health_empty_db(client):
 
 
 # ── 3. Queue counts reflect communication statuses ──
+
 
 def test_health_queue_counts(client, db):
     # Seed communications in various statuses
@@ -54,6 +58,7 @@ def test_health_queue_counts(client, db):
 
 
 # ── 4. Spend tracking from llm_usage ──
+
 
 def test_health_spend_tracking(client, db):
     comm_id = str(uuid.uuid4())
@@ -81,6 +86,7 @@ def test_health_spend_tracking(client, db):
 
 
 # ── 5. Budget-paused when spend meets or exceeds daily budget ──
+
 
 def test_health_budget_paused(client, db):
     comm_id = str(uuid.uuid4())

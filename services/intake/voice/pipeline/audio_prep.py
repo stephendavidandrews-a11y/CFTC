@@ -23,7 +23,17 @@ TARGET_SAMPLE_RATE = 16000
 TARGET_CHANNELS = 1
 
 # Formats that need conversion (anything not already clean WAV)
-NEEDS_CONVERSION = {".m4a", ".mp4", ".aac", ".mp3", ".ogg", ".opus", ".flac", ".wma", ".webm"}
+NEEDS_CONVERSION = {
+    ".m4a",
+    ".mp4",
+    ".aac",
+    ".mp3",
+    ".ogg",
+    ".opus",
+    ".flac",
+    ".wma",
+    ".webm",
+}
 
 # Resolve ffmpeg/ffprobe paths — Homebrew on macOS puts them in /opt/homebrew/bin
 # which may not be in PATH for background services or SSH sessions.
@@ -77,17 +87,24 @@ def prepare_audio(audio_path: Path, cache_dir: Path | None = None) -> Path:
         # WAV but wrong sample rate — still needs conversion
         logger.info(f"Resampling WAV to {TARGET_SAMPLE_RATE}Hz mono: {audio_path.name}")
     else:
-        logger.info(f"Converting {suffix} to {TARGET_SAMPLE_RATE}Hz mono WAV: {audio_path.name}")
+        logger.info(
+            f"Converting {suffix} to {TARGET_SAMPLE_RATE}Hz mono WAV: {audio_path.name}"
+        )
 
     # Convert with ffmpeg
     try:
         ffmpeg_path = _find_tool("ffmpeg")
         cmd = [
-            ffmpeg_path, "-y",        # overwrite
-            "-i", str(audio_path),    # input
-            "-ac", str(TARGET_CHANNELS),   # mono
-            "-ar", str(TARGET_SAMPLE_RATE), # 16kHz
-            "-sample_fmt", "s16",     # 16-bit PCM
+            ffmpeg_path,
+            "-y",  # overwrite
+            "-i",
+            str(audio_path),  # input
+            "-ac",
+            str(TARGET_CHANNELS),  # mono
+            "-ar",
+            str(TARGET_SAMPLE_RATE),  # 16kHz
+            "-sample_fmt",
+            "s16",  # 16-bit PCM
             str(wav_path),
         ]
         result = subprocess.run(
@@ -100,7 +117,9 @@ def prepare_audio(audio_path: Path, cache_dir: Path | None = None) -> Path:
             logger.error(f"ffmpeg conversion failed: {result.stderr[-500:]}")
             raise RuntimeError(f"ffmpeg failed with code {result.returncode}")
 
-        logger.info(f"Converted to WAV: {wav_path.name} ({wav_path.stat().st_size / 1024 / 1024:.1f} MB)")
+        logger.info(
+            f"Converted to WAV: {wav_path.name} ({wav_path.stat().st_size / 1024 / 1024:.1f} MB)"
+        )
         return wav_path
 
     except FileNotFoundError:
@@ -114,8 +133,11 @@ def _is_target_format(wav_path: Path) -> bool:
     try:
         ffprobe_path = _find_tool("ffprobe")
         cmd = [
-            ffprobe_path, "-v", "quiet",
-            "-print_format", "json",
+            ffprobe_path,
+            "-v",
+            "quiet",
+            "-print_format",
+            "json",
             "-show_streams",
             str(wav_path),
         ]
@@ -124,6 +146,7 @@ def _is_target_format(wav_path: Path) -> bool:
             return False
 
         import json
+
         data = json.loads(result.stdout)
         for stream in data.get("streams", []):
             if stream.get("codec_type") == "audio":

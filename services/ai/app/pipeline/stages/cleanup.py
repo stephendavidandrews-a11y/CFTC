@@ -37,16 +37,22 @@ def _build_batch_payload(segments: list[dict]) -> str:
     """Build the user prompt payload for a batch of segments."""
     batch = []
     for seg in segments:
-        batch.append({
-            "id": seg["id"],
-            "speaker": seg["speaker_label"],
-            "text": seg["raw_text"],
-            "confidence": round(seg["confidence"], 3) if seg["confidence"] else None,
-        })
+        batch.append(
+            {
+                "id": seg["id"],
+                "speaker": seg["speaker_label"],
+                "text": seg["raw_text"],
+                "confidence": round(seg["confidence"], 3)
+                if seg["confidence"]
+                else None,
+            }
+        )
     return json.dumps(batch, ensure_ascii=False)
 
 
-def _parse_cleanup_response(text: str, segment_ids: set[str]) -> tuple[dict[str, str], str | None]:
+def _parse_cleanup_response(
+    text: str, segment_ids: set[str]
+) -> tuple[dict[str, str], str | None]:
     """Parse Haiku's cleanup response into ({segment_id: cleaned_text}, proposed_title).
 
     Tolerates markdown fencing, partial responses, and both old (array)
@@ -89,7 +95,6 @@ def _parse_cleanup_response(text: str, segment_ids: set[str]) -> tuple[dict[str,
     return result, proposed_title
 
 
-
 def _build_correction_glossary(db) -> str:
     """Build a glossary appendix from accumulated human corrections."""
     try:
@@ -109,10 +114,14 @@ def _build_correction_glossary(db) -> str:
     if not rows:
         return ""
 
-    lines = ["## Domain Corrections (learned from reviewer feedback)",
-             "These corrections have been consistently made by reviewers. Apply them proactively:"]
+    lines = [
+        "## Domain Corrections (learned from reviewer feedback)",
+        "These corrections have been consistently made by reviewers. Apply them proactively:",
+    ]
     for row in rows:
-        lines.append(f'- "{row["pattern_from"]}" \u2192 "{row["pattern_to"]}" ({row["freq"]} occurrences)')
+        lines.append(
+            f'- "{row["pattern_from"]}" \u2192 "{row["pattern_to"]}" ({row["freq"]} occurrences)'
+        )
 
     return "\n".join(lines)
 
@@ -139,12 +148,15 @@ async def run_cleanup_stage(db, communication_id: str) -> dict:
         system_prompt += "\n\n" + glossary
 
     # Fetch raw transcript segments
-    rows = db.execute("""
+    rows = db.execute(
+        """
         SELECT id, speaker_label, raw_text, confidence
         FROM transcripts
         WHERE communication_id = ? AND raw_text IS NOT NULL
         ORDER BY start_time
-    """, (communication_id,)).fetchall()
+    """,
+        (communication_id,),
+    ).fetchall()
 
     if not rows:
         logger.info("[%s] No transcript segments to clean", communication_id[:8])
@@ -159,7 +171,7 @@ async def run_cleanup_stage(db, communication_id: str) -> dict:
 
     # Process in batches
     for batch_start in range(0, len(segments), CLEANUP_BATCH_SIZE):
-        batch = segments[batch_start:batch_start + CLEANUP_BATCH_SIZE]
+        batch = segments[batch_start : batch_start + CLEANUP_BATCH_SIZE]
         batch_ids = {seg["id"] for seg in batch}
 
         user_prompt = _build_batch_payload(batch)
@@ -203,7 +215,8 @@ async def run_cleanup_stage(db, communication_id: str) -> dict:
                 total_cleaned += 1
                 logger.debug(
                     "[%s] Segment %s: cleanup miss, using raw text",
-                    communication_id[:8], seg["id"][:8],
+                    communication_id[:8],
+                    seg["id"][:8],
                 )
 
         db.commit()
@@ -211,8 +224,10 @@ async def run_cleanup_stage(db, communication_id: str) -> dict:
         logger.info(
             "[%s] Cleanup batch %d-%d: %d/%d cleaned ($%.4f)",
             communication_id[:8],
-            batch_start, batch_start + len(batch),
-            len(cleaned_map), len(batch),
+            batch_start,
+            batch_start + len(batch),
+            len(cleaned_map),
+            len(batch),
             response.usage.cost_usd,
         )
 
@@ -229,12 +244,17 @@ async def run_cleanup_stage(db, communication_id: str) -> dict:
                 (proposed_title, communication_id),
             )
             db.commit()
-            logger.info("[%s] Title set from cleanup: %s", communication_id[:8], proposed_title)
+            logger.info(
+                "[%s] Title set from cleanup: %s", communication_id[:8], proposed_title
+            )
 
     logger.info(
         "[%s] Cleanup complete: %d segments, %d in + %d out tokens, $%.4f",
-        communication_id[:8], total_cleaned,
-        total_input_tokens, total_output_tokens, total_cost,
+        communication_id[:8],
+        total_cleaned,
+        total_input_tokens,
+        total_output_tokens,
+        total_cost,
     )
 
     return {

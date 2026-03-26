@@ -45,13 +45,33 @@ DECISION_CLEARING_ID = "eeeeeeee-5555-4000-8000-000000000001"
 
 FULL_CONTEXT = {
     "people": [
-        {"id": PERSON_TYLER_ID, "full_name": "Tyler S. Badgley", "title": "General Counsel"},
-        {"id": PERSON_STEPHEN_ID, "full_name": "Stephen Andrews", "title": "Deputy GC, Regulatory"},
-        {"id": PERSON_PRIYA_ID, "full_name": "Priya Sharma", "title": "Attorney-Advisor"},
+        {
+            "id": PERSON_TYLER_ID,
+            "full_name": "Tyler S. Badgley",
+            "title": "General Counsel",
+        },
+        {
+            "id": PERSON_STEPHEN_ID,
+            "full_name": "Stephen Andrews",
+            "title": "Deputy GC, Regulatory",
+        },
+        {
+            "id": PERSON_PRIYA_ID,
+            "full_name": "Priya Sharma",
+            "title": "Attorney-Advisor",
+        },
     ],
     "organizations": [
-        {"id": ORG_OGC_REG_ID, "name": "OGC - Regulatory", "organization_type": "CFTC office"},
-        {"id": ORG_SEC_ID, "name": "Securities and Exchange Commission", "organization_type": "Federal agency"},
+        {
+            "id": ORG_OGC_REG_ID,
+            "name": "OGC - Regulatory",
+            "organization_type": "CFTC office",
+        },
+        {
+            "id": ORG_SEC_ID,
+            "name": "Securities and Exchange Commission",
+            "organization_type": "Federal agency",
+        },
     ],
     "matters": [
         {
@@ -61,16 +81,28 @@ FULL_CONTEXT = {
             "status": "draft in progress",
             "priority": "critical this week",
             "open_tasks": [
-                {"id": TASK_CUSTODY_MEMO_ID, "title": "Draft custody rule options memo",
-                 "status": "in progress", "assigned_to_person_id": PERSON_PRIYA_ID,
-                 "due_date": "2026-04-30"},
+                {
+                    "id": TASK_CUSTODY_MEMO_ID,
+                    "title": "Draft custody rule options memo",
+                    "status": "in progress",
+                    "assigned_to_person_id": PERSON_PRIYA_ID,
+                    "due_date": "2026-04-30",
+                },
             ],
             "open_decisions": [
-                {"id": DECISION_CLEARING_ID, "title": "Clearing rule approach — phased vs immediate",
-                 "status": "pending", "decision_type": "policy"},
+                {
+                    "id": DECISION_CLEARING_ID,
+                    "title": "Clearing rule approach — phased vs immediate",
+                    "status": "pending",
+                    "decision_type": "policy",
+                },
             ],
             "stakeholders": [
-                {"person_id": PERSON_TYLER_ID, "full_name": "Tyler S. Badgley", "role": "supervisor"},
+                {
+                    "person_id": PERSON_TYLER_ID,
+                    "full_name": "Tyler S. Badgley",
+                    "role": "supervisor",
+                },
             ],
             "organizations": [],
             "recent_updates": [],
@@ -252,8 +284,18 @@ SAMPLE_PAYLOAD = {
                         "durability": "durable",
                         "sensitivity": "moderate",
                         "linked_entities": [
-                            {"entity_type": "organization", "entity_id": ORG_OGC_REG_ID, "entity_name": "OGC - Regulatory", "relationship_role": "subject"},
-                            {"entity_type": "person", "entity_id": None, "entity_name": "Tyler S. Badgley", "relationship_role": "source"},
+                            {
+                                "entity_type": "organization",
+                                "entity_id": ORG_OGC_REG_ID,
+                                "entity_name": "OGC - Regulatory",
+                                "relationship_role": "subject",
+                            },
+                            {
+                                "entity_type": "person",
+                                "entity_id": None,
+                                "entity_name": "Tyler S. Badgley",
+                                "relationship_role": "source",
+                            },
                         ],
                     },
                     "confidence": 0.93,
@@ -336,11 +378,24 @@ SAMPLE_PAYLOAD = {
                         "boss_attends": 1,
                         "external_parties_attend": 0,
                         "participants": [
-                            {"person_id": PERSON_TYLER_ID, "meeting_role": "chair", "attended": True, "key_contribution_summary": "Led discussion."},
-                            {"person_id": PERSON_STEPHEN_ID, "meeting_role": "attendee", "attended": True, "key_contribution_summary": "Asked about role expectations."},
+                            {
+                                "person_id": PERSON_TYLER_ID,
+                                "meeting_role": "chair",
+                                "attended": True,
+                                "key_contribution_summary": "Led discussion.",
+                            },
+                            {
+                                "person_id": PERSON_STEPHEN_ID,
+                                "meeting_role": "attendee",
+                                "attended": True,
+                                "key_contribution_summary": "Asked about role expectations.",
+                            },
                         ],
                         "matter_links": [
-                            {"matter_id": MATTER_CRYPTO_ID, "relationship_type": "primary topic"},
+                            {
+                                "matter_id": MATTER_CRYPTO_ID,
+                                "relationship_type": "primary topic",
+                            },
                         ],
                     },
                     "confidence": 0.98,
@@ -445,6 +500,7 @@ LEGACY_FOLLOW_UP_PAYLOAD = {
 # Test functions
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def section(title: str):
     print(f"\n{'=' * 70}")
     print(f"  {title}")
@@ -470,13 +526,17 @@ def test_pydantic_validation():
         print("\n--- Source evidence normalization ---")
         for bi, bundle in enumerate(output.bundles):
             for ii, item in enumerate(bundle.items):
-                has_v2 = item.source_evidence is not None and len(item.source_evidence) > 0
+                has_v2 = (
+                    item.source_evidence is not None and len(item.source_evidence) > 0
+                )
                 has_v1 = item.source_excerpt not in (None, "")
                 ev_count = len(item.source_evidence) if item.source_evidence else 0
-                print(f"  bundle[{bi}].item[{ii}] ({item.item_type}): "
-                      f"v2_evidence={ev_count}, v1_excerpt={'yes' if has_v1 else 'no'}, "
-                      f"v1_segments={len(item.source_segments or [])}, "
-                      f"client_id={item.client_id or '-'}")
+                print(
+                    f"  bundle[{bi}].item[{ii}] ({item.item_type}): "
+                    f"v2_evidence={ev_count}, v1_excerpt={'yes' if has_v1 else 'no'}, "
+                    f"v1_segments={len(item.source_segments or [])}, "
+                    f"client_id={item.client_id or '-'}"
+                )
 
         print("\n  RESULT: PASS — Pydantic validation succeeded")
         return output
@@ -497,13 +557,18 @@ def test_legacy_follow_up_conversion():
 
     # Import and run the converter
     from app.pipeline.stages.extraction import _convert_legacy_follow_ups
+
     count = _convert_legacy_follow_ups(output)
 
     item = output.bundles[0].items[0]
-    print(f"  After conversion:  item_type={item.item_type}, task_mode={item.proposed_data.get('task_mode')}")
+    print(
+        f"  After conversion:  item_type={item.item_type}, task_mode={item.proposed_data.get('task_mode')}"
+    )
     print(f"  Conversion count:  {count}")
     assert item.item_type == "task", f"Expected task, got {item.item_type}"
-    assert item.proposed_data.get("task_mode") == "follow_up", "Expected task_mode=follow_up"
+    assert item.proposed_data.get("task_mode") == "follow_up", (
+        "Expected task_mode=follow_up"
+    )
     print("  RESULT: PASS — follow_up -> task(task_mode=follow_up)")
 
 
@@ -520,9 +585,13 @@ def test_name_resolution():
     task_item = name_bundle.items[0]
     print("  Before resolution:")
     print(f"    bundle.target_matter_id: {name_bundle.target_matter_id}")
-    print(f"    item.assigned_to_person_id: {task_item.proposed_data.get('assigned_to_person_id')}")
+    print(
+        f"    item.assigned_to_person_id: {task_item.proposed_data.get('assigned_to_person_id')}"
+    )
     print(f"    item.assigned_to_name (item-level): {task_item.assigned_to_name}")
-    print(f"    item.assigned_to_name (pd): {task_item.proposed_data.get('assigned_to_name')}")
+    print(
+        f"    item.assigned_to_name (pd): {task_item.proposed_data.get('assigned_to_name')}"
+    )
 
     # Context note linked entity with null entity_id
     ctx_item = output.bundles[0].items[4]  # context_note
@@ -534,22 +603,28 @@ def test_name_resolution():
 
     print("\n  After resolution:")
     print(f"    bundle.target_matter_id: {name_bundle.target_matter_id}")
-    print(f"    item.assigned_to_person_id: {task_item.proposed_data.get('assigned_to_person_id')}")
+    print(
+        f"    item.assigned_to_person_id: {task_item.proposed_data.get('assigned_to_person_id')}"
+    )
 
     # Check context note linked entity resolution
     linked_after = ctx_item.proposed_data.get("linked_entities", [])
     resolved_entities = [le for le in linked_after if le.get("entity_id") is not None]
-    print(f"    context_note linked_entities resolved: {len(resolved_entities)}/{len(linked_after)}")
+    print(
+        f"    context_note linked_entities resolved: {len(resolved_entities)}/{len(linked_after)}"
+    )
 
     print(f"\n  Resolution log ({len(log)} entries):")
     for entry in log:
         print(f"    - {entry}")
 
     # Assertions
-    assert name_bundle.target_matter_id == MATTER_CRYPTO_ID, \
+    assert name_bundle.target_matter_id == MATTER_CRYPTO_ID, (
         f"Expected matter resolved, got {name_bundle.target_matter_id}"
-    assert task_item.proposed_data["assigned_to_person_id"] == PERSON_PRIYA_ID, \
+    )
+    assert task_item.proposed_data["assigned_to_person_id"] == PERSON_PRIYA_ID, (
         f"Expected Priya's ID, got {task_item.proposed_data['assigned_to_person_id']}"
+    )
 
     print("\n  RESULT: PASS — Names resolved to UUIDs")
 
@@ -572,8 +647,9 @@ def test_ref_validation():
     print(f"  tracks_task_ref after validation:  {ref_after}")
     print(f"  Warnings: {warnings}")
 
-    assert ref_after == "$ref:temp-tyler-sec-contacts", \
+    assert ref_after == "$ref:temp-tyler-sec-contacts", (
         f"Valid ref should be preserved, got {ref_after}"
+    )
     assert len(warnings) == 0, f"Expected no warnings, got {warnings}"
     print("  RESULT: PASS — Valid $ref preserved, no warnings")
 
@@ -600,34 +676,44 @@ def test_update_validation():
         "extraction_version": "2.0.0",
         "communication_id": "test-bad",
         "extraction_summary": "Bad update test",
-        "bundles": [{
-            "bundle_type": "standalone",
-            "confidence": 0.85,
-            "rationale": "Test bad updates.",
-            "items": [{
-                "item_type": "task_update",
-                "proposed_data": {
-                    "existing_task_id": "nonexistent-task-id",
-                    "existing_task_title": "Fake Task",
-                    "changes": {"title": "New Title"},  # title is NOT in allowed fields
-                    "change_summary": "Bad change",
-                },
-                "confidence": 0.80,
-                "rationale": "Should generate warnings.",
-                "source_evidence": [{
-                    "excerpt": "test",
-                    "segments": ["seg-bad"],
-                    "time_range": {"start": 0, "end": 1},
-                }],
-            }],
-        }],
+        "bundles": [
+            {
+                "bundle_type": "standalone",
+                "confidence": 0.85,
+                "rationale": "Test bad updates.",
+                "items": [
+                    {
+                        "item_type": "task_update",
+                        "proposed_data": {
+                            "existing_task_id": "nonexistent-task-id",
+                            "existing_task_title": "Fake Task",
+                            "changes": {
+                                "title": "New Title"
+                            },  # title is NOT in allowed fields
+                            "change_summary": "Bad change",
+                        },
+                        "confidence": 0.80,
+                        "rationale": "Should generate warnings.",
+                        "source_evidence": [
+                            {
+                                "excerpt": "test",
+                                "segments": ["seg-bad"],
+                                "time_range": {"start": 0, "end": 1},
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
     }
     bad_output = ExtractionOutput(**bad_payload)
     bad_warnings = _validate_update_items(bad_output, FULL_CONTEXT)
     print(f"\n  Bad task_update warnings: {len(bad_warnings)}")
     for w in bad_warnings:
         print(f"    - {w}")
-    assert len(bad_warnings) >= 2, "Expected warnings for unknown task ID and disallowed field"
+    assert len(bad_warnings) >= 2, (
+        "Expected warnings for unknown task ID and disallowed field"
+    )
 
     print("\n  RESULT: PASS — Valid updates clean, invalid updates warned")
 
@@ -640,6 +726,7 @@ def test_converters():
 
     # First resolve names so converters have good data
     from app.pipeline.stages.extraction import _resolve_entity_names
+
     _resolve_entity_names(output, FULL_CONTEXT)
 
     bundle_dict = {
@@ -670,8 +757,10 @@ def test_converters():
         ops = convert_item(item_dict, bundle_dict, refs)
         all_ops.extend(ops)
         for op, src_id in ops:
-            print(f"  {item.item_type:25s} -> {op['op']:6s} {op['table']:25s} "
-                  f"id={op.get('id', op.get('client_id', '-'))[:12] if op.get('id') or op.get('client_id') else '-'}")
+            print(
+                f"  {item.item_type:25s} -> {op['op']:6s} {op['table']:25s} "
+                f"id={op.get('id', op.get('client_id', '-'))[:12] if op.get('id') or op.get('client_id') else '-'}"
+            )
 
     # Process standalone bundle items
     print("\n--- Standalone bundle items ---")
@@ -693,33 +782,53 @@ def test_converters():
     print("\n--- Specific converter checks ---")
 
     # Check tracks_task_id on follow_up task
-    follow_up_ops = [op for op, _ in all_ops if op.get("data", {}).get("tracks_task_id")]
+    follow_up_ops = [
+        op for op, _ in all_ops if op.get("data", {}).get("tracks_task_id")
+    ]
     print(f"  Tasks with tracks_task_id: {len(follow_up_ops)}")
     if follow_up_ops:
         print(f"    tracks_task_id = {follow_up_ops[0]['data']['tracks_task_id']}")
 
     # Check task_update produces UPDATE not INSERT
-    task_update_ops = [op for op, _ in all_ops if op.get("table") == "tasks" and op.get("op") == "update"]
+    task_update_ops = [
+        op
+        for op, _ in all_ops
+        if op.get("table") == "tasks" and op.get("op") == "update"
+    ]
     print(f"  Task UPDATE ops: {len(task_update_ops)}")
     if task_update_ops:
         print(f"    Target: {task_update_ops[0].get('id', '?')[:12]}...")
         print(f"    Changes: {list(task_update_ops[0]['data'].keys())}")
 
     # Check decision_update
-    decision_update_ops = [op for op, _ in all_ops if op.get("table") == "decisions" and op.get("op") == "update"]
+    decision_update_ops = [
+        op
+        for op, _ in all_ops
+        if op.get("table") == "decisions" and op.get("op") == "update"
+    ]
     print(f"  Decision UPDATE ops: {len(decision_update_ops)}")
 
     # Check org_detail_update
-    org_update_ops = [op for op, _ in all_ops if op.get("table") == "organizations" and op.get("op") == "update"]
+    org_update_ops = [
+        op
+        for op, _ in all_ops
+        if op.get("table") == "organizations" and op.get("op") == "update"
+    ]
     print(f"  Org UPDATE ops: {len(org_update_ops)}")
 
     # Check person_detail_update splits
     profile_ops = [op for op, _ in all_ops if op.get("table") == "person_profiles"]
-    people_ops = [op for op, _ in all_ops if op.get("table") == "people" and op.get("op") == "update"]
+    people_ops = [
+        op
+        for op, _ in all_ops
+        if op.get("table") == "people" and op.get("op") == "update"
+    ]
     print(f"  Person profile INSERT ops: {len(profile_ops)}")
     print(f"  People table UPDATE ops: {len(people_ops)}")
     if profile_ops:
-        print(f"    Profile fields: {[k for k in profile_ops[0]['data'].keys() if k != 'person_id']}")
+        print(
+            f"    Profile fields: {[k for k in profile_ops[0]['data'].keys() if k != 'person_id']}"
+        )
     if people_ops:
         print(f"    People fields: {list(people_ops[0]['data'].keys())}")
 
@@ -728,11 +837,19 @@ def test_converters():
     print(f"  Context note INSERT ops: {len(ctx_ops)}")
 
     # Assertions
-    assert len(task_update_ops) == 1, f"Expected 1 task UPDATE, got {len(task_update_ops)}"
-    assert len(decision_update_ops) == 1, f"Expected 1 decision UPDATE, got {len(decision_update_ops)}"
+    assert len(task_update_ops) == 1, (
+        f"Expected 1 task UPDATE, got {len(task_update_ops)}"
+    )
+    assert len(decision_update_ops) == 1, (
+        f"Expected 1 decision UPDATE, got {len(decision_update_ops)}"
+    )
     assert len(org_update_ops) == 1, f"Expected 1 org UPDATE, got {len(org_update_ops)}"
-    assert len(profile_ops) == 1, f"Expected 1 person_profiles INSERT, got {len(profile_ops)}"
-    assert len(people_ops) == 1, f"Expected 1 people UPDATE (email), got {len(people_ops)}"
+    assert len(profile_ops) == 1, (
+        f"Expected 1 person_profiles INSERT, got {len(profile_ops)}"
+    )
+    assert len(people_ops) == 1, (
+        f"Expected 1 people UPDATE (email), got {len(people_ops)}"
+    )
     assert len(ctx_ops) == 1, f"Expected 1 context_notes INSERT, got {len(ctx_ops)}"
     assert len(follow_up_ops) >= 1, "Expected at least 1 task with tracks_task_id"
 
@@ -766,13 +883,15 @@ def test_policy_toggle_map():
     for toggle, item_type in sorted(POLICY_TOGGLE_MAP.items()):
         print(f"    {toggle:35s} -> {item_type}")
 
-    assert "propose_follow_ups" not in POLICY_TOGGLE_MAP, \
+    assert "propose_follow_ups" not in POLICY_TOGGLE_MAP, (
         "propose_follow_ups should not be in POLICY_TOGGLE_MAP"
+    )
 
     # All toggle targets should be in VALID_ITEM_TYPES
     for toggle, item_type in POLICY_TOGGLE_MAP.items():
-        assert item_type in VALID_ITEM_TYPES, \
+        assert item_type in VALID_ITEM_TYPES, (
             f"Toggle target {item_type} not in VALID_ITEM_TYPES"
+        )
 
     print("\n  RESULT: PASS — No follow_up toggle, all targets valid")
 
@@ -783,6 +902,7 @@ def test_batch_op_format():
 
     output = ExtractionOutput(**SAMPLE_PAYLOAD)
     from app.pipeline.stages.extraction import _resolve_entity_names
+
     _resolve_entity_names(output, FULL_CONTEXT)
 
     bundle_dict = {
@@ -810,8 +930,7 @@ def test_batch_op_format():
                 assert "data" in op, f"INSERT missing 'data': {op}"
             elif op["op"] == "update":
                 assert "data" in op, f"UPDATE missing 'data': {op}"
-                assert "record_id" in op, \
-                    f"UPDATE missing 'record_id': {op}"
+                assert "record_id" in op, f"UPDATE missing 'record_id': {op}"
 
             print(f"  {item.item_type}: {json.dumps(op, indent=4, default=str)[:500]}")
             print()

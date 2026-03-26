@@ -177,7 +177,9 @@ def test_create_context_note_link_requires_fields():
 
 def test_create_context_note_link_rejects_empty_strings():
     with pytest.raises(ValidationError):
-        CreateContextNoteLink(entity_type="", entity_id="x", relationship_role="subject")
+        CreateContextNoteLink(
+            entity_type="", entity_id="x", relationship_role="subject"
+        )
 
 
 @pytest.mark.parametrize("matter_type", ENUMS["matter_type"])

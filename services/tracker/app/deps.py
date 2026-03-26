@@ -1,4 +1,5 @@
 """Shared request-scoped dependencies for tracker routers."""
+
 from fastapi import Request
 
 

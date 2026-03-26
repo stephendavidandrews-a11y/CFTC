@@ -49,12 +49,14 @@ POLICY = {
 
 
 def _sample_evidence(speaker: str, excerpt: str) -> list[dict]:
-    return [{
-        "excerpt": excerpt,
-        "segments": ["seg-001"],
-        "time_range": {"start": 1.0, "end": 2.0},
-        "speaker": speaker,
-    }]
+    return [
+        {
+            "excerpt": excerpt,
+            "segments": ["seg-001"],
+            "time_range": {"start": 1.0, "end": 2.0},
+            "speaker": speaker,
+        }
+    ]
 
 
 def test_v2_1_postprocess_repairs_shapes_without_rewriting_task_ownership():
@@ -163,9 +165,14 @@ def test_v2_1_postprocess_repairs_shapes_without_rewriting_task_ownership():
 
     assert action_task.proposed_data["assigned_to_person_id"] == PERSON_TYLER_ID
     assert follow_up_task.proposed_data["waiting_on_person_id"] == PERSON_TYLER_ID
-    assert follow_up_task.proposed_data["tracks_task_ref"] == "$ref:temp-tyler-sec-contacts"
+    assert (
+        follow_up_task.proposed_data["tracks_task_ref"]
+        == "$ref:temp-tyler-sec-contacts"
+    )
 
-    assert context_note.proposed_data["body"].startswith("The four priorities are crypto")
+    assert context_note.proposed_data["body"].startswith(
+        "The four priorities are crypto"
+    )
     assert "content" not in context_note.proposed_data
     assert "tags" not in context_note.proposed_data
     assert context_note.proposed_data["category"] == "strategic_context"
@@ -175,7 +182,10 @@ def test_v2_1_postprocess_repairs_shapes_without_rewriting_task_ownership():
 
     assert "prior_roles_summary" not in person_detail.proposed_data
     assert "prior_roles_summary" not in person_detail.proposed_data["fields"]
-    assert "go-between" in person_detail.proposed_data["fields"]["personal_notes_summary"].lower()
+    assert (
+        "go-between"
+        in person_detail.proposed_data["fields"]["personal_notes_summary"].lower()
+    )
 
     repairs = processed["post_processing_log"]["shape_repairs"]
     assert len(repairs) >= 4

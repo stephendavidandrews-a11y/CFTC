@@ -11,6 +11,7 @@ Phase 4: extracting (Sonnet extraction with tiered context, config-driven suppre
 Phase 5: Opus escalation (automatic retry with Opus on quality triggers).
 Phase 6 (partial): committing (tracker writeback of reviewed bundles).
 """
+
 import asyncio
 import uuid
 import logging
@@ -22,18 +23,29 @@ from app.routers.events import publish_event
 logger = logging.getLogger(__name__)
 
 
-def _log_error(db, communication_id: str, error_stage: str, error_message: str,
-               target_state: str = "error"):
+def _log_error(
+    db,
+    communication_id: str,
+    error_stage: str,
+    error_message: str,
+    target_state: str = "error",
+):
     """Persist error to communication_error_log and send notification."""
     try:
         db.execute(
             "INSERT INTO communication_error_log (communication_id, error_stage, error_message) "
             "VALUES (?, ?, ?)",
-            (communication_id, error_stage, error_message[:2000] if error_message else None),
+            (
+                communication_id,
+                error_stage,
+                error_message[:2000] if error_message else None,
+            ),
         )
         db.commit()
     except Exception as log_err:
-        logger.warning("Failed to write error log for %s: %s", communication_id, log_err)
+        logger.warning(
+            "Failed to write error log for %s: %s", communication_id, log_err
+        )
 
     # Send notification (non-blocking, debounced)
     try:
@@ -42,27 +54,38 @@ def _log_error(db, communication_id: str, error_stage: str, error_message: str,
         ).fetchone()
         title = title_row["title"] if title_row else None
         from app.notifications import notify_pipeline_error
-        notify_pipeline_error(communication_id, title, error_stage,
-                              error_message or "", target_state)
+
+        notify_pipeline_error(
+            communication_id, title, error_stage, error_message or "", target_state
+        )
     except Exception as notif_err:
-        logger.warning("Failed to send error notification for %s: %s", communication_id[:8], notif_err)
+        logger.warning(
+            "Failed to send error notification for %s: %s",
+            communication_id[:8],
+            notif_err,
+        )
 
 
 # Semaphores for resource gating
-TRANSCRIPTION_SEMAPHORE = asyncio.Semaphore(1)   # Whisper is memory-heavy
-LLM_SEMAPHORE = asyncio.Semaphore(3)             # Claude API calls can overlap
+TRANSCRIPTION_SEMAPHORE = asyncio.Semaphore(1)  # Whisper is memory-heavy
+LLM_SEMAPHORE = asyncio.Semaphore(3)  # Claude API calls can overlap
 
 # Terminal states — pipeline stops here
-TERMINAL_STATES = {"complete", "duplicate", "error", "paused_budget",
-                   "waiting_for_api", "awaiting_tracker"}
+TERMINAL_STATES = {
+    "complete",
+    "duplicate",
+    "error",
+    "paused_budget",
+    "waiting_for_api",
+    "awaiting_tracker",
+}
 
 # Human gate states — pipeline pauses for user action
 HUMAN_GATE_STATES = {
     "awaiting_speaker_review",
     "awaiting_participant_review",
-    "awaiting_entity_review",
+    "awaiting_association_review",
     "awaiting_bundle_review",
-    "reviewed",
 }
 
 # Valid transitions: current_status -> next_status
@@ -75,10 +98,10 @@ AUDIO_TRANSITIONS = {
     "awaiting_speaker_review": "speaker_review_in_progress",
     "speaker_review_in_progress": "speakers_confirmed",
     "speakers_confirmed": "enriching",
-    "enriching": "awaiting_entity_review",
-    "awaiting_entity_review": "entity_review_in_progress",
-    "entity_review_in_progress": "entities_confirmed",
-    "entities_confirmed": "extracting",
+    "enriching": "awaiting_association_review",
+    "awaiting_association_review": "association_review_in_progress",
+    "association_review_in_progress": "associations_confirmed",
+    "associations_confirmed": "extracting",
     "extracting": "awaiting_bundle_review",
     "awaiting_bundle_review": "bundle_review_in_progress",
     "bundle_review_in_progress": "reviewed",
@@ -93,10 +116,10 @@ EMAIL_TRANSITIONS = {
     "processing_attachments": "awaiting_participant_review",
     "awaiting_participant_review": "participants_confirmed",
     "participants_confirmed": "enriching",
-    "enriching": "awaiting_entity_review",
-    "awaiting_entity_review": "entity_review_in_progress",
-    "entity_review_in_progress": "entities_confirmed",
-    "entities_confirmed": "extracting",
+    "enriching": "awaiting_association_review",
+    "awaiting_association_review": "association_review_in_progress",
+    "association_review_in_progress": "associations_confirmed",
+    "associations_confirmed": "extracting",
     "extracting": "awaiting_bundle_review",
     "awaiting_bundle_review": "bundle_review_in_progress",
     "bundle_review_in_progress": "reviewed",
@@ -134,14 +157,17 @@ def acquire_processing_lock(db, communication_id: str) -> str | None:
     expires = (datetime.utcnow() + timedelta(minutes=LOCK_DURATION_MINUTES)).isoformat()
 
     # Acquire only if not locked or lock is expired
-    cursor = db.execute("""
+    cursor = db.execute(
+        """
         UPDATE communications
         SET processing_lock_token = ?,
             locked_at = ?,
             lock_expires_at = ?
         WHERE id = ?
         AND (processing_lock_token IS NULL OR lock_expires_at < ?)
-    """, (token, now, expires, communication_id, now))
+    """,
+        (token, now, expires, communication_id, now),
+    )
     db.commit()
 
     if cursor.rowcount == 1:
@@ -151,13 +177,16 @@ def acquire_processing_lock(db, communication_id: str) -> str | None:
 
 def release_processing_lock(db, communication_id: str, token: str):
     """Release a processing lock. Only succeeds if we hold the lock."""
-    db.execute("""
+    db.execute(
+        """
         UPDATE communications
         SET processing_lock_token = NULL,
             locked_at = NULL,
             lock_expires_at = NULL
         WHERE id = ? AND processing_lock_token = ?
-    """, (communication_id, token))
+    """,
+        (communication_id, token),
+    )
     db.commit()
 
 
@@ -167,12 +196,17 @@ def renew_processing_lock(db, communication_id: str, token: str) -> bool:
     Returns True if renewal succeeded (we still hold the lock).
     Returns False if the lock was stolen or released.
     """
-    new_expires = (datetime.utcnow() + timedelta(minutes=LOCK_DURATION_MINUTES)).isoformat()
-    cursor = db.execute("""
+    new_expires = (
+        datetime.utcnow() + timedelta(minutes=LOCK_DURATION_MINUTES)
+    ).isoformat()
+    cursor = db.execute(
+        """
         UPDATE communications
         SET lock_expires_at = ?
         WHERE id = ? AND processing_lock_token = ?
-    """, (new_expires, communication_id, token))
+    """,
+        (new_expires, communication_id, token),
+    )
     db.commit()
     return cursor.rowcount == 1
 
@@ -190,9 +224,16 @@ async def _lock_renewal_task(communication_id: str, token: str, db_factory):
             try:
                 renewed = renew_processing_lock(db, communication_id, token)
                 if renewed:
-                    logger.debug("Lock renewed for %s (token %s)", communication_id[:8], token[:8])
+                    logger.debug(
+                        "Lock renewed for %s (token %s)",
+                        communication_id[:8],
+                        token[:8],
+                    )
                 else:
-                    logger.warning("Lock renewal FAILED for %s — lock may have been stolen", communication_id[:8])
+                    logger.warning(
+                        "Lock renewal FAILED for %s — lock may have been stolen",
+                        communication_id[:8],
+                    )
                     return  # Stop renewing; processing loop will detect
             finally:
                 db.close()
@@ -202,35 +243,57 @@ async def _lock_renewal_task(communication_id: str, token: str, db_factory):
             logger.warning("Lock renewal error for %s: %s", communication_id[:8], e)
 
 
-def cas_transition(db, communication_id: str, expected_status: str,
-                   next_status: str, error_message: str = None,
-                   error_stage: str = None) -> bool:
+def cas_transition(
+    db,
+    communication_id: str,
+    expected_status: str,
+    next_status: str,
+    error_message: str = None,
+    error_stage: str = None,
+) -> bool:
     """
     Atomic compare-and-set status transition.
     Returns True if the transition succeeded, False if the status was already changed.
     """
     now = datetime.utcnow().isoformat()
     # States that preserve error_message/error_stage (for targeted retry/resume)
-    _error_like_states = {"error", "paused_budget", "waiting_for_api", "awaiting_tracker"}
+    _error_like_states = {
+        "error",
+        "paused_budget",
+        "waiting_for_api",
+        "awaiting_tracker",
+    }
     if next_status in _error_like_states:
-        cursor = db.execute("""
+        cursor = db.execute(
+            """
             UPDATE communications
             SET processing_status = ?,
                 error_message = ?,
                 error_stage = ?,
                 updated_at = ?
             WHERE id = ? AND processing_status = ?
-        """, (next_status, error_message, error_stage, now,
-              communication_id, expected_status))
+        """,
+            (
+                next_status,
+                error_message,
+                error_stage,
+                now,
+                communication_id,
+                expected_status,
+            ),
+        )
     else:
-        cursor = db.execute("""
+        cursor = db.execute(
+            """
             UPDATE communications
             SET processing_status = ?,
                 error_message = NULL,
                 error_stage = NULL,
                 updated_at = ?
             WHERE id = ? AND processing_status = ?
-        """, (next_status, now, communication_id, expected_status))
+        """,
+            (next_status, now, communication_id, expected_status),
+        )
     db.commit()
     return cursor.rowcount == 1
 
@@ -280,7 +343,7 @@ async def process_communication(communication_id: str, db_factory=None):
             while True:
                 comm = db.execute(
                     "SELECT id, processing_status, source_type FROM communications WHERE id = ?",
-                    (communication_id,)
+                    (communication_id,),
                 ).fetchone()
 
                 if not comm:
@@ -291,21 +354,32 @@ async def process_communication(communication_id: str, db_factory=None):
                 source_type = comm["source_type"]
 
                 if status in TERMINAL_STATES:
-                    logger.info("Communication %s in terminal state: %s", communication_id, status)
+                    logger.info(
+                        "Communication %s in terminal state: %s",
+                        communication_id,
+                        status,
+                    )
                     break
 
                 if status in HUMAN_GATE_STATES:
-                    await publish_event("communication_status", {
-                        "communication_id": communication_id,
-                        "status": status,
-                    })
-                    logger.info("Communication %s at human gate: %s", communication_id, status)
+                    await publish_event(
+                        "communication_status",
+                        {
+                            "communication_id": communication_id,
+                            "status": status,
+                        },
+                    )
+                    logger.info(
+                        "Communication %s at human gate: %s", communication_id, status
+                    )
                     break
 
                 transitions = get_transitions_for_source(source_type)
                 next_status = transitions.get(status)
                 if not next_status:
-                    logger.warning("No transition from status %s for %s", status, communication_id)
+                    logger.warning(
+                        "No transition from status %s for %s", status, communication_id
+                    )
                     break
 
                 # Reset retry counter when stage changes
@@ -319,49 +393,86 @@ async def process_communication(communication_id: str, db_factory=None):
                     db.execute("SAVEPOINT %s" % savepoint_name)
 
                     # Run the stage handler
-                    next_status = await run_stage(db, communication_id, status, source_type)
+                    next_status = await run_stage(
+                        db, communication_id, status, source_type
+                    )
 
                     # Release savepoint (merge stage writes into main transaction)
-                    db.execute("RELEASE SAVEPOINT %s" % savepoint_name)
+                    # Note: stages may call db.commit() internally (e.g. LLM usage tracking),
+                    # which releases all savepoints. This is safe — data is already persisted.
+                    try:
+                        db.execute("RELEASE SAVEPOINT %s" % savepoint_name)
+                    except Exception:
+                        # Savepoint already released by an internal commit — data is safe
+                        db.commit()  # Ensure any uncommitted stage writes are persisted
 
                     # CAS transition
                     if not cas_transition(db, communication_id, status, next_status):
-                        logger.warning("CAS failed for %s: %s -> %s", communication_id, status, next_status)
+                        logger.warning(
+                            "CAS failed for %s: %s -> %s",
+                            communication_id,
+                            status,
+                            next_status,
+                        )
                         break
 
-                    await publish_event("communication_status", {
-                        "communication_id": communication_id,
-                        "status": next_status,
-                        "previous_status": status,
-                    })
+                    await publish_event(
+                        "communication_status",
+                        {
+                            "communication_id": communication_id,
+                            "status": next_status,
+                            "previous_status": status,
+                        },
+                    )
 
                 except Exception as e:
                     # Roll back partial stage writes before handling the error
                     try:
                         db.execute("ROLLBACK TO SAVEPOINT %s" % savepoint_name)
                         db.execute("RELEASE SAVEPOINT %s" % savepoint_name)
-                        logger.debug("Rolled back savepoint %s for %s", savepoint_name, communication_id[:8])
+                        logger.debug(
+                            "Rolled back savepoint %s for %s",
+                            savepoint_name,
+                            communication_id[:8],
+                        )
                     except Exception as rb_err:
-                        logger.warning("Savepoint rollback failed for %s: %s", communication_id[:8], rb_err)
+                        # Savepoint gone (stage committed) — data already persisted, nothing to roll back
+                        logger.debug(
+                            "Savepoint %s already released for %s (stage committed internally)",
+                            savepoint_name,
+                            communication_id[:8],
+                        )
 
                     # Budget exhaustion → paused_budget (not error)
                     from app.llm.client import BudgetExceededError, LLMError
+
                     if isinstance(e, BudgetExceededError):
                         logger.warning(
                             "Budget exceeded for %s at stage %s: %s",
-                            communication_id, status, e,
+                            communication_id,
+                            status,
+                            e,
                         )
-                        _log_error(db, communication_id, status, str(e), "paused_budget")
+                        _log_error(
+                            db, communication_id, status, str(e), "paused_budget"
+                        )
                         cas_transition(
-                            db, communication_id, status, "paused_budget",
-                            error_message=str(e), error_stage=status,
+                            db,
+                            communication_id,
+                            status,
+                            "paused_budget",
+                            error_message=str(e),
+                            error_stage=status,
                         )
-                        await publish_event("communication_status", {
-                            "communication_id": communication_id,
-                            "status": "paused_budget",
-                            "previous_status": status,
-                            "error_message": str(e),
-                        })
+                        await publish_event(
+                            "communication_status",
+                            {
+                                "communication_id": communication_id,
+                                "status": "paused_budget",
+                                "previous_status": status,
+                                "error_message": str(e),
+                            },
+                        )
                         break
 
                     # Recoverable LLM errors → retry with backoff (4B)
@@ -372,62 +483,102 @@ async def process_communication(communication_id: str, db_factory=None):
                             logger.warning(
                                 "Recoverable LLM error for %s at %s (attempt %d/3, "
                                 "retrying in %ds): %s",
-                                communication_id[:8], status, stage_retries, wait, e,
+                                communication_id[:8],
+                                status,
+                                stage_retries,
+                                wait,
+                                e,
                             )
                             await asyncio.sleep(wait)
                             continue  # Re-enter the while loop at the same stage
 
                     # LLM connection error (retries exhausted) → waiting_for_api
-                    if isinstance(e, LLMError) and e.error_type in ("connection_error", "rate_limit"):
+                    if isinstance(e, LLMError) and e.error_type in (
+                        "connection_error",
+                        "rate_limit",
+                    ):
                         logger.warning(
                             "LLM unavailable for %s at %s (retries exhausted) — deferring",
-                            communication_id[:8], status,
+                            communication_id[:8],
+                            status,
                         )
-                        _log_error(db, communication_id, status, str(e), "waiting_for_api")
+                        _log_error(
+                            db, communication_id, status, str(e), "waiting_for_api"
+                        )
                         cas_transition(
-                            db, communication_id, status, "waiting_for_api",
-                            error_message=str(e), error_stage=status,
+                            db,
+                            communication_id,
+                            status,
+                            "waiting_for_api",
+                            error_message=str(e),
+                            error_stage=status,
                         )
-                        await publish_event("communication_status", {
-                            "communication_id": communication_id,
-                            "status": "waiting_for_api",
-                            "previous_status": status,
-                        })
+                        await publish_event(
+                            "communication_status",
+                            {
+                                "communication_id": communication_id,
+                                "status": "waiting_for_api",
+                                "previous_status": status,
+                            },
+                        )
                         break
 
                     # Tracker connection error → awaiting_tracker
                     from app.writeback.tracker_client import TrackerBatchError
-                    if isinstance(e, TrackerBatchError) and e.error_type == "connection_error":
+
+                    if (
+                        isinstance(e, TrackerBatchError)
+                        and e.error_type == "connection_error"
+                    ):
                         logger.warning(
                             "Tracker unavailable for %s at %s — deferring",
-                            communication_id[:8], status,
+                            communication_id[:8],
+                            status,
                         )
-                        _log_error(db, communication_id, status, str(e), "awaiting_tracker")
+                        _log_error(
+                            db, communication_id, status, str(e), "awaiting_tracker"
+                        )
                         cas_transition(
-                            db, communication_id, status, "awaiting_tracker",
-                            error_message=str(e), error_stage=status,
+                            db,
+                            communication_id,
+                            status,
+                            "awaiting_tracker",
+                            error_message=str(e),
+                            error_stage=status,
                         )
-                        await publish_event("communication_status", {
-                            "communication_id": communication_id,
-                            "status": "awaiting_tracker",
-                            "previous_status": status,
-                        })
+                        await publish_event(
+                            "communication_status",
+                            {
+                                "communication_id": communication_id,
+                                "status": "awaiting_tracker",
+                                "previous_status": status,
+                            },
+                        )
                         break
 
                     # Non-recoverable error
-                    logger.error("Stage %s failed for %s: %s", status, communication_id, str(e))
+                    logger.error(
+                        "Stage %s failed for %s: %s", status, communication_id, str(e)
+                    )
                     _log_error(db, communication_id, status, str(e))
                     cas_transition(
-                        db, communication_id, status, "error",
-                        error_message=str(e), error_stage=status
+                        db,
+                        communication_id,
+                        status,
+                        "error",
+                        error_message=str(e),
+                        error_stage=status,
                     )
-                    await publish_event("communication_status", {
-                        "communication_id": communication_id,
-                        "status": "error",
-                        "previous_status": status,
-                        "error_message": str(e),
-                        "error_stage": status,
-                    })
+                    await publish_event(
+                        "communication_status",
+                        {
+                            "communication_id": communication_id,
+                            "status": "error",
+                            "previous_status": status,
+                            "error_message": str(e),
+                            "error_stage": status,
+                        },
+                    )
                     break
 
         finally:
@@ -524,8 +675,11 @@ async def _handle_attachment_processing(db, communication_id: str) -> str:
 
     # If all participants are auto-confirmed, skip participant review
     if result["all_confirmed"]:
-        logger.info("[%s] All %d participants auto-confirmed -- skipping review",
-                    communication_id[:8], result["total"])
+        logger.info(
+            "[%s] All %d participants auto-confirmed -- skipping review",
+            communication_id[:8],
+            result["total"],
+        )
         return "participants_confirmed"
 
     return "awaiting_participant_review"
@@ -547,11 +701,14 @@ async def _handle_preprocessing(db, communication_id: str) -> str:
     if not original_path.exists():
         raise FileNotFoundError(f"Audio file not found on disk: {original_path}")
 
-    await publish_event("stage_progress", {
-        "communication_id": communication_id,
-        "stage": "preprocessing",
-        "message": f"Normalizing {audio_row['original_filename']}...",
-    })
+    await publish_event(
+        "stage_progress",
+        {
+            "communication_id": communication_id,
+            "stage": "preprocessing",
+            "message": f"Normalizing {audio_row['original_filename']}...",
+        },
+    )
 
     # Run preprocessing (synchronous, wrapped for async)
     loop = asyncio.get_event_loop()
@@ -561,36 +718,50 @@ async def _handle_preprocessing(db, communication_id: str) -> str:
 
     # Update audio_files with normalized path info
     import json
-    db.execute("""
+
+    db.execute(
+        """
         UPDATE communications
         SET source_metadata = COALESCE(source_metadata, ?),
             updated_at = datetime('now')
         WHERE id = ?
-    """, (json.dumps(metadata), communication_id))
+    """,
+        (json.dumps(metadata), communication_id),
+    )
     db.commit()
 
     # Store the normalized path for downstream stages
     # We store it as a second audio_files record with format='wav_normalized'
-    db.execute("""
+    db.execute(
+        """
         INSERT OR IGNORE INTO audio_files
             (id, communication_id, file_path, original_filename, format,
              file_size_bytes, created_at)
         VALUES (?, ?, ?, ?, 'wav_normalized', ?, datetime('now'))
-    """, (
-        str(uuid.uuid4()), communication_id,
-        str(normalized_path), normalized_path.name,
-        normalized_path.stat().st_size if normalized_path.exists() else None,
-    ))
+    """,
+        (
+            str(uuid.uuid4()),
+            communication_id,
+            str(normalized_path),
+            normalized_path.name,
+            normalized_path.stat().st_size if normalized_path.exists() else None,
+        ),
+    )
     db.commit()
 
-    await publish_event("stage_progress", {
-        "communication_id": communication_id,
-        "stage": "preprocessing",
-        "message": "Preprocessing complete",
-        "normalized_path": str(normalized_path),
-    })
+    await publish_event(
+        "stage_progress",
+        {
+            "communication_id": communication_id,
+            "stage": "preprocessing",
+            "message": "Preprocessing complete",
+            "normalized_path": str(normalized_path),
+        },
+    )
 
-    logger.info("[%s] Preprocessing complete: %s", communication_id[:8], normalized_path.name)
+    logger.info(
+        "[%s] Preprocessing complete: %s", communication_id[:8], normalized_path.name
+    )
     return "transcribing"  # next state
 
 
@@ -619,20 +790,26 @@ async def _handle_transcription(db, communication_id: str) -> str:
     if not audio_path.exists():
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
-    await publish_event("stage_progress", {
-        "communication_id": communication_id,
-        "stage": "transcribing",
-        "message": "Sending to transcription worker...",
-    })
+    await publish_event(
+        "stage_progress",
+        {
+            "communication_id": communication_id,
+            "stage": "transcribing",
+            "message": "Sending to transcription worker...",
+        },
+    )
 
     result = await run_transcription_stage(db, communication_id, audio_path)
 
-    await publish_event("stage_progress", {
-        "communication_id": communication_id,
-        "stage": "transcribing",
-        "message": f"Transcription complete: {len(result.segments)} segments, "
-                   f"{result.num_speakers} speakers, {result.duration:.0f}s",
-    })
+    await publish_event(
+        "stage_progress",
+        {
+            "communication_id": communication_id,
+            "stage": "transcribing",
+            "message": f"Transcription complete: {len(result.segments)} segments, "
+            f"{result.num_speakers} speakers, {result.duration:.0f}s",
+        },
+    )
 
     return "cleaning"  # next state
 
@@ -641,22 +818,28 @@ async def _handle_cleanup(db, communication_id: str) -> str:
     """Run Haiku transcript cleanup (filler removal, punctuation, etc.)."""
     from app.pipeline.stages.cleanup import run_cleanup_stage
 
-    await publish_event("stage_progress", {
-        "communication_id": communication_id,
-        "stage": "cleaning",
-        "message": "Running Haiku transcript cleanup...",
-    })
+    await publish_event(
+        "stage_progress",
+        {
+            "communication_id": communication_id,
+            "stage": "cleaning",
+            "message": "Running Haiku transcript cleanup...",
+        },
+    )
 
     result = await run_cleanup_stage(db, communication_id)
 
-    await publish_event("stage_progress", {
-        "communication_id": communication_id,
-        "stage": "cleaning",
-        "message": (
-            f"Cleanup complete: {result['segments_cleaned']} segments, "
-            f"${result['total_cost_usd']:.4f}"
-        ),
-    })
+    await publish_event(
+        "stage_progress",
+        {
+            "communication_id": communication_id,
+            "stage": "cleaning",
+            "message": (
+                f"Cleanup complete: {result['segments_cleaned']} segments, "
+                f"${result['total_cost_usd']:.4f}"
+            ),
+        },
+    )
 
     logger.info(
         "[%s] Cleanup stage done: %d segments cleaned, $%.4f",
@@ -671,22 +854,28 @@ async def _handle_enrichment(db, communication_id: str) -> str:
     """Run Haiku enrichment (summary, topics, entities, sensitivity flags)."""
     from app.pipeline.stages.enrichment import run_enrichment_stage
 
-    await publish_event("stage_progress", {
-        "communication_id": communication_id,
-        "stage": "enriching",
-        "message": "Running Haiku enrichment...",
-    })
+    await publish_event(
+        "stage_progress",
+        {
+            "communication_id": communication_id,
+            "stage": "enriching",
+            "message": "Running Haiku enrichment...",
+        },
+    )
 
     result = await run_enrichment_stage(db, communication_id)
 
-    await publish_event("stage_progress", {
-        "communication_id": communication_id,
-        "stage": "enriching",
-        "message": (
-            f"Enrichment complete: {result['entities_found']} entities, "
-            f"{result['topics_found']} topics, ${result['total_cost_usd']:.4f}"
-        ),
-    })
+    await publish_event(
+        "stage_progress",
+        {
+            "communication_id": communication_id,
+            "stage": "enriching",
+            "message": (
+                f"Enrichment complete: {result['entities_found']} entities, "
+                f"{result['topics_found']} topics, ${result['total_cost_usd']:.4f}"
+            ),
+        },
+    )
 
     logger.info(
         "[%s] Enrichment stage done: %d entities, %d topics, $%.4f",
@@ -695,18 +884,21 @@ async def _handle_enrichment(db, communication_id: str) -> str:
         result["topics_found"],
         result["total_cost_usd"],
     )
-    return "awaiting_entity_review"  # next state
+    return "awaiting_association_review"  # next state
 
 
 async def _handle_extraction(db, communication_id: str) -> str:
     """Run Sonnet extraction (structured intelligence proposals from transcript)."""
     from app.pipeline.stages.extraction import run_extraction_stage
 
-    await publish_event("stage_progress", {
-        "communication_id": communication_id,
-        "stage": "extracting",
-        "message": "Running Sonnet extraction...",
-    })
+    await publish_event(
+        "stage_progress",
+        {
+            "communication_id": communication_id,
+            "stage": "extracting",
+            "message": "Running Sonnet extraction...",
+        },
+    )
 
     result = await run_extraction_stage(db, communication_id)
 
@@ -714,16 +906,19 @@ async def _handle_extraction(db, communication_id: str) -> str:
     if result.get("escalated"):
         escalation_note = f" (escalated to {result.get('model_used', 'Opus')})"
 
-    await publish_event("stage_progress", {
-        "communication_id": communication_id,
-        "stage": "extracting",
-        "message": (
-            f"Extraction complete{escalation_note}: {result['bundles_created']} bundles, "
-            f"{result['items_created']} items, "
-            f"{result['items_suppressed']} suppressed, "
-            f"${result['total_cost_usd']:.4f}"
-        ),
-    })
+    await publish_event(
+        "stage_progress",
+        {
+            "communication_id": communication_id,
+            "stage": "extracting",
+            "message": (
+                f"Extraction complete{escalation_note}: {result['bundles_created']} bundles, "
+                f"{result['items_created']} items, "
+                f"{result['items_suppressed']} suppressed, "
+                f"${result['total_cost_usd']:.4f}"
+            ),
+        },
+    )
 
     logger.info(
         "[%s] Extraction stage done: %d bundles, %d items, %d suppressed, "
@@ -746,22 +941,35 @@ async def _handle_committing(db, communication_id: str) -> str:
     # Pre-commit health check: verify tracker is reachable before starting
     import httpx
     from app.config import TRACKER_BASE_URL
+
     try:
         async with httpx.AsyncClient(timeout=5.0) as hc:
-            health_url = TRACKER_BASE_URL.rstrip("/").rsplit("/tracker", 1)[0] + "/tracker/health"
+            health_url = (
+                TRACKER_BASE_URL.rstrip("/").rsplit("/tracker", 1)[0]
+                + "/tracker/health"
+            )
             resp = await hc.get(health_url)
         if resp.status_code != 200:
-            raise TrackerBatchError(0, "connection_error",
-                                    "Pre-commit health check: tracker returned %d" % resp.status_code)
+            raise TrackerBatchError(
+                0,
+                "connection_error",
+                "Pre-commit health check: tracker returned %d" % resp.status_code,
+            )
     except (httpx.ConnectError, httpx.TimeoutException, OSError) as e:
-        raise TrackerBatchError(0, "connection_error",
-                                "Pre-commit health check: tracker unreachable — %s" % e)
+        raise TrackerBatchError(
+            0,
+            "connection_error",
+            "Pre-commit health check: tracker unreachable — %s" % e,
+        )
 
-    await publish_event("stage_progress", {
-        "communication_id": communication_id,
-        "stage": "committing",
-        "message": "Committing reviewed items to tracker...",
-    })
+    await publish_event(
+        "stage_progress",
+        {
+            "communication_id": communication_id,
+            "stage": "committing",
+            "message": "Committing reviewed items to tracker...",
+        },
+    )
 
     result = await commit_communication(db, communication_id)
 
@@ -769,7 +977,8 @@ async def _handle_committing(db, communication_id: str) -> str:
         # Partial failure — raise so orchestrator transitions to error
         failed_details = [
             f"{br.bundle_id[:8]}({br.error_type}: {br.error})"
-            for br in result.bundle_results if not br.success
+            for br in result.bundle_results
+            if not br.success
         ]
         raise RuntimeError(
             f"Commit partial failure: {result.bundles_failed} bundles failed "
@@ -777,14 +986,17 @@ async def _handle_committing(db, communication_id: str) -> str:
             f"Failures: {'; '.join(failed_details)}"
         )
 
-    await publish_event("stage_progress", {
-        "communication_id": communication_id,
-        "stage": "committing",
-        "message": (
-            f"Commit complete: {result.bundles_committed} bundles, "
-            f"{result.total_records} records written"
-        ),
-    })
+    await publish_event(
+        "stage_progress",
+        {
+            "communication_id": communication_id,
+            "stage": "committing",
+            "message": (
+                f"Commit complete: {result.bundles_committed} bundles, "
+                f"{result.total_records} records written"
+            ),
+        },
+    )
 
     logger.info(
         "[%s] Committing stage done: %d bundles committed, %d records, %d skipped",

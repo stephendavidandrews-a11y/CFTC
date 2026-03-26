@@ -48,7 +48,9 @@ def extract_vocal_features(audio_path: Path, start: float, end: float) -> dict:
 
         # Jitter and Shimmer
         point_process = call(snd, "To PointProcess (periodic, cc)", 75, 600)
-        features["jitter"] = call(point_process, "Get jitter (local)", 0, 0, 0.0001, 0.02, 1.3)
+        features["jitter"] = call(
+            point_process, "Get jitter (local)", 0, 0, 0.0001, 0.02, 1.3
+        )
         features["shimmer"] = call(
             [snd, point_process], "Get shimmer (local)", 0, 0, 0.0001, 0.02, 1.3, 1.6
         )
@@ -138,10 +140,21 @@ def aggregate_speaker_features(
     # Average numeric features across segments
     aggregated = {}
     numeric_keys = [
-        "pitch_mean", "pitch_std", "pitch_min", "pitch_max",
-        "jitter", "shimmer", "hnr", "intensity_mean",
-        "f1_mean", "f2_mean", "f3_mean",
-        "rms_mean", "spectral_centroid", "zcr_mean", "spectral_rolloff",
+        "pitch_mean",
+        "pitch_std",
+        "pitch_min",
+        "pitch_max",
+        "jitter",
+        "shimmer",
+        "hnr",
+        "intensity_mean",
+        "f1_mean",
+        "f2_mean",
+        "f3_mean",
+        "rms_mean",
+        "spectral_centroid",
+        "zcr_mean",
+        "spectral_rolloff",
         "speaking_rate_wpm",
     ]
 

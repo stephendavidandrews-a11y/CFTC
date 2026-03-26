@@ -42,6 +42,7 @@ logger = logging.getLogger(__name__)
 # Typed errors
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class UndoErrorType(str, Enum):
     INVALID_COMMUNICATION = "invalid_communication"
     NOT_UNDOABLE_STATE = "not_undoable_state"
@@ -56,8 +57,10 @@ class UndoErrorType(str, Enum):
 
 class UndoError(Exception):
     """Typed undo failure."""
-    def __init__(self, error_type: UndoErrorType, message: str,
-                 details: dict | None = None):
+
+    def __init__(
+        self, error_type: UndoErrorType, message: str, details: dict | None = None
+    ):
         self.error_type = error_type
         self.message = message
         self.details = details or {}
@@ -68,9 +71,11 @@ class UndoError(Exception):
 # Data structures
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class ConflictInfo:
     """A single field-level conflict between written and current state."""
+
     writeback_id: str
     target_table: str
     target_record_id: str
@@ -83,6 +88,7 @@ class ConflictInfo:
 @dataclass
 class WritebackReversal:
     """Result of reversing a single writeback."""
+
     writeback_id: str
     target_table: str
     target_record_id: str
@@ -97,6 +103,7 @@ class WritebackReversal:
 @dataclass
 class UndoResult:
     """Complete undo operation result."""
+
     communication_id: str
     success: bool = False
     total_writebacks: int = 0
@@ -118,8 +125,15 @@ TRACKER_TIMEOUT = 30.0
 
 # Fields to ignore when detecting conflicts (system-managed, not user-editable)
 SYSTEM_FIELDS = {
-    "id", "created_at", "updated_at", "created_by", "updated_by",
-    "source", "source_id", "ai_confidence", "automation_hold",
+    "id",
+    "created_at",
+    "updated_at",
+    "created_by",
+    "updated_by",
+    "source",
+    "source_id",
+    "ai_confidence",
+    "automation_hold",
     "external_refs",
 }
 
@@ -127,6 +141,7 @@ SYSTEM_FIELDS = {
 # ═══════════════════════════════════════════════════════════════════════════
 # Tracker HTTP helpers
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def _tracker_auth():
     if TRACKER_USER and TRACKER_PASS:
@@ -144,7 +159,9 @@ async def _tracker_get(table: str, record_id: str) -> dict | None:
             return resp.json()
         if resp.status_code == 404:
             return None
-        logger.warning("Tracker GET %s/%s returned %d", table, record_id[:8], resp.status_code)
+        logger.warning(
+            "Tracker GET %s/%s returned %d", table, record_id[:8], resp.status_code
+        )
         return None
     except (httpx.ConnectError, httpx.TimeoutException) as e:
         logger.error("Tracker GET failed: %s", e)
@@ -159,8 +176,13 @@ async def _tracker_delete(table: str, record_id: str) -> bool:
             resp = await client.delete(url, auth=_tracker_auth())
         if resp.status_code in (200, 204, 404):
             return True
-        logger.warning("Tracker DELETE %s/%s returned %d: %s",
-                       table, record_id[:8], resp.status_code, resp.text[:200])
+        logger.warning(
+            "Tracker DELETE %s/%s returned %d: %s",
+            table,
+            record_id[:8],
+            resp.status_code,
+            resp.text[:200],
+        )
         return False
     except (httpx.ConnectError, httpx.TimeoutException) as e:
         logger.error("Tracker DELETE failed: %s", e)
@@ -175,8 +197,13 @@ async def _tracker_update(table: str, record_id: str, data: dict) -> bool:
             resp = await client.put(url, json=data, auth=_tracker_auth())
         if resp.status_code in (200, 204):
             return True
-        logger.warning("Tracker PUT %s/%s returned %d: %s",
-                       table, record_id[:8], resp.status_code, resp.text[:200])
+        logger.warning(
+            "Tracker PUT %s/%s returned %d: %s",
+            table,
+            record_id[:8],
+            resp.status_code,
+            resp.text[:200],
+        )
         return False
     except (httpx.ConnectError, httpx.TimeoutException) as e:
         logger.error("Tracker PUT failed: %s", e)
@@ -186,6 +213,7 @@ async def _tracker_update(table: str, record_id: str, data: dict) -> bool:
 # ═══════════════════════════════════════════════════════════════════════════
 # Conflict detection
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def _detect_conflicts(
     writeback_id: str,
@@ -229,15 +257,17 @@ def _detect_conflicts(
             continue
 
         if written_value != current_value:
-            conflicts.append(ConflictInfo(
-                writeback_id=writeback_id,
-                target_table=target_table,
-                target_record_id=target_record_id,
-                write_type=write_type,
-                field_name=field_name,
-                written_value=written_value,
-                current_value=current_value,
-            ))
+            conflicts.append(
+                ConflictInfo(
+                    writeback_id=writeback_id,
+                    target_table=target_table,
+                    target_record_id=target_record_id,
+                    write_type=write_type,
+                    field_name=field_name,
+                    written_value=written_value,
+                    current_value=current_value,
+                )
+            )
 
     return conflicts
 
@@ -273,6 +303,7 @@ def _undo_sort_key(wb: dict) -> int:
 # ═══════════════════════════════════════════════════════════════════════════
 # Main undo function
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 async def undo_communication(
     db,
@@ -315,14 +346,17 @@ async def undo_communication(
         )
 
     # ── Step 2: Load non-reversed writebacks ──
-    writebacks = db.execute("""
+    writebacks = db.execute(
+        """
         SELECT id, communication_id, bundle_id, bundle_item_id,
                target_table, target_record_id, write_type,
                written_data, previous_data, reversed
         FROM tracker_writebacks
         WHERE communication_id = ? AND reversed = 0
         ORDER BY rowid ASC
-    """, (communication_id,)).fetchall()
+    """,
+        (communication_id,),
+    ).fetchall()
 
     result.total_writebacks = len(writebacks)
 
@@ -350,10 +384,17 @@ async def undo_communication(
     wb_list.sort(key=_undo_sort_key)
 
     # ── Step 3: Audit undo_started ──
-    write_audit(db, communication_id, None, None, "undo_started", {
-        "total_writebacks": len(wb_list),
-        "force": force,
-    })
+    write_audit(
+        db,
+        communication_id,
+        None,
+        None,
+        "undo_started",
+        {
+            "total_writebacks": len(wb_list),
+            "force": force,
+        },
+    )
     db.commit()
 
     # ── Step 4: Conflict detection pass (unless force) ──
@@ -372,20 +413,26 @@ async def undo_communication(
                 # Record missing — for inserts, this is fine (already deleted)
                 # For updates, this is unexpected
                 if wb["write_type"] == "update":
-                    all_conflicts.append(ConflictInfo(
-                        writeback_id=wb["id"],
-                        target_table=wb["target_table"],
-                        target_record_id=wb["target_record_id"],
-                        write_type=wb["write_type"],
-                        field_name="_record",
-                        written_value="exists",
-                        current_value="missing",
-                    ))
+                    all_conflicts.append(
+                        ConflictInfo(
+                            writeback_id=wb["id"],
+                            target_table=wb["target_table"],
+                            target_record_id=wb["target_record_id"],
+                            write_type=wb["write_type"],
+                            field_name="_record",
+                            written_value="exists",
+                            current_value="missing",
+                        )
+                    )
                 continue
 
             conflicts = _detect_conflicts(
-                wb["id"], wb["target_table"], wb["target_record_id"],
-                wb["write_type"], written_data, current,
+                wb["id"],
+                wb["target_table"],
+                wb["target_record_id"],
+                wb["write_type"],
+                written_data,
+                current,
             )
             all_conflicts.extend(conflicts)
 
@@ -401,20 +448,27 @@ async def undo_communication(
         )
 
         # Audit conflict
-        write_audit(db, communication_id, None, None, "undo_conflict_detected", {
-            "conflict_count": len(all_conflicts),
-            "affected_tables": list(set(c.target_table for c in all_conflicts)),
-            "conflicts": [
-                {
-                    "table": c.target_table,
-                    "record_id": c.target_record_id,
-                    "field": c.field_name,
-                    "written": str(c.written_value)[:200],
-                    "current": str(c.current_value)[:200],
-                }
-                for c in all_conflicts[:20]  # cap audit detail
-            ],
-        })
+        write_audit(
+            db,
+            communication_id,
+            None,
+            None,
+            "undo_conflict_detected",
+            {
+                "conflict_count": len(all_conflicts),
+                "affected_tables": list(set(c.target_table for c in all_conflicts)),
+                "conflicts": [
+                    {
+                        "table": c.target_table,
+                        "record_id": c.target_record_id,
+                        "field": c.field_name,
+                        "written": str(c.written_value)[:200],
+                        "current": str(c.current_value)[:200],
+                    }
+                    for c in all_conflicts[:20]  # cap audit detail
+                ],
+            },
+        )
         db.commit()
 
         return result
@@ -445,7 +499,9 @@ async def undo_communication(
                 previous = _parse_json(wb["previous_data"])
                 if previous:
                     ok = await _tracker_update(
-                        wb["target_table"], wb["target_record_id"], previous,
+                        wb["target_table"],
+                        wb["target_record_id"],
+                        previous,
                     )
                     if ok:
                         reversal.success = True
@@ -467,8 +523,11 @@ async def undo_communication(
 
         except Exception as e:
             reversal.error = str(e)
-            logger.exception("[%s] Undo reversal failed for writeback %s",
-                             communication_id[:8], wb["id"][:8])
+            logger.exception(
+                "[%s] Undo reversal failed for writeback %s",
+                communication_id[:8],
+                wb["id"][:8],
+            )
 
         result.reversals.append(reversal)
 
@@ -480,35 +539,54 @@ async def undo_communication(
 
     # ── Step 7: Update communication status ──
     if result.success:
-        db.execute("""
+        db.execute(
+            """
             UPDATE communications
             SET processing_status = 'reviewed',
                 error_message = NULL,
                 error_stage = NULL,
                 updated_at = datetime('now')
             WHERE id = ?
-        """, (communication_id,))
+        """,
+            (communication_id,),
+        )
         db.commit()
 
-        write_audit(db, communication_id, None, None, "undo_complete", {
-            "reversed_count": result.reversed_count,
-            "skipped_count": result.skipped_count,
-            "forced": force,
-        })
+        write_audit(
+            db,
+            communication_id,
+            None,
+            None,
+            "undo_complete",
+            {
+                "reversed_count": result.reversed_count,
+                "skipped_count": result.skipped_count,
+                "forced": force,
+            },
+        )
         db.commit()
 
         logger.info(
             "[%s] Undo complete: %d reversed, %d skipped",
-            communication_id[:8], result.reversed_count, result.skipped_count,
+            communication_id[:8],
+            result.reversed_count,
+            result.skipped_count,
         )
     else:
         # Partial failure — leave status as-is, record the failure
-        write_audit(db, communication_id, None, None, "undo_partial_failure", {
-            "reversed_count": result.reversed_count,
-            "failed_count": len(failed_reversals),
-            "skipped_count": result.skipped_count,
-            "failed_tables": [r.target_table for r in failed_reversals],
-        })
+        write_audit(
+            db,
+            communication_id,
+            None,
+            None,
+            "undo_partial_failure",
+            {
+                "reversed_count": result.reversed_count,
+                "failed_count": len(failed_reversals),
+                "skipped_count": result.skipped_count,
+                "failed_tables": [r.target_table for r in failed_reversals],
+            },
+        )
         db.commit()
 
         result.error_type = UndoErrorType.PARTIAL_FAILURE
@@ -519,7 +597,9 @@ async def undo_communication(
 
         logger.warning(
             "[%s] Undo partial failure: %d reversed, %d failed",
-            communication_id[:8], result.reversed_count, len(failed_reversals),
+            communication_id[:8],
+            result.reversed_count,
+            len(failed_reversals),
         )
 
     return result
@@ -529,13 +609,17 @@ async def undo_communication(
 # Helpers
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _mark_reversed(db, writeback_id: str):
     """Mark a single tracker_writebacks row as reversed."""
-    db.execute("""
+    db.execute(
+        """
         UPDATE tracker_writebacks
         SET reversed = 1, reversed_at = datetime('now')
         WHERE id = ?
-    """, (writeback_id,))
+    """,
+        (writeback_id,),
+    )
 
 
 def _parse_json(raw: str | None) -> dict | None:

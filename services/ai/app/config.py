@@ -3,6 +3,7 @@ Configuration for the CFTC AI Layer service.
 
 Loads ai_policy.json for runtime policy, env vars for infrastructure.
 """
+
 import json
 import os
 import sys
@@ -11,6 +12,7 @@ import logging
 from pathlib import Path
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 logger = logging.getLogger(__name__)
@@ -24,7 +26,9 @@ PROMPT_BASE_DIR = BASE_DIR / "prompts"
 
 AI_DB_PATH = Path(os.environ.get("AI_DB_PATH", str(BASE_DIR / "data" / "ai.db")))
 AI_UPLOAD_DIR = Path(os.environ.get("AI_UPLOAD_DIR", str(BASE_DIR / "uploads")))
-AI_AUDIO_WATCH_DIR = Path(os.environ.get("AI_AUDIO_WATCH_DIR", str(BASE_DIR / "audio-inbox")))
+AI_AUDIO_WATCH_DIR = Path(
+    os.environ.get("AI_AUDIO_WATCH_DIR", str(BASE_DIR / "audio-inbox"))
+)
 
 TRACKER_BASE_URL = os.environ.get("TRACKER_BASE_URL", "http://tracker:8004/tracker")
 TRACKER_USER = os.environ.get("TRACKER_USER", "")
@@ -55,10 +59,9 @@ CORS_ORIGINS = [
 # Policy config (ai_policy.json)
 # ---------------------------------------------------------------------------
 
-CONFIG_PATH = Path(os.environ.get(
-    "AI_CONFIG_PATH",
-    str(BASE_DIR / "config" / "ai_policy.json")
-))
+CONFIG_PATH = Path(
+    os.environ.get("AI_CONFIG_PATH", str(BASE_DIR / "config" / "ai_policy.json"))
+)
 
 _policy_cache: dict | None = None
 
@@ -127,10 +130,13 @@ def _log_config_change(db, section: str, old_data, new_data):
         old_val = json.dumps(old_flat.get(key), default=str)
         new_val = json.dumps(new_flat.get(key), default=str)
         if old_val != new_val:
-            db.execute("""
+            db.execute(
+                """
                 INSERT INTO config_audit_log (id, section, field, old_value, new_value)
                 VALUES (?, ?, ?, ?, ?)
-            """, (str(uuid.uuid4()), section, key, old_val, new_val))
+            """,
+                (str(uuid.uuid4()), section, key, old_val, new_val),
+            )
     db.commit()
 
 
@@ -153,14 +159,14 @@ def _default_policy() -> dict:
             "tracker_person_id": None,
             "email_addresses": [],
             "name": "",
-            "title": ""
+            "title": "",
         },
         "routing_policy": {
             "new_matter_threshold": "low",
             "match_confidence_minimum": 0.5,
             "multi_matter_enabled": True,
             "max_new_matters_per_communication": 3,
-            "standalone_items_enabled": True
+            "standalone_items_enabled": True,
         },
         "extraction_policy": {
             "propose_tasks": True,
@@ -174,19 +180,26 @@ def _default_policy() -> dict:
             "propose_status_changes": False,
             "propose_documents": True,
             "capture_stance_data": True,
-            "capture_intelligence_notes": True
+            "capture_intelligence_notes": True,
         },
         "sensitivity_policy": {
             "flag_enforcement_sensitive": True,
             "flag_congressional_sensitive": True,
-            "flag_deliberative": True
+            "flag_deliberative": True,
         },
         "trust_config": {
             action: {"mode": "review_required", "auto_commit_threshold": None}
             for action in [
-                "task", "matter_update", "decision", "status_change",
-                "meeting_record", "stakeholder_addition", "new_matter",
-                "new_person", "new_organization", "document"
+                "task",
+                "matter_update",
+                "decision",
+                "status_change",
+                "meeting_record",
+                "stakeholder_addition",
+                "new_matter",
+                "new_person",
+                "new_organization",
+                "document",
             ]
         },
         "model_config": {
@@ -197,55 +210,53 @@ def _default_policy() -> dict:
                 "low_confidence": True,
                 "over_splitting": True,
                 "uncertainty_flags": True,
-                "validation_failure": True
+                "validation_failure": True,
             },
             "active_prompt_versions": {
-                "extraction": "v1.0.0",
+                "extraction": "v3.0.0",
                 "haiku_cleanup": "v1.0.0",
-                "haiku_enrichment": "v1.0.0"
+                "haiku_enrichment": "v2.0.0",
             },
             "daily_budget_usd": 10.00,
-            "budget_warning_threshold": 0.80
+            "budget_warning_threshold": 0.80,
+        },
+        "enrichment": {
+            "include_people_registry": True,
+            "include_orgs_registry": True,
+            "include_matters_list": True,
+            "include_directives_list": True,
+            "max_registry_entries": 500,
         },
         "proactive_config": {
             "daily_digest": {
                 "enabled": False,
                 "schedule_time": "06:00",
-                "email_digest": False
+                "email_digest": False,
             },
             "weekly_brief": {
                 "enabled": False,
                 "schedule_day": "sunday",
                 "schedule_time": "20:00",
-                "auto_boss_brief": False
+                "auto_boss_brief": False,
             },
-            "realtime_alerts": {
-                "enabled": False,
-                "check_interval_minutes": 60
-            },
+            "realtime_alerts": {"enabled": False, "check_interval_minutes": 60},
             "deadline_thresholds": {
                 "critical_days": 3,
                 "warning_days": 7,
                 "external_deadline_critical_days": 3,
                 "decision_deadline_critical_days": 3,
-                "work_deadline_critical_days": 3
+                "work_deadline_critical_days": 3,
             },
             "staleness_thresholds": {
                 "critical_this_week_days": 5,
                 "important_this_month_days": 10,
                 "strategic_slow_burn_days": 21,
-                "monitoring_only_days": 30
+                "monitoring_only_days": 30,
             },
-            "followup_thresholds": {
-                "overdue_alert": True,
-                "upcoming_days": 3
-            },
-            "workload_thresholds": {
-                "multiplier": 2.0,
-                "max_matters_flag": 5
-            },
-            "snooze_options_days": [3, 7, 14, 30]
-        }
+            "followup_thresholds": {"overdue_alert": True, "upcoming_days": 3},
+            "workload_thresholds": {"multiplier": 2.0, "max_matters_flag": 5},
+            "snooze_options_days": [3, 7, 14, 30],
+        },
     }
 
 
@@ -260,9 +271,13 @@ def validate_config():
         errors.append(f"Upload directory parent does not exist: {AI_UPLOAD_DIR.parent}")
     if errors:
         import sys
+
         for err in errors:
             print(f"CONFIG ERROR: {err}", file=sys.stderr)
         if os.environ.get("APP_ENV") == "production":
             sys.exit(1)
         else:
-            print("WARNING: Running with config errors (non-production mode)", file=sys.stderr)
+            print(
+                "WARNING: Running with config errors (non-production mode)",
+                file=sys.stderr,
+            )

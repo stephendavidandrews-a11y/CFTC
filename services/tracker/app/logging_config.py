@@ -9,6 +9,7 @@ Usage in any module:
 Request-scoped context (request_id, user) is automatically bound
 by the request ID middleware and available in all log events.
 """
+
 import logging
 import os
 import sys

@@ -23,8 +23,14 @@ PROMPT_DIR = PROMPT_BASE_DIR / "meeting_intelligence"
 # --- Tier gating ---
 
 FULL_TIER_MEETING_TYPES = {
-    "leadership meeting", "interagency meeting", "Hill meeting", "briefing",
-    "industry meeting", "commissioner office", "client meeting", "check-in",
+    "leadership meeting",
+    "interagency meeting",
+    "Hill meeting",
+    "briefing",
+    "industry meeting",
+    "commissioner office",
+    "client meeting",
+    "check-in",
 }
 
 
@@ -51,6 +57,7 @@ def determine_tier(
 
 # --- Prompt loading ---
 
+
 def _load_prompt(version: str) -> str:
     prompt_path = PROMPT_DIR / f"{version}.md"
     if not prompt_path.exists():
@@ -59,6 +66,7 @@ def _load_prompt(version: str) -> str:
 
 
 # --- Context assembly ---
+
 
 def _build_user_prompt(
     db,
@@ -81,17 +89,24 @@ def _build_user_prompt(
         sections.append(f"Type: {meeting_data['meeting_type']}")
     if meeting_data.get("purpose"):
         sections.append(f"Purpose: {meeting_data['purpose']}")
-    sections.append(f"Boss attends: {'yes' if meeting_data.get('boss_attends') else 'no'}")
-    sections.append(f"External parties: {'yes' if meeting_data.get('external_parties_attend') else 'no'}")
+    sections.append(
+        f"Boss attends: {'yes' if meeting_data.get('boss_attends') else 'no'}"
+    )
+    sections.append(
+        f"External parties: {'yes' if meeting_data.get('external_parties_attend') else 'no'}"
+    )
 
     # Participants
-    participants = db.execute("""
+    participants = db.execute(
+        """
         SELECT cp.speaker_label, cp.proposed_name, cp.proposed_title,
                cp.proposed_org, cp.participant_role
         FROM communication_participants cp
         WHERE cp.communication_id = ?
         ORDER BY cp.speaker_label
-    """, (communication_id,)).fetchall()
+    """,
+        (communication_id,),
+    ).fetchall()
 
     if participants:
         sections.append("\n## Participants\n")
@@ -112,8 +127,10 @@ def _build_user_prompt(
     # Committed items
     if committed_items:
         sections.append("\n## Items Committed to Tracker\n")
-        sections.append("These items were extracted from this conversation and have been "
-                        "confirmed and written to the tracking system:\n")
+        sections.append(
+            "These items were extracted from this conversation and have been "
+            "confirmed and written to the tracking system:\n"
+        )
         for item in committed_items:
             sections.append(f"### {item['item_type']}: {item.get('title', 'Untitled')}")
             data = item.get("proposed_data", {})
@@ -122,22 +139,34 @@ def _build_user_prompt(
                     data = json.loads(data)
                 except (json.JSONDecodeError, TypeError):
                     data = {}
-            for key in ("title", "summary", "description", "status", "due_date",
-                        "assigned_to_person_id", "priority", "decision_result",
-                        "update_type", "readout_summary"):
+            for key in (
+                "title",
+                "summary",
+                "description",
+                "status",
+                "due_date",
+                "assigned_to_person_id",
+                "priority",
+                "decision_result",
+                "update_type",
+                "readout_summary",
+            ):
                 val = data.get(key)
                 if val:
                     sections.append(f"  {key}: {val}")
             sections.append("")
 
     # Full transcript
-    segments = db.execute("""
+    segments = db.execute(
+        """
         SELECT speaker_label, start_time, end_time,
                reviewed_text, cleaned_text, raw_text
         FROM transcripts
         WHERE communication_id = ?
         ORDER BY start_time
-    """, (communication_id,)).fetchall()
+    """,
+        (communication_id,),
+    ).fetchall()
 
     if segments:
         speaker_names = {
@@ -158,15 +187,19 @@ def _build_user_prompt(
 
 # --- Committed items retrieval ---
 
+
 def _get_committed_items(db, communication_id: str) -> list[dict]:
-    rows = db.execute("""
+    rows = db.execute(
+        """
         SELECT rbi.item_type, rbi.proposed_data, rbi.rationale, rbi.status
         FROM review_bundle_items rbi
         JOIN review_bundles rb ON rbi.bundle_id = rb.id
         WHERE rb.communication_id = ?
           AND rbi.status IN ('accepted', 'edited')
         ORDER BY rb.sort_order, rbi.sort_order
-    """, (communication_id,)).fetchall()
+    """,
+        (communication_id,),
+    ).fetchall()
 
     items = []
     for row in rows:
@@ -176,17 +209,20 @@ def _get_committed_items(db, communication_id: str) -> list[dict]:
                 data = json.loads(data)
             except (json.JSONDecodeError, TypeError):
                 data = {}
-        items.append({
-            "item_type": row["item_type"],
-            "proposed_data": data,
-            "rationale": row["rationale"],
-            "title": data.get("title", ""),
-        })
+        items.append(
+            {
+                "item_type": row["item_type"],
+                "proposed_data": data,
+                "rationale": row["rationale"],
+                "title": data.get("title", ""),
+            }
+        )
     return items
 
 
 def _get_meeting_data_from_committed(db, communication_id: str) -> dict | None:
-    row = db.execute("""
+    row = db.execute(
+        """
         SELECT rbi.proposed_data
         FROM review_bundle_items rbi
         JOIN review_bundles rb ON rbi.bundle_id = rb.id
@@ -194,7 +230,9 @@ def _get_meeting_data_from_committed(db, communication_id: str) -> dict | None:
           AND rbi.item_type = 'meeting_record'
           AND rbi.status IN ('accepted', 'edited')
         LIMIT 1
-    """, (communication_id,)).fetchone()
+    """,
+        (communication_id,),
+    ).fetchone()
 
     if not row:
         return None
@@ -210,6 +248,7 @@ def _get_meeting_data_from_committed(db, communication_id: str) -> dict | None:
 
 # --- Main generation ---
 
+
 async def generate_meeting_intelligence(
     db,
     communication_id: str,
@@ -221,35 +260,41 @@ async def generate_meeting_intelligence(
     """
     meeting_data = _get_meeting_data_from_committed(db, communication_id)
     if not meeting_data:
-        logger.info("[%s] No meeting_record found -- skipping intelligence generation",
-                    communication_id[:8])
+        logger.info(
+            "[%s] No meeting_record found -- skipping intelligence generation",
+            communication_id[:8],
+        )
         return None
 
     # Get the tracker meeting_id from writebacks
-    wb_row = db.execute("""
+    wb_row = db.execute(
+        """
         SELECT tw.target_record_id
         FROM tracker_writebacks tw
         WHERE tw.communication_id = ?
           AND tw.target_table = 'meetings'
         LIMIT 1
-    """, (communication_id,)).fetchone()
+    """,
+        (communication_id,),
+    ).fetchone()
 
     meeting_id = wb_row["target_record_id"] if wb_row else None
     if not meeting_id:
-        logger.warning("[%s] Meeting committed but no tracker meeting_id in writebacks",
-                       communication_id[:8])
+        logger.warning(
+            "[%s] Meeting committed but no tracker meeting_id in writebacks",
+            communication_id[:8],
+        )
         return None
 
     # Duration and participant count for tier gating
     comm = db.execute(
-        "SELECT duration_seconds FROM communications WHERE id = ?",
-        (communication_id,)
+        "SELECT duration_seconds FROM communications WHERE id = ?", (communication_id,)
     ).fetchone()
     duration = comm["duration_seconds"] if comm else None
 
     participant_count = db.execute(
         "SELECT COUNT(*) as cnt FROM communication_participants WHERE communication_id = ?",
-        (communication_id,)
+        (communication_id,),
     ).fetchone()["cnt"]
 
     tier = determine_tier(
@@ -260,14 +305,22 @@ async def generate_meeting_intelligence(
         external_parties=bool(meeting_data.get("external_parties_attend")),
     )
 
-    logger.info("[%s] Generating %s-tier meeting intelligence for meeting %s",
-                communication_id[:8], tier.upper(), meeting_id[:8])
+    logger.info(
+        "[%s] Generating %s-tier meeting intelligence for meeting %s",
+        communication_id[:8],
+        tier.upper(),
+        meeting_id[:8],
+    )
 
     committed_items = _get_committed_items(db, communication_id)
 
     system_prompt = _load_prompt(prompt_version)
     user_prompt = _build_user_prompt(
-        db, communication_id, meeting_data, committed_items, tier,
+        db,
+        communication_id,
+        meeting_data,
+        committed_items,
+        tier,
     )
 
     # Model selection by tier
@@ -304,26 +357,39 @@ async def generate_meeting_intelligence(
     try:
         intelligence = json.loads(raw_text)
     except json.JSONDecodeError as e:
-        logger.error("[%s] Failed to parse meeting intelligence JSON: %s\nRaw: %s",
-                     communication_id[:8], e, raw_text[:500])
+        logger.error(
+            "[%s] Failed to parse meeting intelligence JSON: %s\nRaw: %s",
+            communication_id[:8],
+            e,
+            raw_text[:500],
+        )
         return None
 
     # Store to DB
     intel_id = str(uuid.uuid4())
-    _store_intelligence(db, intel_id, meeting_id, communication_id,
-                        tier, intelligence, response, prompt_version)
+    _store_intelligence(
+        db,
+        intel_id,
+        meeting_id,
+        communication_id,
+        tier,
+        intelligence,
+        response,
+        prompt_version,
+    )
 
     logger.info(
         "[%s] Meeting intelligence generated: tier=%s, meeting=%s, "
         "$%.4f (%d in + %d out tokens)",
-        communication_id[:8], tier, meeting_id[:8],
+        communication_id[:8],
+        tier,
+        meeting_id[:8],
         response.usage.cost_usd,
         response.usage.input_tokens,
         response.usage.output_tokens,
     )
 
     return intelligence
-
 
 
 def _safe_text(val, default=""):
@@ -335,14 +401,16 @@ def _safe_text(val, default=""):
     return str(val)
 
 
-def _store_intelligence(db, intel_id, meeting_id, communication_id,
-                        tier, intel, response, prompt_version):
+def _store_intelligence(
+    db, intel_id, meeting_id, communication_id, tier, intel, response, prompt_version
+):
     layer1 = intel.get("layer_1_skim", {})
     layer2 = intel.get("layer_2_operating")
     layer3 = intel.get("layer_3_record")
     closing = intel.get("closing_block", {})
 
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO meeting_intelligence (
             id, meeting_id, communication_id, version, tier,
             executive_summary,
@@ -374,33 +442,50 @@ def _store_intelligence(db, intel_id, meeting_id, communication_id,
             ?, ?, ?,
             datetime('now'), datetime('now')
         )
-    """, (
-        intel_id, meeting_id, communication_id, tier,
-        _safe_text(layer1.get("executive_summary", "")),
-        json.dumps(layer1.get("decisions_made", []), default=str),
-        json.dumps(layer1.get("non_decisions", []), default=str),
-        json.dumps(layer1.get("action_items_summary", []), default=str),
-        json.dumps(layer1.get("risks_surfaced", []), default=str),
-        json.dumps(layer1.get("briefing_required", {}), default=str),
-        json.dumps(layer2.get("key_issues_discussed", []), default=str) if layer2 else None,
-        json.dumps(layer2.get("participant_positions", []), default=str) if layer2 else None,
-        json.dumps(layer2.get("dependencies_surfaced", []), default=str) if layer2 else None,
-        _safe_text(layer2.get("what_changed_in_matter")) if layer2 else None,
-        json.dumps(layer2.get("commitments_made", []), default=str) if layer2 else None,
-        json.dumps(layer2.get("recommended_next_move", {}), default=str) if layer2 else None,
-        _safe_text(layer3.get("purpose_and_context")) if layer3 else None,
-        json.dumps(layer3.get("materials_referenced", []), default=str) if layer3 else None,
-        _safe_text(layer3.get("detailed_notes")) if layer3 else None,
-        json.dumps(layer3.get("tags", []), default=str) if layer3 else None,
-        _safe_text(closing.get("why_this_meeting_mattered", "")),
-        _safe_text(closing.get("what_changed", "")),
-        _safe_text(closing.get("what_i_need_to_do", "")),
-        _safe_text(closing.get("what_boss_needs_to_know", "")),
-        _safe_text(closing.get("what_can_wait", "")),
-        response.usage.model,
-        prompt_version,
-        response.usage.input_tokens,
-        response.usage.output_tokens,
-        response.usage.cost_usd,
-    ))
+    """,
+        (
+            intel_id,
+            meeting_id,
+            communication_id,
+            tier,
+            _safe_text(layer1.get("executive_summary", "")),
+            json.dumps(layer1.get("decisions_made", []), default=str),
+            json.dumps(layer1.get("non_decisions", []), default=str),
+            json.dumps(layer1.get("action_items_summary", []), default=str),
+            json.dumps(layer1.get("risks_surfaced", []), default=str),
+            json.dumps(layer1.get("briefing_required", {}), default=str),
+            json.dumps(layer2.get("key_issues_discussed", []), default=str)
+            if layer2
+            else None,
+            json.dumps(layer2.get("participant_positions", []), default=str)
+            if layer2
+            else None,
+            json.dumps(layer2.get("dependencies_surfaced", []), default=str)
+            if layer2
+            else None,
+            _safe_text(layer2.get("what_changed_in_matter")) if layer2 else None,
+            json.dumps(layer2.get("commitments_made", []), default=str)
+            if layer2
+            else None,
+            json.dumps(layer2.get("recommended_next_move", {}), default=str)
+            if layer2
+            else None,
+            _safe_text(layer3.get("purpose_and_context")) if layer3 else None,
+            json.dumps(layer3.get("materials_referenced", []), default=str)
+            if layer3
+            else None,
+            _safe_text(layer3.get("detailed_notes")) if layer3 else None,
+            json.dumps(layer3.get("tags", []), default=str) if layer3 else None,
+            _safe_text(closing.get("why_this_meeting_mattered", "")),
+            _safe_text(closing.get("what_changed", "")),
+            _safe_text(closing.get("what_i_need_to_do", "")),
+            _safe_text(closing.get("what_boss_needs_to_know", "")),
+            _safe_text(closing.get("what_can_wait", "")),
+            response.usage.model,
+            prompt_version,
+            response.usage.input_tokens,
+            response.usage.output_tokens,
+            response.usage.cost_usd,
+        ),
+    )
     db.commit()

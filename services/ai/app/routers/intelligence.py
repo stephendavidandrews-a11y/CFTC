@@ -2,6 +2,7 @@
 
 Endpoints for listing, viewing, and manually generating daily/weekly briefs.
 """
+
 import json
 import logging
 from datetime import date
@@ -67,7 +68,10 @@ def get_brief_by_date(brief_type: str, brief_date: str):
             (brief_type, brief_date),
         ).fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail=f"No brief found for {brief_type} on {brief_date}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"No brief found for {brief_type} on {brief_date}",
+            )
         result = dict(row)
         if result.get("content"):
             try:
@@ -80,7 +84,9 @@ def get_brief_by_date(brief_type: str, brief_date: str):
 
 
 @router.post("/intelligence/generate")
-def generate_brief(brief_type: str = Query("daily", description="daily, weekly, or dev-report")):
+def generate_brief(
+    brief_type: str = Query("daily", description="daily, weekly, or dev-report"),
+):
     """Manually trigger brief generation.
 
     This runs synchronously and returns the generated brief.
@@ -98,6 +104,7 @@ def generate_brief(brief_type: str = Query("daily", description="daily, weekly, 
             llm_client = None
             try:
                 from app.llm.client import get_llm_client
+
                 llm_client = get_llm_client()
             except Exception:
                 logger.info("LLM client unavailable, skipping meeting prep narratives")
@@ -110,7 +117,11 @@ def generate_brief(brief_type: str = Query("daily", description="daily, weekly, 
             docx_path = render_daily_docx(data)
 
             # Store
-            model = "haiku" if any(m.get("prep_narrative") for m in data.get("meetings", [])) else None
+            model = (
+                "haiku"
+                if any(m.get("prep_narrative") for m in data.get("meetings", []))
+                else None
+            )
             brief_id = store_brief(db, "daily", today, data, str(docx_path), model)
 
             # Send email
@@ -136,7 +147,10 @@ def generate_brief(brief_type: str = Query("daily", description="daily, weekly, 
             }
 
         elif brief_type == "weekly":
-            from app.jobs.weekly_brief import generate_weekly_brief, add_executive_summary
+            from app.jobs.weekly_brief import (
+                generate_weekly_brief,
+                add_executive_summary,
+            )
             from app.jobs.daily_brief import store_brief
             from app.jobs.html_renderer import render_weekly_html
             from app.jobs.docx_renderer import render_weekly_docx

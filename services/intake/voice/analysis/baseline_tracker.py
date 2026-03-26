@@ -11,9 +11,17 @@ from datetime import datetime, timezone
 logger = logging.getLogger(__name__)
 
 BASELINE_FIELDS = [
-    "pitch_mean", "pitch_std", "jitter", "shimmer", "hnr",
-    "speaking_rate_wpm", "spectral_centroid", "rms_mean",
-    "f1_mean", "f2_mean", "f3_mean",
+    "pitch_mean",
+    "pitch_std",
+    "jitter",
+    "shimmer",
+    "hnr",
+    "speaking_rate_wpm",
+    "spectral_centroid",
+    "rms_mean",
+    "f1_mean",
+    "f2_mean",
+    "f3_mean",
 ]
 
 
@@ -23,6 +31,7 @@ def update_baseline(conn, tracker_person_id: str, features: dict):
     EMA: new_baseline = alpha * new + (1 - alpha) * old
     """
     from config import BASELINE_EMA_ALPHA
+
     alpha = BASELINE_EMA_ALPHA
 
     row = conn.execute(
@@ -43,12 +52,19 @@ def update_baseline(conn, tracker_person_id: str, features: dict):
                 sample_count, last_updated
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)""",
             (
-                str(uuid.uuid4()), tracker_person_id,
-                features.get("pitch_mean"), features.get("pitch_std"),
-                features.get("jitter"), features.get("shimmer"), features.get("hnr"),
-                features.get("speaking_rate_wpm"), features.get("spectral_centroid"),
+                str(uuid.uuid4()),
+                tracker_person_id,
+                features.get("pitch_mean"),
+                features.get("pitch_std"),
+                features.get("jitter"),
+                features.get("shimmer"),
+                features.get("hnr"),
+                features.get("speaking_rate_wpm"),
+                features.get("spectral_centroid"),
                 features.get("rms_mean"),
-                features.get("f1_mean"), features.get("f2_mean"), features.get("f3_mean"),
+                features.get("f1_mean"),
+                features.get("f2_mean"),
+                features.get("f3_mean"),
                 now,
             ),
         )
@@ -91,8 +107,13 @@ def compare_to_baseline(conn, tracker_person_id: str, features: dict) -> dict:
         return {}
 
     comparison_fields = [
-        "pitch_mean", "jitter", "shimmer", "hnr",
-        "speaking_rate_wpm", "spectral_centroid", "rms_mean",
+        "pitch_mean",
+        "jitter",
+        "shimmer",
+        "hnr",
+        "speaking_rate_wpm",
+        "spectral_centroid",
+        "rms_mean",
     ]
 
     deviations = {}

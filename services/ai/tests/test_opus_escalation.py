@@ -41,6 +41,7 @@ from app.pipeline.stages.extraction_models import (
 # Test helpers
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _run(coro):
     """Run async coroutine synchronously."""
     loop = asyncio.new_event_loop()
@@ -189,8 +190,14 @@ def _seed_communication(db, comm_id, duration=300, num_segments=50):
         db.execute(
             "INSERT INTO transcripts (id, communication_id, speaker_label, "
             "start_time, end_time, cleaned_text) VALUES (?, ?, ?, ?, ?, ?)",
-            (str(uuid.uuid4()), comm_id, f"SPEAKER_{i % 3:02d}",
-             i * 6.0, (i + 1) * 6.0, f"Test segment {i}"),
+            (
+                str(uuid.uuid4()),
+                comm_id,
+                f"SPEAKER_{i % 3:02d}",
+                i * 6.0,
+                (i + 1) * 6.0,
+                f"Test segment {i}",
+            ),
         )
     db.execute(
         "INSERT INTO communication_participants "
@@ -210,24 +217,28 @@ def _make_extraction_output(
     """Build a mock ExtractionOutput."""
     bundles = []
     for i in range(num_bundles):
-        items = [ExtractionItem(
-            item_type="task",
-            proposed_data={"title": f"Task {i}", "matter_id": f"matter-{i}"},
-            confidence=confidence,
-            rationale=f"Test rationale {i}",
-            source_excerpt=f"Test excerpt {i}",
-            source_segments=[str(uuid.uuid4())],
-            source_time_range=SourceTimeRange(start=i * 60.0, end=(i + 1) * 60.0),
-        )]
-        bundles.append(ExtractionBundle(
-            bundle_type=bundle_type,
-            target_matter_id=f"matter-{i}" if bundle_type == "matter" else None,
-            target_matter_title=f"Test Matter {i}",
-            confidence=confidence,
-            rationale=f"Bundle rationale {i}",
-            uncertainty_flags=uncertainty_flags or [],
-            items=items,
-        ))
+        items = [
+            ExtractionItem(
+                item_type="task",
+                proposed_data={"title": f"Task {i}", "matter_id": f"matter-{i}"},
+                confidence=confidence,
+                rationale=f"Test rationale {i}",
+                source_excerpt=f"Test excerpt {i}",
+                source_segments=[str(uuid.uuid4())],
+                source_time_range=SourceTimeRange(start=i * 60.0, end=(i + 1) * 60.0),
+            )
+        ]
+        bundles.append(
+            ExtractionBundle(
+                bundle_type=bundle_type,
+                target_matter_id=f"matter-{i}" if bundle_type == "matter" else None,
+                target_matter_title=f"Test Matter {i}",
+                confidence=confidence,
+                rationale=f"Bundle rationale {i}",
+                uncertainty_flags=uncertainty_flags or [],
+                items=items,
+            )
+        )
     return ExtractionOutput(
         communication_id=comm_id,
         extraction_summary="Test extraction",
@@ -248,7 +259,11 @@ def _make_sonnet_result(
     """Build a mock ExtractionAttemptResult for Sonnet."""
     if success:
         extraction = _make_extraction_output(
-            comm_id, num_bundles, bundle_type, confidence, uncertainty_flags,
+            comm_id,
+            num_bundles,
+            bundle_type,
+            confidence,
+            uncertainty_flags,
         )
         return ExtractionAttemptResult(
             success=True,
@@ -256,13 +271,21 @@ def _make_sonnet_result(
             attempt_number=1,
             raw_output=json.dumps({"bundles": []}),
             parsed_output=extraction,
-            processed={"bundles": extraction.bundles, "post_processing_log": {
-                "code_suppressed_items": [], "dedup_warnings": [],
-                "invalid_references_cleaned": [],
-            }},
-            usage_data={"input_tokens": 1000, "output_tokens": 500,
-                        "processing_seconds": 3.0, "cost_usd": 0.0105,
-                        "total_cost_usd": 0.0105},
+            processed={
+                "bundles": extraction.bundles,
+                "post_processing_log": {
+                    "code_suppressed_items": [],
+                    "dedup_warnings": [],
+                    "invalid_references_cleaned": [],
+                },
+            },
+            usage_data={
+                "input_tokens": 1000,
+                "output_tokens": 500,
+                "processing_seconds": 3.0,
+                "cost_usd": 0.0105,
+                "total_cost_usd": 0.0105,
+            },
         )
     else:
         return ExtractionAttemptResult(
@@ -296,6 +319,7 @@ DEFAULT_POLICY = {
 # 1. Trigger detection tests
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestTriggerDetection:
     """Verify each escalation trigger fires correctly."""
 
@@ -323,7 +347,9 @@ class TestTriggerDetection:
         comm_id = str(uuid.uuid4())
         _seed_communication(db, comm_id)
         result = _make_sonnet_result(
-            num_bundles=5, bundle_type="new_matter", comm_id=comm_id,
+            num_bundles=5,
+            bundle_type="new_matter",
+            comm_id=comm_id,
         )
         triggers = detect_triggers(result, db, comm_id, DEFAULT_POLICY)
         assert EscalationTrigger.OVER_SPLITTING in triggers
@@ -406,6 +432,7 @@ class TestTriggerDetection:
 # 2. Escalation decision tests
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestEscalationDecision:
     """Verify escalation decision logic."""
 
@@ -468,17 +495,20 @@ class TestEscalationDecision:
 # 3. Meta-instruction builder tests
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestMetaInstruction:
     """Verify Opus meta-instruction construction."""
 
     def test_includes_trigger_descriptions(self):
         """Each trigger type produces relevant instruction text."""
         result = _make_sonnet_result()
-        for trigger in [EscalationTrigger.LOW_CONFIDENCE,
-                        EscalationTrigger.OVER_SPLITTING,
-                        EscalationTrigger.UNCERTAINTY_FLAGS,
-                        EscalationTrigger.VALIDATION_FAILURE,
-                        EscalationTrigger.EMPTY_EXTRACTION]:
+        for trigger in [
+            EscalationTrigger.LOW_CONFIDENCE,
+            EscalationTrigger.OVER_SPLITTING,
+            EscalationTrigger.UNCERTAINTY_FLAGS,
+            EscalationTrigger.VALIDATION_FAILURE,
+            EscalationTrigger.EMPTY_EXTRACTION,
+        ]:
             instruction = build_opus_meta_instruction([trigger], result)
             assert "Escalation Context" in instruction
             assert "Issues Detected" in instruction
@@ -489,7 +519,8 @@ class TestMetaInstruction:
         result = _make_sonnet_result()
         result.raw_output = '{"bundles": [{"test": true}]}'
         instruction = build_opus_meta_instruction(
-            [EscalationTrigger.LOW_CONFIDENCE], result,
+            [EscalationTrigger.LOW_CONFIDENCE],
+            result,
         )
         assert "Previous Attempt Output" in instruction
         assert '"test": true' in instruction
@@ -499,7 +530,8 @@ class TestMetaInstruction:
         result = _make_sonnet_result()
         result.raw_output = "x" * 20000
         instruction = build_opus_meta_instruction(
-            [EscalationTrigger.LOW_CONFIDENCE], result,
+            [EscalationTrigger.LOW_CONFIDENCE],
+            result,
         )
         assert "[truncated]" in instruction
 
@@ -519,55 +551,74 @@ class TestMetaInstruction:
 # 4. Full extraction flow tests (mocked LLM)
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _good_extraction_json(comm_id):
     """Return a valid extraction JSON string."""
-    return json.dumps({
-        "extraction_version": "1.0.0",
-        "communication_id": comm_id,
-        "extraction_summary": "Test",
-        "bundles": [{
-            "bundle_type": "matter",
-            "target_matter_id": "m-1",
-            "target_matter_title": "Test Matter",
-            "confidence": 0.85,
-            "rationale": "Strong match",
-            "items": [{
-                "item_type": "task",
-                "proposed_data": {"title": "Draft memo", "matter_id": "m-1"},
-                "confidence": 0.9,
-                "rationale": "Explicit delegation",
-                "source_excerpt": "Can you draft the memo?",
-                "source_segments": ["seg-1"],
-                "source_time_range": {"start": 10.0, "end": 25.0},
-            }],
-        }],
-    })
+    return json.dumps(
+        {
+            "extraction_version": "1.0.0",
+            "communication_id": comm_id,
+            "extraction_summary": "Test",
+            "bundles": [
+                {
+                    "bundle_type": "matter",
+                    "target_matter_id": "m-1",
+                    "target_matter_title": "Test Matter",
+                    "confidence": 0.85,
+                    "rationale": "Strong match",
+                    "items": [
+                        {
+                            "item_type": "task",
+                            "proposed_data": {
+                                "title": "Draft memo",
+                                "matter_id": "m-1",
+                            },
+                            "confidence": 0.9,
+                            "rationale": "Explicit delegation",
+                            "source_excerpt": "Can you draft the memo?",
+                            "source_segments": ["seg-1"],
+                            "source_time_range": {"start": 10.0, "end": 25.0},
+                        }
+                    ],
+                }
+            ],
+        }
+    )
 
 
 def _low_confidence_extraction_json(comm_id):
     """Return extraction with low-confidence bundle."""
-    return json.dumps({
-        "extraction_version": "1.0.0",
-        "communication_id": comm_id,
-        "extraction_summary": "Uncertain",
-        "bundles": [{
-            "bundle_type": "matter",
-            "target_matter_id": "m-1",
-            "target_matter_title": "Possibly this matter",
-            "confidence": 0.3,
-            "rationale": "Weak signals",
-            "uncertainty_flags": ["Not sure about routing"],
-            "items": [{
-                "item_type": "matter_update",
-                "proposed_data": {"summary": "Something mentioned", "matter_id": "m-1"},
-                "confidence": 0.4,
-                "rationale": "Low confidence",
-                "source_excerpt": "They mentioned something about...",
-                "source_segments": ["seg-1"],
-                "source_time_range": {"start": 0.0, "end": 30.0},
-            }],
-        }],
-    })
+    return json.dumps(
+        {
+            "extraction_version": "1.0.0",
+            "communication_id": comm_id,
+            "extraction_summary": "Uncertain",
+            "bundles": [
+                {
+                    "bundle_type": "matter",
+                    "target_matter_id": "m-1",
+                    "target_matter_title": "Possibly this matter",
+                    "confidence": 0.3,
+                    "rationale": "Weak signals",
+                    "uncertainty_flags": ["Not sure about routing"],
+                    "items": [
+                        {
+                            "item_type": "matter_update",
+                            "proposed_data": {
+                                "summary": "Something mentioned",
+                                "matter_id": "m-1",
+                            },
+                            "confidence": 0.4,
+                            "rationale": "Low confidence",
+                            "source_excerpt": "They mentioned something about...",
+                            "source_segments": ["seg-1"],
+                            "source_time_range": {"start": 0.0, "end": 30.0},
+                        }
+                    ],
+                }
+            ],
+        }
+    )
 
 
 def _make_llm_response(text, model="claude-sonnet-4-20250514", cost=0.01):
@@ -588,13 +639,20 @@ def _make_llm_response(text, model="claude-sonnet-4-20250514", cost=0.01):
 class TestFullExtractionFlow:
     """Test the complete extraction + escalation pipeline (mocked LLM)."""
 
-    @patch("app.pipeline.stages.extraction._fetch_tracker_context", new_callable=AsyncMock)
+    @patch(
+        "app.pipeline.stages.extraction._fetch_tracker_context", new_callable=AsyncMock
+    )
     @patch("app.pipeline.stages.extraction.call_llm", new_callable=AsyncMock)
     @patch("app.pipeline.stages.extraction._load_system_prompt")
     @patch("app.config.load_policy")
     @patch("app.routers.events.publish_event", new_callable=AsyncMock)
     def test_normal_sonnet_success_no_escalation(
-        self, mock_publish, mock_policy, mock_prompt, mock_llm, mock_ctx,
+        self,
+        mock_publish,
+        mock_policy,
+        mock_prompt,
+        mock_llm,
+        mock_ctx,
     ):
         """Path 1: Sonnet succeeds cleanly, no escalation triggers."""
         db = _make_db()
@@ -603,13 +661,19 @@ class TestFullExtractionFlow:
 
         mock_policy.return_value = DEFAULT_POLICY
         mock_prompt.return_value = "system prompt"
-        mock_ctx.return_value = {"matters": [], "people": [], "organizations": [],
-                                 "recent_meetings": [], "standalone_tasks": []}
+        mock_ctx.return_value = {
+            "matters": [],
+            "people": [],
+            "organizations": [],
+            "recent_meetings": [],
+            "standalone_tasks": [],
+        }
         mock_llm.return_value = _make_llm_response(
             _good_extraction_json(comm_id),
         )
 
         from app.pipeline.stages.extraction import run_extraction_stage
+
         result = _run(run_extraction_stage(db, comm_id))
 
         assert result["bundles_created"] == 1
@@ -627,13 +691,20 @@ class TestFullExtractionFlow:
         assert extractions[0]["success"] == 1
         assert extractions[0]["escalation_reason"] is None
 
-    @patch("app.pipeline.stages.extraction._fetch_tracker_context", new_callable=AsyncMock)
+    @patch(
+        "app.pipeline.stages.extraction._fetch_tracker_context", new_callable=AsyncMock
+    )
     @patch("app.pipeline.stages.extraction.call_llm", new_callable=AsyncMock)
     @patch("app.pipeline.stages.extraction._load_system_prompt")
     @patch("app.config.load_policy")
     @patch("app.routers.events.publish_event", new_callable=AsyncMock)
     def test_sonnet_retry_on_parse_failure(
-        self, mock_publish, mock_policy, mock_prompt, mock_llm, mock_ctx,
+        self,
+        mock_publish,
+        mock_policy,
+        mock_prompt,
+        mock_llm,
+        mock_ctx,
     ):
         """Path 2: Sonnet parse fails, retries, succeeds on attempt 2."""
         db = _make_db()
@@ -642,10 +713,16 @@ class TestFullExtractionFlow:
 
         mock_policy.return_value = DEFAULT_POLICY
         mock_prompt.return_value = "system prompt"
-        mock_ctx.return_value = {"matters": [], "people": [], "organizations": [],
-                                 "recent_meetings": [], "standalone_tasks": []}
+        mock_ctx.return_value = {
+            "matters": [],
+            "people": [],
+            "organizations": [],
+            "recent_meetings": [],
+            "standalone_tasks": [],
+        }
 
         call_count = [0]
+
         def side_effect(*args, **kwargs):
             call_count[0] += 1
             if call_count[0] == 1:
@@ -655,19 +732,27 @@ class TestFullExtractionFlow:
         mock_llm.side_effect = side_effect
 
         from app.pipeline.stages.extraction import run_extraction_stage
+
         result = _run(run_extraction_stage(db, comm_id))
 
         assert result["bundles_created"] == 1
         assert result["attempt_number"] == 2  # succeeded on retry
         assert result["escalated"] == False
 
-    @patch("app.pipeline.stages.extraction._fetch_tracker_context", new_callable=AsyncMock)
+    @patch(
+        "app.pipeline.stages.extraction._fetch_tracker_context", new_callable=AsyncMock
+    )
     @patch("app.pipeline.stages.extraction.call_llm", new_callable=AsyncMock)
     @patch("app.pipeline.stages.extraction._load_system_prompt")
     @patch("app.config.load_policy")
     @patch("app.routers.events.publish_event", new_callable=AsyncMock)
     def test_opus_escalation_on_low_confidence(
-        self, mock_publish, mock_policy, mock_prompt, mock_llm, mock_ctx,
+        self,
+        mock_publish,
+        mock_policy,
+        mock_prompt,
+        mock_llm,
+        mock_ctx,
     ):
         """Path 3: Sonnet succeeds with low confidence → Opus escalation."""
         db = _make_db()
@@ -676,10 +761,16 @@ class TestFullExtractionFlow:
 
         mock_policy.return_value = DEFAULT_POLICY
         mock_prompt.return_value = "system prompt"
-        mock_ctx.return_value = {"matters": [], "people": [], "organizations": [],
-                                 "recent_meetings": [], "standalone_tasks": []}
+        mock_ctx.return_value = {
+            "matters": [],
+            "people": [],
+            "organizations": [],
+            "recent_meetings": [],
+            "standalone_tasks": [],
+        }
 
         call_count = [0]
+
         def side_effect(*args, **kwargs):
             call_count[0] += 1
             model = kwargs.get("model", args[4] if len(args) > 4 else "")
@@ -687,7 +778,8 @@ class TestFullExtractionFlow:
                 # Opus returns high-confidence result
                 return _make_llm_response(
                     _good_extraction_json(comm_id),
-                    model="claude-opus-4-6", cost=2.50,
+                    model="claude-opus-4-6",
+                    cost=2.50,
                 )
             # Sonnet returns low-confidence
             return _make_llm_response(
@@ -697,6 +789,7 @@ class TestFullExtractionFlow:
         mock_llm.side_effect = side_effect
 
         from app.pipeline.stages.extraction import run_extraction_stage
+
         result = _run(run_extraction_stage(db, comm_id))
 
         assert result["escalated"] == True
@@ -719,13 +812,20 @@ class TestFullExtractionFlow:
         assert extractions[1]["escalation_reason"] is not None
         assert "low_confidence" in extractions[1]["escalation_reason"]
 
-    @patch("app.pipeline.stages.extraction._fetch_tracker_context", new_callable=AsyncMock)
+    @patch(
+        "app.pipeline.stages.extraction._fetch_tracker_context", new_callable=AsyncMock
+    )
     @patch("app.pipeline.stages.extraction.call_llm", new_callable=AsyncMock)
     @patch("app.pipeline.stages.extraction._load_system_prompt")
     @patch("app.config.load_policy")
     @patch("app.routers.events.publish_event", new_callable=AsyncMock)
     def test_all_attempts_fail_terminal_error(
-        self, mock_publish, mock_policy, mock_prompt, mock_llm, mock_ctx,
+        self,
+        mock_publish,
+        mock_policy,
+        mock_prompt,
+        mock_llm,
+        mock_ctx,
     ):
         """Path 4: Sonnet fails, Opus fails → terminal RuntimeError."""
         db = _make_db()
@@ -734,23 +834,36 @@ class TestFullExtractionFlow:
 
         mock_policy.return_value = DEFAULT_POLICY
         mock_prompt.return_value = "system prompt"
-        mock_ctx.return_value = {"matters": [], "people": [], "organizations": [],
-                                 "recent_meetings": [], "standalone_tasks": []}
+        mock_ctx.return_value = {
+            "matters": [],
+            "people": [],
+            "organizations": [],
+            "recent_meetings": [],
+            "standalone_tasks": [],
+        }
 
         # All calls return invalid JSON
         mock_llm.return_value = _make_llm_response("not valid json {{{")
 
         from app.pipeline.stages.extraction import run_extraction_stage
+
         with pytest.raises(RuntimeError, match="Extraction failed"):
             _run(run_extraction_stage(db, comm_id))
 
-    @patch("app.pipeline.stages.extraction._fetch_tracker_context", new_callable=AsyncMock)
+    @patch(
+        "app.pipeline.stages.extraction._fetch_tracker_context", new_callable=AsyncMock
+    )
     @patch("app.pipeline.stages.extraction.call_llm", new_callable=AsyncMock)
     @patch("app.pipeline.stages.extraction._load_system_prompt")
     @patch("app.config.load_policy")
     @patch("app.routers.events.publish_event", new_callable=AsyncMock)
     def test_budget_blocks_opus_falls_back_to_sonnet(
-        self, mock_publish, mock_policy, mock_prompt, mock_llm, mock_ctx,
+        self,
+        mock_publish,
+        mock_policy,
+        mock_prompt,
+        mock_llm,
+        mock_ctx,
     ):
         """Path 5: Sonnet low-confidence, budget blocks Opus → use Sonnet."""
         db = _make_db()
@@ -767,13 +880,19 @@ class TestFullExtractionFlow:
 
         mock_policy.return_value = DEFAULT_POLICY
         mock_prompt.return_value = "system prompt"
-        mock_ctx.return_value = {"matters": [], "people": [], "organizations": [],
-                                 "recent_meetings": [], "standalone_tasks": []}
+        mock_ctx.return_value = {
+            "matters": [],
+            "people": [],
+            "organizations": [],
+            "recent_meetings": [],
+            "standalone_tasks": [],
+        }
         mock_llm.return_value = _make_llm_response(
             _low_confidence_extraction_json(comm_id),
         )
 
         from app.pipeline.stages.extraction import run_extraction_stage
+
         result = _run(run_extraction_stage(db, comm_id))
 
         # Should still succeed with Sonnet result
@@ -781,13 +900,20 @@ class TestFullExtractionFlow:
         assert result["escalated"] == False
         assert result["model_used"] == "claude-sonnet-4-20250514"
 
-    @patch("app.pipeline.stages.extraction._fetch_tracker_context", new_callable=AsyncMock)
+    @patch(
+        "app.pipeline.stages.extraction._fetch_tracker_context", new_callable=AsyncMock
+    )
     @patch("app.pipeline.stages.extraction.call_llm", new_callable=AsyncMock)
     @patch("app.pipeline.stages.extraction._load_system_prompt")
     @patch("app.config.load_policy")
     @patch("app.routers.events.publish_event", new_callable=AsyncMock)
     def test_opus_fails_falls_back_to_sonnet(
-        self, mock_publish, mock_policy, mock_prompt, mock_llm, mock_ctx,
+        self,
+        mock_publish,
+        mock_policy,
+        mock_prompt,
+        mock_llm,
+        mock_ctx,
     ):
         """Opus fails → fall back to Sonnet result."""
         db = _make_db()
@@ -796,16 +922,21 @@ class TestFullExtractionFlow:
 
         mock_policy.return_value = DEFAULT_POLICY
         mock_prompt.return_value = "system prompt"
-        mock_ctx.return_value = {"matters": [], "people": [], "organizations": [],
-                                 "recent_meetings": [], "standalone_tasks": []}
+        mock_ctx.return_value = {
+            "matters": [],
+            "people": [],
+            "organizations": [],
+            "recent_meetings": [],
+            "standalone_tasks": [],
+        }
 
         call_count = [0]
+
         def side_effect(*args, **kwargs):
             call_count[0] += 1
             model = kwargs.get("model", "")
             if "opus" in model:
-                return _make_llm_response("opus invalid {{{",
-                                          model="claude-opus-4-6")
+                return _make_llm_response("opus invalid {{{", model="claude-opus-4-6")
             return _make_llm_response(
                 _low_confidence_extraction_json(comm_id),
             )
@@ -813,6 +944,7 @@ class TestFullExtractionFlow:
         mock_llm.side_effect = side_effect
 
         from app.pipeline.stages.extraction import run_extraction_stage
+
         result = _run(run_extraction_stage(db, comm_id))
 
         # Fell back to Sonnet
@@ -824,16 +956,24 @@ class TestFullExtractionFlow:
 # 5. Audit trail tests
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestAuditTrail:
     """Verify extraction records reflect escalation decisions."""
 
-    @patch("app.pipeline.stages.extraction._fetch_tracker_context", new_callable=AsyncMock)
+    @patch(
+        "app.pipeline.stages.extraction._fetch_tracker_context", new_callable=AsyncMock
+    )
     @patch("app.pipeline.stages.extraction.call_llm", new_callable=AsyncMock)
     @patch("app.pipeline.stages.extraction._load_system_prompt")
     @patch("app.config.load_policy")
     @patch("app.routers.events.publish_event", new_callable=AsyncMock)
     def test_successful_escalation_records_both(
-        self, mock_publish, mock_policy, mock_prompt, mock_llm, mock_ctx,
+        self,
+        mock_publish,
+        mock_policy,
+        mock_prompt,
+        mock_llm,
+        mock_ctx,
     ):
         """Successful Opus escalation persists both Sonnet and Opus records."""
         db = _make_db()
@@ -842,17 +982,24 @@ class TestAuditTrail:
 
         mock_policy.return_value = DEFAULT_POLICY
         mock_prompt.return_value = "system prompt"
-        mock_ctx.return_value = {"matters": [], "people": [], "organizations": [],
-                                 "recent_meetings": [], "standalone_tasks": []}
+        mock_ctx.return_value = {
+            "matters": [],
+            "people": [],
+            "organizations": [],
+            "recent_meetings": [],
+            "standalone_tasks": [],
+        }
 
         call_count = [0]
+
         def side_effect(*args, **kwargs):
             call_count[0] += 1
             model = kwargs.get("model", "")
             if "opus" in model:
                 return _make_llm_response(
                     _good_extraction_json(comm_id),
-                    model="claude-opus-4-6", cost=2.50,
+                    model="claude-opus-4-6",
+                    cost=2.50,
                 )
             return _make_llm_response(
                 _low_confidence_extraction_json(comm_id),
@@ -861,6 +1008,7 @@ class TestAuditTrail:
         mock_llm.side_effect = side_effect
 
         from app.pipeline.stages.extraction import run_extraction_stage
+
         _run(run_extraction_stage(db, comm_id))
 
         records = db.execute(
@@ -880,13 +1028,20 @@ class TestAuditTrail:
         assert records[1]["success"] == 1
         assert "low_confidence" in records[1]["escalation_reason"]
 
-    @patch("app.pipeline.stages.extraction._fetch_tracker_context", new_callable=AsyncMock)
+    @patch(
+        "app.pipeline.stages.extraction._fetch_tracker_context", new_callable=AsyncMock
+    )
     @patch("app.pipeline.stages.extraction.call_llm", new_callable=AsyncMock)
     @patch("app.pipeline.stages.extraction._load_system_prompt")
     @patch("app.config.load_policy")
     @patch("app.routers.events.publish_event", new_callable=AsyncMock)
     def test_escalation_records_both_models_in_ai_extractions(
-        self, mock_publish, mock_policy, mock_prompt, mock_llm, mock_ctx,
+        self,
+        mock_publish,
+        mock_policy,
+        mock_prompt,
+        mock_llm,
+        mock_ctx,
     ):
         """Escalation persists both Sonnet and Opus in ai_extractions with correct models."""
         db = _make_db()
@@ -895,15 +1050,21 @@ class TestAuditTrail:
 
         mock_policy.return_value = DEFAULT_POLICY
         mock_prompt.return_value = "system prompt"
-        mock_ctx.return_value = {"matters": [], "people": [], "organizations": [],
-                                 "recent_meetings": [], "standalone_tasks": []}
+        mock_ctx.return_value = {
+            "matters": [],
+            "people": [],
+            "organizations": [],
+            "recent_meetings": [],
+            "standalone_tasks": [],
+        }
 
         def side_effect(*args, **kwargs):
             model = kwargs.get("model", "")
             if "opus" in model:
                 return _make_llm_response(
                     _good_extraction_json(comm_id),
-                    model="claude-opus-4-6", cost=2.50,
+                    model="claude-opus-4-6",
+                    cost=2.50,
                 )
             return _make_llm_response(
                 _low_confidence_extraction_json(comm_id),
@@ -912,6 +1073,7 @@ class TestAuditTrail:
         mock_llm.side_effect = side_effect
 
         from app.pipeline.stages.extraction import run_extraction_stage
+
         _run(run_extraction_stage(db, comm_id))
 
         records = db.execute(
@@ -934,14 +1096,17 @@ class TestAuditTrail:
 # 6. Regression tests — Phase 4B/4C/writeback unaffected
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestRegression:
     """Verify existing Phase 4B behavior is preserved."""
 
     def test_extraction_models_unchanged(self):
         """ExtractionOutput model structure unchanged."""
         from app.pipeline.stages.extraction_models import (
-            VALID_BUNDLE_TYPES, VALID_ITEM_TYPES,
+            VALID_BUNDLE_TYPES,
+            VALID_ITEM_TYPES,
         )
+
         assert VALID_BUNDLE_TYPES == {"matter", "new_matter", "standalone"}
         assert "task" in VALID_ITEM_TYPES
         assert "meeting_record" in VALID_ITEM_TYPES
@@ -951,19 +1116,23 @@ class TestRegression:
         from app.pipeline.stages.escalation import (
             EscalationTrigger,
         )
+
         assert EscalationTrigger.LOW_CONFIDENCE.value == "low_confidence"
 
     def test_bundle_review_models_unchanged(self):
         """Bundle review models still work."""
         from app.bundle_review.models import (
-            BUNDLE_REVIEW_STATES, BUNDLE_TERMINAL,
+            BUNDLE_REVIEW_STATES,
+            BUNDLE_TERMINAL,
         )
+
         assert "awaiting_bundle_review" in BUNDLE_REVIEW_STATES
         assert "accepted" in BUNDLE_TERMINAL
 
     def test_writeback_ordering_unchanged(self):
         """Writeback ordering unchanged."""
         from app.writeback.ordering import ITEM_TYPE_ORDER
+
         assert ITEM_TYPE_ORDER["new_organization"] == 0
         assert ITEM_TYPE_ORDER["new_person"] == 1
 

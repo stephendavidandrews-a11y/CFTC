@@ -20,15 +20,20 @@ def check_review_state(db, communication_id: str):
     if not row:
         raise HTTPException(404, detail={"error_type": "not_found"})
     if row["processing_status"] not in BUNDLE_REVIEW_STATES:
-        raise HTTPException(400, detail={
-            "error_type": "invalid_state",
-            "message": f"Communication not in bundle review (current: {row['processing_status']})",
-        })
+        raise HTTPException(
+            400,
+            detail={
+                "error_type": "invalid_state",
+                "message": f"Communication not in bundle review (current: {row['processing_status']})",
+            },
+        )
 
 
 def ensure_in_progress(db, communication_id: str):
     """Auto-transition from awaiting_bundle_review to bundle_review_in_progress."""
-    cas_transition(db, communication_id, "awaiting_bundle_review", "bundle_review_in_progress")
+    cas_transition(
+        db, communication_id, "awaiting_bundle_review", "bundle_review_in_progress"
+    )
 
 
 def get_bundle(db, communication_id: str, bundle_id: str) -> dict:
@@ -38,10 +43,13 @@ def get_bundle(db, communication_id: str, bundle_id: str) -> dict:
         (bundle_id, communication_id),
     ).fetchone()
     if not bundle:
-        raise HTTPException(404, detail={
-            "error_type": "not_found",
-            "message": f"Bundle {bundle_id[:8]} not found in communication {communication_id[:8]}",
-        })
+        raise HTTPException(
+            404,
+            detail={
+                "error_type": "not_found",
+                "message": f"Bundle {bundle_id[:8]} not found in communication {communication_id[:8]}",
+            },
+        )
     return dict(bundle)
 
 
@@ -52,8 +60,11 @@ def get_item(db, bundle_id: str, item_id: str) -> dict:
         (item_id, bundle_id),
     ).fetchone()
     if not item:
-        raise HTTPException(404, detail={
-            "error_type": "not_found",
-            "message": f"Item {item_id[:8]} not found in bundle {bundle_id[:8]}",
-        })
+        raise HTTPException(
+            404,
+            detail={
+                "error_type": "not_found",
+                "message": f"Item {item_id[:8]} not found in bundle {bundle_id[:8]}",
+            },
+        )
     return dict(item)

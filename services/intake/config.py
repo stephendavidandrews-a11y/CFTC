@@ -68,8 +68,8 @@ VP_MIN_SEGMENT_DURATION = 3.0  # seconds
 # Signal quality thresholds
 VP_MIN_SNR_DB = 15.0
 VP_MIN_HNR_DB = 10.0
-VP_MAX_JITTER_PCT = 0.02       # 2%
-VP_MAX_SHIMMER_PCT = 0.05      # 5%
+VP_MAX_JITTER_PCT = 0.02  # 2%
+VP_MAX_SHIMMER_PCT = 0.05  # 5%
 VP_MAX_ENERGY_VARIANCE_STD = 2.0  # reject if variance > 2 std devs from mean
 
 # Speaker purity

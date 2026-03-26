@@ -25,13 +25,20 @@ def validate_proposed_data(item_type: str, data: dict):
         required = {"title": str}
     elif item_type == "stakeholder_addition":
         # Need at least person_id or organization_id or a name
-        if not (data.get("person_id") or data.get("organization_id")
-                or data.get("person_name") or data.get("organization_name")):
-            raise HTTPException(400, detail={
-                "error_type": "validation_failure",
-                "message": "stakeholder_addition requires person_id, organization_id, "
-                           "person_name, or organization_name",
-            })
+        if not (
+            data.get("person_id")
+            or data.get("organization_id")
+            or data.get("person_name")
+            or data.get("organization_name")
+        ):
+            raise HTTPException(
+                400,
+                detail={
+                    "error_type": "validation_failure",
+                    "message": "stakeholder_addition requires person_id, organization_id, "
+                    "person_name, or organization_name",
+                },
+            )
         return
     elif item_type == "document":
         required = {"title": str}
@@ -46,10 +53,13 @@ def validate_proposed_data(item_type: str, data: dict):
 
     missing = [k for k in required if not data.get(k)]
     if missing:
-        raise HTTPException(400, detail={
-            "error_type": "validation_failure",
-            "message": f"{item_type} requires: {', '.join(missing)}",
-        })
+        raise HTTPException(
+            400,
+            detail={
+                "error_type": "validation_failure",
+                "message": f"{item_type} requires: {', '.join(missing)}",
+            },
+        )
 
 
 def compute_blockers(bundles: list[dict]) -> list[dict]:
@@ -61,22 +71,26 @@ def compute_blockers(bundles: list[dict]) -> list[dict]:
     blockers = []
     for b in bundles:
         if b["status"] not in BUNDLE_TERMINAL:
-            blockers.append({
-                "type": "bundle_not_resolved",
-                "bundle_id": b["id"],
-                "bundle_title": b.get("target_matter_title"),
-                "current_status": b["status"],
-            })
+            blockers.append(
+                {
+                    "type": "bundle_not_resolved",
+                    "bundle_id": b["id"],
+                    "bundle_title": b.get("target_matter_title"),
+                    "current_status": b["status"],
+                }
+            )
             continue
         if b["status"] == "rejected":
             continue
         for item in b.get("items", []):
             if item["status"] not in ITEM_TERMINAL:
-                blockers.append({
-                    "type": "item_not_resolved",
-                    "bundle_id": b["id"],
-                    "item_id": item["id"],
-                    "item_type": item["item_type"],
-                    "current_status": item["status"],
-                })
+                blockers.append(
+                    {
+                        "type": "item_not_resolved",
+                        "bundle_id": b["id"],
+                        "item_id": item["id"],
+                        "item_type": item["item_type"],
+                        "current_status": item["status"],
+                    }
+                )
     return blockers

@@ -57,6 +57,7 @@ _openai_client = None
 
 class BudgetExceededError(Exception):
     """Raised when the daily LLM budget is exhausted."""
+
     def __init__(self, today_spend: float, daily_budget: float):
         self.today_spend = today_spend
         self.daily_budget = daily_budget
@@ -68,8 +69,10 @@ class BudgetExceededError(Exception):
 
 class LLMError(Exception):
     """Typed error for LLM failures."""
-    def __init__(self, message: str, error_type: str = "llm_error",
-                 recoverable: bool = False):
+
+    def __init__(
+        self, message: str, error_type: str = "llm_error", recoverable: bool = False
+    ):
         super().__init__(message)
         self.error_type = error_type
         self.recoverable = recoverable
@@ -78,6 +81,7 @@ class LLMError(Exception):
 @dataclass
 class LLMUsage:
     """Usage metadata from a single LLM call."""
+
     model: str
     input_tokens: int
     output_tokens: int
@@ -88,6 +92,7 @@ class LLMUsage:
 @dataclass
 class LLMResponse:
     """Full response from an LLM call."""
+
     text: str
     usage: LLMUsage
     stop_reason: str
@@ -123,6 +128,7 @@ def _get_openai_client():
                 recoverable=False,
             )
         import os
+
         api_key = os.environ.get("OPENAI_API_KEY", "")
         if not api_key:
             raise LLMError(
@@ -159,10 +165,16 @@ def check_budget(db) -> tuple[float, float, bool]:
 
     is_over = today_spend >= daily_budget
 
-    if not is_over and daily_budget > 0 and today_spend >= daily_budget * warning_threshold:
+    if (
+        not is_over
+        and daily_budget > 0
+        and today_spend >= daily_budget * warning_threshold
+    ):
         logger.warning(
             "Budget warning: $%.4f of $%.2f daily budget (%.0f%%)",
-            today_spend, daily_budget, (today_spend / daily_budget) * 100,
+            today_spend,
+            daily_budget,
+            (today_spend / daily_budget) * 100,
         )
 
     return today_spend, daily_budget, is_over
@@ -178,11 +190,14 @@ def record_usage(
     cost_usd: float,
 ):
     """Record LLM usage to the llm_usage table."""
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO llm_usage (communication_id, stage, model, input_tokens, output_tokens, cost_usd)
         VALUES (?, ?, ?, ?, ?, ?)
-    """, (communication_id, stage, model, input_tokens, output_tokens, cost_usd))
-    db.commit()
+    """,
+        (communication_id, stage, model, input_tokens, output_tokens, cost_usd),
+    )
+    # db.commit()  # Removed: orchestrator savepoint handles commit
 
 
 async def _call_with_retry(func, *args, **kwargs):
@@ -195,10 +210,13 @@ async def _call_with_retry(func, *args, **kwargs):
             last_error = e
             if not e.recoverable or attempt == MAX_LLM_RETRIES - 1:
                 raise
-            delay = RETRY_BASE_DELAY * (2 ** attempt)
+            delay = RETRY_BASE_DELAY * (2**attempt)
             logger.warning(
                 "LLM call failed (attempt %d/%d, retrying in %.1fs): %s",
-                attempt + 1, MAX_LLM_RETRIES, delay, e,
+                attempt + 1,
+                MAX_LLM_RETRIES,
+                delay,
+                e,
             )
             await asyncio.sleep(delay)
     raise last_error  # should not reach here
@@ -249,6 +267,7 @@ async def _call_llm_once(
         try:
             import asyncio
             import functools
+
             loop = asyncio.get_event_loop()
             # Build kwargs - reasoning models don't allow temperature
             oai_kwargs = {
@@ -287,24 +306,26 @@ async def _call_llm_once(
         stop_reason = response.choices[0].finish_reason or "stop"
 
     else:
-        # ── Anthropic path ──
+        # ── Anthropic path (streaming for large outputs) ──
         client = _get_client()
         try:
             import asyncio
             import functools
-            loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(
-                None,
-                functools.partial(
-                    client.messages.create,
+
+            def _stream_collect():
+                """Use streaming to avoid timeout on large outputs."""
+                with client.messages.stream(
                     model=model,
                     max_tokens=max_tokens,
                     temperature=temperature,
-
                     system=system_prompt,
                     messages=[{"role": "user", "content": user_prompt}],
-                ),
-            )
+                ) as stream:
+                    response = stream.get_final_message()
+                return response
+
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(None, _stream_collect)
         except anthropic.RateLimitError as e:
             raise LLMError(
                 f"Rate limited: {e}",
@@ -355,8 +376,13 @@ async def _call_llm_once(
 
     logger.info(
         "[%s] LLM %s/%s: %d in + %d out = $%.4f (%.1fs)",
-        communication_id[:8], stage, model.split("-")[1],
-        input_tokens, output_tokens, cost, elapsed,
+        communication_id[:8],
+        stage,
+        model.split("-")[1],
+        input_tokens,
+        output_tokens,
+        cost,
+        elapsed,
     )
 
     return LLMResponse(
@@ -379,6 +405,12 @@ async def call_llm(
     """Call LLM with automatic retry on recoverable errors."""
     return await _call_with_retry(
         _call_llm_once,
-        db, communication_id, stage, model,
-        system_prompt, user_prompt, max_tokens, temperature,
+        db,
+        communication_id,
+        stage,
+        model,
+        system_prompt,
+        user_prompt,
+        max_tokens,
+        temperature,
     )

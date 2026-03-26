@@ -12,13 +12,17 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from db.connection import get_connection
-from voice.speakers.resolver import promote_voice_sample, get_suggestions_for_conversation
+from voice.speakers.resolver import (
+    promote_voice_sample,
+    get_suggestions_for_conversation,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["speakers"])
 
 
 # ── Request Models ──
+
 
 class AssignSpeakerRequest(BaseModel):
     conversation_id: str
@@ -38,6 +42,7 @@ class ReassignSegmentRequest(BaseModel):
 
 
 # ── Speaker Assignment ──
+
 
 @router.post("/correct-speaker")
 def assign_speaker(req: AssignSpeakerRequest):
@@ -74,15 +79,23 @@ def assign_speaker(req: AssignSpeakerRequest):
                    (id, conversation_id, speaker_label, tracker_person_id,
                     confidence, method, confirmed)
                    VALUES (?, ?, ?, ?, 1.0, 'manual', 1)""",
-                (str(uuid.uuid4()), req.conversation_id, req.speaker_label,
-                 req.tracker_person_id),
+                (
+                    str(uuid.uuid4()),
+                    req.conversation_id,
+                    req.speaker_label,
+                    req.tracker_person_id,
+                ),
             )
 
         # Promote voice sample to speaker profile
-        promote_voice_sample(conn, req.conversation_id, req.speaker_label, req.tracker_person_id)
+        promote_voice_sample(
+            conn, req.conversation_id, req.speaker_label, req.tracker_person_id
+        )
 
         conn.commit()
-        logger.info(f"Assigned {req.speaker_label} -> person {req.tracker_person_id[:8]} in {req.conversation_id[:8]}")
+        logger.info(
+            f"Assigned {req.speaker_label} -> person {req.tracker_person_id[:8]} in {req.conversation_id[:8]}"
+        )
         return {"status": "ok", "tracker_person_id": req.tracker_person_id}
     finally:
         conn.close()
@@ -98,7 +111,9 @@ def merge_speakers(req: MergeSpeakersRequest):
             (req.conversation_id, req.from_label),
         ).fetchone()["cnt"]
         if count == 0:
-            raise HTTPException(404, f"No segments with speaker_label '{req.from_label}'")
+            raise HTTPException(
+                404, f"No segments with speaker_label '{req.from_label}'"
+            )
 
         conn.execute(
             "UPDATE transcripts SET speaker_label = ? WHERE conversation_id = ? AND speaker_label = ?",
@@ -112,7 +127,9 @@ def merge_speakers(req: MergeSpeakersRequest):
         )
 
         conn.commit()
-        logger.info(f"Merged {req.from_label} -> {req.to_label} in {req.conversation_id[:8]} ({count} segments)")
+        logger.info(
+            f"Merged {req.from_label} -> {req.to_label} in {req.conversation_id[:8]} ({count} segments)"
+        )
         return {"status": "ok", "segments_updated": count}
     finally:
         conn.close()

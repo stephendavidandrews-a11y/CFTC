@@ -11,6 +11,14 @@ import {
   rejectEntity,
   confirmAllEntities,
   completeEntityReview,
+  confirmMatterAssociation,
+  rejectMatterAssociation,
+  addMatterAssociation,
+  confirmDirectiveAssociation,
+  rejectDirectiveAssociation,
+  addDirectiveAssociation,
+  updateSegmentIntent,
+  dismissIntelligenceFlag,
 } from "../../api/ai";
 import ConfidenceIndicator from "../../components/shared/ConfidenceIndicator";
 import PersonOrgResolver from "../../components/shared/PersonOrgResolver";
@@ -34,6 +42,25 @@ const TYPE_LABELS = {
   case: "Case",
   concept: "Concept",
 };
+
+
+
+const INTENT_OPTIONS = [
+  { value: "casual", label: "Casual", color: "#a78bfa" },
+  { value: "planning", label: "Planning", color: "#60a5fa" },
+  { value: "decision", label: "Decision", color: "#fbbf24" },
+  { value: "strategic", label: "Strategic", color: "#f87171" },
+  { value: "briefing", label: "Briefing", color: "#34d399" },
+  { value: "policy", label: "Policy", color: "#fb923c" },
+  { value: "negotiation", label: "Negotiation", color: "#e879f9" },
+];
+
+function formatTime(secs) {
+  if (!secs && secs !== 0) return "";
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  return m + ":" + String(s).padStart(2, "0");
+}
 
 // ── Entity row (expandable) ─────────────────────────────────────────────────
 
@@ -334,6 +361,210 @@ function EntityRow({ entity, communicationId, onUpdate, isExpanded, onToggle }) 
   );
 }
 
+
+// ── Association Row (matter or directive) ────────────────────────────────────
+
+function AssociationRow({ assoc, type, communicationId, onUpdate }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+
+  const confirmFn = type === "matter" ? confirmMatterAssociation : confirmDirectiveAssociation;
+  const rejectFn = type === "matter" ? rejectMatterAssociation : rejectDirectiveAssociation;
+  const label = type === "matter" ? assoc.matter_title : assoc.directive_label;
+
+  const statusColor = assoc.confirmed === 1 ? "#4ade80" : assoc.confirmed === -1 ? "#f87171" : theme.text.faint;
+  const statusLabel = assoc.confirmed === 1 ? "Confirmed" : assoc.confirmed === -1 ? "Rejected" : "Pending";
+
+  const handleConfirm = async () => {
+    setBusy(true);
+    try {
+      await confirmFn(communicationId, assoc.id);
+      toast.success(`Confirmed: ${label}`);
+      onUpdate();
+    } catch (e) { toast.error(e.message); }
+    setBusy(false);
+  };
+
+  const handleReject = async () => {
+    setBusy(true);
+    try {
+      await rejectFn(communicationId, assoc.id);
+      toast.info(`Rejected: ${label}`);
+      onUpdate();
+    } catch (e) { toast.error(e.message); }
+    setBusy(false);
+  };
+
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 10, padding: "8px 14px",
+      background: theme.bg.card, border: "1px solid " + (assoc.confirmed === 1 ? "rgba(74,222,128,0.2)" : assoc.confirmed === -1 ? "rgba(248,113,113,0.2)" : theme.border.subtle),
+      borderRadius: 6, marginBottom: 4,
+      opacity: busy ? 0.6 : 1,
+    }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ color: theme.text.primary, fontWeight: 600, fontSize: 13 }}>{label}</span>
+        {assoc.reasoning && (
+          <div style={{ fontSize: 11, color: theme.text.faint, marginTop: 2 }}>{assoc.reasoning}</div>
+        )}
+        {assoc.relevant_segments && Array.isArray(assoc.relevant_segments) && assoc.relevant_segments.length > 0 && (
+          <span style={{ fontSize: 10, color: theme.text.faint, marginLeft: 8 }}>
+            Segments: {assoc.relevant_segments.join(", ")}
+          </span>
+        )}
+      </div>
+      <div style={{ width: 70 }}>
+        <ConfidenceIndicator score={assoc.confidence} size="bar" width={50} />
+      </div>
+      <span style={{ fontSize: 12, fontWeight: 600, color: statusColor, width: 70, textAlign: "center" }}>
+        {statusLabel}
+      </span>
+      {assoc.confirmed === 0 && (
+        <div style={{ display: "flex", gap: 4 }}>
+          <button onClick={handleConfirm} style={{ padding: "3px 10px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: "rgba(74,222,128,0.15)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.3)", cursor: "pointer" }}>Yes</button>
+          <button onClick={handleReject} style={{ padding: "3px 10px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: "rgba(248,113,113,0.1)", color: "#f87171", border: "1px solid rgba(248,113,113,0.3)", cursor: "pointer" }}>No</button>
+        </div>
+      )}
+      {assoc.confirmed !== 0 && (
+        <button onClick={assoc.confirmed === 1 ? handleReject : handleConfirm} style={{ padding: "3px 10px", borderRadius: 4, fontSize: 10, background: "transparent", color: theme.text.faint, border: "1px solid " + theme.border.subtle, cursor: "pointer" }}>
+          {assoc.confirmed === 1 ? "Reject" : "Confirm"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── Segment Intent Row ───────────────────────────────────────────────────────
+
+function IntentRow({ segment, communicationId, onUpdate }) {
+  const toast = useToast();
+
+  const handleChange = async (e) => {
+    try {
+      await updateSegmentIntent(communicationId, segment.index, e.target.value);
+      toast.success(`Updated intent for "${segment.topic}"`);
+      onUpdate();
+    } catch (err) { toast.error(err.message); }
+  };
+
+  const intentOption = INTENT_OPTIONS.find((o) => o.value === segment.intent) || INTENT_OPTIONS[4];
+
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 10, padding: "6px 14px",
+      background: theme.bg.card, border: "1px solid " + theme.border.subtle,
+      borderRadius: 6, marginBottom: 4,
+    }}>
+      <span style={{ fontSize: 11, color: theme.text.faint, fontFamily: theme.font.mono, width: 75 }}>
+        {formatTime(segment.start_time)}-{formatTime(segment.end_time)}
+      </span>
+      <span style={{ flex: 1, color: theme.text.primary, fontSize: 13, fontWeight: 500 }}>
+        {segment.topic}
+      </span>
+      <select
+        value={segment.intent}
+        onChange={handleChange}
+        style={{
+          padding: "3px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600,
+          background: theme.bg.card, color: intentOption.color,
+          border: "1px solid " + theme.border.subtle, cursor: "pointer",
+        }}
+      >
+        {INTENT_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+// ── Intelligence Flag Row ────────────────────────────────────────────────────
+
+function FlagRow({ flag, index, communicationId, onUpdate }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+
+  const handleDismiss = async () => {
+    setBusy(true);
+    try {
+      await dismissIntelligenceFlag(communicationId, index);
+      toast.info("Flag dismissed");
+      onUpdate();
+    } catch (e) { toast.error(e.message); }
+    setBusy(false);
+  };
+
+  const FLAG_TYPE_COLORS = {
+    personal_detail: "#a78bfa",
+    org_operational: "#60a5fa",
+    political_signal: "#f87171",
+    relationship_dynamic: "#e879f9",
+    process_insight: "#34d399",
+    strategic_context: "#fbbf24",
+    policy_detail: "#fb923c",
+  };
+
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 10, padding: "6px 14px",
+      background: theme.bg.card, border: "1px solid " + theme.border.subtle,
+      borderRadius: 6, marginBottom: 4,
+      opacity: busy ? 0.6 : 1,
+    }}>
+      <span style={{
+        fontSize: 9, fontWeight: 700, textTransform: "uppercase",
+        padding: "2px 6px", borderRadius: 3,
+        background: (FLAG_TYPE_COLORS[flag.flag_type] || theme.text.faint) + "20",
+        color: FLAG_TYPE_COLORS[flag.flag_type] || theme.text.faint,
+        whiteSpace: "nowrap",
+      }}>
+        {(flag.flag_type || "").replace(/_/g, " ")}
+      </span>
+      {flag.about_entity && (
+        <span style={{ fontSize: 12, color: theme.text.muted, fontWeight: 600 }}>
+          {flag.about_entity.name || "Unknown"}
+        </span>
+      )}
+      <span style={{ flex: 1, fontSize: 12, color: theme.text.faint }}>
+        {flag.hint}
+      </span>
+      <button onClick={handleDismiss} style={{
+        padding: "2px 8px", borderRadius: 4, fontSize: 10,
+        background: "transparent", color: theme.text.faint,
+        border: "1px solid " + theme.border.subtle, cursor: "pointer",
+      }}>
+        Dismiss
+      </button>
+    </div>
+  );
+}
+
+// ── Section Header ───────────────────────────────────────────────────────────
+
+function SectionHeader({ title, count, pendingCount }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 8,
+      marginTop: 20, marginBottom: 8,
+    }}>
+      <h2 style={{ fontSize: 14, fontWeight: 700, color: theme.text.primary, margin: 0 }}>
+        {title}
+      </h2>
+      {count > 0 && (
+        <span style={{ fontSize: 11, color: theme.text.faint }}>({count})</span>
+      )}
+      {pendingCount > 0 && (
+        <span style={{
+          fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 3,
+          background: "rgba(251,191,36,0.15)", color: "#fbbf24",
+        }}>
+          {pendingCount} pending
+        </span>
+      )}
+    </div>
+  );
+}
+
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function EntityReviewDetailPage() {
@@ -342,6 +573,20 @@ export default function EntityReviewDetailPage() {
   const toast = useToast();
   const { data, loading, error, refetch } = useApi(() => getEntityReviewDetail(id), [id]);
   const [expandedId, setExpandedId] = useState(null);
+  const scrollRef = React.useRef(null);
+
+  // Preserve scroll position across refetches
+  const refetchKeepScroll = React.useCallback(() => {
+    const scrollTop = scrollRef.current?.scrollTop || 0;
+    refetch().then(() => {
+      // Double-RAF to ensure React has rendered before restoring scroll
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (scrollRef.current) scrollRef.current.scrollTop = scrollTop;
+        });
+      });
+    }).catch(() => {});  // Swallow errors — refetch sets error state already
+  }, [refetch]);
   const [completing, setCompleting] = useState(false);
   const [confirmingAll, setConfirmingAll] = useState(false);
 
@@ -352,6 +597,23 @@ export default function EntityReviewDetailPage() {
   const confirmedCount = entities.filter((e) => e.confirmed === 1).length;
   const rejectedCount = entities.filter((e) => e.confirmed === -1).length;
   const allReviewed = pendingCount === 0 && entities.length > 0;
+
+  // Association data from v2 enrichment
+  const matterAssociations = data?.matter_associations || [];
+  const directiveAssociations = data?.directive_associations || [];
+  const segmentIntents = data?.segment_intents || [];
+  const intelligenceFlags = data?.intelligence_flags || [];
+
+  // Only show reviewable entities (person/org) in the entity section
+  const reviewableEntities = entities.filter(e => e.entity_type === "person" || e.entity_type === "organization");
+  const infoEntities = entities.filter(e => e.entity_type !== "person" && e.entity_type !== "organization");
+
+  const pendingMatterAssocs = matterAssociations.filter(a => a.confirmed === 0).length;
+  const pendingDirectiveAssocs = directiveAssociations.filter(a => a.confirmed === 0).length;
+
+  // All reviewable items must be resolved for completion
+  const allAssociationsReviewed = pendingMatterAssocs === 0 && pendingDirectiveAssocs === 0;
+  const canComplete = allReviewed && allAssociationsReviewed;
 
   // Auto-expand first pending entity
   useEffect(() => {
@@ -366,7 +628,7 @@ export default function EntityReviewDetailPage() {
     try {
       const result = await confirmAllEntities(id);
       toast.success(`Confirmed ${result.confirmed_count} entities`);
-      refetch();
+      refetchKeepScroll();
     } catch (e) {
       toast.error(`Confirm all failed: ${e.message}`);
     }
@@ -385,7 +647,7 @@ export default function EntityReviewDetailPage() {
     setCompleting(false);
   };
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <div style={{ padding: "40px 32px", color: theme.text.faint }}>
         Loading entity review...
@@ -426,10 +688,12 @@ export default function EntityReviewDetailPage() {
           {data?.title || data?.original_filename || "Untitled"}
         </h1>
         <div style={{ fontSize: 12, color: theme.text.faint, marginTop: 2 }}>
-          {entities.length} entities \u00b7
+          {reviewableEntities.length} entities \u00b7
           {" "}{confirmedCount} confirmed \u00b7
           {" "}{rejectedCount} rejected \u00b7
           {" "}{pendingCount} pending
+          {matterAssociations.length > 0 && ` \u00b7 ${matterAssociations.length} matter assocs`}
+          {directiveAssociations.length > 0 && ` \u00b7 ${directiveAssociations.length} directive assocs`}
         </div>
 
         {/* Summary from enrichment */}
@@ -465,7 +729,7 @@ export default function EntityReviewDetailPage() {
       </div>
 
       {/* Entity table (scrollable) */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px" }}>
+      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "16px 24px" }}>
         {/* Pre-checked hint */}
         {pendingCount > 0 && entities.some((e) => e.confirmed === 0 && e.confidence >= 0.9) && (
           <div style={{
@@ -483,16 +747,107 @@ export default function EntityReviewDetailPage() {
           </div>
         )}
 
-        {entities.map((entity) => (
+        {/* People section */}
+        {reviewableEntities.filter(e => e.entity_type === "person").length > 0 && (
+          <SectionHeader
+            title="People"
+            count={reviewableEntities.filter(e => e.entity_type === "person").length}
+            pendingCount={reviewableEntities.filter(e => e.entity_type === "person" && e.confirmed === 0).length}
+          />
+        )}
+        {reviewableEntities.filter(e => e.entity_type === "person").map((entity) => (
           <EntityRow
             key={entity.id}
             entity={entity}
             communicationId={id}
-            onUpdate={refetch}
+            onUpdate={refetchKeepScroll}
             isExpanded={expandedId === entity.id}
             onToggle={() => setExpandedId(expandedId === entity.id ? null : entity.id)}
           />
         ))}
+
+        {/* Organizations section */}
+        {reviewableEntities.filter(e => e.entity_type === "organization").length > 0 && (
+          <SectionHeader
+            title="Organizations"
+            count={reviewableEntities.filter(e => e.entity_type === "organization").length}
+            pendingCount={reviewableEntities.filter(e => e.entity_type === "organization" && e.confirmed === 0).length}
+          />
+        )}
+        {reviewableEntities.filter(e => e.entity_type === "organization").map((entity) => (
+          <EntityRow
+            key={entity.id}
+            entity={entity}
+            communicationId={id}
+            onUpdate={refetchKeepScroll}
+            isExpanded={expandedId === entity.id}
+            onToggle={() => setExpandedId(expandedId === entity.id ? null : entity.id)}
+          />
+        ))}
+
+        {/* Matter Associations */}
+        {matterAssociations.length > 0 && (
+          <>
+            <SectionHeader title="Matter Associations" count={matterAssociations.length} pendingCount={pendingMatterAssocs} />
+            {matterAssociations.map((assoc) => (
+              <AssociationRow key={assoc.id} assoc={assoc} type="matter" communicationId={id} onUpdate={refetchKeepScroll} />
+            ))}
+          </>
+        )}
+
+        {/* Directive Associations */}
+        {directiveAssociations.length > 0 && (
+          <>
+            <SectionHeader title="Directive Associations" count={directiveAssociations.length} pendingCount={pendingDirectiveAssocs} />
+            {directiveAssociations.map((assoc) => (
+              <AssociationRow key={assoc.id} assoc={assoc} type="directive" communicationId={id} onUpdate={refetchKeepScroll} />
+            ))}
+          </>
+        )}
+
+        {/* Segment Intents */}
+        {segmentIntents.length > 0 && (
+          <>
+            <SectionHeader title="Segment Intents" count={segmentIntents.length} pendingCount={0} />
+            {segmentIntents.map((seg, i) => (
+              <IntentRow key={i} segment={seg} communicationId={id} onUpdate={refetchKeepScroll} />
+            ))}
+          </>
+        )}
+
+        {/* Intelligence Flags */}
+        {intelligenceFlags.length > 0 && (
+          <>
+            <SectionHeader title="Intelligence Flags" count={intelligenceFlags.length} pendingCount={0} />
+            <div style={{ fontSize: 11, color: theme.text.faint, marginBottom: 6 }}>
+              These flags guide downstream extraction. Dismiss any that seem incorrect.
+            </div>
+            {intelligenceFlags.map((flag, i) => (
+              <FlagRow key={i} flag={flag} index={i} communicationId={id} onUpdate={refetchKeepScroll} />
+            ))}
+          </>
+        )}
+
+        {/* Info entities (auto-confirmed, not reviewable) */}
+        {infoEntities.length > 0 && (
+          <>
+            <SectionHeader title="Other Mentions (auto-confirmed)" count={infoEntities.length} pendingCount={0} />
+            <div style={{ fontSize: 11, color: theme.text.faint, marginBottom: 8 }}>
+              Regulations, legislation, cases, and concepts — no review needed, provided to extraction as context.
+            </div>
+            {infoEntities.map((entity) => (
+              <div key={entity.id} style={{
+                display: "flex", alignItems: "center", gap: 8, padding: "4px 14px",
+                fontSize: 12, color: theme.text.faint,
+              }}>
+                <span>{TYPE_ICONS[entity.entity_type] || "\u2022"}</span>
+                <span style={{ color: theme.text.muted }}>{entity.mention_text}</span>
+                <span style={{ fontSize: 10 }}>({entity.entity_type})</span>
+                <span style={{ fontSize: 10, fontFamily: theme.font.mono }}>{entity.mention_count}x</span>
+              </div>
+            ))}
+          </>
+        )}
       </div>
 
       {/* Bottom bar */}
@@ -534,13 +889,13 @@ export default function EntityReviewDetailPage() {
           )}
           <button
             onClick={handleComplete}
-            disabled={!allReviewed || completing}
+            disabled={!canComplete || completing}
             style={{
               padding: "8px 20px", borderRadius: 6, fontSize: 13, fontWeight: 600,
-              background: allReviewed && !completing ? "#3b82f6" : "#374151",
-              color: allReviewed && !completing ? "#fff" : "#6b7280",
+              background: canComplete && !completing ? "#3b82f6" : "#374151",
+              color: canComplete && !completing ? "#fff" : "#6b7280",
               border: "none",
-              cursor: allReviewed && !completing ? "pointer" : "not-allowed",
+              cursor: canComplete && !completing ? "pointer" : "not-allowed",
             }}
           >
             {completing ? "Completing..." : "Confirm All & Continue"}

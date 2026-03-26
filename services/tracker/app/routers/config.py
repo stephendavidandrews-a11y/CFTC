@@ -1,4 +1,5 @@
 """System configuration endpoints."""
+
 from fastapi import APIRouter, Depends
 from app.db import get_db
 
