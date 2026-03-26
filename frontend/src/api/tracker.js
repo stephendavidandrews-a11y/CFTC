@@ -453,3 +453,23 @@ export function deleteDirectiveDocument(linkId) {
   return fetchJSON(`${P}/directive-documents/${linkId}`, { method: "DELETE" });
 }
 
+// ── Matter Regulatory IDs ──────────────────────────────────────────────────
+export function listRegulatoryIds(matterId) {
+  return fetchJSON(`${P}/matters/${matterId}/regulatory-ids`);
+}
+export function addRegulatoryId(matterId, data) {
+  return fetchJSON(`${P}/matters/${matterId}/regulatory-ids`, {
+    method: "POST", body: JSON.stringify(data),
+    headers: {"Content-Type": "application/json"},
+  });
+}
+export function removeRegulatoryId(matterId, regId) {
+  return fetchJSON(`${P}/matters/${matterId}/regulatory-ids/${regId}`, { method: "DELETE" });
+}
+export function changeMatterType(matterId, newType) {
+  return fetchJSON(`${P}/matters/${matterId}/change-type`, {
+    method: "PUT", body: JSON.stringify({ new_type: newType }),
+    headers: {"Content-Type": "application/json"},
+  });
+}
+

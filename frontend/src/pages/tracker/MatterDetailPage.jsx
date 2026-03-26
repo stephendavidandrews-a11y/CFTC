@@ -8,7 +8,8 @@ import {
   getMatter,
   listPeople, listOrganizations, listMatters,
   getMatterTags, addMatterTag, removeMatterTag, listTags, createTag,
-  getEnums, deleteMatter
+  getEnums, deleteMatter,
+  addRegulatoryId, removeRegulatoryId
 } from "../../api/tracker";
 import { useDrawer } from "../../contexts/DrawerContext";
 import Badge from "../../components/shared/Badge";
@@ -79,6 +80,10 @@ export default function MatterDetailPage() {
   const [showNewTag, setShowNewTag] = useState(false);
   const [newTagName, setNewTagName] = useState("");
   const [enums, setLoadedEnums] = useState({});
+  const [showRegIdForm, setShowRegIdForm] = useState(false);
+  const [regIdType, setRegIdType] = useState("fr_citation");
+  const [regIdValue, setRegIdValue] = useState("");
+  const [regIdRelationship, setRegIdRelationship] = useState("primary");
 
   React.useEffect(() => { if (matter?.title) document.title = matter?.title + " | Command Center"; }, [matter?.title]);
 
@@ -120,6 +125,23 @@ export default function MatterDetailPage() {
     } catch (e) { console.error(e); toast.error(e.message || "Operation failed"); }
   }, [newTagName]);
 
+  const handleAddRegId = useCallback(async () => {
+    if (!regIdValue.trim()) return;
+    try {
+      await addRegulatoryId(id, { id_type: regIdType, id_value: regIdValue.trim(), relationship: regIdRelationship });
+      setRegIdValue("");
+      setShowRegIdForm(false);
+      refetch();
+    } catch (e) { console.error(e); toast.error(e.message || "Failed to add regulatory ID"); }
+  }, [id, regIdType, regIdValue, regIdRelationship, refetch]);
+
+  const handleRemoveRegId = useCallback(async (rid) => {
+    try {
+      await removeRegulatoryId(id, rid);
+      refetch();
+    } catch (e) { console.error(e); toast.error(e.message || "Failed to remove regulatory ID"); }
+  }, [id, refetch]);
+
   if (loading) {
     return <div style={{ padding: "60px 32px", textAlign: "center", color: theme.text.faint }}>Loading matter...</div>;
   }
@@ -150,23 +172,16 @@ export default function MatterDetailPage() {
     { label: "Status", value: matter.status },
     { label: "Priority", value: matter.priority },
     { label: "Sensitivity", value: matter.sensitivity },
-    { label: "Boss Involvement", value: matter.boss_involvement_level },
-    { label: "RIN", value: matter.rin },
-    { label: "Regulatory Stage", value: matter.regulatory_stage },
-    { label: "Risk Level", value: matter.risk_level },
+    { label: "Blocker", value: matter.blocker, render: (v) => v ? <span style={{ color: "#ef5350", fontWeight: 600 }}>{v}</span> : <span style={{ color: "#888" }}>None</span> },
   ];
 
   const infoRight = [
     { label: "Owner", value: matter.owner_name || matter.owner },
-    { label: "Supervisor", value: matter.supervisor_name || matter.supervisor },
     { label: "Client Org", value: matter.client_org_name || matter.client_org },
-    { label: "Requesting Org", value: matter.requesting_org_name || matter.requesting_org },
-    { label: "Reviewing Org", value: matter.reviewing_org_name || matter.reviewing_org },
     { label: "Opened Date", value: formatDate(matter.opened_date || matter.created_at) },
-    { label: "Revisit Date", value: formatDate(matter.revisit_date) },
     { label: "Work Deadline", value: formatDate(matter.work_deadline) },
     { label: "External Deadline", value: formatDate(matter.external_deadline) },
-    { label: "Decision Deadline", value: formatDate(matter.decision_deadline) },
+    { label: "Next Step", value: matter.next_step },
   ];
 
   const tabs = [
@@ -193,9 +208,14 @@ export default function MatterDetailPage() {
           </div>
           {/* Title */}
           <h1 style={titleStyle}>{matter.title}</h1>
-          {matter.matter_number && (
-            <div style={{ fontSize: 12, color: theme.text.faint, marginTop: 2 }}>#{matter.matter_number}</div>
-          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
+            {matter.matter_number && (
+              <span style={{ fontSize: 12, color: theme.text.faint }}>#{matter.matter_number}</span>
+            )}
+            {matter.source && matter.source !== "manual" && (
+              <Badge bg="rgba(100,181,246,0.15)" text="#64b5f6" label={matter.source} />
+            )}
+          </div>
         </div>
         <button style={btnPrimary} onClick={() => openDrawer("matter", matter, refetch)}>
           Edit
@@ -233,7 +253,7 @@ export default function MatterDetailPage() {
           {infoLeft.map((item) => (
             <div key={item.label} style={{ marginBottom: 12 }}>
               <div style={labelStyle}>{item.label}</div>
-              <div style={valStyle}>{item.value || "\u2014"}</div>
+              <div style={valStyle}>{item.render ? item.render(item.value) : (item.value || "\u2014")}</div>
             </div>
           ))}
         </div>
@@ -247,26 +267,108 @@ export default function MatterDetailPage() {
         </div>
       </div>
 
+      {/* Extension Section */}
+      {(() => {
+        const extBorderColor =
+          matter.matter_type === "rulemaking" ? "#ce93d8" :
+          matter.matter_type === "guidance" ? "#64b5f6" : "#ef5350";
+        const extLabel =
+          matter.matter_type === "rulemaking" ? "Rulemaking" :
+          matter.matter_type === "guidance" ? "Guidance" : "Enforcement";
+        const ext = matter.extension;
+
+        if (ext) {
+          // Comment period badge logic
+          let commentBadge = null;
+          if (matter.matter_type === "rulemaking" && matter.comment_period_status) {
+            if (matter.comment_period_status === "closed") {
+              commentBadge = (
+                <Badge bg="rgba(136,136,136,0.15)" text="#888" label={`Comment Period Closed${matter.comment_period_closes ? ` on ${formatDate(matter.comment_period_closes)}` : ""}`} />
+              );
+            } else if (matter.comment_period_status === "open") {
+              const days = matter.comment_period_closes
+                ? Math.ceil((new Date(matter.comment_period_closes) - new Date()) / 86400000)
+                : null;
+              const badgeColor = days !== null && days <= 3 ? "#ef5350" : days !== null && days <= 14 ? "#ffb74d" : "#888";
+              const badgeBg = days !== null && days <= 3 ? "rgba(239,83,80,0.15)" : days !== null && days <= 14 ? "rgba(255,183,77,0.15)" : "rgba(136,136,136,0.15)";
+              commentBadge = (
+                <Badge bg={badgeBg} text={badgeColor} label={days !== null ? `Comment Period: ${days} day${days !== 1 ? "s" : ""} left` : "Comment Period Open"} />
+              );
+            }
+          }
+
+          return (
+            <div style={{ marginTop: 16, marginBottom: 16, borderLeft: `3px solid ${extBorderColor}`, paddingLeft: 16 }}>
+              <h4 style={{ color: extBorderColor, marginBottom: 8 }}>{extLabel} Details</h4>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 24px" }}>
+                {matter.matter_type === "rulemaking" && (<>
+                  {ext.rin && <div><span style={{ color: "#888" }}>RIN</span> <span style={valStyle}>{ext.rin}</span></div>}
+                  {ext.regulatory_stage && <div><span style={{ color: "#888" }}>Regulatory Stage</span> <span style={valStyle}>{ext.regulatory_stage}</span></div>}
+                  {ext.workflow_status && <div><span style={{ color: "#888" }}>Workflow Status</span> <span style={valStyle}>{ext.workflow_status}</span></div>}
+                  {commentBadge && <div style={{ gridColumn: "1 / -1" }}>{commentBadge}</div>}
+                  {ext.cfr_citation && <div><span style={{ color: "#888" }}>CFR Citation</span> <span style={valStyle}>{ext.cfr_citation}</span></div>}
+                  {ext.docket_number && <div><span style={{ color: "#888" }}>Docket Number</span> <span style={valStyle}>{ext.docket_number}</span></div>}
+                  {ext.fr_doc_number && <div><span style={{ color: "#888" }}>FR Doc Number</span> <span style={valStyle}>{ext.fr_doc_number}</span></div>}
+                  {ext.federal_register_citation && <div><span style={{ color: "#888" }}>Federal Register Citation</span> <span style={valStyle}>{ext.federal_register_citation}</span></div>}
+                  {ext.unified_agenda_priority && <div><span style={{ color: "#888" }}>Unified Agenda Priority</span> <span style={valStyle}>{ext.unified_agenda_priority}</span></div>}
+                  {ext.interagency_role && <div><span style={{ color: "#888" }}>Interagency Role</span> <span style={valStyle}>{ext.interagency_role}</span></div>}
+                  {ext.is_petition && <div><Badge bg="rgba(239,83,80,0.15)" text="#ef5350" label="Petition" /></div>}
+                  {ext.petition_disposition && <div><span style={{ color: "#888" }}>Petition Disposition</span> <span style={valStyle}>{ext.petition_disposition}</span></div>}
+                  {ext.review_trigger && <div><span style={{ color: "#888" }}>Review Trigger</span> <span style={valStyle}>{ext.review_trigger}</span></div>}
+                </>)}
+                {matter.matter_type === "guidance" && (<>
+                  {ext.instrument_type && <div><span style={{ color: "#888" }}>Instrument Type</span> <span style={valStyle}>{ext.instrument_type}</span></div>}
+                  {ext.cftc_letter_number && <div><span style={{ color: "#888" }}>CFTC Letter Number</span> <span style={valStyle}>{ext.cftc_letter_number}</span></div>}
+                  {ext.workflow_status && <div><span style={{ color: "#888" }}>Workflow Status</span> <span style={valStyle}>{ext.workflow_status}</span></div>}
+                  {ext.published_in_fr != null && <div><Badge bg={ext.published_in_fr ? "rgba(129,199,132,0.15)" : "rgba(136,136,136,0.15)"} text={ext.published_in_fr ? "#81c784" : "#888"} label={ext.published_in_fr ? "Published in FR" : "Not in FR"} /></div>}
+                  {(ext.requestor_name || ext.requestor_org) && <div><span style={{ color: "#888" }}>Requestor</span> <span style={valStyle}>{[ext.requestor_name, ext.requestor_org].filter(Boolean).join(", ")}</span></div>}
+                  {ext.requestor_counsel && <div><span style={{ color: "#888" }}>Requestor Counsel</span> <span style={valStyle}>{ext.requestor_counsel}</span></div>}
+                  {ext.request_date && <div><span style={{ color: "#888" }}>Request Date</span> <span style={valStyle}>{formatDate(ext.request_date)}</span></div>}
+                  {ext.issuing_office && <div><span style={{ color: "#888" }}>Issuing Office</span> <span style={valStyle}>{ext.issuing_office}</span></div>}
+                  {ext.signatory && <div><span style={{ color: "#888" }}>Signatory</span> <span style={valStyle}>{ext.signatory}</span></div>}
+                  {ext.staff_contact && <div><span style={{ color: "#888" }}>Staff Contact</span> <span style={valStyle}>{ext.staff_contact}</span></div>}
+                  {ext.legal_question && <div style={{ gridColumn: "1 / -1" }}><span style={{ color: "#888" }}>Legal Question</span> <span style={{ ...valStyle, whiteSpace: "pre-wrap" }}>{ext.legal_question}</span></div>}
+                  {ext.cea_provisions && <div><span style={{ color: "#888" }}>CEA Provisions</span> <span style={valStyle}>{ext.cea_provisions}</span></div>}
+                  {ext.cfr_provisions && <div><span style={{ color: "#888" }}>CFR Provisions</span> <span style={valStyle}>{ext.cfr_provisions}</span></div>}
+                  {ext.conditions_summary && <div style={{ gridColumn: "1 / -1" }}><span style={{ color: "#888" }}>Conditions Summary</span> <span style={{ ...valStyle, whiteSpace: "pre-wrap" }}>{ext.conditions_summary}</span></div>}
+                  {ext.amends_matter && <div><span style={{ color: "#888" }}>Amends Matter</span> <span style={valStyle}><a href={`/matters/${ext.amends_matter}`} style={{ color: theme.accent.blue }}>{ext.amends_matter}</a></span></div>}
+                  {ext.prior_letter_number && <div><span style={{ color: "#888" }}>Prior Letter Number</span> <span style={valStyle}>{ext.prior_letter_number}</span></div>}
+                  {ext.issuance_date && <div><span style={{ color: "#888" }}>Issuance Date</span> <span style={valStyle}>{formatDate(ext.issuance_date)}</span></div>}
+                  {ext.expiration_date && <div><span style={{ color: "#888" }}>Expiration Date</span> <span style={valStyle}>{formatDate(ext.expiration_date)}</span></div>}
+                </>)}
+                {matter.matter_type === "enforcement" && (<>
+                  {ext.requesting_division && <div><span style={{ color: "#888" }}>Requesting Division</span> <span style={valStyle}>{ext.requesting_division}</span></div>}
+                  {ext.enforcement_reference && <div><span style={{ color: "#888" }}>Enforcement Reference</span> <span style={valStyle}>{ext.enforcement_reference}</span></div>}
+                  {ext.workflow_status && <div><span style={{ color: "#888" }}>Workflow Status</span> <span style={valStyle}>{ext.workflow_status}</span></div>}
+                  {ext.legal_issue_type && <div><span style={{ color: "#888" }}>Legal Issue Type</span> <span style={valStyle}>{ext.legal_issue_type}</span></div>}
+                  {ext.support_type && <div><span style={{ color: "#888" }}>Support Type</span> <span style={valStyle}>{ext.support_type}</span></div>}
+                  {ext.litigation_stage && <div><span style={{ color: "#888" }}>Litigation Stage</span> <span style={valStyle}>{ext.litigation_stage}</span></div>}
+                  {ext.court_or_forum && <div><span style={{ color: "#888" }}>Court/Forum</span> <span style={valStyle}>{ext.court_or_forum}</span></div>}
+                  {ext.deadline_source && <div><span style={{ color: "#888" }}>Deadline Source</span> <span style={valStyle}>{ext.deadline_source}</span></div>}
+                  {ext.privilege_flags && <div><span style={{ color: "#888" }}>Privilege Flags</span> <span style={valStyle}>{ext.privilege_flags}</span></div>}
+                  {ext.confidential && <div><Badge bg="rgba(239,83,80,0.15)" text="#ef5350" label="Confidential" /></div>}
+                </>)}
+              </div>
+            </div>
+          );
+        } else if (["rulemaking", "guidance", "enforcement"].includes(matter.matter_type)) {
+          return (
+            <div style={{ padding: "12px 16px", border: "1px dashed #555", borderRadius: 6, margin: "16px 0" }}>
+              <span style={{ color: "#888" }}>No {matter.matter_type} details recorded.</span>
+            </div>
+          );
+        }
+        return null;
+      })()}
+
       {/* Context Section */}
-      {(matter.problem_statement || matter.why_it_matters || matter.description || matter.outcome_summary) && (
+      {(matter.description || matter.outcome_summary) && (
         <div style={{ ...cardStyle, marginBottom: 24 }}>
           <div style={sectionTitle}>Context</div>
           {matter.description && (
             <div style={{ marginBottom: 12 }}>
               <div style={labelStyle}>Description</div>
               <div style={{ ...valStyle, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{matter.description}</div>
-            </div>
-          )}
-          {matter.problem_statement && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={labelStyle}>Problem Statement</div>
-              <div style={{ ...valStyle, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{matter.problem_statement}</div>
-            </div>
-          )}
-          {matter.why_it_matters && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={labelStyle}>Why It Matters</div>
-              <div style={{ ...valStyle, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{matter.why_it_matters}</div>
             </div>
           )}
           {matter.outcome_summary && (
@@ -279,43 +381,66 @@ export default function MatterDetailPage() {
       )}
 
       {/* Current State Card */}
-      {(matter.next_step || matter.pending_decision) && (
+      {matter.next_step && (
         <div style={{ ...cardStyle, marginBottom: 24, background: theme.bg.cardHover, borderLeft: `3px solid ${theme.accent.blue}` }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: theme.text.primary, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.02em" }}>Current State</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            {matter.next_step && (
-              <div>
-                <div style={labelStyle}>Next Step</div>
-                <div style={valStyle}>{matter.next_step}</div>
-              </div>
-            )}
-            {matter.next_step_owner_name && (
-              <div>
-                <div style={labelStyle}>Next Step Owner</div>
-                <div style={valStyle}>{matter.next_step_owner_name}</div>
-              </div>
-            )}
-            {matter.pending_decision && (
-              <div style={{ gridColumn: "1 / -1" }}>
-                <div style={labelStyle}>Pending Decision</div>
-                <div style={{ ...valStyle, whiteSpace: "pre-wrap" }}>{matter.pending_decision}</div>
-              </div>
-            )}
+          <div>
+            <div style={labelStyle}>Next Step</div>
+            <div style={valStyle}>{matter.next_step}</div>
           </div>
         </div>
       )}
 
-      {/* Rulemaking Details */}
-      {matter.matter_type === "rulemaking" && (matter.federal_register_citation || matter.unified_agenda_priority || matter.docket_number) && (
-        <div style={{ ...cardStyle, marginBottom: 24 }}>
-          <div style={sectionTitle}>Rulemaking Details</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
-            <div><div style={labelStyle}>FR Citation</div><div style={valStyle}>{matter.federal_register_citation || "\u2014"}</div></div>
-            <div><div style={labelStyle}>Unified Agenda Priority</div><div style={valStyle}>{matter.unified_agenda_priority || "\u2014"}</div></div>
-            <div><div style={labelStyle}>Docket Number</div><div style={valStyle}>{matter.docket_number || "\u2014"}</div></div>
-          </div>
+      {/* Regulatory IDs */}
+      <div style={{ ...cardStyle, marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <div style={sectionTitle}>Regulatory IDs</div>
+          <button style={{ ...btnSecondary, padding: "4px 10px", fontSize: 11 }} onClick={() => setShowRegIdForm((v) => !v)}>
+            {showRegIdForm ? "Cancel" : "+ Add"}
+          </button>
         </div>
-      )}
+        {(matter.regulatory_ids && matter.regulatory_ids.length > 0) ? matter.regulatory_ids.map((rid) => (
+          <div key={rid.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+            <Badge bg="rgba(100,181,246,0.15)" text="#64b5f6" label={rid.id_type} />
+            <span style={valStyle}>{rid.id_value}</span>
+            {rid.relationship && <span style={{ fontSize: 11, color: "#888" }}>({rid.relationship})</span>}
+            <button
+              onClick={() => handleRemoveRegId(rid.id)}
+              style={{ background: "transparent", border: "none", cursor: "pointer", color: "#ef5350", fontSize: 14, padding: "0 4px", lineHeight: 1, opacity: 0.7 }}
+              title="Remove"
+            >&#128465;</button>
+          </div>
+        )) : (
+          <div style={{ color: "#888", fontSize: 12 }}>No regulatory IDs linked.</div>
+        )}
+        {showRegIdForm && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+            <select style={{ ...inputStyle, width: 140, padding: "4px 8px", fontSize: 12 }} value={regIdType} onChange={(e) => setRegIdType(e.target.value)}>
+              <option value="fr_citation">FR Citation</option>
+              <option value="rin">RIN</option>
+              <option value="cfr_part">CFR Part</option>
+              <option value="docket_number">Docket Number</option>
+              <option value="stage1_doc_id">Stage 1 Doc ID</option>
+              <option value="letter_number">Letter Number</option>
+            </select>
+            <input
+              style={{ ...inputStyle, width: 180, padding: "4px 8px", fontSize: 12 }}
+              placeholder="ID value..."
+              value={regIdValue}
+              onChange={(e) => setRegIdValue(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAddRegId()}
+            />
+            <select style={{ ...inputStyle, width: 120, padding: "4px 8px", fontSize: 12 }} value={regIdRelationship} onChange={(e) => setRegIdRelationship(e.target.value)}>
+              <option value="primary">Primary</option>
+              <option value="related">Related</option>
+              <option value="under_review">Under Review</option>
+              <option value="amends">Amends</option>
+              <option value="supersedes">Supersedes</option>
+            </select>
+            <button style={{ ...btnPrimary, padding: "4px 10px", fontSize: 11 }} onClick={handleAddRegId}>Save</button>
+          </div>
+        )}
+      </div>
 
       {/* Tags */}
       <div style={{ ...cardStyle, marginBottom: 24, padding: "14px 24px" }}>
