@@ -6,6 +6,7 @@ and page visit telemetry. Zero LLM cost — pure database queries.
 For months 1-2: verbose format with purpose + distribution + impact per field.
 After month 2: compact format (percentages and trends only).
 """
+
 import logging
 import os
 from datetime import date, timedelta
@@ -15,7 +16,12 @@ import httpx
 try:
     from dotenv import load_dotenv
     import os as _os
-    load_dotenv(_os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))), ".env"))
+
+    load_dotenv(
+        _os.path.join(
+            _os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))), ".env"
+        )
+    )
 except ImportError:
     pass
 
@@ -49,55 +55,289 @@ def _items(resp):
 # ═══════════════════════════════════════════════════════════════════════════
 
 MATTER_FIELDS = [
-    {"field": "status", "purpose": "Current state of the matter", "source": "manual", "impact": "Brief cannot assess portfolio health", "weight": 3},
-    {"field": "priority", "purpose": "Relative importance for triage", "source": "manual", "impact": "Brief cannot rank matters; all treated equally", "weight": 2},
-    {"field": "sensitivity", "purpose": "Leadership/enforcement/congressional flags", "source": "manual", "impact": "Risk register section is empty", "weight": 2},
-    {"field": "boss_involvement_level", "purpose": "What level of boss attention needed", "source": "manual", "impact": "Boss queue in daily brief cannot function", "weight": 3},
-    {"field": "next_step", "purpose": "What happens next on this matter", "source": "manual", "impact": "No execution spine; portfolio health degrades", "weight": 3},
-    {"field": "next_step_assigned_to_person_id", "purpose": "Who is responsible for next action", "source": "manual", "impact": "Accountability gap; team view cannot flag drift", "weight": 3},
-    {"field": "work_deadline", "purpose": "Internal delivery deadline", "source": "manual", "impact": "Deadline section misses internal dates", "weight": 2},
-    {"field": "decision_deadline", "purpose": "When a decision must be made", "source": "manual", "impact": "Decision docket has no urgency signal", "weight": 2},
-    {"field": "external_deadline", "purpose": "Court/statutory/regulatory deadline", "source": "manual", "impact": "Hardest deadlines missed in horizon scan", "weight": 2},
-    {"field": "risk_level", "purpose": "Red/yellow/green posture", "source": "manual", "impact": "Portfolio health view has no risk signal", "weight": 1},
-    {"field": "revisit_date", "purpose": "When to re-evaluate parked matters", "source": "manual", "impact": "Parked matters go permanently dark", "weight": 1},
-    {"field": "matter_type", "purpose": "Category of work", "source": "manual", "impact": "No portfolio grouping by type", "weight": 1},
+    {
+        "field": "status",
+        "purpose": "Current state of the matter",
+        "source": "manual",
+        "impact": "Brief cannot assess portfolio health",
+        "weight": 3,
+    },
+    {
+        "field": "priority",
+        "purpose": "Relative importance for triage",
+        "source": "manual",
+        "impact": "Brief cannot rank matters; all treated equally",
+        "weight": 2,
+    },
+    {
+        "field": "sensitivity",
+        "purpose": "Leadership/enforcement/congressional flags",
+        "source": "manual",
+        "impact": "Risk register section is empty",
+        "weight": 2,
+    },
+    {
+        "field": "boss_involvement_level",
+        "purpose": "What level of boss attention needed",
+        "source": "manual",
+        "impact": "Boss queue in daily brief cannot function",
+        "weight": 3,
+    },
+    {
+        "field": "next_step",
+        "purpose": "What happens next on this matter",
+        "source": "manual",
+        "impact": "No execution spine; portfolio health degrades",
+        "weight": 3,
+    },
+    {
+        "field": "next_step_assigned_to_person_id",
+        "purpose": "Who is responsible for next action",
+        "source": "manual",
+        "impact": "Accountability gap; team view cannot flag drift",
+        "weight": 3,
+    },
+    {
+        "field": "work_deadline",
+        "purpose": "Internal delivery deadline",
+        "source": "manual",
+        "impact": "Deadline section misses internal dates",
+        "weight": 2,
+    },
+    {
+        "field": "decision_deadline",
+        "purpose": "When a decision must be made",
+        "source": "manual",
+        "impact": "Decision docket has no urgency signal",
+        "weight": 2,
+    },
+    {
+        "field": "external_deadline",
+        "purpose": "Court/statutory/regulatory deadline",
+        "source": "manual",
+        "impact": "Hardest deadlines missed in horizon scan",
+        "weight": 2,
+    },
+    {
+        "field": "risk_level",
+        "purpose": "Red/yellow/green posture",
+        "source": "manual",
+        "impact": "Portfolio health view has no risk signal",
+        "weight": 1,
+    },
+    {
+        "field": "revisit_date",
+        "purpose": "When to re-evaluate parked matters",
+        "source": "manual",
+        "impact": "Parked matters go permanently dark",
+        "weight": 1,
+    },
+    {
+        "field": "matter_type",
+        "purpose": "Category of work",
+        "source": "manual",
+        "impact": "No portfolio grouping by type",
+        "weight": 1,
+    },
 ]
 
 TASK_FIELDS = [
-    {"field": "task_mode", "purpose": "action/follow_up/monitoring", "source": "manual", "impact": "All tasks look alike; no supervisory signal", "weight": 2, "is_enum": True,
-     "enum_values": ["action", "follow_up", "monitoring"]},
-    {"field": "expected_output", "purpose": "What done looks like", "source": "ai", "impact": "Completion is ambiguous", "weight": 2},
-    {"field": "waiting_on_person_id", "purpose": "Who is blocking this task", "source": "ai", "impact": "Blocked work invisible", "weight": 1},
-    {"field": "due_date", "purpose": "When the task is due", "source": "manual", "impact": "No overdue detection; deadline section incomplete", "weight": 3},
-    {"field": "assigned_to_person_id", "purpose": "Who owns the task", "source": "manual", "impact": "Team workload view broken", "weight": 3},
-    {"field": "matter_id", "purpose": "Which matter this serves", "source": "ai", "impact": "Orphan tasks have no context", "weight": 2},
-    {"field": "task_type", "purpose": "Category of task", "source": "manual", "impact": "No task type analysis", "weight": 1, "is_enum": True},
+    {
+        "field": "task_mode",
+        "purpose": "action/follow_up/monitoring",
+        "source": "manual",
+        "impact": "All tasks look alike; no supervisory signal",
+        "weight": 2,
+        "is_enum": True,
+        "enum_values": ["action", "follow_up", "monitoring"],
+    },
+    {
+        "field": "expected_output",
+        "purpose": "What done looks like",
+        "source": "ai",
+        "impact": "Completion is ambiguous",
+        "weight": 2,
+    },
+    {
+        "field": "waiting_on_person_id",
+        "purpose": "Who is blocking this task",
+        "source": "ai",
+        "impact": "Blocked work invisible",
+        "weight": 1,
+    },
+    {
+        "field": "due_date",
+        "purpose": "When the task is due",
+        "source": "manual",
+        "impact": "No overdue detection; deadline section incomplete",
+        "weight": 3,
+    },
+    {
+        "field": "assigned_to_person_id",
+        "purpose": "Who owns the task",
+        "source": "manual",
+        "impact": "Team workload view broken",
+        "weight": 3,
+    },
+    {
+        "field": "matter_id",
+        "purpose": "Which matter this serves",
+        "source": "ai",
+        "impact": "Orphan tasks have no context",
+        "weight": 2,
+    },
+    {
+        "field": "task_type",
+        "purpose": "Category of task",
+        "source": "manual",
+        "impact": "No task type analysis",
+        "weight": 1,
+        "is_enum": True,
+    },
 ]
 
 PEOPLE_FIELDS = [
-    {"field": "relationship_category", "purpose": "Role type (Boss, Leadership, etc.)", "source": "manual", "impact": "Brief cannot distinguish stakeholder types", "weight": 2, "is_enum": True,
-     "enum_values": ["Boss", "Leadership", "Direct report", "Indirect report", "OGC peer", "Internal client", "Commissioner office", "Partner agency", "Hill", "Outside party"]},
-    {"field": "stakeholder_role", "purpose": "Stakeholder influence type", "source": "manual", "impact": "Cannot assess stakeholder influence", "weight": 1, "is_enum": True, "enum_values": ["Decision-maker", "Recommender", "Drafter", "Blocker", "Influencer", "FYI only"]},
-    {"field": "last_interaction_date", "purpose": "When you last engaged", "source": "manual", "impact": "Relationship neglect invisible", "weight": 2},
-    {"field": "next_interaction_needed_date", "purpose": "When to follow up", "source": "manual", "impact": "Follow-up section of brief is empty", "weight": 2},
-    {"field": "next_interaction_type", "purpose": "How to follow up", "source": "manual", "impact": "Follow-ups are vague", "weight": 1},
-    {"field": "substantive_areas", "purpose": "What this person works on", "source": "manual", "impact": "Extraction cannot route to relevant people", "weight": 1},
-    {"field": "manager_person_id", "purpose": "Org chart hierarchy", "source": "manual", "impact": "No supervisory chain reasoning", "weight": 1},
-    {"field": "title", "purpose": "Job title", "source": "manual", "impact": "No role context in briefs", "weight": 1},
-    {"field": "organization_id", "purpose": "Which org they belong to", "source": "manual", "impact": "No org grouping", "weight": 1},
+    {
+        "field": "relationship_category",
+        "purpose": "Role type (Boss, Leadership, etc.)",
+        "source": "manual",
+        "impact": "Brief cannot distinguish stakeholder types",
+        "weight": 2,
+        "is_enum": True,
+        "enum_values": [
+            "Boss",
+            "Leadership",
+            "Direct report",
+            "Indirect report",
+            "OGC peer",
+            "Internal client",
+            "Commissioner office",
+            "Partner agency",
+            "Hill",
+            "Outside party",
+        ],
+    },
+    {
+        "field": "stakeholder_role",
+        "purpose": "Stakeholder influence type",
+        "source": "manual",
+        "impact": "Cannot assess stakeholder influence",
+        "weight": 1,
+        "is_enum": True,
+        "enum_values": [
+            "Decision-maker",
+            "Recommender",
+            "Drafter",
+            "Blocker",
+            "Influencer",
+            "FYI only",
+        ],
+    },
+    {
+        "field": "last_interaction_date",
+        "purpose": "When you last engaged",
+        "source": "manual",
+        "impact": "Relationship neglect invisible",
+        "weight": 2,
+    },
+    {
+        "field": "next_interaction_needed_date",
+        "purpose": "When to follow up",
+        "source": "manual",
+        "impact": "Follow-up section of brief is empty",
+        "weight": 2,
+    },
+    {
+        "field": "next_interaction_type",
+        "purpose": "How to follow up",
+        "source": "manual",
+        "impact": "Follow-ups are vague",
+        "weight": 1,
+    },
+    {
+        "field": "substantive_areas",
+        "purpose": "What this person works on",
+        "source": "manual",
+        "impact": "Extraction cannot route to relevant people",
+        "weight": 1,
+    },
+    {
+        "field": "manager_person_id",
+        "purpose": "Org chart hierarchy",
+        "source": "manual",
+        "impact": "No supervisory chain reasoning",
+        "weight": 1,
+    },
+    {
+        "field": "title",
+        "purpose": "Job title",
+        "source": "manual",
+        "impact": "No role context in briefs",
+        "weight": 1,
+    },
+    {
+        "field": "organization_id",
+        "purpose": "Which org they belong to",
+        "source": "manual",
+        "impact": "No org grouping",
+        "weight": 1,
+    },
 ]
 
 MEETING_FIELDS = [
-    {"field": "meeting_type", "purpose": "1:1/group/congressional/etc.", "source": "manual", "impact": "Meeting intelligence cannot tier (core vs full)", "weight": 2, "is_enum": True},
-    {"field": "readout_summary", "purpose": "Post-meeting capture", "source": "manual", "impact": "Meetings produce no record", "weight": 3},
-    {"field": "prep_needed", "purpose": "Flag for pre-meeting prep", "source": "manual", "impact": "Daily brief cannot flag meetings needing prep", "weight": 1},
-    {"field": "purpose", "purpose": "Why the meeting exists", "source": "manual", "impact": "No meeting context", "weight": 1},
+    {
+        "field": "meeting_type",
+        "purpose": "1:1/group/congressional/etc.",
+        "source": "manual",
+        "impact": "Meeting intelligence cannot tier (core vs full)",
+        "weight": 2,
+        "is_enum": True,
+    },
+    {
+        "field": "readout_summary",
+        "purpose": "Post-meeting capture",
+        "source": "manual",
+        "impact": "Meetings produce no record",
+        "weight": 3,
+    },
+    {
+        "field": "prep_needed",
+        "purpose": "Flag for pre-meeting prep",
+        "source": "manual",
+        "impact": "Daily brief cannot flag meetings needing prep",
+        "weight": 1,
+    },
+    {
+        "field": "purpose",
+        "purpose": "Why the meeting exists",
+        "source": "manual",
+        "impact": "No meeting context",
+        "weight": 1,
+    },
 ]
 
 DECISION_FIELDS = [
-    {"field": "decision_assigned_to_person_id", "purpose": "Who must decide", "source": "manual", "impact": "No accountability for pending decisions", "weight": 2},
-    {"field": "decision_due_date", "purpose": "When decision is needed", "source": "manual", "impact": "Decision docket has no urgency", "weight": 2},
-    {"field": "options_summary", "purpose": "What the choices are", "source": "manual", "impact": "Decisions are titles only", "weight": 1},
+    {
+        "field": "decision_assigned_to_person_id",
+        "purpose": "Who must decide",
+        "source": "manual",
+        "impact": "No accountability for pending decisions",
+        "weight": 2,
+    },
+    {
+        "field": "decision_due_date",
+        "purpose": "When decision is needed",
+        "source": "manual",
+        "impact": "Decision docket has no urgency",
+        "weight": 2,
+    },
+    {
+        "field": "options_summary",
+        "purpose": "What the choices are",
+        "source": "manual",
+        "impact": "Decisions are titles only",
+        "weight": 1,
+    },
 ]
 
 
@@ -105,7 +345,12 @@ def _analyze_fields(items, field_defs, entity_name):
     """Analyze field completeness for a set of items."""
     total = len(items)
     if total == 0:
-        return {"entity": entity_name, "total": 0, "fields": [], "message": f"No {entity_name} to analyze."}
+        return {
+            "entity": entity_name,
+            "total": 0,
+            "fields": [],
+            "message": f"No {entity_name} to analyze.",
+        }
 
     results = []
     for fd in field_defs:
@@ -163,7 +408,13 @@ def _analyze_pipeline_quality(db):
         "SELECT model as model_used, SUM(cost_usd) as total_cost, COUNT(*) as calls FROM llm_usage WHERE created_at >= ? GROUP BY model",
         (week_ago,),
     ).fetchall()
-    spend = {row["model_used"]: {"cost": round(row["total_cost"] or 0, 4), "calls": row["calls"]} for row in spend_rows}
+    spend = {
+        row["model_used"]: {
+            "cost": round(row["total_cost"] or 0, 4),
+            "calls": row["calls"],
+        }
+        for row in spend_rows
+    }
     total_spend = sum(s["cost"] for s in spend.values())
 
     # Communications processed
@@ -188,7 +439,9 @@ def _analyze_page_visits(db):
     """Analyze page visit telemetry."""
     week_ago = (date.today() - timedelta(days=7)).isoformat()
     try:
-        db.execute("CREATE TABLE IF NOT EXISTS page_visits (id TEXT PRIMARY KEY, page TEXT NOT NULL, timestamp TEXT NOT NULL, session_id TEXT)")
+        db.execute(
+            "CREATE TABLE IF NOT EXISTS page_visits (id TEXT PRIMARY KEY, page TEXT NOT NULL, timestamp TEXT NOT NULL, session_id TEXT)"
+        )
         rows = db.execute(
             "SELECT page, COUNT(*) as visits FROM page_visits WHERE timestamp >= ? GROUP BY page ORDER BY visits DESC",
             (week_ago,),
@@ -232,13 +485,19 @@ def generate_dev_report(db):
 
     # Fetch all entity data from tracker
     matters = _items(_tracker_get("/matters"))
-    active_matters = [m for m in matters if m.get("status") not in ("closed", "archived", "withdrawn")]
+    active_matters = [
+        m for m in matters if m.get("status") not in ("closed", "archived", "withdrawn")
+    ]
     tasks = _items(_tracker_get("/tasks", {"exclude_done": "true"}))
     people = _items(_tracker_get("/people"))
     active_people = [p for p in people if p.get("is_active", True)]
     meetings = _items(_tracker_get("/meetings"))
     decisions = _items(_tracker_get("/decisions"))
-    open_decisions = [d for d in decisions if d.get("status") not in ("decided", "implemented", "closed")]
+    open_decisions = [
+        d
+        for d in decisions
+        if d.get("status") not in ("decided", "implemented", "closed")
+    ]
 
     # Field analysis per entity
     matter_analysis = _analyze_fields(active_matters, MATTER_FIELDS, "matters")
@@ -258,7 +517,13 @@ def generate_dev_report(db):
 
     # Compute overall completeness
     all_fields = []
-    for analysis in [matter_analysis, task_analysis, people_analysis, meeting_analysis, decision_analysis]:
+    for analysis in [
+        matter_analysis,
+        task_analysis,
+        people_analysis,
+        meeting_analysis,
+        decision_analysis,
+    ]:
         all_fields.extend(analysis.get("fields", []))
 
     if all_fields:
@@ -275,19 +540,36 @@ def generate_dev_report(db):
     suggestions = []
     for f in underused[:5]:
         if f["source"] == "ai":
-            suggestions.append(f"'{f['field']}' is {f['pct']}% populated — extraction prompt may need tuning")
+            suggestions.append(
+                f"'{f['field']}' is {f['pct']}% populated — extraction prompt may need tuning"
+            )
         else:
-            suggestions.append(f"'{f['field']}' is {f['pct']}% populated — manual entry needed. Impact: {f['impact']}")
+            suggestions.append(
+                f"'{f['field']}' is {f['pct']}% populated — manual entry needed. Impact: {f['impact']}"
+            )
 
     if pipeline.get("edit_rate", 0) > 25:
-        suggestions.append(f"Edit rate is {pipeline['edit_rate']}% — review extraction prompt quality")
+        suggestions.append(
+            f"Edit rate is {pipeline['edit_rate']}% — review extraction prompt quality"
+        )
 
     # Unvisited pages
     visited_pages = {pv["page"] for pv in page_visits}
-    important_pages = {"/tasks", "/people", "/matters", "/meetings", "/decisions",
-                       "/context-notes", "/review/speakers", "/review/entities",
-                       "/review/bundles", "/intelligence/daily", "/intelligence/weekly",
-                       "/settings/ai", "/workload"}
+    important_pages = {
+        "/tasks",
+        "/people",
+        "/matters",
+        "/meetings",
+        "/decisions",
+        "/context-notes",
+        "/review/speakers",
+        "/review/entities",
+        "/review/bundles",
+        "/intelligence/daily",
+        "/intelligence/weekly",
+        "/settings/ai",
+        "/workload",
+    }
     unvisited = important_pages - visited_pages
     if unvisited:
         suggestions.append(f"Unvisited pages this week: {', '.join(sorted(unvisited))}")
@@ -306,10 +588,24 @@ def generate_dev_report(db):
         "context_notes": context_notes,
         "pipeline": pipeline,
         "page_visits": page_visits,
-        "underused": [{"field": f"{f.get('entity', '')}.{f['field']}" if 'entity' not in f else f['field'], "pct": f["pct"], "source": f["source"], "impact": f["impact"]} for f in underused],
+        "underused": [
+            {
+                "field": f"{f.get('entity', '')}.{f['field']}"
+                if "entity" not in f
+                else f["field"],
+                "pct": f["pct"],
+                "source": f["source"],
+                "impact": f["impact"],
+            }
+            for f in underused
+        ],
         "suggestions": suggestions,
     }
 
-    logger.info("Dev report: overall score %d%%, %d underused fields, %d suggestions",
-                overall_score, len(underused), len(suggestions))
+    logger.info(
+        "Dev report: overall score %d%%, %d underused fields, %d suggestions",
+        overall_score,
+        len(underused),
+        len(suggestions),
+    )
     return data

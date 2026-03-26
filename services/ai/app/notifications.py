@@ -31,9 +31,13 @@ _last_sent: datetime | None = None
 _lock = threading.Lock()
 
 
-def notify_pipeline_error(communication_id: str, title: str | None,
-                          error_stage: str, error_message: str,
-                          target_state: str = "error"):
+def notify_pipeline_error(
+    communication_id: str,
+    title: str | None,
+    error_stage: str,
+    error_message: str,
+    target_state: str = "error",
+):
     """Queue an error notification. Sends immediately or batches within debounce window.
 
     Args:
@@ -58,9 +62,15 @@ def notify_pipeline_error(communication_id: str, title: str | None,
         _error_buffer.append(entry)
 
         # If last email was within debounce window, let the buffer accumulate
-        if _last_sent and (datetime.utcnow() - _last_sent).total_seconds() < DEBOUNCE_SECONDS:
-            logger.debug("Error notification buffered (debounce): %s at %s",
-                         communication_id[:8], error_stage)
+        if (
+            _last_sent
+            and (datetime.utcnow() - _last_sent).total_seconds() < DEBOUNCE_SECONDS
+        ):
+            logger.debug(
+                "Error notification buffered (debounce): %s at %s",
+                communication_id[:8],
+                error_stage,
+            )
             return
 
         # Otherwise, flush the buffer
@@ -98,11 +108,19 @@ def _send_error_email(errors: list[dict]):
         return
 
     if not SMTP_USER or not SMTP_PASS:
-        logger.info("Pipeline error notification (SMTP not configured — logged only): %d errors", len(errors))
+        logger.info(
+            "Pipeline error notification (SMTP not configured — logged only): %d errors",
+            len(errors),
+        )
         for e in errors:
-            logger.warning("  [%s] %s at %s → %s: %s",
-                           e["communication_id"][:8], e["title"][:30],
-                           e["error_stage"], e["target_state"], e["error_message"][:80])
+            logger.warning(
+                "  [%s] %s at %s → %s: %s",
+                e["communication_id"][:8],
+                e["title"][:30],
+                e["error_stage"],
+                e["target_state"],
+                e["error_message"][:80],
+            )
         return
 
     if not MANAGER_EMAIL:
@@ -110,7 +128,10 @@ def _send_error_email(errors: list[dict]):
         return
 
     # Build email
-    subject = "CFTC AI: %d pipeline error%s" % (len(errors), "s" if len(errors) > 1 else "")
+    subject = "CFTC AI: %d pipeline error%s" % (
+        len(errors),
+        "s" if len(errors) > 1 else "",
+    )
 
     rows = ""
     for e in errors:
@@ -148,7 +169,12 @@ def _send_error_email(errors: list[dict]):
         Generated at %s by CFTC AI Layer
       </p>
     </div>
-    """ % (len(errors), "s" if len(errors) > 1 else "", rows, datetime.utcnow().isoformat() + "Z")
+    """ % (
+        len(errors),
+        "s" if len(errors) > 1 else "",
+        rows,
+        datetime.utcnow().isoformat() + "Z",
+    )
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
@@ -161,10 +187,16 @@ def _send_error_email(errors: list[dict]):
             server.starttls()
             server.login(SMTP_USER, SMTP_PASS)
             server.send_message(msg)
-        logger.info("Pipeline error email sent: %d errors → %s", len(errors), MANAGER_EMAIL)
+        logger.info(
+            "Pipeline error email sent: %d errors → %s", len(errors), MANAGER_EMAIL
+        )
     except Exception as e:
         logger.error("Pipeline error email FAILED: %s", e)
         # Log errors to stdout so they're not lost
         for err in errors:
-            logger.warning("  [UNSENT] %s at %s: %s",
-                           err["communication_id"][:8], err["error_stage"], err["error_message"][:80])
+            logger.warning(
+                "  [UNSENT] %s at %s: %s",
+                err["communication_id"][:8],
+                err["error_stage"],
+                err["error_message"][:80],
+            )

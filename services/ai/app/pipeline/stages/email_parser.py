@@ -6,6 +6,7 @@ Parses email files into structured messages and attachment records.
 Thread detection via In-Reply-To/References headers and quoted-reply heuristics.
 Deduplication via message_hash (SHA-256 of sender+timestamp+body[:200]).
 """
+
 import email
 import email.policy
 import hashlib
@@ -43,7 +44,9 @@ PROPOSABLE_MIME_TYPES = {
 }
 
 
-def compute_message_hash(sender_email: str, timestamp_str: str, body_prefix: str) -> str:
+def compute_message_hash(
+    sender_email: str, timestamp_str: str, body_prefix: str
+) -> str:
     """SHA-256 hash for dedup: lowercase(sender) | timestamp | first 200 chars of body."""
     raw = f"{(sender_email or '').lower().strip()}|{timestamp_str or ''}|{(body_prefix or '')[:200]}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32]
@@ -85,6 +88,7 @@ def _html_to_text(html: str) -> str:
     """Convert HTML to plain text. Falls back to regex stripping."""
     try:
         from bs4 import BeautifulSoup
+
         soup = BeautifulSoup(html, "html.parser")
         # Remove script/style elements
         for tag in soup(["script", "style"]):
@@ -118,7 +122,13 @@ def _detect_thread_messages(body_text: str, subject: str) -> list[dict]:
 
     if len(parts) <= 1:
         # No thread detected -- single message
-        return [{"body_text": body_text.strip()[:MAX_BODY_LENGTH], "is_quoted": False, "quote_attribution": None}]
+        return [
+            {
+                "body_text": body_text.strip()[:MAX_BODY_LENGTH],
+                "is_quoted": False,
+                "quote_attribution": None,
+            }
+        ]
 
     messages = []
     current_text = ""
@@ -137,26 +147,40 @@ def _detect_thread_messages(body_text: str, subject: str) -> list[dict]:
 
         if is_delimiter:
             if current_text.strip():
-                messages.append({
-                    "body_text": current_text.strip()[:MAX_BODY_LENGTH],
-                    "is_quoted": len(messages) > 0,
-                    "quote_attribution": None,
-                })
+                messages.append(
+                    {
+                        "body_text": current_text.strip()[:MAX_BODY_LENGTH],
+                        "is_quoted": len(messages) > 0,
+                        "quote_attribution": None,
+                    }
+                )
             current_text = ""
         else:
             current_text += part
 
     if current_text.strip():
-        messages.append({
-            "body_text": current_text.strip()[:MAX_BODY_LENGTH],
-            "is_quoted": len(messages) > 0,
-            "quote_attribution": current_attribution,
-        })
+        messages.append(
+            {
+                "body_text": current_text.strip()[:MAX_BODY_LENGTH],
+                "is_quoted": len(messages) > 0,
+                "quote_attribution": current_attribution,
+            }
+        )
 
     # Reverse so oldest is first (index 0)
     messages.reverse()
 
-    return messages if messages else [{"body_text": body_text.strip()[:MAX_BODY_LENGTH], "is_quoted": False, "quote_attribution": None}]
+    return (
+        messages
+        if messages
+        else [
+            {
+                "body_text": body_text.strip()[:MAX_BODY_LENGTH],
+                "is_quoted": False,
+                "quote_attribution": None,
+            }
+        ]
+    )
 
 
 def parse_email_file(file_path: Path) -> dict:
@@ -196,7 +220,9 @@ def parse_email_file(file_path: Path) -> dict:
 
     # Body
     plain_text, html_text = _extract_body_text(msg)
-    body_text = plain_text if plain_text else _html_to_text(html_text) if html_text else ""
+    body_text = (
+        plain_text if plain_text else _html_to_text(html_text) if html_text else ""
+    )
 
     # Thread detection
     thread_messages = _detect_thread_messages(body_text, subject)
@@ -211,18 +237,26 @@ def parse_email_file(file_path: Path) -> dict:
             sent_str if idx == len(thread_messages) - 1 else "",
             thread_msg["body_text"],
         )
-        messages.append({
-            "message_index": idx,
-            "sender_email": from_email_addr if idx == len(thread_messages) - 1 else None,
-            "sender_name": from_name if idx == len(thread_messages) - 1 else None,
-            "recipient_emails": json.dumps([a["email"] for a in to_addresses]) if idx == len(thread_messages) - 1 else None,
-            "cc_emails": json.dumps([a["email"] for a in cc_addresses]) if idx == len(thread_messages) - 1 else None,
-            "timestamp": sent_str if idx == len(thread_messages) - 1 else None,
-            "subject": subject,
-            "body_text": thread_msg["body_text"],
-            "message_hash": msg_hash,
-            "is_new": 0 if thread_msg["is_quoted"] else 1,
-        })
+        messages.append(
+            {
+                "message_index": idx,
+                "sender_email": from_email_addr
+                if idx == len(thread_messages) - 1
+                else None,
+                "sender_name": from_name if idx == len(thread_messages) - 1 else None,
+                "recipient_emails": json.dumps([a["email"] for a in to_addresses])
+                if idx == len(thread_messages) - 1
+                else None,
+                "cc_emails": json.dumps([a["email"] for a in cc_addresses])
+                if idx == len(thread_messages) - 1
+                else None,
+                "timestamp": sent_str if idx == len(thread_messages) - 1 else None,
+                "subject": subject,
+                "body_text": thread_msg["body_text"],
+                "message_hash": msg_hash,
+                "is_new": 0 if thread_msg["is_quoted"] else 1,
+            }
+        )
 
     # Attachments
     attachments = []
@@ -234,26 +268,34 @@ def parse_email_file(file_path: Path) -> dict:
                 payload = part.get_payload(decode=True)
                 if payload:
                     mime_type = part.get_content_type()
-                    attachments.append({
-                        "original_filename": filename,
-                        "mime_type": mime_type,
-                        "file_size_bytes": len(payload),
-                        "payload": payload,
-                        "is_document_proposable": 1 if mime_type in PROPOSABLE_MIME_TYPES else 0,
-                    })
+                    attachments.append(
+                        {
+                            "original_filename": filename,
+                            "mime_type": mime_type,
+                            "file_size_bytes": len(payload),
+                            "payload": payload,
+                            "is_document_proposable": 1
+                            if mime_type in PROPOSABLE_MIME_TYPES
+                            else 0,
+                        }
+                    )
             # Also check for inline images / embedded content with filenames
             elif part.get_filename():
                 filename = part.get_filename()
                 payload = part.get_payload(decode=True)
                 if payload and len(payload) > 100:  # Skip tiny inline images
                     mime_type = part.get_content_type()
-                    attachments.append({
-                        "original_filename": filename,
-                        "mime_type": mime_type,
-                        "file_size_bytes": len(payload),
-                        "payload": payload,
-                        "is_document_proposable": 1 if mime_type in PROPOSABLE_MIME_TYPES else 0,
-                    })
+                    attachments.append(
+                        {
+                            "original_filename": filename,
+                            "mime_type": mime_type,
+                            "file_size_bytes": len(payload),
+                            "payload": payload,
+                            "is_document_proposable": 1
+                            if mime_type in PROPOSABLE_MIME_TYPES
+                            else 0,
+                        }
+                    )
 
     return {
         "subject": subject,
@@ -292,41 +334,51 @@ async def run_email_parsing_stage(db, communication_id: str) -> dict:
     if not source_path.exists():
         raise FileNotFoundError(f"Email file not found: {source_path}")
 
-    await publish_event("stage_progress", {
-        "communication_id": communication_id,
-        "stage": "parsing",
-        "message": f"Parsing {comm['original_filename']}...",
-    })
+    await publish_event(
+        "stage_progress",
+        {
+            "communication_id": communication_id,
+            "stage": "parsing",
+            "message": f"Parsing {comm['original_filename']}...",
+        },
+    )
 
     # Parse the email
     parsed = parse_email_file(source_path)
 
     # Update communication title from subject
-    db.execute("""
+    db.execute(
+        """
         UPDATE communications
         SET title = COALESCE(title, ?),
             source_metadata = ?,
             updated_at = datetime('now')
         WHERE id = ?
-    """, (
-        parsed["subject"],
-        json.dumps({
-            "message_id": parsed["message_id"],
-            "in_reply_to": parsed["in_reply_to"],
-            "references": parsed["references"],
-            "from_email": parsed["from_email"],
-            "from_name": parsed["from_name"],
-            "to_count": len(parsed["to_addresses"]),
-            "cc_count": len(parsed["cc_addresses"]),
-            "attachment_count": len(parsed["attachments"]),
-            "thread_message_count": len(parsed["messages"]),
-        }),
-        communication_id,
-    ))
+    """,
+        (
+            parsed["subject"],
+            json.dumps(
+                {
+                    "message_id": parsed["message_id"],
+                    "in_reply_to": parsed["in_reply_to"],
+                    "references": parsed["references"],
+                    "from_email": parsed["from_email"],
+                    "from_name": parsed["from_name"],
+                    "to_count": len(parsed["to_addresses"]),
+                    "cc_count": len(parsed["cc_addresses"]),
+                    "attachment_count": len(parsed["attachments"]),
+                    "thread_message_count": len(parsed["messages"]),
+                }
+            ),
+            communication_id,
+        ),
+    )
 
     # Check user email config for is_from_user
     policy = load_policy()
-    user_emails = {e.lower() for e in policy.get("user_config", {}).get("email_addresses", [])}
+    user_emails = {
+        e.lower() for e in policy.get("user_config", {}).get("email_addresses", [])
+    }
 
     # Write messages
     new_message_count = 0
@@ -349,22 +401,34 @@ async def run_email_parsing_stage(db, communication_id: str) -> dict:
         elif is_new:
             new_message_count += 1
 
-        is_from_user = 1 if (msg_data.get("sender_email") or "").lower() in user_emails else 0
+        is_from_user = (
+            1 if (msg_data.get("sender_email") or "").lower() in user_emails else 0
+        )
 
-        db.execute("""
+        db.execute(
+            """
             INSERT INTO communication_messages
                 (id, communication_id, message_index, sender_email, sender_name,
                  recipient_emails, cc_emails, timestamp, subject, body_text,
                  message_hash, is_new, is_from_user, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-        """, (
-            msg_id, communication_id, msg_data["message_index"],
-            msg_data["sender_email"], msg_data["sender_name"],
-            msg_data["recipient_emails"], msg_data["cc_emails"],
-            msg_data["timestamp"], msg_data["subject"],
-            msg_data["body_text"], msg_data["message_hash"],
-            is_new, is_from_user,
-        ))
+        """,
+            (
+                msg_id,
+                communication_id,
+                msg_data["message_index"],
+                msg_data["sender_email"],
+                msg_data["sender_name"],
+                msg_data["recipient_emails"],
+                msg_data["cc_emails"],
+                msg_data["timestamp"],
+                msg_data["subject"],
+                msg_data["body_text"],
+                msg_data["message_hash"],
+                is_new,
+                is_from_user,
+            ),
+        )
 
     # Save attachments to disk and write artifact records
     storage_dir = AI_UPLOAD_DIR / communication_id / "attachments"
@@ -372,7 +436,7 @@ async def run_email_parsing_stage(db, communication_id: str) -> dict:
 
     for att in parsed["attachments"]:
         att_id = str(uuid.uuid4())
-        safe_name = re.sub(r'[^\w\-_\.]', '_', att["original_filename"])
+        safe_name = re.sub(r"[^\w\-_\.]", "_", att["original_filename"])
         att_path = storage_dir / f"{att_id}_{safe_name}"
 
         # Size check
@@ -383,38 +447,58 @@ async def run_email_parsing_stage(db, communication_id: str) -> dict:
         # Write file
         att_path.write_bytes(att["payload"])
 
-        db.execute("""
+        db.execute(
+            """
             INSERT INTO communication_artifacts
                 (id, communication_id, original_filename, mime_type, file_size_bytes,
                  file_path, artifact_type, text_extraction_status, is_document_proposable,
                  quarantine_reason, created_at)
             VALUES (?, ?, ?, ?, ?, ?, 'attachment', ?, ?, ?, datetime('now'))
-        """, (
-            att_id, communication_id, att["original_filename"],
-            att["mime_type"], att["file_size_bytes"], str(att_path),
-            "quarantined" if quarantine_reason else "pending",
-            att["is_document_proposable"],
-            quarantine_reason,
-        ))
+        """,
+            (
+                att_id,
+                communication_id,
+                att["original_filename"],
+                att["mime_type"],
+                att["file_size_bytes"],
+                str(att_path),
+                "quarantined" if quarantine_reason else "pending",
+                att["is_document_proposable"],
+                quarantine_reason,
+            ),
+        )
 
     db.commit()
 
     # Check if ALL messages are duplicates -> mark communication as duplicate
     if new_message_count == 0 and len(parsed["messages"]) > 0:
-        logger.info("[%s] All %d messages are duplicates -- marking as duplicate",
-                    communication_id[:8], len(parsed["messages"]))
-        return {"is_duplicate": True, "messages": len(parsed["messages"]), "attachments": len(parsed["attachments"])}
+        logger.info(
+            "[%s] All %d messages are duplicates -- marking as duplicate",
+            communication_id[:8],
+            len(parsed["messages"]),
+        )
+        return {
+            "is_duplicate": True,
+            "messages": len(parsed["messages"]),
+            "attachments": len(parsed["attachments"]),
+        }
 
-    await publish_event("stage_progress", {
-        "communication_id": communication_id,
-        "stage": "parsing",
-        "message": f"Parsed: {new_message_count} new messages, {len(parsed['attachments'])} attachments",
-    })
+    await publish_event(
+        "stage_progress",
+        {
+            "communication_id": communication_id,
+            "stage": "parsing",
+            "message": f"Parsed: {new_message_count} new messages, {len(parsed['attachments'])} attachments",
+        },
+    )
 
     logger.info(
         "[%s] Email parsing complete: %d messages (%d new, %d dup), %d attachments",
-        communication_id[:8], len(parsed["messages"]),
-        new_message_count, duplicate_message_count, len(parsed["attachments"]),
+        communication_id[:8],
+        len(parsed["messages"]),
+        new_message_count,
+        duplicate_message_count,
+        len(parsed["attachments"]),
     )
 
     return {

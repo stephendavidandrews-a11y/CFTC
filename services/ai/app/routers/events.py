@@ -1,4 +1,5 @@
 """SSE endpoint for pipeline progress updates."""
+
 import asyncio
 import json
 import logging

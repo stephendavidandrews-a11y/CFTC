@@ -324,6 +324,63 @@ export function completeEntityReview(communicationId) {
   });
 }
 
+
+// ── Association Review (Phase 2A) ────────────────────────────────────────────
+export function confirmMatterAssociation(communicationId, associationId) {
+  return fetchJSON(`/ai/api/entity-review/${communicationId}/confirm-matter-association`, {
+    method: "POST",
+    body: JSON.stringify({ association_id: associationId }),
+  });
+}
+
+export function rejectMatterAssociation(communicationId, associationId) {
+  return fetchJSON(`/ai/api/entity-review/${communicationId}/reject-matter-association`, {
+    method: "POST",
+    body: JSON.stringify({ association_id: associationId }),
+  });
+}
+
+export function addMatterAssociation(communicationId, data) {
+  return fetchJSON(`/ai/api/entity-review/${communicationId}/add-matter-association`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function confirmDirectiveAssociation(communicationId, associationId) {
+  return fetchJSON(`/ai/api/entity-review/${communicationId}/confirm-directive-association`, {
+    method: "POST",
+    body: JSON.stringify({ association_id: associationId }),
+  });
+}
+
+export function rejectDirectiveAssociation(communicationId, associationId) {
+  return fetchJSON(`/ai/api/entity-review/${communicationId}/reject-directive-association`, {
+    method: "POST",
+    body: JSON.stringify({ association_id: associationId }),
+  });
+}
+
+export function addDirectiveAssociation(communicationId, data) {
+  return fetchJSON(`/ai/api/entity-review/${communicationId}/add-directive-association`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateSegmentIntent(communicationId, segmentIndex, intent) {
+  return fetchJSON(`/ai/api/entity-review/${communicationId}/update-segment-intent`, {
+    method: "POST",
+    body: JSON.stringify({ segment_index: segmentIndex, intent }),
+  });
+}
+
+export function dismissIntelligenceFlag(communicationId, flagIndex) {
+  return fetchJSON(`/ai/api/entity-review/${communicationId}/dismiss-intelligence-flag`, {
+    method: "POST",
+    body: JSON.stringify({ flag_index: flagIndex }),
+  });
+}
 // ── Intelligence ─────────────────────────────────────────────────────────────
 export function getIntelligenceBriefs(params = {}) {
   const qs = new URLSearchParams(params).toString();

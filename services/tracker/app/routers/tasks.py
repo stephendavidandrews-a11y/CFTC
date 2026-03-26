@@ -1,4 +1,5 @@
 """Task CRUD endpoints."""
+
 import uuid
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -13,6 +14,7 @@ from app.concurrency import get_etag, check_etag
 from app.idempotency import claim_idempotency_key, finalize_idempotency_key
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
+
 
 @router.get("")
 async def list_tasks(
@@ -65,8 +67,17 @@ async def list_tasks(
         conditions.append("t.status NOT IN ('done', 'completed', 'deferred')")
 
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
-    allowed_sorts = {"title", "status", "due_date", "priority", "created_at", "updated_at",
-                     "task_mode", "task_type", "owner_name"}
+    allowed_sorts = {
+        "title",
+        "status",
+        "due_date",
+        "priority",
+        "created_at",
+        "updated_at",
+        "task_mode",
+        "task_type",
+        "owner_name",
+    }
     if sort_by not in allowed_sorts:
         sort_by = "due_date"
     sort_direction = "DESC" if sort_dir.lower() == "desc" else "ASC"
@@ -74,16 +85,20 @@ async def list_tasks(
         "owner_name": "p.full_name",
     }.get(sort_by, f"t.{sort_by}")
 
-    total = db.execute(f"""
+    total = db.execute(
+        f"""
         SELECT COUNT(*) as c FROM tasks t
         LEFT JOIN people p ON t.assigned_to_person_id = p.id
         LEFT JOIN matters m ON t.matter_id = m.id
         LEFT JOIN people wp ON t.waiting_on_person_id = wp.id
         LEFT JOIN organizations wo ON t.waiting_on_org_id = wo.id
         {where}
-    """, params).fetchone()["c"]
+    """,
+        params,
+    ).fetchone()["c"]
 
-    rows = db.execute(f"""
+    rows = db.execute(
+        f"""
         SELECT t.*, p.full_name as owner_name, m.title as matter_title, m.matter_number,
                wp.full_name as waiting_on_person_name, wo.name as waiting_on_org_name,
                db_person.full_name as delegated_by_name,
@@ -98,7 +113,9 @@ async def list_tasks(
         {where}
         ORDER BY {order_expr} {sort_direction} NULLS LAST
         LIMIT ? OFFSET ?
-    """, params + [limit, offset]).fetchall()
+    """,
+        params + [limit, offset],
+    ).fetchall()
 
     items = [dict(row) for row in rows]
 
@@ -121,12 +138,19 @@ async def list_tasks(
         "needs_review": summary_rows["needs_review"] or 0,
     }
 
-    return {"items": items, "total": total, "limit": limit, "offset": offset, "summary": summary}
+    return {
+        "items": items,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "summary": summary,
+    }
 
 
 @router.get("/{task_id}")
 async def get_task(task_id: str, db=Depends(get_db)):
-    row = db.execute("""
+    row = db.execute(
+        """
         SELECT t.*, p.full_name as owner_name, m.title as matter_title, m.matter_number,
                wp.full_name as waiting_on_name, wo.name as waiting_on_org_name
         FROM tasks t
@@ -135,7 +159,9 @@ async def get_task(task_id: str, db=Depends(get_db)):
         LEFT JOIN people wp ON t.waiting_on_person_id = wp.id
         LEFT JOIN organizations wo ON t.waiting_on_org_id = wo.id
         WHERE t.id = ?
-    """, (task_id,)).fetchone()
+    """,
+        (task_id,),
+    ).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Task not found")
     result = dict(row)
@@ -144,7 +170,9 @@ async def get_task(task_id: str, db=Depends(get_db)):
     tracked_by = db.execute(
         "SELECT id, title FROM tasks WHERE tracks_task_id = ?", (task_id,)
     ).fetchall()
-    result["tracked_by_tasks"] = [{"id": r["id"], "title": r["title"]} for r in tracked_by]
+    result["tracked_by_tasks"] = [
+        {"id": r["id"], "title": r["title"]} for r in tracked_by
+    ]
 
     # Forward lookup: if this task tracks another, include tracked task title
     if result.get("tracks_task_id"):
@@ -157,20 +185,29 @@ async def get_task(task_id: str, db=Depends(get_db)):
 
 
 @router.post("")
-async def create_task(body: CreateTask, request: Request, db=Depends(get_db),
-                      write_source: str = Depends(get_write_source)):
+async def create_task(
+    body: CreateTask,
+    request: Request,
+    db=Depends(get_db),
+    write_source: str = Depends(get_write_source),
+):
     idem_key = request.headers.get("idempotency-key")
     cached = claim_idempotency_key(db, idem_key, body.model_dump(), "/tracker/tasks")
     if cached == "conflict":
         raise HTTPException(409, detail="Idempotency key reused with different payload")
     if cached == "pending":
-        raise HTTPException(409, detail="Request with this idempotency key is still in progress")
+        raise HTTPException(
+            409, detail="Request with this idempotency key is still in progress"
+        )
     if isinstance(cached, dict):
-        return JSONResponse(status_code=cached["status_code"], content=json.loads(cached["body"]))
+        return JSONResponse(
+            status_code=cached["status_code"], content=json.loads(cached["body"])
+        )
     task_id = str(uuid.uuid4())
     now = datetime.now().isoformat()
     source_val = write_source if body.source == "manual" else body.source
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO tasks (id, matter_id, title, description, task_type, status, task_mode,
             priority, assigned_to_person_id, created_by_person_id, delegated_by_person_id,
             supervising_person_id, waiting_on_person_id, waiting_on_org_id,
@@ -180,26 +217,54 @@ async def create_task(body: CreateTask, request: Request, db=Depends(get_db),
             tracks_task_id, trigger_description,
             created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        task_id, body.matter_id, body.title, body.description,
-        body.task_type, body.status, body.task_mode,
-        body.priority, body.assigned_to_person_id,
-        body.created_by_person_id, body.delegated_by_person_id,
-        body.supervising_person_id, body.waiting_on_person_id,
-        body.waiting_on_org_id, body.waiting_on_description,
-        body.expected_output, body.due_date, body.deadline_type,
-        body.sort_order,
-        body.next_follow_up_date, body.completion_notes,
-        body.started_at, body.completed_at,
-        source_val, body.source_id,
-        body.ai_confidence, body.automation_hold, body.external_refs,
-        body.tracks_task_id, body.trigger_description,
-        now, now,
-    ))
+    """,
+        (
+            task_id,
+            body.matter_id,
+            body.title,
+            body.description,
+            body.task_type,
+            body.status,
+            body.task_mode,
+            body.priority,
+            body.assigned_to_person_id,
+            body.created_by_person_id,
+            body.delegated_by_person_id,
+            body.supervising_person_id,
+            body.waiting_on_person_id,
+            body.waiting_on_org_id,
+            body.waiting_on_description,
+            body.expected_output,
+            body.due_date,
+            body.deadline_type,
+            body.sort_order,
+            body.next_follow_up_date,
+            body.completion_notes,
+            body.started_at,
+            body.completed_at,
+            source_val,
+            body.source_id,
+            body.ai_confidence,
+            body.automation_hold,
+            body.external_refs,
+            body.tracks_task_id,
+            body.trigger_description,
+            now,
+            now,
+        ),
+    )
     new_data = body.model_dump()
-    new_data.update({"id": task_id, "source": source_val, "created_at": now, "updated_at": now})
-    log_event(db, table_name="tasks", record_id=task_id, action="create",
-              source=write_source, new_data=new_data)
+    new_data.update(
+        {"id": task_id, "source": source_val, "created_at": now, "updated_at": now}
+    )
+    log_event(
+        db,
+        table_name="tasks",
+        record_id=task_id,
+        action="create",
+        source=write_source,
+        new_data=new_data,
+    )
     result = {"id": task_id}
     finalize_idempotency_key(db, idem_key, 200, result)
     db.commit()
@@ -207,8 +272,13 @@ async def create_task(body: CreateTask, request: Request, db=Depends(get_db),
 
 
 @router.put("/{task_id}")
-async def update_task(task_id: str, body: UpdateTask, request: Request, db=Depends(get_db),
-                      write_source: str = Depends(get_write_source)):
+async def update_task(
+    task_id: str,
+    body: UpdateTask,
+    request: Request,
+    db=Depends(get_db),
+    write_source: str = Depends(get_write_source),
+):
     old = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
     if not old:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -224,8 +294,15 @@ async def update_task(task_id: str, body: UpdateTask, request: Request, db=Depen
     sets.append("updated_at = ?")
     params.extend([now, task_id])
     db.execute(f"UPDATE tasks SET {', '.join(sets)} WHERE id = ?", params)
-    log_event(db, table_name="tasks", record_id=task_id, action="update",
-              source=write_source, old_record=old, new_data=data)
+    log_event(
+        db,
+        table_name="tasks",
+        record_id=task_id,
+        action="update",
+        source=write_source,
+        old_record=old,
+        new_data=data,
+    )
 
     # Completion hook: when a task is marked done, transition tracking follow_ups
     if data.get("status") == "done" and old["status"] != "done":
@@ -234,28 +311,38 @@ async def update_task(task_id: str, body: UpdateTask, request: Request, db=Depen
         if old["assigned_to_person_id"]:
             assignee_row = db.execute(
                 "SELECT full_name FROM people WHERE id = ?",
-                (old["assigned_to_person_id"],)
+                (old["assigned_to_person_id"],),
             ).fetchone()
             if assignee_row:
                 assignee_name = assignee_row["full_name"]
 
         tracking_tasks = db.execute(
             "SELECT id, status FROM tasks WHERE tracks_task_id = ? AND status NOT IN ('done', 'deferred')",
-            (task_id,)
+            (task_id,),
         ).fetchall()
         for tt in tracking_tasks:
             now_ts = datetime.now().isoformat()
             db.execute(
                 "UPDATE tasks SET status = 'needs review', updated_at = ? WHERE id = ?",
-                (now_ts, tt["id"])
+                (now_ts, tt["id"]),
             )
             summary_text = "Tracked action completed. Ready to close."
             if assignee_name:
-                summary_text = f"Tracked action completed by {assignee_name}. Ready to close."
+                summary_text = (
+                    f"Tracked action completed by {assignee_name}. Ready to close."
+                )
             update_id = str(uuid.uuid4())
             db.execute(
                 "INSERT INTO task_updates (id, task_id, update_type, summary, old_status, new_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (update_id, tt["id"], "status update", summary_text, tt["status"], "needs review", now_ts)
+                (
+                    update_id,
+                    tt["id"],
+                    "status update",
+                    summary_text,
+                    tt["status"],
+                    "needs review",
+                    now_ts,
+                ),
             )
 
     db.commit()
@@ -263,14 +350,24 @@ async def update_task(task_id: str, body: UpdateTask, request: Request, db=Depen
 
 
 @router.delete("/{task_id}")
-async def delete_task(task_id: str, request: Request, db=Depends(get_db),
-                      write_source: str = Depends(get_write_source)):
+async def delete_task(
+    task_id: str,
+    request: Request,
+    db=Depends(get_db),
+    write_source: str = Depends(get_write_source),
+):
     old = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
     if not old:
         raise HTTPException(status_code=404, detail="Task not found")
     check_etag(request, old)
     db.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
-    log_event(db, table_name="tasks", record_id=task_id, action="delete",
-              source=write_source, old_record=old)
+    log_event(
+        db,
+        table_name="tasks",
+        record_id=task_id,
+        action="delete",
+        source=write_source,
+        old_record=old,
+    )
     db.commit()
     return {"deleted": True}

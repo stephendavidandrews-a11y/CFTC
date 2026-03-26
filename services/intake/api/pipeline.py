@@ -39,7 +39,9 @@ async def upload_recording(
     max_size = 200 * 1024 * 1024
     contents = await file.read()
     if len(contents) > max_size:
-        raise HTTPException(413, f"File too large ({len(contents) / 1024 / 1024:.1f}MB). Max: 200MB")
+        raise HTTPException(
+            413, f"File too large ({len(contents) / 1024 / 1024:.1f}MB). Max: 200MB"
+        )
 
     inbox_dir = INBOX_SOURCES[source]
     inbox_dir.mkdir(parents=True, exist_ok=True)
@@ -71,8 +73,17 @@ async def upload_recording(
             """INSERT INTO audio_files (id, conversation_id, file_path, original_filename,
                source, format, file_size_bytes, captured_at, created_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (audio_id, conversation_id, str(dest), safe_name,
-             source, ext.lstrip("."), len(contents), now, now),
+            (
+                audio_id,
+                conversation_id,
+                str(dest),
+                safe_name,
+                source,
+                ext.lstrip("."),
+                len(contents),
+                now,
+                now,
+            ),
         )
         conn.commit()
     except Exception as e:
@@ -83,7 +94,9 @@ async def upload_recording(
     finally:
         conn.close()
 
-    t = threading.Thread(target=process_conversation, args=(conversation_id,), daemon=True)
+    t = threading.Thread(
+        target=process_conversation, args=(conversation_id,), daemon=True
+    )
     t.start()
 
     return {
@@ -130,7 +143,9 @@ async def pipeline_status():
         ).fetchall():
             status_counts[row["processing_status"]] = row["n"]
 
-        total_profiles = conn.execute("SELECT count(DISTINCT tracker_person_id) as n FROM speaker_voice_profiles").fetchone()["n"]
+        total_profiles = conn.execute(
+            "SELECT count(DISTINCT tracker_person_id) as n FROM speaker_voice_profiles"
+        ).fetchone()["n"]
 
         return {
             "conversations": status_counts,

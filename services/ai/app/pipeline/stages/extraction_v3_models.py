@@ -36,7 +36,13 @@ DIRECTNESS_VALUES = {
 }
 DURABILITY_VALUES = {"ephemeral", "working", "durable"}
 MEMORY_VALUE_VALUES = {"none", "low", "medium", "high"}
-ROUTING_CONFIDENCE_VALUES = {"high", "medium", "multi", "standalone", "new_matter_candidate"}
+ROUTING_CONFIDENCE_VALUES = {
+    "high",
+    "medium",
+    "multi",
+    "standalone",
+    "new_matter_candidate",
+}
 ENTITY_TYPE_VALUES = {
     "person",
     "organization",
@@ -48,7 +54,15 @@ ENTITY_TYPE_VALUES = {
     "concept",
     "legislation",
 }
-MATCHABLE_RECORD_TYPE_VALUES = {"person", "organization", "matter", "task", "decision", "document", "meeting"}
+MATCHABLE_RECORD_TYPE_VALUES = {
+    "person",
+    "organization",
+    "matter",
+    "task",
+    "decision",
+    "document",
+    "meeting",
+}
 CONTEXT_NOTE_CATEGORY_VALUES = {
     "policy_operating_rule",
     "process_note",
@@ -97,7 +111,9 @@ PERSON_DETAIL_PEOPLE_FIELD_VALUES = {
     "manager_person_id",
 }
 PERSON_DETAIL_ALLOWED_TOP_LEVEL_FIELDS = {"person_id", "person_name", "fields"}
-PERSON_DETAIL_ALLOWED_FIELDS = PERSON_PROFILE_FIELD_VALUES | PERSON_DETAIL_PEOPLE_FIELD_VALUES
+PERSON_DETAIL_ALLOWED_FIELDS = (
+    PERSON_PROFILE_FIELD_VALUES | PERSON_DETAIL_PEOPLE_FIELD_VALUES
+)
 
 OBSERVATION_SUBTYPE_MAP = {
     "task_signal": {
@@ -261,8 +277,13 @@ class Pass1Observation(V3BaseModel):
                 f"Invalid memory_value: {self.memory_value!r}. Allowed values: {sorted(MEMORY_VALUE_VALUES)}"
             )
 
-        if self.observation_type in MEMORY_OBSERVATION_TYPES and self.memory_value == "none":
-            raise ValueError("Memory observations must use memory_value 'low', 'medium', or 'high'")
+        if (
+            self.observation_type in MEMORY_OBSERVATION_TYPES
+            and self.memory_value == "none"
+        ):
+            raise ValueError(
+                "Memory observations must use memory_value 'low', 'medium', or 'high'"
+            )
 
         return self
 
@@ -319,12 +340,18 @@ class MatterRoutingAssessment(V3BaseModel):
 
         if self.routing_confidence == "standalone":
             if self.primary_matter_id is not None:
-                raise ValueError("standalone routing_confidence cannot include primary_matter_id")
+                raise ValueError(
+                    "standalone routing_confidence cannot include primary_matter_id"
+                )
             if not self.standalone_reason:
-                raise ValueError("standalone routing_confidence requires standalone_reason")
+                raise ValueError(
+                    "standalone routing_confidence requires standalone_reason"
+                )
 
         if self.routing_confidence != "standalone" and self.standalone_reason:
-            raise ValueError("standalone_reason is only allowed when routing_confidence='standalone'")
+            raise ValueError(
+                "standalone_reason is only allowed when routing_confidence='standalone'"
+            )
 
         return self
 
@@ -429,18 +456,25 @@ class V3ProposalItem(V3BaseModel):
             )
 
         sensitivity = data.get("sensitivity")
-        if sensitivity is not None and sensitivity not in CONTEXT_NOTE_SENSITIVITY_VALUES:
+        if (
+            sensitivity is not None
+            and sensitivity not in CONTEXT_NOTE_SENSITIVITY_VALUES
+        ):
             raise ValueError(
                 f"Invalid context_note sensitivity: {sensitivity!r}. "
                 f"Allowed values: {sorted(CONTEXT_NOTE_SENSITIVITY_VALUES)}"
             )
 
         if posture == "attributed_view" and not data.get("speaker_attribution"):
-            raise ValueError("context_note with posture='attributed_view' requires speaker_attribution")
+            raise ValueError(
+                "context_note with posture='attributed_view' requires speaker_attribution"
+            )
 
         linked_entities = data.get("linked_entities")
         if linked_entities is not None and not isinstance(linked_entities, list):
-            raise ValueError("context_note linked_entities must be a list when provided")
+            raise ValueError(
+                "context_note linked_entities must be a list when provided"
+            )
 
     def _validate_person_detail_update(self):
         data = self.proposed_data
@@ -456,7 +490,9 @@ class V3ProposalItem(V3BaseModel):
 
         fields = data.get("fields")
         if not isinstance(fields, dict) or not fields:
-            raise ValueError("person_detail_update proposed_data requires non-empty 'fields'")
+            raise ValueError(
+                "person_detail_update proposed_data requires non-empty 'fields'"
+            )
 
         unknown_profile_fields = set(fields) - PERSON_DETAIL_ALLOWED_FIELDS
         if unknown_profile_fields:
@@ -530,7 +566,10 @@ class V3SuppressedObservation(V3BaseModel):
                 f"Allowed values: {sorted(allowed_subtypes)}"
             )
 
-        if self.candidate_item_type is not None and self.candidate_item_type not in VALID_ITEM_TYPES:
+        if (
+            self.candidate_item_type is not None
+            and self.candidate_item_type not in VALID_ITEM_TYPES
+        ):
             raise ValueError(
                 f"Invalid candidate_item_type: {self.candidate_item_type!r}. "
                 f"Allowed values: {sorted(VALID_ITEM_TYPES)}"

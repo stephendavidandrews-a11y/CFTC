@@ -37,7 +37,11 @@ async def _run(args) -> Path:
             pass2_model=args.pass2_model,
         )
 
-    output_dir = Path(args.output_dir) if args.output_dir else _default_output_dir(args.communication_id)
+    output_dir = (
+        Path(args.output_dir)
+        if args.output_dir
+        else _default_output_dir(args.communication_id)
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
 
     _write_json(output_dir / "pass1.json", result["pass1"])
@@ -64,8 +68,12 @@ def main():
         default=str(AI_DB_PATH),
         help="Path to ai.db (defaults to app.config.AI_DB_PATH)",
     )
-    parser.add_argument("--pass1-model", default=None, help="Optional model override for pass 1")
-    parser.add_argument("--pass2-model", default=None, help="Optional model override for pass 2")
+    parser.add_argument(
+        "--pass1-model", default=None, help="Optional model override for pass 1"
+    )
+    parser.add_argument(
+        "--pass2-model", default=None, help="Optional model override for pass 2"
+    )
     parser.add_argument(
         "--output-dir",
         default=None,

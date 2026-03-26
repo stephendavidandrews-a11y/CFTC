@@ -2,6 +2,7 @@
 
 Tracks page visits for the weekly dev report.
 """
+
 import logging
 import uuid
 from datetime import datetime
@@ -27,7 +28,12 @@ def log_page_visit(req: PageVisitRequest):
     try:
         db.execute(
             "INSERT INTO page_visits (id, page, timestamp, session_id) VALUES (?, ?, ?, ?)",
-            (str(uuid.uuid4()), req.page, datetime.utcnow().isoformat(), req.session_id),
+            (
+                str(uuid.uuid4()),
+                req.page,
+                datetime.utcnow().isoformat(),
+                req.session_id,
+            ),
         )
         db.commit()
         return {"status": "ok"}

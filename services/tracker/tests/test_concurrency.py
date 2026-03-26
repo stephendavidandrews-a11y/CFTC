@@ -1,4 +1,5 @@
 """Tests for concurrency module — ETag generation and If-Match checking."""
+
 import pytest
 from unittest.mock import MagicMock
 from app.concurrency import get_etag, check_etag

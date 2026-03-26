@@ -8,6 +8,7 @@ Design:
   - Quality gate: minimum 5 seconds of speech before promoting to profile
   - L2 normalization on storage
 """
+
 import logging
 import math
 import struct
@@ -31,6 +32,7 @@ BLEND_NEW = 0.3
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _unpack(blob: bytes) -> Optional[list[float]]:
     if not blob or len(blob) != EXPECTED_BLOB_SIZE:
@@ -56,6 +58,7 @@ def _is_zero_vec(vec: list[float]) -> bool:
 # ---------------------------------------------------------------------------
 # Profile CRUD
 # ---------------------------------------------------------------------------
+
 
 def get_profile(db, tracker_person_id: str) -> Optional[dict]:
     """Get a voice profile by tracker person ID. Returns None if not found."""
@@ -118,6 +121,7 @@ def activate_profile(db, tracker_person_id: str) -> bool:
 # Quality-gated profile promotion
 # ---------------------------------------------------------------------------
 
+
 def promote_sample_to_profile(
     db,
     communication_id: str,
@@ -152,9 +156,17 @@ def promote_sample_to_profile(
     speech_seconds = dur_row["total"] if dur_row and dur_row["total"] else 0.0
 
     if speech_seconds < MIN_SPEECH_SECONDS:
-        logger.info("[%s] Skipping profile promotion for %s: %.1fs speech (min %.1fs)",
-                    communication_id[:8], speaker_label, speech_seconds, MIN_SPEECH_SECONDS)
-        return {"status": "skipped", "reason": f"insufficient speech ({speech_seconds:.1f}s < {MIN_SPEECH_SECONDS}s)"}
+        logger.info(
+            "[%s] Skipping profile promotion for %s: %.1fs speech (min %.1fs)",
+            communication_id[:8],
+            speaker_label,
+            speech_seconds,
+            MIN_SPEECH_SECONDS,
+        )
+        return {
+            "status": "skipped",
+            "reason": f"insufficient speech ({speech_seconds:.1f}s < {MIN_SPEECH_SECONDS}s)",
+        }
 
     quality = min(1.0, speech_seconds / 30.0)  # 30s = max quality score
 
@@ -173,46 +185,79 @@ def promote_sample_to_profile(
             new_count = (existing["sample_count"] or 1) + 1
             new_total = (existing["total_speech_seconds"] or 0.0) + speech_seconds
 
-            db.execute("""
+            db.execute(
+                """
                 UPDATE speaker_voice_profiles
                 SET embedding = ?, quality_score = ?, sample_count = ?,
                     total_speech_seconds = ?, source_communication_id = ?,
                     updated_at = datetime('now')
                 WHERE id = ?
-            """, (_pack(blended), quality, new_count, new_total,
-                  communication_id, existing["id"]))
+            """,
+                (
+                    _pack(blended),
+                    quality,
+                    new_count,
+                    new_total,
+                    communication_id,
+                    existing["id"],
+                ),
+            )
         else:
             # Dimension mismatch — overwrite (shouldn't happen normally)
             normalized = _l2_normalize(emb)
-            db.execute("""
+            db.execute(
+                """
                 UPDATE speaker_voice_profiles
                 SET embedding = ?, quality_score = ?, sample_count = 1,
                     total_speech_seconds = ?, source_communication_id = ?,
                     updated_at = datetime('now')
                 WHERE id = ?
-            """, (_pack(normalized), quality, speech_seconds,
-                  communication_id, existing["id"]))
+            """,
+                (
+                    _pack(normalized),
+                    quality,
+                    speech_seconds,
+                    communication_id,
+                    existing["id"],
+                ),
+            )
 
         result_status = "updated"
-        logger.info("[%s] Updated voice profile for person %s (sample #%d)",
-                    communication_id[:8], tracker_person_id[:8],
-                    (existing["sample_count"] or 1) + 1)
+        logger.info(
+            "[%s] Updated voice profile for person %s (sample #%d)",
+            communication_id[:8],
+            tracker_person_id[:8],
+            (existing["sample_count"] or 1) + 1,
+        )
     else:
         # Create new profile
         normalized = _l2_normalize(emb)
         profile_id = str(uuid.uuid4())
-        db.execute("""
+        db.execute(
+            """
             INSERT INTO speaker_voice_profiles
                 (id, tracker_person_id, embedding, embedding_dimension, quality_score,
                  sample_count, total_speech_seconds, status, source_communication_id,
                  created_from)
             VALUES (?, ?, ?, ?, ?, 1, ?, 'active', ?, 'confirmed_review')
-        """, (profile_id, tracker_person_id, _pack(normalized), EMBEDDING_DIM,
-              quality, speech_seconds, communication_id))
+        """,
+            (
+                profile_id,
+                tracker_person_id,
+                _pack(normalized),
+                EMBEDDING_DIM,
+                quality,
+                speech_seconds,
+                communication_id,
+            ),
+        )
 
         result_status = "created"
-        logger.info("[%s] Created voice profile for person %s",
-                    communication_id[:8], tracker_person_id[:8])
+        logger.info(
+            "[%s] Created voice profile for person %s",
+            communication_id[:8],
+            tracker_person_id[:8],
+        )
 
     # Mark the voice sample as promoted
     db.execute(
@@ -221,12 +266,16 @@ def promote_sample_to_profile(
     )
 
     db.commit()
-    return {"status": result_status, "reason": f"speech={speech_seconds:.1f}s, quality={quality:.2f}"}
+    return {
+        "status": result_status,
+        "reason": f"speech={speech_seconds:.1f}s, quality={quality:.2f}",
+    }
 
 
 def get_sample_history(db, tracker_person_id: str) -> list[dict]:
     """Get all voice samples that have been promoted to this person's profile."""
-    rows = db.execute("""
+    rows = db.execute(
+        """
         SELECT vs.id, vs.communication_id, vs.speaker_label,
                vs.speech_duration_seconds, vs.created_at,
                c.title as communication_title
@@ -238,5 +287,7 @@ def get_sample_history(db, tracker_person_id: str) -> list[dict]:
         WHERE cp.tracker_person_id = ?
           AND vs.promoted_to_profile = 1
         ORDER BY vs.created_at DESC
-    """, (tracker_person_id,)).fetchall()
+    """,
+        (tracker_person_id,),
+    ).fetchall()
     return [dict(r) for r in rows]

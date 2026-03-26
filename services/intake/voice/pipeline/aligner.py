@@ -30,6 +30,7 @@ def _get_align_model():
     if _align_model is None:
         import whisperx
         from config import ALIGNMENT_DEVICE
+
         logger.info(f"Loading wav2vec2 alignment model on {ALIGNMENT_DEVICE}")
         _align_model, _align_metadata = whisperx.load_align_model(
             language_code="en",
@@ -77,6 +78,7 @@ class AlignedTranscript:
 def _diarization_to_dataframe(diarization: DiarizationResult):
     """Convert DiarizationResult to pandas DataFrame for whisperx."""
     import pandas as pd
+
     rows = []
     for seg in diarization.segments:
         rows.append({"start": seg.start, "end": seg.end, "speaker": seg.speaker})
@@ -96,7 +98,7 @@ def _detect_overlap_regions(diarization: DiarizationResult) -> list[OverlapRegio
     overlaps = []
 
     for i, seg_a in enumerate(sorted_segs):
-        for seg_b in sorted_segs[i + 1:]:
+        for seg_b in sorted_segs[i + 1 :]:
             if seg_b.start >= seg_a.end:
                 break
             if seg_a.speaker == seg_b.speaker:
@@ -105,11 +107,13 @@ def _detect_overlap_regions(diarization: DiarizationResult) -> list[OverlapRegio
             overlap_start = max(seg_a.start, seg_b.start)
             overlap_end = min(seg_a.end, seg_b.end)
             if overlap_end > overlap_start:
-                overlaps.append(OverlapRegion(
-                    start=overlap_start,
-                    end=overlap_end,
-                    speakers=sorted([seg_a.speaker, seg_b.speaker]),
-                ))
+                overlaps.append(
+                    OverlapRegion(
+                        start=overlap_start,
+                        end=overlap_end,
+                        speakers=sorted([seg_a.speaker, seg_b.speaker]),
+                    )
+                )
 
     if not overlaps:
         return []
@@ -128,7 +132,9 @@ def _detect_overlap_regions(diarization: DiarizationResult) -> list[OverlapRegio
     return merged
 
 
-def _word_in_overlap(word_start: float, word_end: float, overlaps: list[OverlapRegion]) -> bool:
+def _word_in_overlap(
+    word_start: float, word_end: float, overlaps: list[OverlapRegion]
+) -> bool:
     """Check if a word falls within any overlap region."""
     word_mid = (word_start + word_end) / 2
     for o in overlaps:
@@ -154,15 +160,18 @@ def align(
     # Convert transcription to whisperx format
     transcript_segments = []
     for seg in transcription.segments:
-        transcript_segments.append({
-            "start": seg.start,
-            "end": seg.end,
-            "text": seg.text,
-        })
+        transcript_segments.append(
+            {
+                "start": seg.start,
+                "end": seg.end,
+                "text": seg.text,
+            }
+        )
 
     # Stage 1: Forced alignment (wav2vec2)
     logger.info("Running wav2vec2 forced alignment...")
     from config import ALIGNMENT_DEVICE
+
     audio = whisperx.load_audio(str(audio_path))
     aligned_result = whisperx.align(
         transcript_segments,
@@ -196,30 +205,38 @@ def align(
             w_speaker = w.get("speaker", speaker)
             w_start = w.get("start", seg.get("start", 0.0))
             w_end = w.get("end", seg.get("end", 0.0))
-            w_overlap = _word_in_overlap(w_start, w_end, overlap_regions) if overlap_regions else False
+            w_overlap = (
+                _word_in_overlap(w_start, w_end, overlap_regions)
+                if overlap_regions
+                else False
+            )
 
             if w_overlap:
                 overlap_word_count += 1
                 seg_has_overlap = True
 
-            words.append(AlignedWord(
-                word=w.get("word", "").strip(),
-                start=w_start,
-                end=w_end,
-                speaker=w_speaker,
-                probability=w.get("score", 0.0),
-                is_overlap=w_overlap,
-            ))
+            words.append(
+                AlignedWord(
+                    word=w.get("word", "").strip(),
+                    start=w_start,
+                    end=w_end,
+                    speaker=w_speaker,
+                    probability=w.get("score", 0.0),
+                    is_overlap=w_overlap,
+                )
+            )
             speakers_set.add(w_speaker)
 
-        output_segments.append(AlignedSegment(
-            speaker=speaker,
-            start=seg.get("start", 0.0),
-            end=seg.get("end", 0.0),
-            text=seg.get("text", "").strip(),
-            words=words,
-            is_overlap=seg_has_overlap,
-        ))
+        output_segments.append(
+            AlignedSegment(
+                speaker=speaker,
+                start=seg.get("start", 0.0),
+                end=seg.get("end", 0.0),
+                text=seg.get("text", "").strip(),
+                words=words,
+                is_overlap=seg_has_overlap,
+            )
+        )
 
     # Re-group by speaker boundaries
     regrouped = _regroup_by_speaker(output_segments)
@@ -258,26 +275,30 @@ def _regroup_by_speaker(segments: list[AlignedSegment]) -> list[AlignedSegment]:
             current_words.append(word)
         else:
             has_overlap = any(w.is_overlap for w in current_words)
-            regrouped.append(AlignedSegment(
+            regrouped.append(
+                AlignedSegment(
+                    speaker=current_speaker,
+                    start=current_words[0].start,
+                    end=current_words[-1].end,
+                    text=" ".join(w.word for w in current_words),
+                    words=current_words,
+                    is_overlap=has_overlap,
+                )
+            )
+            current_speaker = word.speaker
+            current_words = [word]
+
+    if current_words:
+        has_overlap = any(w.is_overlap for w in current_words)
+        regrouped.append(
+            AlignedSegment(
                 speaker=current_speaker,
                 start=current_words[0].start,
                 end=current_words[-1].end,
                 text=" ".join(w.word for w in current_words),
                 words=current_words,
                 is_overlap=has_overlap,
-            ))
-            current_speaker = word.speaker
-            current_words = [word]
-
-    if current_words:
-        has_overlap = any(w.is_overlap for w in current_words)
-        regrouped.append(AlignedSegment(
-            speaker=current_speaker,
-            start=current_words[0].start,
-            end=current_words[-1].end,
-            text=" ".join(w.word for w in current_words),
-            words=current_words,
-            is_overlap=has_overlap,
-        ))
+            )
+        )
 
     return regrouped

@@ -1,4 +1,5 @@
 """Health and operational status endpoints."""
+
 import logging
 import shutil
 from datetime import datetime
@@ -47,6 +48,7 @@ async def health(db=Depends(get_db)):
         disk_free_mb = -1
 
     from app.main import _disk_low, _ready
+
     return {
         "status": "ok" if _ready else "starting",
         "ready": _ready,
@@ -70,19 +72,24 @@ async def health(db=Depends(get_db)):
 @router.get("/errors")
 async def recent_errors(db=Depends(get_db), limit: int = 50):
     """Recent pipeline errors with communication details."""
-    rows = db.execute("""
+    rows = db.execute(
+        """
         SELECT c.id, c.title, c.processing_status, c.error_stage, c.error_message,
                c.updated_at, c.source_type
         FROM communications c
         WHERE c.processing_status IN ('error', 'waiting_for_api', 'awaiting_tracker', 'paused_budget')
         ORDER BY c.updated_at DESC
         LIMIT ?
-    """, (limit,)).fetchall()
+    """,
+        (limit,),
+    ).fetchall()
     return {"errors": [dict(r) for r in rows], "count": len(rows)}
 
 
 @router.get("/errors/history")
-async def error_history(db=Depends(get_db), communication_id: str = None, limit: int = 100):
+async def error_history(
+    db=Depends(get_db), communication_id: str = None, limit: int = 100
+):
     """Error history from communication_error_log."""
     if communication_id:
         rows = db.execute(
@@ -143,6 +150,7 @@ async def cost_summary(db=Depends(get_db)):
 async def notification_status():
     """Current state of the error notification system."""
     from app.notifications import get_buffer_status
+
     return get_buffer_status()
 
 
@@ -150,6 +158,7 @@ async def notification_status():
 async def flush_notifications():
     """Force-flush buffered error notifications."""
     from app.notifications import flush_error_buffer
+
     count = flush_error_buffer()
     return {"flushed": count}
 
@@ -158,6 +167,7 @@ async def flush_notifications():
 async def test_notification():
     """Send a test notification email to verify SMTP configuration."""
     from app.notifications import notify_pipeline_error, get_buffer_status
+
     status = get_buffer_status()
     if not status["smtp_configured"]:
         return {"error": "SMTP not configured", "status": status}
@@ -175,6 +185,7 @@ async def test_notification():
 async def trigger_stuck_recovery():
     """Manual trigger for stuck communication recovery scanner."""
     from app.main import run_stuck_recovery
+
     actions = run_stuck_recovery()
     return {
         "recovered": len(actions),

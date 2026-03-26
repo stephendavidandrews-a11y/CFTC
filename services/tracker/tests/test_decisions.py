@@ -1,6 +1,9 @@
 """Tests for decisions router — CRUD operations."""
+
 from tests.conftest import (
-    seed_matter, seed_decision, make_id,
+    seed_matter,
+    seed_decision,
+    make_id,
 )
 
 

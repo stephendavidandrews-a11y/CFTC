@@ -3,6 +3,7 @@
 Generates .docx attachments for email briefs using python-docx.
 Clean formatting: Arial, tables, section headers.
 """
+
 import logging
 from datetime import date
 from pathlib import Path
@@ -90,11 +91,14 @@ def render_daily_docx(data: dict, path: str | Path | None = None) -> Path:
                     run.font.size = Pt(9)
 
         for c in changes[:20]:
-            _add_table_row(table, [
-                c.get("entity_type", ""),
-                c.get("summary", ""),
-                (c.get("timestamp") or "")[:16],
-            ])
+            _add_table_row(
+                table,
+                [
+                    c.get("entity_type", ""),
+                    c.get("summary", ""),
+                    (c.get("timestamp") or "")[:16],
+                ],
+            )
     else:
         _add_para(doc, "No changes since last brief.", color=(148, 163, 184))
 
@@ -113,12 +117,15 @@ def render_daily_docx(data: dict, path: str | Path | None = None) -> Path:
                     run.font.size = Pt(9)
 
         for a in actions[:15]:
-            _add_table_row(table, [
-                a.get("tag", ""),
-                a.get("title", ""),
-                a.get("matter", ""),
-                a.get("detail", ""),
-            ])
+            _add_table_row(
+                table,
+                [
+                    a.get("tag", ""),
+                    a.get("title", ""),
+                    a.get("matter", ""),
+                    a.get("detail", ""),
+                ],
+            )
     else:
         _add_para(doc, "No action items today.", color=(148, 163, 184))
 
@@ -138,9 +145,16 @@ def render_daily_docx(data: dict, path: str | Path | None = None) -> Path:
             if details:
                 _add_para(doc, " \u2022 ".join(details), color=(100, 116, 139))
 
-            participants = [p.get("full_name", p.get("name", "")) for p in m.get("participants", [])]
+            participants = [
+                p.get("full_name", p.get("name", "")) for p in m.get("participants", [])
+            ]
             if participants:
-                _add_para(doc, "Participants: " + ", ".join(participants), size=9, color=(100, 116, 139))
+                _add_para(
+                    doc,
+                    "Participants: " + ", ".join(participants),
+                    size=9,
+                    color=(100, 116, 139),
+                )
 
             if m.get("prep_narrative"):
                 p = doc.add_paragraph()
@@ -167,12 +181,15 @@ def render_daily_docx(data: dict, path: str | Path | None = None) -> Path:
                     run.font.size = Pt(9)
 
         for f in followups[:10]:
-            _add_table_row(table, [
-                f.get("name", ""),
-                f.get("organization", ""),
-                f.get("next_date", ""),
-                f.get("purpose", "") or f.get("interaction_type", ""),
-            ])
+            _add_table_row(
+                table,
+                [
+                    f.get("name", ""),
+                    f.get("organization", ""),
+                    f.get("next_date", ""),
+                    f.get("purpose", "") or f.get("interaction_type", ""),
+                ],
+            )
     else:
         _add_para(doc, "No follow-ups due.", color=(148, 163, 184))
 
@@ -182,7 +199,11 @@ def render_daily_docx(data: dict, path: str | Path | None = None) -> Path:
     overdue = pulse.get("overdue_count", 0)
     if overdue:
         by_assignee = pulse.get("overdue_by_assignee", {})
-        _add_para(doc, f"{overdue} overdue tasks: " + ", ".join(f"{k} ({v})" for k, v in by_assignee.items()))
+        _add_para(
+            doc,
+            f"{overdue} overdue tasks: "
+            + ", ".join(f"{k} ({v})" for k, v in by_assignee.items()),
+        )
     overloaded = pulse.get("overloaded_people", [])
     if overloaded:
         names = ", ".join(f"{p['name']} ({p['task_count']})" for p in overloaded)
@@ -196,7 +217,9 @@ def render_daily_docx(data: dict, path: str | Path | None = None) -> Path:
     if comment_dls:
         table = doc.add_table(rows=1, cols=5)
         table.style = "Table Grid"
-        for i, label in enumerate(["Matter", "Deadline", "Days Left", "Topics", "Progress"]):
+        for i, label in enumerate(
+            ["Matter", "Deadline", "Days Left", "Topics", "Progress"]
+        ):
             table.rows[0].cells[i].text = label
             for p in table.rows[0].cells[i].paragraphs:
                 for run in p.runs:
@@ -208,15 +231,22 @@ def render_daily_docx(data: dict, path: str | Path | None = None) -> Path:
             taken = sc.get("position_taken", 0)
             total = cd.get("total_topics", 0)
             pct = f"{round(taken / total * 100)}%" if total else "0%"
-            _add_table_row(table, [
-                cd.get("matter_title", "")[:45],
-                cd.get("comment_deadline", ""),
-                str(cd.get("days_remaining", "")),
-                f"{total} topics, {cd.get('total_questions', 0)} questions",
-                f"{taken}/{total} ({pct})",
-            ])
+            _add_table_row(
+                table,
+                [
+                    cd.get("matter_title", "")[:45],
+                    cd.get("comment_deadline", ""),
+                    str(cd.get("days_remaining", "")),
+                    f"{total} topics, {cd.get('total_questions', 0)} questions",
+                    f"{taken}/{total} ({pct})",
+                ],
+            )
     else:
-        _add_para(doc, "No comment periods closing in the next 30 days.", color=(148, 163, 184))
+        _add_para(
+            doc,
+            "No comment periods closing in the next 30 days.",
+            color=(148, 163, 184),
+        )
 
     # Section 7: Directives Watch
     _add_heading(doc, "Directives Watch", level=1)
@@ -225,7 +255,11 @@ def render_daily_docx(data: dict, path: str | Path | None = None) -> Path:
         for dw in dir_watch:
             days = dw.get("days_remaining")
             deadline_str = f"{days}d to deadline" if days is not None else "NEW"
-            _add_para(doc, f"{dw.get('title', '')} — {dw.get('source_type', '')} — {deadline_str}", size=10)
+            _add_para(
+                doc,
+                f"{dw.get('title', '')} — {dw.get('source_type', '')} — {deadline_str}",
+                size=10,
+            )
     else:
         _add_para(doc, "No directives requiring attention.", color=(148, 163, 184))
 
@@ -256,9 +290,14 @@ def render_weekly_docx(data, path=None):
     _add_heading(doc, "What I Got Wrong", level=1)
     if cal.get("has_data"):
         _add_para(doc, f"Signal Quality: {cal.get('score', 0)}%", bold=True, size=14)
-        _add_para(doc, f"Materialized: {cal.get('materialized', 0)}, Resolved: {cal.get('resolved', 0)}, Still open: {cal.get('still_open', 0)}, Wrong: {cal.get('wrong', 0)}")
+        _add_para(
+            doc,
+            f"Materialized: {cal.get('materialized', 0)}, Resolved: {cal.get('resolved', 0)}, Still open: {cal.get('still_open', 0)}, Wrong: {cal.get('wrong', 0)}",
+        )
     else:
-        _add_para(doc, cal.get("message", "No calibration data."), color=(148, 163, 184))
+        _add_para(
+            doc, cal.get("message", "No calibration data."), color=(148, 163, 184)
+        )
 
     # Executive Summary
     _add_heading(doc, "Executive Summary", level=1)
@@ -274,7 +313,12 @@ def render_weekly_docx(data, path=None):
     # Portfolio Health
     _add_heading(doc, "Portfolio Health", level=1)
     portfolio = data.get("portfolio", {})
-    for posture, label in [("critical", "Critical"), ("important", "Important"), ("strategic", "Strategic"), ("monitoring", "Monitoring")]:
+    for posture, label in [
+        ("critical", "Critical"),
+        ("important", "Important"),
+        ("strategic", "Strategic"),
+        ("monitoring", "Monitoring"),
+    ]:
         items = portfolio.get(posture, [])
         if items:
             _add_para(doc, f"{label} ({len(items)})", bold=True, size=11)
@@ -288,7 +332,15 @@ def render_weekly_docx(data, path=None):
                         run.font.name = "Arial"
                         run.font.size = Pt(9)
             for m in items:
-                _add_table_row(table, [m.get("title", ""), m.get("status", ""), m.get("nearest_deadline", ""), m.get("next_step_owner", "")])
+                _add_table_row(
+                    table,
+                    [
+                        m.get("title", ""),
+                        m.get("status", ""),
+                        m.get("nearest_deadline", ""),
+                        m.get("next_step_owner", ""),
+                    ],
+                )
 
     # Decision Docket
     _add_heading(doc, "Decision Docket", level=1)
@@ -304,7 +356,15 @@ def render_weekly_docx(data, path=None):
                     run.font.name = "Arial"
                     run.font.size = Pt(9)
         for d in decisions:
-            _add_table_row(table, [d.get("title", ""), d.get("matter_title", ""), d.get("decision_owner", ""), d.get("due_date", "")])
+            _add_table_row(
+                table,
+                [
+                    d.get("title", ""),
+                    d.get("matter_title", ""),
+                    d.get("decision_owner", ""),
+                    d.get("due_date", ""),
+                ],
+            )
     else:
         _add_para(doc, "No open decisions.", color=(148, 163, 184))
 
@@ -323,12 +383,24 @@ def render_weekly_docx(data, path=None):
                     run.font.name = "Arial"
                     run.font.size = Pt(9)
         for w in workload:
-            _add_table_row(table, [w.get("name", ""), str(w.get("open_tasks", 0)), str(w.get("open_matters", 0)), str(w.get("overdue", 0))])
+            _add_table_row(
+                table,
+                [
+                    w.get("name", ""),
+                    str(w.get("open_tasks", 0)),
+                    str(w.get("open_matters", 0)),
+                    str(w.get("overdue", 0)),
+                ],
+            )
     drifting = team.get("drifting_matters", [])
     if drifting:
         _add_para(doc, "Drifting Matters:", bold=True)
         for dm in drifting:
-            _add_para(doc, f"  {dm.get('title', '')} - {dm.get('days_stale', 0)} days stale - {dm.get('owner', '')}", size=9)
+            _add_para(
+                doc,
+                f"  {dm.get('title', '')} - {dm.get('days_stale', 0)} days stale - {dm.get('owner', '')}",
+                size=9,
+            )
 
     # Stakeholders
     _add_heading(doc, "Stakeholders & Relationships", level=1)
@@ -337,29 +409,47 @@ def render_weekly_docx(data, path=None):
     if touchpoints:
         _add_para(doc, "Touchpoints Due:", bold=True)
         for tp in touchpoints:
-            _add_para(doc, f"  {tp.get('name', '')} ({tp.get('organization', '')}) - {tp.get('next_date', '')} - {tp.get('purpose', '')}", size=9)
+            _add_para(
+                doc,
+                f"  {tp.get('name', '')} ({tp.get('organization', '')}) - {tp.get('next_date', '')} - {tp.get('purpose', '')}",
+                size=9,
+            )
     neglected = stak.get("neglected", [])
     if neglected:
         _add_para(doc, "Neglected Relationships:", bold=True)
         for n in neglected:
-            _add_para(doc, f"  {n.get('name', '')} ({n.get('category', '')}) - {n.get('days_since', 0)} days", size=9)
+            _add_para(
+                doc,
+                f"  {n.get('name', '')} ({n.get('category', '')}) - {n.get('days_since', 0)} days",
+                size=9,
+            )
     if not touchpoints and not neglected:
         _add_para(doc, "No stakeholder actions needed.", color=(148, 163, 184))
 
     # Deadlines
     _add_heading(doc, "Deadlines & Horizon Scan", level=1)
     dl_data = data.get("deadlines", {})
-    for period, label in [("two_weeks", "Next 2 Weeks"), ("thirty_days", "Next 30 Days"), ("ninety_days", "Next 90 Days")]:
+    for period, label in [
+        ("two_weeks", "Next 2 Weeks"),
+        ("thirty_days", "Next 30 Days"),
+        ("ninety_days", "Next 90 Days"),
+    ]:
         items = dl_data.get(period, [])
         if items:
             _add_para(doc, f"{label} ({len(items)}):", bold=True)
             for item in items:
-                _add_para(doc, f"  {item.get('date', '')} - {item.get('deadline_type', '')} - {item.get('matter_title', '')} - {item.get('owner', '')}", size=9)
+                _add_para(
+                    doc,
+                    f"  {item.get('date', '')} - {item.get('deadline_type', '')} - {item.get('matter_title', '')} - {item.get('owner', '')}",
+                    size=9,
+                )
 
     # Data Hygiene
     _add_heading(doc, "Data Hygiene", level=1)
     hygiene = data.get("hygiene", {})
-    _add_para(doc, f"Tracker Health Score: {hygiene.get('score', 0)}%", bold=True, size=14)
+    _add_para(
+        doc, f"Tracker Health Score: {hygiene.get('score', 0)}%", bold=True, size=14
+    )
     for c in hygiene.get("checks", []):
         field = c.get("field", "")
         _add_para(doc, f"  {field}: {c['count']}/{c['total']} ({c['pct']}%)", size=9)
@@ -371,10 +461,16 @@ def render_weekly_docx(data, path=None):
     cp_totals = cp.get("totals", {})
     if cp_matters:
         sb = cp_totals.get("status_breakdown", {})
-        _add_para(doc, f"Positions taken: {sb.get('position_taken', 0)} | In progress: {sb.get('drafting', 0) + sb.get('final_review', 0)} | Not started: {sb.get('open', 0) + sb.get('not_started', 0)}", bold=True)
+        _add_para(
+            doc,
+            f"Positions taken: {sb.get('position_taken', 0)} | In progress: {sb.get('drafting', 0) + sb.get('final_review', 0)} | Not started: {sb.get('open', 0) + sb.get('not_started', 0)}",
+            bold=True,
+        )
         table = doc.add_table(rows=1, cols=5)
         table.style = "Table Grid"
-        for i, h in enumerate(["Matter", "Deadline", "Topics", "Questions", "Complete"]):
+        for i, h in enumerate(
+            ["Matter", "Deadline", "Topics", "Questions", "Complete"]
+        ):
             table.rows[0].cells[i].text = h
             for p in table.rows[0].cells[i].paragraphs:
                 for run in p.runs:
@@ -383,14 +479,21 @@ def render_weekly_docx(data, path=None):
                     run.font.size = Pt(9)
         for cm in cp_matters:
             dr = cm.get("days_remaining")
-            dl_str = f"{cm.get('comment_deadline', '')} ({dr}d)" if dr is not None else "none"
-            _add_table_row(table, [
-                cm.get("matter_title", "")[:40],
-                dl_str,
-                str(cm.get("total_topics", 0)),
-                str(cm.get("total_questions", 0)),
-                f"{cm.get('completion_pct', 0)}%",
-            ])
+            dl_str = (
+                f"{cm.get('comment_deadline', '')} ({dr}d)"
+                if dr is not None
+                else "none"
+            )
+            _add_table_row(
+                table,
+                [
+                    cm.get("matter_title", "")[:40],
+                    dl_str,
+                    str(cm.get("total_topics", 0)),
+                    str(cm.get("total_questions", 0)),
+                    f"{cm.get('completion_pct', 0)}%",
+                ],
+            )
     else:
         _add_para(doc, "No comment topics tracked.", color=(148, 163, 184))
 
@@ -399,18 +502,32 @@ def render_weekly_docx(data, path=None):
     dir_status = data.get("directives_status", {})
     if dir_status.get("has_data"):
         by_st = dir_status.get("by_status", {})
-        status_line = ", ".join(f"{st.replace('_', ' ').title()}: {count}" for st, count in by_st.items())
-        _add_para(doc, f"Total: {dir_status.get('total', 0)} — {status_line}", bold=True)
+        status_line = ", ".join(
+            f"{st.replace('_', ' ').title()}: {count}" for st, count in by_st.items()
+        )
+        _add_para(
+            doc, f"Total: {dir_status.get('total', 0)} — {status_line}", bold=True
+        )
         overdue_dir = dir_status.get("overdue", [])
         if overdue_dir:
-            _add_para(doc, f"Overdue ({len(overdue_dir)}):", bold=True, color=(239, 68, 68))
+            _add_para(
+                doc, f"Overdue ({len(overdue_dir)}):", bold=True, color=(239, 68, 68)
+            )
             for od in overdue_dir:
-                _add_para(doc, f"  {od.get('title', '')} - {od.get('deadline', '')} - {abs(od.get('days_remaining', 0))}d overdue", size=9)
+                _add_para(
+                    doc,
+                    f"  {od.get('title', '')} - {od.get('deadline', '')} - {abs(od.get('days_remaining', 0))}d overdue",
+                    size=9,
+                )
         upcoming_dir = dir_status.get("upcoming", [])
         if upcoming_dir:
             _add_para(doc, f"Approaching ({len(upcoming_dir)}):", bold=True)
             for ud in upcoming_dir:
-                _add_para(doc, f"  {ud.get('title', '')} - {ud.get('deadline', '')} - {ud.get('days_remaining', 0)}d", size=9)
+                _add_para(
+                    doc,
+                    f"  {ud.get('title', '')} - {ud.get('deadline', '')} - {ud.get('days_remaining', 0)}d",
+                    size=9,
+                )
     else:
         _add_para(doc, "No policy directives tracked.", color=(148, 163, 184))
 

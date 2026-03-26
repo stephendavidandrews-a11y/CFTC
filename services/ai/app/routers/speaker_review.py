@@ -16,6 +16,7 @@ Design principles:
 - Provisional people have no tracker_person_id until bundle commit
 - Full audit trail in voiceprint_match_log + review_action_log
 """
+
 import json
 import logging
 import uuid
@@ -42,19 +43,24 @@ SPEAKER_REVIEW_STATES = {"awaiting_speaker_review", "speaker_review_in_progress"
 # Request / Response models
 # ---------------------------------------------------------------------------
 
+
 class LinkSpeakerRequest(BaseModel):
     """Link a speaker to an existing tracker person."""
+
     participant_id: str
     tracker_person_id: str
     proposed_name: Optional[str] = None
     proposed_title: Optional[str] = None
     proposed_org: Optional[str] = None
-    voiceprint_match_log_id: Optional[str] = None  # if confirming a voiceprint candidate
+    voiceprint_match_log_id: Optional[str] = (
+        None  # if confirming a voiceprint candidate
+    )
     skip_voiceprint: bool = False  # link person without taking/updating voiceprint
 
 
 class NewPersonRequest(BaseModel):
     """Create a provisional new person for an unknown speaker."""
+
     participant_id: str
     proposed_name: str
     proposed_title: Optional[str] = None
@@ -69,6 +75,7 @@ class SkipSpeakerRequest(BaseModel):
 
 class RejectMatchRequest(BaseModel):
     """Reject a voiceprint suggestion (audit log only, no state change)."""
+
     participant_id: str
     match_log_id: str
     reason: Optional[str] = None
@@ -90,7 +97,9 @@ class SpeakerInfo(BaseModel):
     speech_seconds: Optional[float] = None
     sample_utterances: Optional[list[str]] = None
     voiceprint_candidates: Optional[list[dict]] = None
-    vocal_quality: Optional[dict] = None  # SNR, HNR, jitter, shimmer, pitch, quality verdict
+    vocal_quality: Optional[dict] = (
+        None  # SNR, HNR, jitter, shimmer, pitch, quality verdict
+    )
 
 
 class SpeakerReviewDetail(BaseModel):
@@ -109,14 +118,15 @@ class SpeakerReviewDetail(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-
 class UnlinkRequest(BaseModel):
     """Reset a confirmed speaker back to unconfirmed state."""
+
     participant_id: str
 
 
 class MergeSpeakersRequest(BaseModel):
     """Merge multiple speaker labels into one."""
+
     target_label: str
     source_labels: list[str]
 
@@ -155,24 +165,30 @@ async def get_speaker_review_detail(communication_id: str, db=Depends(get_db)):
         raise HTTPException(404, detail={"error_type": "not_found"})
 
     # Participants (speakers)
-    participants = db.execute("""
+    participants = db.execute(
+        """
         SELECT id, speaker_label, tracker_person_id, proposed_name,
                proposed_title, proposed_org, participant_role,
                match_source, confirmed, voiceprint_confidence, voiceprint_method
         FROM communication_participants
         WHERE communication_id = ?
         ORDER BY speaker_label
-    """, (communication_id,)).fetchall()
+    """,
+        (communication_id,),
+    ).fetchall()
 
     # Transcript segments (cleaned preferred, fall back to raw)
-    segments = db.execute("""
+    segments = db.execute(
+        """
         SELECT id, speaker_label, start_time, end_time,
                COALESCE(reviewed_text, cleaned_text, raw_text) as text,
                confidence
         FROM transcripts
         WHERE communication_id = ?
         ORDER BY start_time
-    """, (communication_id,)).fetchall()
+    """,
+        (communication_id,),
+    ).fetchall()
 
     # Run voiceprint matching (on-demand, always uses latest profile library)
     vp_results = match_all_speakers(db, communication_id)
@@ -188,15 +204,20 @@ async def get_speaker_review_detail(communication_id: str, db=Depends(get_db)):
             "SELECT SUM(end_time - start_time) as total FROM transcripts WHERE communication_id = ? AND speaker_label = ?",
             (communication_id, label),
         ).fetchone()
-        speech_secs = round(dur_row["total"], 1) if dur_row and dur_row["total"] else 0.0
+        speech_secs = (
+            round(dur_row["total"], 1) if dur_row and dur_row["total"] else 0.0
+        )
 
         # Get sample utterances (first 3 things this speaker said)
-        first_utterances = db.execute("""
+        first_utterances = db.execute(
+            """
             SELECT COALESCE(reviewed_text, cleaned_text, raw_text) as text
             FROM transcripts
             WHERE communication_id = ? AND speaker_label = ?
             ORDER BY start_time LIMIT 3
-        """, (communication_id, label)).fetchall()
+        """,
+            (communication_id, label),
+        ).fetchall()
         utterances = [u["text"] for u in first_utterances if u["text"]]
 
         # Voiceprint candidates for this speaker
@@ -214,6 +235,7 @@ async def get_speaker_review_detail(communication_id: str, db=Depends(get_db)):
         vocal_quality = None
         if vq_row and vq_row["vocal_quality_json"]:
             import json as _json
+
             vq = _json.loads(vq_row["vocal_quality_json"])
             # Compute quality verdict
             issues = []
@@ -271,29 +293,37 @@ async def get_speaker_review_detail(communication_id: str, db=Depends(get_db)):
                 "f0_stddev_ratio": vq.get("f0_stddev_ratio"),
                 "verdict": verdict,
                 "issues": issues,
-                "embedding_filtered": bool(eq_row["embedding_filtered"]) if eq_row and eq_row["embedding_filtered"] is not None else None,
-                "embedding_quality_score": eq_row["embedding_quality_score"] if eq_row else None,
-                "clean_duration": eq_row["embedding_clean_duration"] if eq_row else None,
+                "embedding_filtered": bool(eq_row["embedding_filtered"])
+                if eq_row and eq_row["embedding_filtered"] is not None
+                else None,
+                "embedding_quality_score": eq_row["embedding_quality_score"]
+                if eq_row
+                else None,
+                "clean_duration": eq_row["embedding_clean_duration"]
+                if eq_row
+                else None,
                 "segments_used": eq_row["embedding_segments_used"] if eq_row else None,
             }
 
-        speakers.append(SpeakerInfo(
-            id=p["id"],
-            speaker_label=label,
-            tracker_person_id=p["tracker_person_id"],
-            proposed_name=p["proposed_name"],
-            proposed_title=p["proposed_title"],
-            proposed_org=p["proposed_org"],
-            participant_role=p["participant_role"],
-            match_source=p["match_source"],
-            confirmed=bool(p["confirmed"]),
-            voiceprint_confidence=p["voiceprint_confidence"],
-            voiceprint_method=p["voiceprint_method"],
-            speech_seconds=speech_secs,
-            sample_utterances=utterances,
-            voiceprint_candidates=candidates if candidates else None,
-            vocal_quality=vocal_quality,
-        ))
+        speakers.append(
+            SpeakerInfo(
+                id=p["id"],
+                speaker_label=label,
+                tracker_person_id=p["tracker_person_id"],
+                proposed_name=p["proposed_name"],
+                proposed_title=p["proposed_title"],
+                proposed_org=p["proposed_org"],
+                participant_role=p["participant_role"],
+                match_source=p["match_source"],
+                confirmed=bool(p["confirmed"]),
+                voiceprint_confidence=p["voiceprint_confidence"],
+                voiceprint_method=p["voiceprint_method"],
+                speech_seconds=speech_secs,
+                sample_utterances=utterances,
+                voiceprint_candidates=candidates if candidates else None,
+                vocal_quality=vocal_quality,
+            )
+        )
 
     vp_summary = {
         "total_speakers": len(speakers),
@@ -335,16 +365,20 @@ async def link_speaker(
         (req.participant_id, communication_id),
     ).fetchone()
     if not participant:
-        raise HTTPException(404, detail={
-            "error_type": "not_found",
-            "message": f"Participant {req.participant_id} not found",
-        })
+        raise HTTPException(
+            404,
+            detail={
+                "error_type": "not_found",
+                "message": f"Participant {req.participant_id} not found",
+            },
+        )
 
     # Determine match source
     match_source = "voiceprint_confirmed" if req.voiceprint_match_log_id else "manual"
 
     # Update participant
-    db.execute("""
+    db.execute(
+        """
         UPDATE communication_participants
         SET tracker_person_id = ?,
             proposed_name = COALESCE(?, proposed_name),
@@ -355,38 +389,52 @@ async def link_speaker(
             voiceprint_method = ?,
             updated_at = datetime('now')
         WHERE id = ? AND communication_id = ?
-    """, (
-        req.tracker_person_id,
-        req.proposed_name, req.proposed_title, req.proposed_org,
-        match_source,
-        match_source,
-        req.participant_id, communication_id,
-    ))
+    """,
+        (
+            req.tracker_person_id,
+            req.proposed_name,
+            req.proposed_title,
+            req.proposed_org,
+            match_source,
+            match_source,
+            req.participant_id,
+            communication_id,
+        ),
+    )
 
     # If confirming a voiceprint candidate, update the match log
     if req.voiceprint_match_log_id:
-        db.execute("""
+        db.execute(
+            """
             UPDATE voiceprint_match_log
             SET reviewer_action = 'confirmed',
                 confirmed_person_id = ?,
                 reviewed_at = datetime('now')
             WHERE id = ?
-        """, (req.tracker_person_id, req.voiceprint_match_log_id))
+        """,
+            (req.tracker_person_id, req.voiceprint_match_log_id),
+        )
 
     # Audit log
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO review_action_log (id, actor, communication_id, action_type, details)
         VALUES (?, 'user', ?, 'link_speaker', ?)
-    """, (
-        str(uuid.uuid4()), communication_id,
-        json.dumps({
-            "participant_id": req.participant_id,
-            "speaker_label": participant["speaker_label"],
-            "tracker_person_id": req.tracker_person_id,
-            "match_source": match_source,
-            "voiceprint_match_log_id": req.voiceprint_match_log_id,
-        }),
-    ))
+    """,
+        (
+            str(uuid.uuid4()),
+            communication_id,
+            json.dumps(
+                {
+                    "participant_id": req.participant_id,
+                    "speaker_label": participant["speaker_label"],
+                    "tracker_person_id": req.tracker_person_id,
+                    "match_source": match_source,
+                    "voiceprint_match_log_id": req.voiceprint_match_log_id,
+                }
+            ),
+        ),
+    )
     db.commit()
 
     # Quality-gated profile promotion (non-blocking, skippable)
@@ -427,13 +475,17 @@ async def create_provisional_person(
         (req.participant_id, communication_id),
     ).fetchone()
     if not participant:
-        raise HTTPException(404, detail={
-            "error_type": "not_found",
-            "message": f"Participant {req.participant_id} not found",
-        })
+        raise HTTPException(
+            404,
+            detail={
+                "error_type": "not_found",
+                "message": f"Participant {req.participant_id} not found",
+            },
+        )
 
     # Update participant with provisional person info
-    db.execute("""
+    db.execute(
+        """
         UPDATE communication_participants
         SET tracker_person_id = NULL,
             proposed_name = ?,
@@ -447,33 +499,48 @@ async def create_provisional_person(
             voiceprint_confidence = NULL,
             updated_at = datetime('now')
         WHERE id = ? AND communication_id = ?
-    """, (
-        req.proposed_name, req.proposed_title, req.proposed_org,
-        req.proposed_org_id, req.participant_role,
-        req.participant_id, communication_id,
-    ))
+    """,
+        (
+            req.proposed_name,
+            req.proposed_title,
+            req.proposed_org,
+            req.proposed_org_id,
+            req.participant_role,
+            req.participant_id,
+            communication_id,
+        ),
+    )
 
     # Update any voiceprint match log entries for this speaker
-    db.execute("""
+    db.execute(
+        """
         UPDATE voiceprint_match_log
         SET reviewer_action = 'new_person', reviewed_at = datetime('now')
         WHERE communication_id = ? AND speaker_label = ? AND reviewer_action IS NULL
-    """, (communication_id, participant["speaker_label"]))
+    """,
+        (communication_id, participant["speaker_label"]),
+    )
 
     # Audit log
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO review_action_log (id, actor, communication_id, action_type, details)
         VALUES (?, 'user', ?, 'create_provisional_person', ?)
-    """, (
-        str(uuid.uuid4()), communication_id,
-        json.dumps({
-            "participant_id": req.participant_id,
-            "speaker_label": participant["speaker_label"],
-            "proposed_name": req.proposed_name,
-            "proposed_title": req.proposed_title,
-            "proposed_org": req.proposed_org,
-        }),
-    ))
+    """,
+        (
+            str(uuid.uuid4()),
+            communication_id,
+            json.dumps(
+                {
+                    "participant_id": req.participant_id,
+                    "speaker_label": participant["speaker_label"],
+                    "proposed_name": req.proposed_name,
+                    "proposed_title": req.proposed_title,
+                    "proposed_org": req.proposed_org,
+                }
+            ),
+        ),
+    )
     db.commit()
 
     return {
@@ -502,26 +569,41 @@ async def skip_speaker(
     if not participant:
         raise HTTPException(404, detail={"error_type": "not_found"})
 
-    db.execute("""
+    db.execute(
+        """
         UPDATE communication_participants
         SET confirmed = 1, match_source = 'skipped', updated_at = datetime('now')
         WHERE id = ? AND communication_id = ?
-    """, (req.participant_id, communication_id))
+    """,
+        (req.participant_id, communication_id),
+    )
 
     # Update any voiceprint match log entries
-    db.execute("""
+    db.execute(
+        """
         UPDATE voiceprint_match_log
         SET reviewer_action = 'skipped', reviewed_at = datetime('now')
         WHERE communication_id = ? AND speaker_label = ? AND reviewer_action IS NULL
-    """, (communication_id, participant["speaker_label"]))
+    """,
+        (communication_id, participant["speaker_label"]),
+    )
 
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO review_action_log (id, actor, communication_id, action_type, details)
         VALUES (?, 'user', ?, 'skip_speaker', ?)
-    """, (
-        str(uuid.uuid4()), communication_id,
-        json.dumps({"participant_id": req.participant_id, "speaker_label": participant["speaker_label"]}),
-    ))
+    """,
+        (
+            str(uuid.uuid4()),
+            communication_id,
+            json.dumps(
+                {
+                    "participant_id": req.participant_id,
+                    "speaker_label": participant["speaker_label"],
+                }
+            ),
+        ),
+    )
     db.commit()
 
     return {"status": "ok", "participant_id": req.participant_id, "skipped": True}
@@ -537,31 +619,41 @@ async def reject_match(
     _check_review_state(db, communication_id)
 
     # Update voiceprint match log
-    result = db.execute("""
+    result = db.execute(
+        """
         UPDATE voiceprint_match_log
         SET reviewer_action = 'rejected', reviewed_at = datetime('now')
         WHERE id = ? AND communication_id = ?
-    """, (req.match_log_id, communication_id))
+    """,
+        (req.match_log_id, communication_id),
+    )
 
     if result.rowcount == 0:
-        raise HTTPException(404, detail={"error_type": "not_found", "message": "Match log entry not found"})
+        raise HTTPException(
+            404,
+            detail={"error_type": "not_found", "message": "Match log entry not found"},
+        )
 
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO review_action_log (id, actor, communication_id, action_type, details)
         VALUES (?, 'user', ?, 'reject_voiceprint_match', ?)
-    """, (
-        str(uuid.uuid4()), communication_id,
-        json.dumps({
-            "participant_id": req.participant_id,
-            "match_log_id": req.match_log_id,
-            "reason": req.reason,
-        }),
-    ))
+    """,
+        (
+            str(uuid.uuid4()),
+            communication_id,
+            json.dumps(
+                {
+                    "participant_id": req.participant_id,
+                    "match_log_id": req.match_log_id,
+                    "reason": req.reason,
+                }
+            ),
+        ),
+    )
     db.commit()
 
     return {"status": "ok", "match_log_id": req.match_log_id, "rejected": True}
-
-
 
 
 @router.post("/{communication_id}/unlink-speaker")
@@ -579,29 +671,45 @@ async def unlink_speaker(
         (req.participant_id, communication_id),
     ).fetchone()
     if not participant:
-        raise HTTPException(404, detail={"error_type": "not_found", "message": f"Participant {req.participant_id} not found"})
+        raise HTTPException(
+            404,
+            detail={
+                "error_type": "not_found",
+                "message": f"Participant {req.participant_id} not found",
+            },
+        )
 
-    db.execute("""
+    db.execute(
+        """
         UPDATE communication_participants
         SET tracker_person_id = NULL, confirmed = 0, match_source = NULL,
             proposed_name = NULL, proposed_title = NULL, proposed_org = NULL,
             voiceprint_confidence = NULL, voiceprint_method = NULL,
             updated_at = datetime('now')
         WHERE id = ? AND communication_id = ?
-    """, (req.participant_id, communication_id))
+    """,
+        (req.participant_id, communication_id),
+    )
 
     import uuid as _uuid
-    db.execute("""
+
+    db.execute(
+        """
         INSERT INTO review_action_log (id, actor, communication_id, action_type, details)
         VALUES (?, 'user', ?, 'unlink_speaker', ?)
-    """, (
-        str(_uuid.uuid4()), communication_id,
-        json.dumps({
-            "participant_id": req.participant_id,
-            "speaker_label": participant["speaker_label"],
-            "previous_name": participant["proposed_name"],
-        }),
-    ))
+    """,
+        (
+            str(_uuid.uuid4()),
+            communication_id,
+            json.dumps(
+                {
+                    "participant_id": req.participant_id,
+                    "speaker_label": participant["speaker_label"],
+                    "previous_name": participant["proposed_name"],
+                }
+            ),
+        ),
+    )
     db.commit()
 
     return {"ok": True, "participant_id": req.participant_id}
@@ -624,43 +732,60 @@ async def merge_speakers(
         (communication_id, req.target_label),
     ).fetchone()
     if not target:
-        raise HTTPException(404, detail={
-            "error_type": "not_found",
-            "message": f"Target speaker {req.target_label} not found",
-        })
+        raise HTTPException(
+            404,
+            detail={
+                "error_type": "not_found",
+                "message": f"Target speaker {req.target_label} not found",
+            },
+        )
 
     merged = 0
     for source_label in req.source_labels:
         if source_label == req.target_label:
             continue
 
-        db.execute("""
+        db.execute(
+            """
             UPDATE transcripts SET speaker_label = ?
             WHERE communication_id = ? AND speaker_label = ?
-        """, (req.target_label, communication_id, source_label))
+        """,
+            (req.target_label, communication_id, source_label),
+        )
 
-        db.execute("""
+        db.execute(
+            """
             DELETE FROM communication_participants
             WHERE communication_id = ? AND speaker_label = ?
-        """, (communication_id, source_label))
+        """,
+            (communication_id, source_label),
+        )
 
         merged += 1
 
     import uuid as _uuid
-    db.execute("""
+
+    db.execute(
+        """
         INSERT INTO review_action_log (id, actor, communication_id, action_type, details)
         VALUES (?, 'user', ?, 'merge_speakers', ?)
-    """, (
-        str(_uuid.uuid4()), communication_id,
-        json.dumps({
-            "target_label": req.target_label,
-            "source_labels": req.source_labels,
-            "merged_count": merged,
-        }),
-    ))
+    """,
+        (
+            str(_uuid.uuid4()),
+            communication_id,
+            json.dumps(
+                {
+                    "target_label": req.target_label,
+                    "source_labels": req.source_labels,
+                    "merged_count": merged,
+                }
+            ),
+        ),
+    )
     db.commit()
 
     return {"ok": True, "merged": merged}
+
 
 @router.post("/{communication_id}/complete")
 async def complete_speaker_review(
@@ -682,42 +807,64 @@ async def complete_speaker_review(
 
     status = comm["processing_status"]
     if status not in SPEAKER_REVIEW_STATES:
-        raise HTTPException(400, detail={
-            "error_type": "invalid_state",
-            "message": f"Communication not in speaker review (current: {status})",
-        })
+        raise HTTPException(
+            400,
+            detail={
+                "error_type": "invalid_state",
+                "message": f"Communication not in speaker review (current: {status})",
+            },
+        )
 
     # Check all confirmed
-    unconfirmed = db.execute("""
+    unconfirmed = db.execute(
+        """
         SELECT id, speaker_label FROM communication_participants
         WHERE communication_id = ? AND confirmed = 0
-    """, (communication_id,)).fetchall()
+    """,
+        (communication_id,),
+    ).fetchall()
 
     if unconfirmed:
         labels = [r["speaker_label"] for r in unconfirmed]
-        raise HTTPException(400, detail={
-            "error_type": "validation_failure",
-            "message": f"Unconfirmed speakers remain: {labels}",
-            "unconfirmed_speakers": labels,
-        })
+        raise HTTPException(
+            400,
+            detail={
+                "error_type": "validation_failure",
+                "message": f"Unconfirmed speakers remain: {labels}",
+                "unconfirmed_speakers": labels,
+            },
+        )
 
     # Advance state
     if status == "awaiting_speaker_review":
-        cas_transition(db, communication_id, "awaiting_speaker_review", "speaker_review_in_progress")
+        cas_transition(
+            db,
+            communication_id,
+            "awaiting_speaker_review",
+            "speaker_review_in_progress",
+        )
 
-    if not cas_transition(db, communication_id, "speaker_review_in_progress", "speakers_confirmed"):
+    if not cas_transition(
+        db, communication_id, "speaker_review_in_progress", "speakers_confirmed"
+    ):
         raise HTTPException(409, detail={"error_type": "conflict"})
 
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO review_action_log (id, actor, communication_id, action_type, old_state, new_state)
         VALUES (?, 'user', ?, 'complete_speaker_review', 'speaker_review_in_progress', 'speakers_confirmed')
-    """, (str(uuid.uuid4()), communication_id))
+    """,
+        (str(uuid.uuid4()), communication_id),
+    )
     db.commit()
 
-    await publish_event("speaker_review_complete", {
-        "communication_id": communication_id,
-        "status": "speakers_confirmed",
-    })
+    await publish_event(
+        "speaker_review_complete",
+        {
+            "communication_id": communication_id,
+            "status": "speakers_confirmed",
+        },
+    )
 
     background_tasks.add_task(_resume_pipeline, communication_id)
 
@@ -727,14 +874,17 @@ async def complete_speaker_review(
 @router.get("/{communication_id}/transcript")
 async def get_transcript(communication_id: str, db=Depends(get_db)):
     """Get the full transcript for display during speaker review."""
-    segments = db.execute("""
+    segments = db.execute(
+        """
         SELECT id, speaker_label, start_time, end_time,
                COALESCE(reviewed_text, cleaned_text, raw_text) as text,
                confidence
         FROM transcripts
         WHERE communication_id = ?
         ORDER BY start_time
-    """, (communication_id,)).fetchall()
+    """,
+        (communication_id,),
+    ).fetchall()
 
     return {
         "communication_id": communication_id,
@@ -747,10 +897,12 @@ async def get_transcript(communication_id: str, db=Depends(get_db)):
 # Voiceprint Profile Management (Phase D — minimal CRUD)
 # ---------------------------------------------------------------------------
 
+
 @router.get("/profiles/list")
 async def list_voice_profiles(status: Optional[str] = "active", db=Depends(get_db)):
     """List all voice profiles in the library."""
     from app.voiceprint.profiles import list_profiles
+
     profiles = list_profiles(db, status=status)
     return {"profiles": profiles, "total": len(profiles)}
 
@@ -759,9 +911,16 @@ async def list_voice_profiles(status: Optional[str] = "active", db=Depends(get_d
 async def get_voice_profile(tracker_person_id: str, db=Depends(get_db)):
     """Get a specific voice profile with contributing sample history."""
     from app.voiceprint.profiles import get_profile, get_sample_history
+
     profile = get_profile(db, tracker_person_id)
     if not profile:
-        raise HTTPException(404, detail={"error_type": "not_found", "message": "No voice profile for this person"})
+        raise HTTPException(
+            404,
+            detail={
+                "error_type": "not_found",
+                "message": "No voice profile for this person",
+            },
+        )
     samples = get_sample_history(db, tracker_person_id)
     return {"profile": profile, "sample_history": samples}
 
@@ -770,12 +929,16 @@ async def get_voice_profile(tracker_person_id: str, db=Depends(get_db)):
 async def deactivate_voice_profile(tracker_person_id: str, db=Depends(get_db)):
     """Deactivate a voice profile (stops matching). Can be reactivated later."""
     from app.voiceprint.profiles import deactivate_profile
+
     if not deactivate_profile(db, tracker_person_id):
         raise HTTPException(404, detail={"error_type": "not_found"})
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO review_action_log (id, actor, action_type, details)
         VALUES (?, 'user', 'deactivate_voice_profile', ?)
-    """, (str(uuid.uuid4()), json.dumps({"tracker_person_id": tracker_person_id})))
+    """,
+        (str(uuid.uuid4()), json.dumps({"tracker_person_id": tracker_person_id})),
+    )
     db.commit()
     return {"status": "deactivated", "tracker_person_id": tracker_person_id}
 
@@ -784,24 +947,29 @@ async def deactivate_voice_profile(tracker_person_id: str, db=Depends(get_db)):
 async def activate_voice_profile(tracker_person_id: str, db=Depends(get_db)):
     """Reactivate an inactive voice profile."""
     from app.voiceprint.profiles import activate_profile
+
     if not activate_profile(db, tracker_person_id):
         raise HTTPException(404, detail={"error_type": "not_found"})
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO review_action_log (id, actor, action_type, details)
         VALUES (?, 'user', 'activate_voice_profile', ?)
-    """, (str(uuid.uuid4()), json.dumps({"tracker_person_id": tracker_person_id})))
+    """,
+        (str(uuid.uuid4()), json.dumps({"tracker_person_id": tracker_person_id})),
+    )
     db.commit()
     return {"status": "active", "tracker_person_id": tracker_person_id}
-
-
 
 
 # ---------------------------------------------------------------------------
 # Transcript editing endpoints
 # ---------------------------------------------------------------------------
 
+
 @router.patch("/{communication_id}/transcripts/{transcript_id}")
-async def edit_transcript_segment(communication_id: str, transcript_id: str, request: Request, db=Depends(get_db)):
+async def edit_transcript_segment(
+    communication_id: str, transcript_id: str, request: Request, db=Depends(get_db)
+):
     """Save human-corrected text for a transcript segment."""
     body = await request.json()
     reviewed_text = body.get("reviewed_text", "").strip()
@@ -833,26 +1001,37 @@ async def edit_transcript_segment(communication_id: str, transcript_id: str, req
 
     # Log correction
     correction_id = str(uuid.uuid4())
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO transcript_corrections
             (id, communication_id, transcript_id, original_text, corrected_text,
              correction_type, pattern_from, pattern_to, applied_count)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
-    """, (
-        correction_id, communication_id, transcript_id,
-        original_text, reviewed_text,
-        "manual", pattern_from, pattern_to,
-    ))
+    """,
+        (
+            correction_id,
+            communication_id,
+            transcript_id,
+            original_text,
+            reviewed_text,
+            "manual",
+            pattern_from,
+            pattern_to,
+        ),
+    )
 
     # Count similar segments (quick string match)
     similar_count = 0
     if pattern_from and len(pattern_from) >= 3:
-        row = db.execute("""
+        row = db.execute(
+            """
             SELECT COUNT(*) as cnt FROM transcripts
             WHERE communication_id = ? AND id != ?
               AND reviewed_text IS NULL
               AND LOWER(COALESCE(cleaned_text, raw_text, '')) LIKE ?
-        """, (communication_id, transcript_id, f"%{pattern_from.lower()}%")).fetchone()
+        """,
+            (communication_id, transcript_id, f"%{pattern_from.lower()}%"),
+        ).fetchone()
         similar_count = row["cnt"] if row else 0
 
     db.commit()
@@ -867,14 +1046,15 @@ async def edit_transcript_segment(communication_id: str, transcript_id: str, req
 
 
 @router.post("/{communication_id}/transcripts/find-similar")
-async def find_similar_corrections(communication_id: str, request: Request, db=Depends(get_db)):
+async def find_similar_corrections(
+    communication_id: str, request: Request, db=Depends(get_db)
+):
     """Find other segments with similar text that could receive the same correction."""
     body = await request.json()
     correction_id = body.get("correction_id")
 
     if not correction_id:
         raise HTTPException(400, "correction_id is required")
-
 
     # Get the correction pattern
     corr = db.execute(
@@ -891,35 +1071,51 @@ async def find_similar_corrections(communication_id: str, request: Request, db=D
         return {"candidates": []}
 
     # Find segments containing the pattern
-    rows = db.execute("""
+    rows = db.execute(
+        """
         SELECT id, speaker_label, start_time,
                COALESCE(cleaned_text, raw_text, '') as current_text
         FROM transcripts
         WHERE communication_id = ? AND reviewed_text IS NULL
           AND LOWER(COALESCE(cleaned_text, raw_text, '')) LIKE ?
         ORDER BY start_time
-    """, (communication_id, f"%{pattern_from.lower()}%")).fetchall()
+    """,
+        (communication_id, f"%{pattern_from.lower()}%"),
+    ).fetchall()
 
     candidates = []
     for row in rows:
         current = row["current_text"]
         # Case-insensitive replacement for the suggested text
-        suggested = re_module.sub(re_module.escape(pattern_from), pattern_to, current, flags=re_module.IGNORECASE)
+        suggested = re_module.sub(
+            re_module.escape(pattern_from),
+            pattern_to,
+            current,
+            flags=re_module.IGNORECASE,
+        )
 
-        candidates.append({
-            "transcript_id": row["id"],
-            "speaker_label": row["speaker_label"],
-            "start_time": row["start_time"],
-            "current_text": current,
-            "suggested_text": suggested,
-            "match_type": "exact",
-        })
+        candidates.append(
+            {
+                "transcript_id": row["id"],
+                "speaker_label": row["speaker_label"],
+                "start_time": row["start_time"],
+                "current_text": current,
+                "suggested_text": suggested,
+                "match_type": "exact",
+            }
+        )
 
-    return {"candidates": candidates, "pattern_from": pattern_from, "pattern_to": pattern_to}
+    return {
+        "candidates": candidates,
+        "pattern_from": pattern_from,
+        "pattern_to": pattern_to,
+    }
 
 
 @router.post("/{communication_id}/transcripts/apply-corrections")
-async def apply_corrections(communication_id: str, request: Request, db=Depends(get_db)):
+async def apply_corrections(
+    communication_id: str, request: Request, db=Depends(get_db)
+):
     """Bulk-apply reviewed_text corrections to selected segments."""
     body = await request.json()
     corrections = body.get("corrections", [])
@@ -927,7 +1123,6 @@ async def apply_corrections(communication_id: str, request: Request, db=Depends(
 
     if not corrections:
         raise HTTPException(400, "corrections list is required")
-
 
     # Get original correction pattern for logging
     pattern_from = None
@@ -962,16 +1157,24 @@ async def apply_corrections(communication_id: str, request: Request, db=Depends(
         )
 
         # Log each propagated correction
-        db.execute("""
+        db.execute(
+            """
             INSERT INTO transcript_corrections
                 (id, communication_id, transcript_id, original_text, corrected_text,
                  correction_type, pattern_from, pattern_to, applied_count)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
-        """, (
-            str(uuid.uuid4()), communication_id, tid,
-            seg["original"], text,
-            "propagated", pattern_from, pattern_to,
-        ))
+        """,
+            (
+                str(uuid.uuid4()),
+                communication_id,
+                tid,
+                seg["original"],
+                text,
+                "propagated",
+                pattern_from,
+                pattern_to,
+            ),
+        )
         applied += 1
 
     # Update applied_count on original correction
@@ -1027,4 +1230,6 @@ def _check_review_state(db, communication_id: str):
 
 
 def _ensure_in_progress(db, communication_id: str):
-    _shared_ensure(db, communication_id, "awaiting_speaker_review", "speaker_review_in_progress")
+    _shared_ensure(
+        db, communication_id, "awaiting_speaker_review", "speaker_review_in_progress"
+    )

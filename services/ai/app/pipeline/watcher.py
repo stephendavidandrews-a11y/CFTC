@@ -6,6 +6,7 @@ create_communication() -> process_communication() path.
 
 Adapted from services/intake/voice/pipeline/watcher.py for the AI service.
 """
+
 import asyncio
 import hashlib
 import logging
@@ -22,8 +23,8 @@ from app.pipeline.stages.preprocessing import ACCEPTED_FORMATS
 logger = logging.getLogger(__name__)
 
 # Stable-file detection: check file size at intervals until it stops changing
-SETTLE_CHECK_INTERVAL = 5.0    # seconds between size checks
-SETTLE_MAX_WAIT = 120.0        # max seconds to wait for stability
+SETTLE_CHECK_INTERVAL = 5.0  # seconds between size checks
+SETTLE_MAX_WAIT = 120.0  # max seconds to wait for stability
 
 
 class _AudioFileHandler(FileSystemEventHandler):
@@ -49,8 +50,10 @@ class _AudioFileHandler(FileSystemEventHandler):
 
     def _schedule_ingest(self, path: Path):
         """Wait for file size to stabilize, then ingest."""
+
         def _wait_and_ingest():
             import time
+
             elapsed = 0.0
             prev_size = -1
             while elapsed < SETTLE_MAX_WAIT:
@@ -65,8 +68,14 @@ class _AudioFileHandler(FileSystemEventHandler):
                 time.sleep(SETTLE_CHECK_INTERVAL)
                 elapsed += SETTLE_CHECK_INTERVAL
             else:
-                logger.warning("File %s not stable after %ds — quarantining", path.name, int(SETTLE_MAX_WAIT))
-                _quarantine_file(path, "size not stable after %ds" % int(SETTLE_MAX_WAIT))
+                logger.warning(
+                    "File %s not stable after %ds — quarantining",
+                    path.name,
+                    int(SETTLE_MAX_WAIT),
+                )
+                _quarantine_file(
+                    path, "size not stable after %ds" % int(SETTLE_MAX_WAIT)
+                )
                 return
 
             try:
@@ -96,11 +105,14 @@ class _AudioFileHandler(FileSystemEventHandler):
             content_hash = _compute_content_hash(path)
             hash_match = db.execute(
                 "SELECT id, file_path FROM audio_files WHERE content_hash = ?",
-                (content_hash,)
+                (content_hash,),
             ).fetchone()
             if hash_match:
-                logger.info("Skipping %s — content matches %s (hash dedup)",
-                            path.name, hash_match["file_path"])
+                logger.info(
+                    "Skipping %s — content matches %s (hash dedup)",
+                    path.name,
+                    hash_match["file_path"],
+                )
                 return
 
             # Determine source from subdirectory name
@@ -113,15 +125,20 @@ class _AudioFileHandler(FileSystemEventHandler):
                 source_metadata={"ingestion": "watcher", "inbox_path": str(path)},
             )
 
-            logger.info("Watcher: created communication %s from %s", comm_id[:8], path.name)
+            logger.info(
+                "Watcher: created communication %s from %s", comm_id[:8], path.name
+            )
 
             # Start pipeline in a new event loop (watcher runs in a thread)
             from app.pipeline.orchestrator import process_communication
+
             try:
                 loop = asyncio.new_event_loop()
                 loop.run_until_complete(process_communication(comm_id))
             except Exception as e:
-                logger.error("Pipeline failed for watcher-ingested %s: %s", comm_id[:8], e)
+                logger.error(
+                    "Pipeline failed for watcher-ingested %s: %s", comm_id[:8], e
+                )
             finally:
                 loop.close()
 

@@ -16,6 +16,7 @@ Queries tracker and AI databases to assemble the 12-section weekly brief:
 
 Cost: ~$0.15/week (one Sonnet call for executive summary).
 """
+
 from __future__ import annotations
 
 import json
@@ -55,6 +56,7 @@ def _items(resp):
 # Section 0: Calibration — What I Got Wrong
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _assemble_calibration(db):
     """Compare last week's daily brief flags against actual outcomes."""
     week_ago = (date.today() - timedelta(days=7)).isoformat()
@@ -66,26 +68,38 @@ def _assemble_calibration(db):
     ).fetchall()
 
     if not rows:
-        return {"has_data": False, "message": "No daily briefs from this week to calibrate against."}
+        return {
+            "has_data": False,
+            "message": "No daily briefs from this week to calibrate against.",
+        }
 
     # Extract all flags from daily briefs
     flagged_items = []
     for row in rows:
         try:
-            content = json.loads(row["content"]) if isinstance(row["content"], str) else row["content"]
+            content = (
+                json.loads(row["content"])
+                if isinstance(row["content"], str)
+                else row["content"]
+            )
         except (json.JSONDecodeError, TypeError):
             continue
         for action in content.get("action_list", []):
-            flagged_items.append({
-                "tag": action.get("tag", ""),
-                "title": action.get("title", ""),
-                "entity_type": action.get("entity_type", ""),
-                "entity_id": action.get("entity_id", ""),
-                "detail": action.get("detail", ""),
-            })
+            flagged_items.append(
+                {
+                    "tag": action.get("tag", ""),
+                    "title": action.get("title", ""),
+                    "entity_type": action.get("entity_type", ""),
+                    "entity_id": action.get("entity_id", ""),
+                    "detail": action.get("detail", ""),
+                }
+            )
 
     if not flagged_items:
-        return {"has_data": False, "message": "No action items flagged in daily briefs this week."}
+        return {
+            "has_data": False,
+            "message": "No action items flagged in daily briefs this week.",
+        }
 
     # Deduplicate by entity_id
     seen = set()
@@ -153,13 +167,18 @@ def _assemble_calibration(db):
         "still_open": still_open,
         "wrong": wrong,
         "score": score,
-        "score_label": "Good" if score >= 70 else "Fair" if score >= 50 else "Needs tuning",
+        "score_label": "Good"
+        if score >= 70
+        else "Fair"
+        if score >= 50
+        else "Needs tuning",
     }
 
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Section 2: Portfolio Health
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def _assemble_portfolio():
     """Active matters grouped by posture."""
@@ -178,7 +197,11 @@ def _assemble_portfolio():
 
         priority = m.get("priority", "")
         # Check nearest deadline
-        deadlines = [m.get("work_deadline"), m.get("decision_deadline"), m.get("external_deadline")]
+        deadlines = [
+            m.get("work_deadline"),
+            m.get("decision_deadline"),
+            m.get("external_deadline"),
+        ]
         nearest = min((d for d in deadlines if d), default=None)
         days_to_deadline = None
         if nearest:
@@ -195,7 +218,9 @@ def _assemble_portfolio():
             "priority": priority,
             "matter_number": m.get("matter_number", ""),
             "next_step": m.get("next_step", ""),
-            "next_step_owner": m.get("next_step_owner_name", m.get("next_step_owner", "")),
+            "next_step_owner": m.get(
+                "next_step_owner_name", m.get("next_step_owner", "")
+            ),
             "nearest_deadline": nearest,
             "days_to_deadline": days_to_deadline,
             "sensitivity": m.get("sensitivity", ""),
@@ -205,7 +230,9 @@ def _assemble_portfolio():
 
         if days_to_deadline is not None and days_to_deadline <= 7:
             critical.append(item)
-        elif priority in ("critical", "high") or (days_to_deadline is not None and days_to_deadline <= 30):
+        elif priority in ("critical", "high") or (
+            days_to_deadline is not None and days_to_deadline <= 30
+        ):
             important.append(item)
         elif status in ("parked / monitoring",):
             monitoring.append(item)
@@ -221,13 +248,17 @@ def _assemble_portfolio():
         "important": important,
         "strategic": strategic,
         "monitoring": monitoring,
-        "total_active": len(critical) + len(important) + len(strategic) + len(monitoring),
+        "total_active": len(critical)
+        + len(important)
+        + len(strategic)
+        + len(monitoring),
     }
 
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Section 3: Decision Docket
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def _assemble_decisions():
     """All open decisions."""
@@ -237,16 +268,18 @@ def _assemble_decisions():
         status = d.get("status", "")
         if status in ("decided", "implemented", "closed"):
             continue
-        open_decisions.append({
-            "id": d.get("id"),
-            "title": d.get("title", ""),
-            "matter_title": d.get("matter_title", ""),
-            "decision_owner": d.get("owner_name", d.get("decision_owner", "")),
-            "due_date": d.get("due_date"),
-            "status": status,
-            "options_summary": d.get("options_summary", ""),
-            "recommended_option": d.get("recommended_option", ""),
-        })
+        open_decisions.append(
+            {
+                "id": d.get("id"),
+                "title": d.get("title", ""),
+                "matter_title": d.get("matter_title", ""),
+                "decision_owner": d.get("owner_name", d.get("decision_owner", "")),
+                "due_date": d.get("due_date"),
+                "status": status,
+                "options_summary": d.get("options_summary", ""),
+                "recommended_option": d.get("recommended_option", ""),
+            }
+        )
     open_decisions.sort(key=lambda x: x.get("due_date") or "9999")
     return open_decisions
 
@@ -254,6 +287,7 @@ def _assemble_decisions():
 # ═══════════════════════════════════════════════════════════════════════════
 # Section 4: Team Management View
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def _assemble_team():
     """Workload and execution by person, including comment topic assignments."""
@@ -285,11 +319,13 @@ def _assemble_team():
                     updated_date = date.fromisoformat(updated[:10])
                     days_stale = (today - updated_date).days
                     if days_stale >= 14:
-                        drifting.append({
-                            "title": m.get("title", ""),
-                            "owner": m.get("next_step_owner_name", ""),
-                            "days_stale": days_stale,
-                        })
+                        drifting.append(
+                            {
+                                "title": m.get("title", ""),
+                                "owner": m.get("next_step_owner_name", ""),
+                                "days_stale": days_stale,
+                            }
+                        )
                 except (ValueError, TypeError):
                     pass
 
@@ -326,6 +362,7 @@ def _assemble_team():
 # Section 5: Stakeholders & Relationships
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _assemble_stakeholders():
     """People needing attention."""
     people = _items(_tracker_get("/people"))
@@ -342,27 +379,34 @@ def _assemble_stakeholders():
 
         # Due touchpoints
         if next_date and next_date <= week_out:
-            touchpoints_due.append({
-                "name": p.get("full_name", ""),
-                "organization": p.get("org_name", ""),
-                "category": category,
-                "lane": p.get("relationship_category", ""),
-                "next_date": next_date,
-                "purpose": p.get("next_interaction_purpose", ""),
-            })
+            touchpoints_due.append(
+                {
+                    "name": p.get("full_name", ""),
+                    "organization": p.get("org_name", ""),
+                    "category": category,
+                    "lane": p.get("relationship_category", ""),
+                    "next_date": next_date,
+                    "purpose": p.get("next_interaction_purpose", ""),
+                }
+            )
 
         # Neglected: important relationships with no interaction in 30+ days
-        if category in ("Boss", "Leadership", "Internal client", "Commissioner office") and last_date:
+        if (
+            category in ("Boss", "Leadership", "Internal client", "Commissioner office")
+            and last_date
+        ):
             try:
                 last = date.fromisoformat(last_date[:10])
                 days_since = (today - last).days
                 if days_since >= 30:
-                    neglected.append({
-                        "name": p.get("full_name", ""),
-                        "organization": p.get("org_name", ""),
-                        "category": category,
-                        "days_since": days_since,
-                    })
+                    neglected.append(
+                        {
+                            "name": p.get("full_name", ""),
+                            "organization": p.get("org_name", ""),
+                            "category": category,
+                            "days_since": days_since,
+                        }
+                    )
             except (ValueError, TypeError):
                 pass
 
@@ -378,6 +422,7 @@ def _assemble_stakeholders():
 # ═══════════════════════════════════════════════════════════════════════════
 # Section 6: Deadlines & Horizon Scan
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def _assemble_deadlines():
     """Forward-looking deadline view."""
@@ -423,6 +468,7 @@ def _assemble_deadlines():
 # Section 7: Documents & Deliverables
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _assemble_documents():
     """Document pipeline status."""
     docs = _items(_tracker_get("/documents"))
@@ -430,10 +476,12 @@ def _assemble_documents():
     by_status = {}
     for d in docs:
         status = d.get("status", "unknown")
-        by_status.setdefault(status, []).append({
-            "title": d.get("title", ""),
-            "matter_title": d.get("matter_title", ""),
-        })
+        by_status.setdefault(status, []).append(
+            {
+                "title": d.get("title", ""),
+                "matter_title": d.get("matter_title", ""),
+            }
+        )
 
     return by_status
 
@@ -441,6 +489,7 @@ def _assemble_documents():
 # ═══════════════════════════════════════════════════════════════════════════
 # Section 8: Risk & Escalation
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def _assemble_risks():
     """High-sensitivity items and bottlenecks."""
@@ -451,13 +500,20 @@ def _assemble_risks():
         status = m.get("status", "")
         if status in ("closed", "archived", "withdrawn"):
             continue
-        if m.get("sensitivity") in ("high", "leadership", "congressional", "enforcement"):
-            high_sensitivity.append({
-                "title": m.get("title", ""),
-                "sensitivity": m.get("sensitivity", ""),
-                "status": status,
-                "boss_involvement": m.get("boss_involvement", ""),
-            })
+        if m.get("sensitivity") in (
+            "high",
+            "leadership",
+            "congressional",
+            "enforcement",
+        ):
+            high_sensitivity.append(
+                {
+                    "title": m.get("title", ""),
+                    "sensitivity": m.get("sensitivity", ""),
+                    "status": status,
+                    "boss_involvement": m.get("boss_involvement", ""),
+                }
+            )
 
     return {"high_sensitivity": high_sensitivity}
 
@@ -465,6 +521,7 @@ def _assemble_risks():
 # ═══════════════════════════════════════════════════════════════════════════
 # Section 9: Data Hygiene Score
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def _assemble_hygiene():
     """Weighted completeness score."""
@@ -474,37 +531,91 @@ def _assemble_hygiene():
     decisions = _items(_tracker_get("/decisions"))
     people = _items(_tracker_get("/people"))
 
-    active_matters = [m for m in matters if m.get("status") not in ("closed", "archived", "withdrawn")]
+    active_matters = [
+        m for m in matters if m.get("status") not in ("closed", "archived", "withdrawn")
+    ]
 
     checks = []
 
     # Matters: next_step_owner (weight 3)
     if active_matters:
-        has_owner = sum(1 for m in active_matters if m.get("next_step_owner") or m.get("next_step_owner_name"))
-        checks.append({"field": "matter.next_step_owner", "pct": round(has_owner / len(active_matters) * 100), "weight": 3, "count": has_owner, "total": len(active_matters)})
+        has_owner = sum(
+            1
+            for m in active_matters
+            if m.get("next_step_owner") or m.get("next_step_owner_name")
+        )
+        checks.append(
+            {
+                "field": "matter.next_step_owner",
+                "pct": round(has_owner / len(active_matters) * 100),
+                "weight": 3,
+                "count": has_owner,
+                "total": len(active_matters),
+            }
+        )
 
     # Tasks: due_date (weight 2)
     if tasks:
         has_due = sum(1 for t in tasks if t.get("due_date"))
-        checks.append({"field": "task.due_date", "pct": round(has_due / len(tasks) * 100), "weight": 2, "count": has_due, "total": len(tasks)})
+        checks.append(
+            {
+                "field": "task.due_date",
+                "pct": round(has_due / len(tasks) * 100),
+                "weight": 2,
+                "count": has_due,
+                "total": len(tasks),
+            }
+        )
 
     # Meetings: readout (weight 2) — only past meetings
     today_str = date.today().isoformat()
-    past_meetings = [m for m in meetings if (m.get("meeting_date") or m.get("start_time", "")[:10] or "") < today_str]
+    past_meetings = [
+        m
+        for m in meetings
+        if (m.get("meeting_date") or m.get("start_time", "")[:10] or "") < today_str
+    ]
     if past_meetings:
         has_readout = sum(1 for m in past_meetings if m.get("readout_summary"))
-        checks.append({"field": "meeting.readout_summary", "pct": round(has_readout / len(past_meetings) * 100), "weight": 2, "count": has_readout, "total": len(past_meetings)})
+        checks.append(
+            {
+                "field": "meeting.readout_summary",
+                "pct": round(has_readout / len(past_meetings) * 100),
+                "weight": 2,
+                "count": has_readout,
+                "total": len(past_meetings),
+            }
+        )
 
     # Decisions: due_date (weight 2)
-    open_decisions = [d for d in decisions if d.get("status") not in ("decided", "implemented", "closed")]
+    open_decisions = [
+        d
+        for d in decisions
+        if d.get("status") not in ("decided", "implemented", "closed")
+    ]
     if open_decisions:
         has_due = sum(1 for d in open_decisions if d.get("due_date"))
-        checks.append({"field": "decision.due_date", "pct": round(has_due / len(open_decisions) * 100), "weight": 2, "count": has_due, "total": len(open_decisions)})
+        checks.append(
+            {
+                "field": "decision.due_date",
+                "pct": round(has_due / len(open_decisions) * 100),
+                "weight": 2,
+                "count": has_due,
+                "total": len(open_decisions),
+            }
+        )
 
     # People: relationship_category (weight 1)
     if people:
         has_cat = sum(1 for p in people if p.get("relationship_category"))
-        checks.append({"field": "person.relationship_category", "pct": round(has_cat / len(people) * 100), "weight": 1, "count": has_cat, "total": len(people)})
+        checks.append(
+            {
+                "field": "person.relationship_category",
+                "pct": round(has_cat / len(people) * 100),
+                "weight": 1,
+                "count": has_cat,
+                "total": len(people),
+            }
+        )
 
     # Matters: updated in 30 days (weight 3)
     if active_matters:
@@ -519,7 +630,15 @@ def _assemble_hygiene():
                         recently_updated += 1
                 except (ValueError, TypeError):
                     pass
-        checks.append({"field": "matter.updated_30d", "pct": round(recently_updated / len(active_matters) * 100), "weight": 3, "count": recently_updated, "total": len(active_matters)})
+        checks.append(
+            {
+                "field": "matter.updated_30d",
+                "pct": round(recently_updated / len(active_matters) * 100),
+                "weight": 3,
+                "count": recently_updated,
+                "total": len(active_matters),
+            }
+        )
 
     # Compute weighted score
     if checks:
@@ -539,13 +658,20 @@ def _assemble_hygiene():
 # Section 10: Rulemaking Comment Progress
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _assemble_comment_progress():
     """Comment topic status and question coverage by matter."""
     matters = _items(_tracker_get("/matters", {"limit": "200"}))
     today = date.today()
 
     rulemaking_matters = []
-    overall_status = {"open": 0, "drafting": 0, "final_review": 0, "position_taken": 0, "not_started": 0}
+    overall_status = {
+        "open": 0,
+        "drafting": 0,
+        "final_review": 0,
+        "position_taken": 0,
+        "not_started": 0,
+    }
     total_topics_all = 0
     total_questions_all = 0
 
@@ -570,13 +696,15 @@ def _assemble_comment_progress():
             overall_status[ps] = overall_status.get(ps, 0) + 1
             questions = t.get("questions", [])
             total_questions += len(questions)
-            topic_summaries.append({
-                "label": t.get("topic_label", ""),
-                "status": ps,
-                "question_count": len(questions),
-                "assignee": t.get("assigned_to_name", ""),
-                "due_date": t.get("due_date"),
-            })
+            topic_summaries.append(
+                {
+                    "label": t.get("topic_label", ""),
+                    "status": ps,
+                    "question_count": len(questions),
+                    "assignee": t.get("assigned_to_name", ""),
+                    "due_date": t.get("due_date"),
+                }
+            )
 
         total_topics_all += total_topics
         total_questions_all += total_questions
@@ -590,17 +718,23 @@ def _assemble_comment_progress():
             except (ValueError, TypeError):
                 pass
 
-        rulemaking_matters.append({
-            "matter_id": m.get("id"),
-            "matter_title": m.get("title", ""),
-            "comment_deadline": deadline,
-            "days_remaining": days_remaining,
-            "total_topics": total_topics,
-            "total_questions": total_questions,
-            "status_counts": status_counts,
-            "completion_pct": round(status_counts.get("position_taken", 0) / total_topics * 100) if total_topics else 0,
-            "topics": topic_summaries,
-        })
+        rulemaking_matters.append(
+            {
+                "matter_id": m.get("id"),
+                "matter_title": m.get("title", ""),
+                "comment_deadline": deadline,
+                "days_remaining": days_remaining,
+                "total_topics": total_topics,
+                "total_questions": total_questions,
+                "status_counts": status_counts,
+                "completion_pct": round(
+                    status_counts.get("position_taken", 0) / total_topics * 100
+                )
+                if total_topics
+                else 0,
+                "topics": topic_summaries,
+            }
+        )
 
     rulemaking_matters.sort(key=lambda x: x.get("days_remaining") or 9999)
 
@@ -618,6 +752,7 @@ def _assemble_comment_progress():
 # ═══════════════════════════════════════════════════════════════════════════
 # Section 11: Policy Directives Status
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def _assemble_directives_status():
     """Policy directive tracking — implementation status and compliance deadlines."""
@@ -671,6 +806,7 @@ def _assemble_directives_status():
 # ═══════════════════════════════════════════════════════════════════════════
 # Main Assembly
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def assemble_weekly_data(db):
     """Assemble all 10 sections of the weekly brief."""
@@ -739,19 +875,25 @@ def add_executive_summary(data, llm_client):
         f"{len(portfolio.get('monitoring', []))} monitoring"
     )
     for m in portfolio.get("critical", [])[:5]:
-        context_parts.append(f"  CRITICAL: {m['title']} — {m.get('status', '')} — deadline {m.get('nearest_deadline', 'none')}")
+        context_parts.append(
+            f"  CRITICAL: {m['title']} — {m.get('status', '')} — deadline {m.get('nearest_deadline', 'none')}"
+        )
 
     # Decisions
     context_parts.append(f"Open decisions: {len(decisions)}")
     for d in decisions[:5]:
-        context_parts.append(f"  {d['title']} — owner: {d.get('decision_owner', 'unassigned')} — due: {d.get('due_date', 'no date')}")
+        context_parts.append(
+            f"  {d['title']} — owner: {d.get('decision_owner', 'unassigned')} — due: {d.get('due_date', 'no date')}"
+        )
 
     # Team
     drifting = team.get("drifting_matters", [])
     if drifting:
         context_parts.append(f"Drifting matters (no update 14+ days): {len(drifting)}")
         for dm in drifting[:3]:
-            context_parts.append(f"  {dm['title']} — {dm['days_stale']} days stale — owner: {dm.get('owner', '')}")
+            context_parts.append(
+                f"  {dm['title']} — {dm['days_stale']} days stale — owner: {dm.get('owner', '')}"
+            )
 
     # Stakeholders
     neglected = stakeholders.get("neglected", [])
@@ -807,6 +949,7 @@ Write as a confident, direct chief-of-staff note. No preamble, no bullet points 
         # Use call_llm since there's no call_sonnet shortcut
         from app.llm.client import call_llm
         import asyncio
+
         result = asyncio.get_event_loop().run_until_complete(
             call_llm(
                 prompt=prompt,
@@ -822,7 +965,10 @@ Write as a confident, direct chief-of-staff note. No preamble, no bullet points 
             elif isinstance(block, dict) and "text" in block:
                 summary += block["text"]
         data["executive_summary"] = summary.strip()
-        logger.info("Sonnet executive summary generated (%d chars)", len(data["executive_summary"]))
+        logger.info(
+            "Sonnet executive summary generated (%d chars)",
+            len(data["executive_summary"]),
+        )
     except Exception as e:
         logger.error("Sonnet executive summary failed: %s", e, exc_info=True)
         data["executive_summary"] = None

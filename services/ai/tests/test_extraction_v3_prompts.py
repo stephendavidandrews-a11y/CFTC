@@ -19,8 +19,14 @@ def test_v3_pass1_prompt_exists_and_mentions_observation_vocab():
     assert "paired_follow_up_for_stephen" in prompt
     assert "Operational commitments outrank memory capture" in prompt
     assert "I need to ask Rusty at SEC about that." in prompt
-    assert 'If Tyler says, "I\'ll ask Rusty at SEC," that is Tyler\'s `task_signal.commitment`.' in prompt
-    assert "Do not silently rewrite a third-party commitment into a Stephen-owned task." in prompt
+    assert (
+        "If Tyler says, \"I'll ask Rusty at SEC,\" that is Tyler's `task_signal.commitment`."
+        in prompt
+    )
+    assert (
+        "Do not silently rewrite a third-party commitment into a Stephen-owned task."
+        in prompt
+    )
     assert "Use `prior_roles_summary` only for actual prior jobs" in prompt
     assert "You are not producing final tracker proposals in this pass." in prompt
 
@@ -44,4 +50,7 @@ def test_v3_pass2_prompt_exists_and_mentions_contract_alignment():
     assert "process_note" in prompt
     assert "attributed_view" in prompt
     assert "Do not invent posture values like `neutral`." in prompt
-    assert "Do not reassign a third-party action to Stephen just because Stephen benefits from it." in prompt
+    assert (
+        "Do not reassign a third-party action to Stephen just because Stephen benefits from it."
+        in prompt
+    )

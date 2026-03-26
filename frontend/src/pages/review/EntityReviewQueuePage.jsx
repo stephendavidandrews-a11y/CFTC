@@ -12,8 +12,8 @@ import SSEBanner from "../../components/shared/SSEBanner";
 // ── Status styles ────────────────────────────────────────────────────────────
 
 const STATUS_STYLES = {
-  awaiting_entity_review: { bg: "#1e3a5f", text: "#60a5fa", label: "Awaiting Review" },
-  entity_review_in_progress: { bg: "#422006", text: "#fbbf24", label: "In Progress" },
+  awaiting_association_review: { bg: "#1e3a5f", text: "#60a5fa", label: "Awaiting Review" },
+  association_review_in_progress: { bg: "#422006", text: "#fbbf24", label: "In Progress" },
 };
 
 function statusBadge(status) {

@@ -4,6 +4,7 @@ FastAPI service on port 8005. API-only — frontend served by Command Center.
 """
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 import logging
@@ -69,6 +70,7 @@ async def lifespan(app: FastAPI):
 
     # Integrity check
     from config import DB_PATH
+
     _check_db_integrity(DB_PATH, "intake.db")
 
     # Start file watcher
@@ -78,6 +80,7 @@ async def lifespan(app: FastAPI):
 
     # Process any stuck pending conversations
     from db.connection import get_connection
+
     conn = get_connection()
     try:
         pending = conn.execute(
@@ -87,15 +90,20 @@ async def lifespan(app: FastAPI):
         conn.close()
 
     if pending:
-        logger.info(f"Startup: {len(pending)} pending conversations — processing in background")
+        logger.info(
+            f"Startup: {len(pending)} pending conversations — processing in background"
+        )
+
         def _process_batch(conv_ids):
             import time
+
             for cid in conv_ids:
                 try:
                     process_conversation(cid)
                 except Exception as exc:
                     logger.error(f"Startup processing failed for {cid[:8]}: {exc}")
                 time.sleep(2)
+
         t = threading.Thread(
             target=_process_batch,
             args=([r["id"] for r in pending],),
@@ -146,13 +154,16 @@ app.include_router(transcribe_router, prefix="/intake/api")
 @app.get("/intake/api/health")
 def health_check():
     from db.connection import get_connection
+
     conn = get_connection()
     try:
         total = conn.execute("SELECT COUNT(*) as n FROM conversations").fetchone()["n"]
         pending = conn.execute(
             "SELECT COUNT(*) as n FROM conversations WHERE processing_status = 'pending'"
         ).fetchone()["n"]
-        voice_profiles = conn.execute("SELECT COUNT(DISTINCT tracker_person_id) as n FROM speaker_voice_profiles").fetchone()["n"]
+        voice_profiles = conn.execute(
+            "SELECT COUNT(DISTINCT tracker_person_id) as n FROM speaker_voice_profiles"
+        ).fetchone()["n"]
     finally:
         conn.close()
 
@@ -163,7 +174,6 @@ def health_check():
         "conversations": {"total": total, "pending": pending},
         "voice_profiles": voice_profiles,
     }
-
 
 
 if __name__ == "__main__":

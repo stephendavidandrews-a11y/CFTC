@@ -1,7 +1,7 @@
 """Entity review API — human gate for confirming entity mentions.
 
 After enrichment extracts entities (people, orgs, regulations, etc.) from
-the transcript, communications enter awaiting_entity_review. This router
+the transcript, communications enter awaiting_association_review. This router
 provides endpoints to:
 
 1. List communications needing entity review
@@ -40,15 +40,21 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/entity-review", tags=["entity-review"])
 
 # States where entity review is accessible
-ENTITY_REVIEW_STATES = {"awaiting_entity_review", "entity_review_in_progress"}
+ENTITY_REVIEW_STATES = {"awaiting_association_review", "association_review_in_progress"}
 
 # Valid entity types
 VALID_ENTITY_TYPES = {
-    "person", "organization", "regulation", "legislation", "case", "concept",
+    "person",
+    "organization",
+    "regulation",
+    "legislation",
+    "case",
+    "concept",
 }
 
 
 # ── Request/Response models ──
+
 
 class ConfirmEntityRequest(BaseModel):
     entity_id: str
@@ -80,6 +86,46 @@ class RejectEntityRequest(BaseModel):
 class MergeEntitiesRequest(BaseModel):
     from_entity_id: str
     to_entity_id: str
+
+
+class ConfirmAssociationRequest(BaseModel):
+    association_id: str
+
+
+class RejectAssociationRequest(BaseModel):
+    association_id: str
+
+
+class AddMatterAssociationRequest(BaseModel):
+    matter_id: str
+    matter_title: str = ""
+    reasoning: str = ""
+
+
+class AddDirectiveAssociationRequest(BaseModel):
+    directive_id: str
+    directive_label: str = ""
+    reasoning: str = ""
+
+
+class UpdateSegmentIntentRequest(BaseModel):
+    segment_index: int
+    intent: str
+
+
+class DismissIntelligenceFlagRequest(BaseModel):
+    flag_index: int
+
+
+VALID_INTENTS = {
+    "casual",
+    "planning",
+    "decision",
+    "strategic",
+    "briefing",
+    "policy",
+    "negotiation",
+}
 
 
 class EntityInfo(BaseModel):
@@ -114,6 +160,7 @@ class EntityReviewDetail(BaseModel):
 
 # ── Endpoints ──
 
+
 @router.get("/queue")
 async def get_entity_review_queue(db=Depends(get_db)):
     """List all communications awaiting entity review."""
@@ -128,7 +175,7 @@ async def get_entity_review_queue(db=Depends(get_db)):
                (SELECT COUNT(*) FROM communication_entities ce
                 WHERE ce.communication_id = c.id AND ce.confirmed = -1) as rejected_count
         FROM communications c
-        WHERE c.processing_status IN ('awaiting_entity_review', 'entity_review_in_progress')
+        WHERE c.processing_status IN ('awaiting_association_review', 'association_review_in_progress')
         ORDER BY c.created_at DESC
     """).fetchall()
 
@@ -154,7 +201,7 @@ async def get_entity_review_detail(communication_id: str, db=Depends(get_db)):
     """Get detailed entity information for review."""
     comm = db.execute(
         """SELECT id, processing_status, title, original_filename, duration_seconds,
-                  topic_segments_json, sensitivity_flags
+                  topic_segments_json, sensitivity_flags, intelligence_flags_json
            FROM communications WHERE id = ?""",
         (communication_id,),
     ).fetchone()
@@ -179,7 +226,8 @@ async def get_entity_review_detail(communication_id: str, db=Depends(get_db)):
             pass
 
     # Get entities with transcript context
-    entities_raw = db.execute("""
+    entities_raw = db.execute(
+        """
         SELECT ce.id, ce.mention_text, ce.entity_type,
                ce.tracker_person_id, ce.tracker_org_id,
                ce.proposed_name, ce.proposed_title, ce.proposed_org,
@@ -196,7 +244,9 @@ async def get_entity_review_detail(communication_id: str, db=Depends(get_db)):
             ce.confirmed ASC,
             ce.mention_count DESC,
             ce.mention_text
-    """, (communication_id,)).fetchall()
+    """,
+        (communication_id,),
+    ).fetchall()
 
     entities = []
     for e in entities_raw:
@@ -210,7 +260,9 @@ async def get_entity_review_detail(communication_id: str, db=Depends(get_db)):
                 (e["first_mention_transcript_id"],),
             ).fetchone()
             if seg:
-                info.first_mention_text = (seg["cleaned_text"] or seg["raw_text"] or "")[:200]
+                info.first_mention_text = (
+                    seg["cleaned_text"] or seg["raw_text"] or ""
+                )[:200]
                 info.first_mention_speaker = seg["speaker_label"]
 
         entities.append(info)
@@ -225,19 +277,99 @@ async def get_entity_review_detail(communication_id: str, db=Depends(get_db)):
     }
     # Count by entity_type
     for etype in VALID_ENTITY_TYPES:
-        entity_counts[f"type_{etype}"] = sum(1 for e in entities if e.entity_type == etype)
+        entity_counts[f"type_{etype}"] = sum(
+            1 for e in entities if e.entity_type == etype
+        )
 
-    return EntityReviewDetail(
-        communication_id=communication_id,
-        processing_status=comm["processing_status"],
-        title=comm["title"],
-        original_filename=comm["original_filename"],
-        duration_seconds=comm["duration_seconds"],
-        summary=summary,
-        entities=entities,
-        entity_counts=entity_counts,
-        sensitivity_flags=sensitivity_flags,
+    # Get matter associations
+    matter_assoc_rows = db.execute(
+        """
+        SELECT id, matter_id, matter_title, confidence, relevant_segments,
+               reasoning, confirmed
+        FROM communication_matter_associations
+        WHERE communication_id = ?
+        ORDER BY confidence DESC
+    """,
+        (communication_id,),
+    ).fetchall()
+    matter_associations = []
+    for r in matter_assoc_rows:
+        ma = dict(r)
+        if ma.get("relevant_segments"):
+            try:
+                ma["relevant_segments"] = json.loads(ma["relevant_segments"])
+            except (json.JSONDecodeError, TypeError):
+                pass
+        matter_associations.append(ma)
+
+    # Get directive associations
+    directive_assoc_rows = db.execute(
+        """
+        SELECT id, directive_id, directive_label, confidence, relevant_segments,
+               reasoning, confirmed
+        FROM communication_directive_associations
+        WHERE communication_id = ?
+        ORDER BY confidence DESC
+    """,
+        (communication_id,),
+    ).fetchall()
+    directive_associations = []
+    for r in directive_assoc_rows:
+        da = dict(r)
+        if da.get("relevant_segments"):
+            try:
+                da["relevant_segments"] = json.loads(da["relevant_segments"])
+            except (json.JSONDecodeError, TypeError):
+                pass
+        directive_associations.append(da)
+
+    # Get segment intents from topic_segments_json
+    segment_intents = []
+    if comm["topic_segments_json"]:
+        try:
+            topic_data = json.loads(comm["topic_segments_json"])
+            for i, t in enumerate(topic_data.get("topics", [])):
+                segment_intents.append(
+                    {
+                        "index": i,
+                        "topic": t.get("topic", ""),
+                        "start_time": t.get("start_time"),
+                        "end_time": t.get("end_time"),
+                        "intent": t.get("intent", "briefing"),
+                    }
+                )
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    # Get intelligence flags
+    intelligence_flags = []
+    intel_json = (
+        comm["intelligence_flags_json"]
+        if "intelligence_flags_json" in comm.keys()
+        else None
     )
+    if intel_json:
+        try:
+            intelligence_flags = json.loads(intel_json)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    result = {
+        "communication_id": communication_id,
+        "processing_status": comm["processing_status"],
+        "title": comm["title"],
+        "original_filename": comm["original_filename"],
+        "duration_seconds": comm["duration_seconds"],
+        "summary": summary,
+        "entities": [e.model_dump() for e in entities],
+        "entity_counts": entity_counts,
+        "sensitivity_flags": sensitivity_flags,
+        "matter_associations": matter_associations,
+        "directive_associations": directive_associations,
+        "segment_intents": segment_intents,
+        "intelligence_flags": intelligence_flags,
+    }
+    return result
 
 
 @router.post("/{communication_id}/confirm-entity")
@@ -257,14 +389,24 @@ async def confirm_entity(
         (req.entity_id,),
     )
 
-    _audit(db, communication_id, "confirm_entity", {
-        "entity_id": req.entity_id,
-        "mention_text": entity["mention_text"],
-        "entity_type": entity["entity_type"],
-    })
+    _audit(
+        db,
+        communication_id,
+        "confirm_entity",
+        {
+            "entity_id": req.entity_id,
+            "mention_text": entity["mention_text"],
+            "entity_type": entity["entity_type"],
+        },
+    )
     db.commit()
 
-    logger.info("[%s] Confirmed entity: %s (%s)", communication_id[:8], entity["mention_text"], entity["entity_type"])
+    logger.info(
+        "[%s] Confirmed entity: %s (%s)",
+        communication_id[:8],
+        entity["mention_text"],
+        entity["entity_type"],
+    )
     return {"status": "ok", "entity_id": req.entity_id, "confirmed": True}
 
 
@@ -284,14 +426,18 @@ async def link_entity(
     _ensure_in_progress(db, communication_id)
 
     if not req.tracker_person_id and not req.tracker_org_id:
-        raise HTTPException(400, detail={
-            "error_type": "validation_failure",
-            "message": "At least one of tracker_person_id or tracker_org_id is required",
-        })
+        raise HTTPException(
+            400,
+            detail={
+                "error_type": "validation_failure",
+                "message": "At least one of tracker_person_id or tracker_org_id is required",
+            },
+        )
 
     entity = _get_entity(db, communication_id, req.entity_id)
 
-    db.execute("""
+    db.execute(
+        """
         UPDATE communication_entities
         SET confirmed = 1,
             tracker_person_id = COALESCE(?, tracker_person_id),
@@ -301,24 +447,36 @@ async def link_entity(
             proposed_org = COALESCE(?, proposed_org),
             updated_at = datetime('now')
         WHERE id = ?
-    """, (
-        req.tracker_person_id, req.tracker_org_id,
-        req.proposed_name, req.proposed_title, req.proposed_org,
-        req.entity_id,
-    ))
+    """,
+        (
+            req.tracker_person_id,
+            req.tracker_org_id,
+            req.proposed_name,
+            req.proposed_title,
+            req.proposed_org,
+            req.entity_id,
+        ),
+    )
 
-    _audit(db, communication_id, "link_entity", {
-        "entity_id": req.entity_id,
-        "mention_text": entity["mention_text"],
-        "tracker_person_id": req.tracker_person_id,
-        "tracker_org_id": req.tracker_org_id,
-    })
+    _audit(
+        db,
+        communication_id,
+        "link_entity",
+        {
+            "entity_id": req.entity_id,
+            "mention_text": entity["mention_text"],
+            "tracker_person_id": req.tracker_person_id,
+            "tracker_org_id": req.tracker_org_id,
+        },
+    )
     db.commit()
 
     logger.info(
         "[%s] Linked entity %s -> person=%s org=%s",
-        communication_id[:8], entity["mention_text"],
-        (req.tracker_person_id or "")[:8], (req.tracker_org_id or "")[:8],
+        communication_id[:8],
+        entity["mention_text"],
+        (req.tracker_person_id or "")[:8],
+        (req.tracker_org_id or "")[:8],
     )
     return {"status": "ok", "entity_id": req.entity_id, "linked": True}
 
@@ -336,10 +494,13 @@ async def edit_entity(
     entity = _get_entity(db, communication_id, req.entity_id)
 
     if req.entity_type and req.entity_type not in VALID_ENTITY_TYPES:
-        raise HTTPException(400, detail={
-            "error_type": "validation_failure",
-            "message": f"Invalid entity_type: {req.entity_type}. Valid: {sorted(VALID_ENTITY_TYPES)}",
-        })
+        raise HTTPException(
+            400,
+            detail={
+                "error_type": "validation_failure",
+                "message": f"Invalid entity_type: {req.entity_type}. Valid: {sorted(VALID_ENTITY_TYPES)}",
+            },
+        )
 
     # Build update dynamically for non-None fields
     updates = []
@@ -366,10 +527,13 @@ async def edit_entity(
         params.append(req.proposed_org)
 
     if not updates:
-        raise HTTPException(400, detail={
-            "error_type": "validation_failure",
-            "message": "No fields to update",
-        })
+        raise HTTPException(
+            400,
+            detail={
+                "error_type": "validation_failure",
+                "message": "No fields to update",
+            },
+        )
 
     updates.append("updated_at = datetime('now')")
     params.append(req.entity_id)
@@ -379,11 +543,20 @@ async def edit_entity(
         params,
     )
 
-    _audit(db, communication_id, "edit_entity", {
-        "entity_id": req.entity_id,
-        "old_values": old_values,
-        "new_values": {k: v for k, v in req.model_dump().items() if v is not None and k != "entity_id"},
-    })
+    _audit(
+        db,
+        communication_id,
+        "edit_entity",
+        {
+            "entity_id": req.entity_id,
+            "old_values": old_values,
+            "new_values": {
+                k: v
+                for k, v in req.model_dump().items()
+                if v is not None and k != "entity_id"
+            },
+        },
+    )
     db.commit()
 
     logger.info("[%s] Edited entity %s", communication_id[:8], entity["mention_text"])
@@ -407,15 +580,25 @@ async def reject_entity(
         (req.entity_id,),
     )
 
-    _audit(db, communication_id, "reject_entity", {
-        "entity_id": req.entity_id,
-        "mention_text": entity["mention_text"],
-        "entity_type": entity["entity_type"],
-        "reason": req.reason,
-    })
+    _audit(
+        db,
+        communication_id,
+        "reject_entity",
+        {
+            "entity_id": req.entity_id,
+            "mention_text": entity["mention_text"],
+            "entity_type": entity["entity_type"],
+            "reason": req.reason,
+        },
+    )
     db.commit()
 
-    logger.info("[%s] Rejected entity: %s (%s)", communication_id[:8], entity["mention_text"], req.reason or "no reason")
+    logger.info(
+        "[%s] Rejected entity: %s (%s)",
+        communication_id[:8],
+        entity["mention_text"],
+        req.reason or "no reason",
+    )
     return {"status": "ok", "entity_id": req.entity_id, "rejected": True}
 
 
@@ -461,18 +644,25 @@ async def merge_entities(
         (req.from_entity_id,),
     )
 
-    _audit(db, communication_id, "merge_entities", {
-        "from_entity_id": req.from_entity_id,
-        "from_mention": from_entity["mention_text"],
-        "to_entity_id": req.to_entity_id,
-        "to_mention": to_entity["mention_text"],
-        "new_count": new_count,
-    })
+    _audit(
+        db,
+        communication_id,
+        "merge_entities",
+        {
+            "from_entity_id": req.from_entity_id,
+            "from_mention": from_entity["mention_text"],
+            "to_entity_id": req.to_entity_id,
+            "to_mention": to_entity["mention_text"],
+            "new_count": new_count,
+        },
+    )
     db.commit()
 
     logger.info(
         "[%s] Merged entity '%s' into '%s'",
-        communication_id[:8], from_entity["mention_text"], to_entity["mention_text"],
+        communication_id[:8],
+        from_entity["mention_text"],
+        to_entity["mention_text"],
     )
     return {"status": "ok", "merged_count": new_count}
 
@@ -490,11 +680,14 @@ async def confirm_all_entities(
     _check_review_state(db, communication_id)
     _ensure_in_progress(db, communication_id)
 
-    count = db.execute("""
+    count = db.execute(
+        """
         UPDATE communication_entities
         SET confirmed = 1, updated_at = datetime('now')
         WHERE communication_id = ? AND confirmed = 0
-    """, (communication_id,)).rowcount
+    """,
+        (communication_id,),
+    ).rowcount
 
     _audit(db, communication_id, "confirm_all_entities", {"count": count})
     db.commit()
@@ -513,7 +706,7 @@ async def complete_entity_review(
 
     All entities must be either confirmed (1) or rejected (-1).
     No pending (0) entities may remain.
-    Transitions: entity_review_in_progress -> entities_confirmed.
+    Transitions: association_review_in_progress -> associations_confirmed.
     """
     comm = db.execute(
         "SELECT processing_status FROM communications WHERE id = ?",
@@ -524,35 +717,94 @@ async def complete_entity_review(
 
     status = comm["processing_status"]
     if status not in ENTITY_REVIEW_STATES:
-        raise HTTPException(400, detail={
-            "error_type": "invalid_state",
-            "message": f"Communication not in entity review state (current: {status})",
-        })
+        raise HTTPException(
+            400,
+            detail={
+                "error_type": "invalid_state",
+                "message": f"Communication not in entity review state (current: {status})",
+            },
+        )
 
-    # Check no pending entities remain
-    pending = db.execute("""
+    # Check no pending person/org entities remain (non-reviewable types are auto-confirmed)
+    pending = db.execute(
+        """
         SELECT mention_text, entity_type FROM communication_entities
         WHERE communication_id = ? AND confirmed = 0
-    """, (communication_id,)).fetchall()
+        AND entity_type IN ('person', 'organization')
+    """,
+        (communication_id,),
+    ).fetchall()
 
     if pending:
-        pending_list = [{"mention_text": r["mention_text"], "entity_type": r["entity_type"]} for r in pending]
-        raise HTTPException(400, detail={
-            "error_type": "validation_failure",
-            "message": f"{len(pending)} unreviewed entities remain",
-            "pending_entities": pending_list,
-        })
+        pending_list = [
+            {"mention_text": r["mention_text"], "entity_type": r["entity_type"]}
+            for r in pending
+        ]
+        raise HTTPException(
+            400,
+            detail={
+                "error_type": "validation_failure",
+                "message": f"{len(pending)} unreviewed entities remain",
+                "pending_entities": pending_list,
+            },
+        )
 
-    # Ensure we're in entity_review_in_progress
-    if status == "awaiting_entity_review":
-        cas_transition(db, communication_id, "awaiting_entity_review", "entity_review_in_progress")
+    # Check no pending matter associations remain
+    pending_matters = db.execute(
+        "SELECT id, matter_title FROM communication_matter_associations WHERE communication_id = ? AND confirmed = 0",
+        (communication_id,),
+    ).fetchall()
+    if pending_matters:
+        raise HTTPException(
+            400,
+            detail={
+                "error_type": "validation_failure",
+                "message": f"{len(pending_matters)} unreviewed matter associations remain",
+                "pending_associations": [
+                    {"id": r["id"], "matter_title": r["matter_title"]}
+                    for r in pending_matters
+                ],
+            },
+        )
 
-    # Advance to entities_confirmed
-    if not cas_transition(db, communication_id, "entity_review_in_progress", "entities_confirmed"):
-        raise HTTPException(409, detail={
-            "error_type": "conflict",
-            "message": "Status already changed by another process",
-        })
+    # Check no pending directive associations remain
+    pending_directives = db.execute(
+        "SELECT id, directive_label FROM communication_directive_associations WHERE communication_id = ? AND confirmed = 0",
+        (communication_id,),
+    ).fetchall()
+    if pending_directives:
+        raise HTTPException(
+            400,
+            detail={
+                "error_type": "validation_failure",
+                "message": f"{len(pending_directives)} unreviewed directive associations remain",
+                "pending_associations": [
+                    {"id": r["id"], "directive_label": r["directive_label"]}
+                    for r in pending_directives
+                ],
+            },
+        )
+
+    # Ensure we're in association_review_in_progress
+    if status == "awaiting_association_review":
+        cas_transition(
+            db,
+            communication_id,
+            "awaiting_association_review",
+            "association_review_in_progress",
+        )
+
+    # Advance to associations_confirmed
+    if not cas_transition(
+        db, communication_id, "association_review_in_progress", "associations_confirmed"
+    ):
+        raise HTTPException(
+            409,
+            detail={
+                "error_type": "conflict",
+                "message": "Status already changed by another process",
+            },
+        )
 
     # Count final state
     confirmed = db.execute(
@@ -570,36 +822,377 @@ async def complete_entity_review(
         (communication_id,),
     ).fetchone()["cnt"]
 
-    _audit(db, communication_id, "complete_entity_review", {
-        "confirmed": confirmed,
-        "rejected": rejected,
-        "linked": linked,
-    })
+    _audit(
+        db,
+        communication_id,
+        "complete_entity_review",
+        {
+            "confirmed": confirmed,
+            "rejected": rejected,
+            "linked": linked,
+        },
+    )
     db.commit()
 
-    await publish_event("entity_review_complete", {
-        "communication_id": communication_id,
-        "status": "entities_confirmed",
-        "confirmed": confirmed,
-        "rejected": rejected,
-        "linked": linked,
-    })
+    await publish_event(
+        "entity_review_complete",
+        {
+            "communication_id": communication_id,
+            "status": "associations_confirmed",
+            "confirmed": confirmed,
+            "rejected": rejected,
+            "linked": linked,
+        },
+    )
 
     # Resume pipeline in background
     background_tasks.add_task(_resume_pipeline, communication_id)
 
     logger.info(
         "[%s] Entity review completed: %d confirmed, %d rejected, %d linked",
-        communication_id[:8], confirmed, rejected, linked,
+        communication_id[:8],
+        confirmed,
+        rejected,
+        linked,
     )
 
     return {
-        "status": "entities_confirmed",
+        "status": "associations_confirmed",
         "communication_id": communication_id,
         "confirmed": confirmed,
         "rejected": rejected,
         "linked": linked,
     }
+
+
+# ── Association review endpoints (Phase 2A) ──
+
+
+@router.post("/{communication_id}/confirm-matter-association")
+async def confirm_matter_association(
+    communication_id: str,
+    req: ConfirmAssociationRequest,
+    db=Depends(get_db),
+):
+    """Confirm a proposed matter association."""
+    _check_review_state(db, communication_id)
+    _ensure_in_progress(db, communication_id)
+
+    row = db.execute(
+        "SELECT * FROM communication_matter_associations WHERE id = ? AND communication_id = ?",
+        (req.association_id, communication_id),
+    ).fetchone()
+    if not row:
+        raise HTTPException(
+            404,
+            detail={
+                "error_type": "not_found",
+                "message": "Matter association not found",
+            },
+        )
+
+    db.execute(
+        "UPDATE communication_matter_associations SET confirmed = 1, confirmed_by = 'user', confirmed_at = datetime('now') WHERE id = ?",
+        (req.association_id,),
+    )
+    _audit(
+        db,
+        communication_id,
+        "confirm_matter_association",
+        {"association_id": req.association_id, "matter_id": row["matter_id"]},
+    )
+    db.commit()
+    return {"status": "ok", "association_id": req.association_id}
+
+
+@router.post("/{communication_id}/reject-matter-association")
+async def reject_matter_association(
+    communication_id: str,
+    req: RejectAssociationRequest,
+    db=Depends(get_db),
+):
+    """Reject a proposed matter association."""
+    _check_review_state(db, communication_id)
+    _ensure_in_progress(db, communication_id)
+
+    row = db.execute(
+        "SELECT * FROM communication_matter_associations WHERE id = ? AND communication_id = ?",
+        (req.association_id, communication_id),
+    ).fetchone()
+    if not row:
+        raise HTTPException(
+            404,
+            detail={
+                "error_type": "not_found",
+                "message": "Matter association not found",
+            },
+        )
+
+    db.execute(
+        "UPDATE communication_matter_associations SET confirmed = -1, confirmed_by = 'user', confirmed_at = datetime('now') WHERE id = ?",
+        (req.association_id,),
+    )
+    _audit(
+        db,
+        communication_id,
+        "reject_matter_association",
+        {"association_id": req.association_id, "matter_id": row["matter_id"]},
+    )
+    db.commit()
+    return {"status": "ok", "association_id": req.association_id}
+
+
+@router.post("/{communication_id}/add-matter-association")
+async def add_matter_association(
+    communication_id: str,
+    req: AddMatterAssociationRequest,
+    db=Depends(get_db),
+):
+    """Manually add a matter association (auto-confirmed)."""
+    _check_review_state(db, communication_id)
+    _ensure_in_progress(db, communication_id)
+
+    assoc_id = str(uuid.uuid4())
+    db.execute(
+        """
+        INSERT INTO communication_matter_associations
+            (id, communication_id, matter_id, matter_title, confidence, reasoning,
+             confirmed, confirmed_by, confirmed_at, created_at)
+        VALUES (?, ?, ?, ?, 1.0, ?, 1, 'user', datetime('now'), datetime('now'))
+    """,
+        (assoc_id, communication_id, req.matter_id, req.matter_title, req.reasoning),
+    )
+    _audit(
+        db,
+        communication_id,
+        "add_matter_association",
+        {"matter_id": req.matter_id, "matter_title": req.matter_title},
+    )
+    db.commit()
+    return {"status": "ok", "association_id": assoc_id}
+
+
+@router.post("/{communication_id}/confirm-directive-association")
+async def confirm_directive_association(
+    communication_id: str,
+    req: ConfirmAssociationRequest,
+    db=Depends(get_db),
+):
+    """Confirm a proposed directive association."""
+    _check_review_state(db, communication_id)
+    _ensure_in_progress(db, communication_id)
+
+    row = db.execute(
+        "SELECT * FROM communication_directive_associations WHERE id = ? AND communication_id = ?",
+        (req.association_id, communication_id),
+    ).fetchone()
+    if not row:
+        raise HTTPException(
+            404,
+            detail={
+                "error_type": "not_found",
+                "message": "Directive association not found",
+            },
+        )
+
+    db.execute(
+        "UPDATE communication_directive_associations SET confirmed = 1, confirmed_by = 'user', confirmed_at = datetime('now') WHERE id = ?",
+        (req.association_id,),
+    )
+    _audit(
+        db,
+        communication_id,
+        "confirm_directive_association",
+        {"association_id": req.association_id, "directive_id": row["directive_id"]},
+    )
+    db.commit()
+    return {"status": "ok", "association_id": req.association_id}
+
+
+@router.post("/{communication_id}/reject-directive-association")
+async def reject_directive_association(
+    communication_id: str,
+    req: RejectAssociationRequest,
+    db=Depends(get_db),
+):
+    """Reject a proposed directive association."""
+    _check_review_state(db, communication_id)
+    _ensure_in_progress(db, communication_id)
+
+    row = db.execute(
+        "SELECT * FROM communication_directive_associations WHERE id = ? AND communication_id = ?",
+        (req.association_id, communication_id),
+    ).fetchone()
+    if not row:
+        raise HTTPException(
+            404,
+            detail={
+                "error_type": "not_found",
+                "message": "Directive association not found",
+            },
+        )
+
+    db.execute(
+        "UPDATE communication_directive_associations SET confirmed = -1, confirmed_by = 'user', confirmed_at = datetime('now') WHERE id = ?",
+        (req.association_id,),
+    )
+    _audit(
+        db,
+        communication_id,
+        "reject_directive_association",
+        {"association_id": req.association_id, "directive_id": row["directive_id"]},
+    )
+    db.commit()
+    return {"status": "ok", "association_id": req.association_id}
+
+
+@router.post("/{communication_id}/add-directive-association")
+async def add_directive_association(
+    communication_id: str,
+    req: AddDirectiveAssociationRequest,
+    db=Depends(get_db),
+):
+    """Manually add a directive association (auto-confirmed)."""
+    _check_review_state(db, communication_id)
+    _ensure_in_progress(db, communication_id)
+
+    assoc_id = str(uuid.uuid4())
+    db.execute(
+        """
+        INSERT INTO communication_directive_associations
+            (id, communication_id, directive_id, directive_label, confidence, reasoning,
+             confirmed, confirmed_by, confirmed_at, created_at)
+        VALUES (?, ?, ?, ?, 1.0, ?, 1, 'user', datetime('now'), datetime('now'))
+    """,
+        (
+            assoc_id,
+            communication_id,
+            req.directive_id,
+            req.directive_label,
+            req.reasoning,
+        ),
+    )
+    _audit(
+        db,
+        communication_id,
+        "add_directive_association",
+        {"directive_id": req.directive_id, "directive_label": req.directive_label},
+    )
+    db.commit()
+    return {"status": "ok", "association_id": assoc_id}
+
+
+@router.post("/{communication_id}/update-segment-intent")
+async def update_segment_intent(
+    communication_id: str,
+    req: UpdateSegmentIntentRequest,
+    db=Depends(get_db),
+):
+    """Update the intent classification for a topic segment."""
+    _check_review_state(db, communication_id)
+    _ensure_in_progress(db, communication_id)
+
+    if req.intent not in VALID_INTENTS:
+        raise HTTPException(
+            400,
+            detail={
+                "error_type": "validation_failure",
+                "message": f"Invalid intent: {req.intent}. Valid: {sorted(VALID_INTENTS)}",
+            },
+        )
+
+    comm = db.execute(
+        "SELECT topic_segments_json FROM communications WHERE id = ?",
+        (communication_id,),
+    ).fetchone()
+    if not comm or not comm["topic_segments_json"]:
+        raise HTTPException(
+            400,
+            detail={
+                "error_type": "validation_failure",
+                "message": "No topic segments found",
+            },
+        )
+
+    topic_data = json.loads(comm["topic_segments_json"])
+    topics = topic_data.get("topics", [])
+    if req.segment_index < 0 or req.segment_index >= len(topics):
+        raise HTTPException(
+            400,
+            detail={
+                "error_type": "validation_failure",
+                "message": f"Segment index {req.segment_index} out of range (0-{len(topics) - 1})",
+            },
+        )
+
+    old_intent = topics[req.segment_index].get("intent")
+    topics[req.segment_index]["intent"] = req.intent
+    topic_data["topics"] = topics
+
+    db.execute(
+        "UPDATE communications SET topic_segments_json = ?, updated_at = datetime('now') WHERE id = ?",
+        (json.dumps(topic_data, ensure_ascii=False), communication_id),
+    )
+    _audit(
+        db,
+        communication_id,
+        "update_segment_intent",
+        {
+            "segment_index": req.segment_index,
+            "old_intent": old_intent,
+            "new_intent": req.intent,
+        },
+    )
+    db.commit()
+    return {"status": "ok", "segment_index": req.segment_index, "intent": req.intent}
+
+
+@router.post("/{communication_id}/dismiss-intelligence-flag")
+async def dismiss_intelligence_flag(
+    communication_id: str,
+    req: DismissIntelligenceFlagRequest,
+    db=Depends(get_db),
+):
+    """Dismiss an intelligence flag (remove from the list)."""
+    _check_review_state(db, communication_id)
+    _ensure_in_progress(db, communication_id)
+
+    comm = db.execute(
+        "SELECT intelligence_flags_json FROM communications WHERE id = ?",
+        (communication_id,),
+    ).fetchone()
+    if not comm or not comm["intelligence_flags_json"]:
+        raise HTTPException(
+            400,
+            detail={
+                "error_type": "validation_failure",
+                "message": "No intelligence flags found",
+            },
+        )
+
+    flags = json.loads(comm["intelligence_flags_json"])
+    if req.flag_index < 0 or req.flag_index >= len(flags):
+        raise HTTPException(
+            400,
+            detail={
+                "error_type": "validation_failure",
+                "message": f"Flag index {req.flag_index} out of range (0-{len(flags) - 1})",
+            },
+        )
+
+    dismissed = flags.pop(req.flag_index)
+    db.execute(
+        "UPDATE communications SET intelligence_flags_json = ?, updated_at = datetime('now') WHERE id = ?",
+        (json.dumps(flags, ensure_ascii=False), communication_id),
+    )
+    _audit(
+        db,
+        communication_id,
+        "dismiss_intelligence_flag",
+        {"flag_index": req.flag_index, "dismissed": dismissed},
+    )
+    db.commit()
+    return {"status": "ok", "flag_index": req.flag_index}
 
 
 # ── Helpers (shared review helpers + entity-specific) ──
@@ -616,7 +1209,12 @@ def _check_review_state(db, communication_id: str):
 
 
 def _ensure_in_progress(db, communication_id: str):
-    _shared_ensure(db, communication_id, "awaiting_entity_review", "entity_review_in_progress")
+    _shared_ensure(
+        db,
+        communication_id,
+        "awaiting_association_review",
+        "association_review_in_progress",
+    )
 
 
 def _get_entity(db, communication_id: str, entity_id: str) -> dict:
@@ -626,19 +1224,25 @@ def _get_entity(db, communication_id: str, entity_id: str) -> dict:
         (entity_id, communication_id),
     ).fetchone()
     if not entity:
-        raise HTTPException(404, detail={
-            "error_type": "not_found",
-            "message": f"Entity {entity_id} not found in communication {communication_id[:8]}",
-        })
+        raise HTTPException(
+            404,
+            detail={
+                "error_type": "not_found",
+                "message": f"Entity {entity_id} not found in communication {communication_id[:8]}",
+            },
+        )
     return dict(entity)
 
 
 def _audit(db, communication_id: str, action_type: str, details: dict):
     """Write to review_action_log."""
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO review_action_log (id, actor, communication_id, action_type, details)
         VALUES (?, 'user', ?, ?, ?)
-    """, (str(uuid.uuid4()), communication_id, action_type, json.dumps(details)))
+    """,
+        (str(uuid.uuid4()), communication_id, action_type, json.dumps(details)),
+    )
 
 
 # _resume_pipeline imported from _review_helpers above

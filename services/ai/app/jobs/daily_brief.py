@@ -11,6 +11,7 @@ Queries tracker and AI databases to assemble the 7-section daily brief:
 
 Cost: ~$0.02/day (one Haiku call for meeting prep narratives).
 """
+
 from __future__ import annotations
 
 import json
@@ -60,14 +61,16 @@ def _assemble_what_changed(db, since: str) -> list[dict]:
 
     changes = []
     for ev in events:
-        changes.append({
-            "entity_type": ev.get("entity_type", "unknown"),
-            "entity_id": ev.get("entity_id"),
-            "action": ev.get("action", ""),
-            "changed_fields": ev.get("changed_fields"),
-            "summary": _summarize_event(ev),
-            "timestamp": ev.get("created_at"),
-        })
+        changes.append(
+            {
+                "entity_type": ev.get("entity_type", "unknown"),
+                "entity_id": ev.get("entity_id"),
+                "action": ev.get("action", ""),
+                "changed_fields": ev.get("changed_fields"),
+                "summary": _summarize_event(ev),
+                "timestamp": ev.get("created_at"),
+            }
+        )
     return changes
 
 
@@ -98,62 +101,81 @@ def _assemble_action_list(db) -> list[dict]:
 
     # Boss-touching items (highest priority)
     for d in intel_data.get("pending_decisions", []):
-        actions.append({
-            "tag": "BOSS",
-            "priority": 0,
-            "title": d.get("title", "Untitled decision"),
-            "matter": d.get("matter_title", ""),
-            "detail": f"Owner: {d.get('owner_name', 'unassigned')}, Due: {d.get('due_date', 'no date')}",
-            "entity_type": "decision",
-            "entity_id": d.get("id"),
-            "sort_key": d.get("due_date", "9999"),
-        })
+        actions.append(
+            {
+                "tag": "BOSS",
+                "priority": 0,
+                "title": d.get("title", "Untitled decision"),
+                "matter": d.get("matter_title", ""),
+                "detail": f"Owner: {d.get('owner_name', 'unassigned')}, Due: {d.get('due_date', 'no date')}",
+                "entity_type": "decision",
+                "entity_id": d.get("id"),
+                "sort_key": d.get("due_date", "9999"),
+            }
+        )
 
     # Deadline items
     for m in intel_data.get("deadline_warnings", []):
-        deadline = m.get("work_deadline") or m.get("decision_deadline") or m.get("external_deadline") or ""
-        deadline_type = "work" if m.get("work_deadline") else "decision" if m.get("decision_deadline") else "external"
-        actions.append({
-            "tag": "DEADLINE",
-            "priority": 1,
-            "title": m.get("title", ""),
-            "matter": "",
-            "detail": f"{deadline_type.title()} deadline: {deadline}, Owner: {m.get('owner_name', '')}",
-            "entity_type": "matter",
-            "entity_id": m.get("id"),
-            "sort_key": deadline,
-        })
+        deadline = (
+            m.get("work_deadline")
+            or m.get("decision_deadline")
+            or m.get("external_deadline")
+            or ""
+        )
+        deadline_type = (
+            "work"
+            if m.get("work_deadline")
+            else "decision"
+            if m.get("decision_deadline")
+            else "external"
+        )
+        actions.append(
+            {
+                "tag": "DEADLINE",
+                "priority": 1,
+                "title": m.get("title", ""),
+                "matter": "",
+                "detail": f"{deadline_type.title()} deadline: {deadline}, Owner: {m.get('owner_name', '')}",
+                "entity_type": "matter",
+                "entity_id": m.get("id"),
+                "sort_key": deadline,
+            }
+        )
 
     # Overdue tasks
     for t in intel_data.get("overdue_tasks", []):
         days = t.get("days_overdue", 0)
-        actions.append({
-            "tag": "OVERDUE",
-            "priority": 3,
-            "title": t.get("title", ""),
-            "matter": t.get("matter_title", ""),
-            "detail": f"Assigned: {t.get('assignee_name', 'unassigned')}, {days} days overdue",
-            "entity_type": "task",
-            "entity_id": t.get("id"),
-            "sort_key": str(1000 - days).zfill(4),  # Most overdue first
-        })
+        actions.append(
+            {
+                "tag": "OVERDUE",
+                "priority": 3,
+                "title": t.get("title", ""),
+                "matter": t.get("matter_title", ""),
+                "detail": f"Assigned: {t.get('assignee_name', 'unassigned')}, {days} days overdue",
+                "entity_type": "task",
+                "entity_id": t.get("id"),
+                "sort_key": str(1000 - days).zfill(4),  # Most overdue first
+            }
+        )
 
     # Review-pending communications
     rows = db.execute(
-        "SELECT id, title, status, source_type, created_at FROM communications WHERE status LIKE 'awaiting%'"
+        "SELECT id, title, processing_status, source_type, created_at FROM communications WHERE processing_status LIKE 'awaiting%'"
     ).fetchall()
     for row in rows:
         created = row["created_at"] or ""
-        actions.append({
-            "tag": "REVIEW",
-            "priority": 4,
-            "title": row["title"] or f"{row['source_type']} communication",
-            "matter": "",
-            "detail": f"Stage: {row['status']}, Since: {created[:10]}",
-            "entity_type": "communication",
-            "entity_id": row["id"],
-            "sort_key": created,
-        })
+        actions.append(
+            {
+                "tag": "REVIEW",
+                "priority": 4,
+                "title": row["title"] or f"{row['source_type']} communication",
+                "matter": "",
+                "detail": f"Stage: {row['processing_status']}, Since: {created[:10]}",
+                "entity_type": "communication",
+                "entity_id": row["id"],
+                "sort_key": created,
+            }
+        )
 
     # Sort: by priority tier, then by sort_key within tier
     actions.sort(key=lambda a: (a["priority"], a["sort_key"]))
@@ -169,43 +191,50 @@ def _assemble_meetings() -> list[dict]:
 
     meetings = []
     for m in meetings_data:
-        meetings.append({
-            "id": m.get("id"),
-            "title": m.get("title", "Untitled"),
-            "meeting_type": m.get("meeting_type", ""),
-            "start_time": m.get("start_time", ""),
-            "end_time": m.get("end_time", ""),
-            "location": m.get("location", ""),
-            "participants": m.get("participants", []),
-            "linked_matters": m.get("matters", []),
-            "prep_needed": m.get("prep_needed", False),
-            "has_external": any(
-                p.get("is_external", False) for p in m.get("participants", [])
-            ),
-            "prep_narrative": None,  # Filled by Haiku in step 3
-        })
+        meetings.append(
+            {
+                "id": m.get("id"),
+                "title": m.get("title", "Untitled"),
+                "meeting_type": m.get("meeting_type", ""),
+                "start_time": m.get("start_time", ""),
+                "end_time": m.get("end_time", ""),
+                "location": m.get("location", ""),
+                "participants": m.get("participants", []),
+                "linked_matters": m.get("matters", []),
+                "prep_needed": m.get("prep_needed", False),
+                "has_external": any(
+                    p.get("is_external", False) for p in m.get("participants", [])
+                ),
+                "prep_narrative": None,  # Filled by Haiku in step 3
+            }
+        )
     return meetings
 
 
 def _assemble_followups() -> list[dict]:
     """Section 4: people needing follow-up + uncommitted action items."""
     cutoff = (date.today() + timedelta(days=3)).isoformat()
-    people = _tracker_get("/people", {"next_interaction_before": cutoff, "sort": "next_interaction_needed_date"})
+    people = _tracker_get(
+        "/people",
+        {"next_interaction_before": cutoff, "sort": "next_interaction_needed_date"},
+    )
     if isinstance(people, dict):
         people = people.get("items", [])
 
     followups = []
     for p in people:
-        followups.append({
-            "person_id": p.get("id"),
-            "name": p.get("full_name", ""),
-            "organization": p.get("org_name", ""),
-            "category": p.get("relationship_category", ""),
-            "lane": p.get("relationship_category", ""),
-            "next_date": p.get("next_interaction_needed_date", ""),
-            "interaction_type": p.get("next_interaction_type", ""),
-            "purpose": p.get("next_interaction_purpose", ""),
-        })
+        followups.append(
+            {
+                "person_id": p.get("id"),
+                "name": p.get("full_name", ""),
+                "organization": p.get("org_name", ""),
+                "category": p.get("relationship_category", ""),
+                "lane": p.get("relationship_category", ""),
+                "next_date": p.get("next_interaction_needed_date", ""),
+                "interaction_type": p.get("next_interaction_type", ""),
+                "purpose": p.get("next_interaction_purpose", ""),
+            }
+        )
     return followups
 
 
@@ -280,18 +309,20 @@ def _assemble_comment_deadlines() -> list[dict]:
             questions = t.get("questions", [])
             total_questions += len(questions)
 
-        results.append({
-            "matter_id": m.get("id"),
-            "matter_title": m.get("title", ""),
-            "comment_deadline": deadline,
-            "days_remaining": days_remaining,
-            "total_topics": total_topics,
-            "total_questions": total_questions,
-            "status_counts": status_counts,
-            "position_taken": status_counts.get("position_taken", 0),
-            "owner": m.get("next_step_owner_name") or m.get("owner_name", ""),
-            "priority": m.get("priority", ""),
-        })
+        results.append(
+            {
+                "matter_id": m.get("id"),
+                "matter_title": m.get("title", ""),
+                "comment_deadline": deadline,
+                "days_remaining": days_remaining,
+                "total_topics": total_topics,
+                "total_questions": total_questions,
+                "status_counts": status_counts,
+                "position_taken": status_counts.get("position_taken", 0),
+                "owner": m.get("next_step_owner_name") or m.get("owner_name", ""),
+                "priority": m.get("priority", ""),
+            }
+        )
 
     results.sort(key=lambda x: x["days_remaining"])
     return results
@@ -302,7 +333,9 @@ def _assemble_directives_watch() -> list[dict]:
     today = date.today()
     horizon = (today + timedelta(days=14)).isoformat()
     directives_resp = _tracker_get("/policy-directives", {"limit": "50"})
-    directives = directives_resp.get("items", []) if isinstance(directives_resp, dict) else []
+    directives = (
+        directives_resp.get("items", []) if isinstance(directives_resp, dict) else []
+    )
 
     watch_items = []
     for d in directives:
@@ -321,24 +354,30 @@ def _assemble_directives_watch() -> list[dict]:
 
         # Include if deadline within 14 days or recently created (within 7 days)
         created = d.get("created_at", "")[:10]
-        is_recent = created >= (today - timedelta(days=7)).isoformat() if created else False
+        is_recent = (
+            created >= (today - timedelta(days=7)).isoformat() if created else False
+        )
         is_approaching = days_remaining is not None and 0 <= days_remaining <= 14
 
         if is_recent or is_approaching:
-            watch_items.append({
-                "id": d.get("id"),
-                "title": d.get("directive_title", ""),
-                "source_type": d.get("source_document_type", ""),
-                "issued_by": d.get("issuing_authority", ""),
-                "compliance_deadline": deadline,
-                "days_remaining": days_remaining,
-                "implementation_status": impl_status,
-                "priority_level": d.get("priority_level", ""),
-                "is_recent": is_recent,
-            })
+            watch_items.append(
+                {
+                    "id": d.get("id"),
+                    "title": d.get("directive_title", ""),
+                    "source_type": d.get("source_document_type", ""),
+                    "issued_by": d.get("issuing_authority", ""),
+                    "compliance_deadline": deadline,
+                    "days_remaining": days_remaining,
+                    "implementation_status": impl_status,
+                    "priority_level": d.get("priority_level", ""),
+                    "is_recent": is_recent,
+                }
+            )
 
     # Sort: approaching deadlines first, then recent additions
-    watch_items.sort(key=lambda x: (x["days_remaining"] if x["days_remaining"] is not None else 999))
+    watch_items.sort(
+        key=lambda x: x["days_remaining"] if x["days_remaining"] is not None else 999
+    )
     return watch_items
 
 
@@ -354,7 +393,9 @@ def assemble_daily_data(db) -> dict:
     since = _get_last_brief_time(db)
     today = date.today()
 
-    logger.info("Assembling daily brief for %s (delta since %s)", today.isoformat(), since[:19])
+    logger.info(
+        "Assembling daily brief for %s (delta since %s)", today.isoformat(), since[:19]
+    )
 
     data = {
         "date": today.isoformat(),
@@ -403,7 +444,9 @@ def add_meeting_prep(data: dict, llm_client) -> dict:
             continue
 
         # Gather context for this meeting
-        participant_names = [p.get("full_name", p.get("name", "")) for p in participants]
+        participant_names = [
+            p.get("full_name", p.get("name", "")) for p in participants
+        ]
         matter_titles = [m.get("title", "") for m in matters]
 
         # Fetch recent context notes for key participants
@@ -423,13 +466,13 @@ def add_meeting_prep(data: dict, llm_client) -> dict:
 
         prompt = f"""Write 2-3 concise prep sentences for this meeting.
 
-Meeting: {meeting.get('title', '')}
-Type: {meeting.get('meeting_type', '')}
-Participants: {', '.join(participant_names)}
-Linked matters: {', '.join(matter_titles) if matter_titles else 'None'}
+Meeting: {meeting.get("title", "")}
+Type: {meeting.get("meeting_type", "")}
+Participants: {", ".join(participant_names)}
+Linked matters: {", ".join(matter_titles) if matter_titles else "None"}
 
 Recent context:
-{chr(10).join(context_snippets[:8]) if context_snippets else 'No recent context notes.'}
+{chr(10).join(context_snippets[:8]) if context_snippets else "No recent context notes."}
 
 Focus on: who matters most in this meeting, what was committed last time, and what to watch for. Be specific and actionable. No preamble."""
 
@@ -465,7 +508,14 @@ def generate_daily_brief(db, llm_client=None) -> dict:
     return data
 
 
-def store_brief(db, brief_type: str, brief_date: str, content: dict, docx_path: str | None = None, model_used: str | None = None) -> str:
+def store_brief(
+    db,
+    brief_type: str,
+    brief_date: str,
+    content: dict,
+    docx_path: str | None = None,
+    model_used: str | None = None,
+) -> str:
     """Store a generated brief in the intelligence_briefs table.
 
     Returns the brief ID.

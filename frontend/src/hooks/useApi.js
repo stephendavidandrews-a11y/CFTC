@@ -13,8 +13,8 @@ export default function useApi(fetchFn, deps = [], { refetchOnFocus = false } = 
   const refetch = useCallback(() => {
     setLoading(true);
     setError(null);
-    fetchFn()
-      .then(setData)
+    return fetchFn()
+      .then((result) => { setData(result); return result; })
       .catch(setError)
       .finally(() => {
         setLoading(false);

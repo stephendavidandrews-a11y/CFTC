@@ -41,6 +41,7 @@ const ITEM_TYPE_COLORS = {
   context_note: { bg: "#134e4a", text: "#5eead4" },
   person_detail_update: { bg: "#1f2937", text: "#d1d5db" },
   org_detail_update: { bg: "#1f2937", text: "#d1d5db" },
+  directive_update: { bg: "#312e81", text: "#818cf8" },
 };
 
 const BUNDLE_TYPE_COLORS = {
@@ -87,6 +88,19 @@ export default function BundleReviewDetailPage() {
     () => getBundleReviewDetail(id), [id]
   );
 
+  const bundleScrollRef = React.useRef(null);
+  const refetchKeepScroll = React.useCallback(() => {
+    const el = bundleScrollRef.current || document.scrollingElement || document.documentElement;
+    const scrollTop = el.scrollTop;
+    refetch();
+    // Restore after React re-render
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        el.scrollTop = scrollTop;
+      });
+    });
+  }, [refetch]);
+
   useEffect(() => {
     const unsub = on("bundle_review_complete", (evt) => {
       if (evt.data?.communication_id === id) refetch();
@@ -109,7 +123,7 @@ export default function BundleReviewDetailPage() {
     setBusy((b) => ({ ...b, [key]: true }));
     try {
       await fn();
-      refetch();
+      refetchKeepScroll();
     } catch (err) {
       toast.error(err.message || "Action failed");
     } finally {
@@ -117,7 +131,7 @@ export default function BundleReviewDetailPage() {
     }
   }, [refetch, toast]);
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <div style={{ padding: "60px 32px", textAlign: "center", color: theme.text.faint, fontSize: 13 }}>
         Loading bundle review...
@@ -764,7 +778,7 @@ function ItemCard({ item, bundleId, bundleStatus, allBundles, busy, lookups, onA
                     <span style={{ fontSize: 11, fontWeight: 600, color: theme.text.faint }}>matter links: </span>
                     {val.map((ml, i) => (
                       <span key={i} style={{ fontSize: 12, color: theme.text.secondary }}>
-                        {ml.matter_title || ml.matter_id?.slice(0, 8) || "?"}{ml.relationship_type ? ` (${ml.relationship_type})` : ""}{i < val.length - 1 ? ", " : ""}
+                        {ml.matter_title || (allBundles || []).find(b => b.target_matter_id === ml.matter_id)?.target_matter_title || ml.matter_id?.slice(0, 8) || "?"}{ml.relationship_type ? ` (${ml.relationship_type})` : ""}{i < val.length - 1 ? ", " : ""}
                       </span>
                     ))}
                   </div>
@@ -1114,6 +1128,13 @@ const FIELD_SCHEMAS = {
     { key: "changes", label: "Changes (JSON)", type: "json", required: true, hint: '{"jurisdiction":"..."}' },
     { key: "change_summary", label: "Change Summary", type: "textarea", required: true },
   ],
+  directive_update: [
+    { key: "directive_id", label: "Directive ID", type: "text", required: true },
+    { key: "directive_label", label: "Directive", type: "text", required: true },
+    { key: "changes", label: "Proposed Changes (JSON)", type: "json", required: true },
+    { key: "add_matter_links", label: "New Matter Links (JSON)", type: "json" },
+    { key: "rationale", label: "Rationale", type: "textarea" },
+  ],
   new_matter: [
     { key: "title", label: "Title", type: "text", required: true },
     { key: "matter_type", label: "Matter Type", type: "select", required: true, options: ["rulemaking", "interpretive guidance", "no-action letter", "exemptive letter", "staff advisory", "other letter", "interagency coordination", "enforcement support", "congressional response", "speech / testimony / briefing prep", "litigation-sensitive issue", "personnel / management", "administrative / ethics / process", "industry inquiry", "international matter", "regulatory review", "prospective policy", "other"] },
@@ -1359,7 +1380,7 @@ function EditItemModal({ isOpen, onClose, item, busy, onSave }) {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Edit ${formatLabel(item.item_type)}`} width={560}>
-      <div style={{ maxHeight: "70vh", overflowY: "auto", paddingRight: 8 }}>
+      <div style={{ maxHeight: "60vh", overflowY: "auto", paddingRight: 8 }}>
         {/* Schema-defined fields first */}
         {schema.map((field) => (
           <SchemaField

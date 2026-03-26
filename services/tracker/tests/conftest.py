@@ -6,6 +6,7 @@ Provides:
   - FastAPI TestClient with auth
   - Factory functions for creating test entities
 """
+
 import sqlite3
 import uuid
 from datetime import datetime

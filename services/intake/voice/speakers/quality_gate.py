@@ -74,9 +74,15 @@ def run_quality_gate(
     """
     from config import (
         VP_MIN_SEGMENT_DURATION,
-        VP_MIN_SNR_DB, VP_MIN_HNR_DB, VP_MAX_JITTER_PCT, VP_MAX_SHIMMER_PCT,
-        VP_MAX_ENERGY_VARIANCE_STD, VP_MAX_F0_STDDEV_RATIO,
-        VP_TARGET_DURATION_MIN, VP_TARGET_DURATION_MAX, VP_PROVISIONAL_IF_BELOW,
+        VP_MIN_SNR_DB,
+        VP_MIN_HNR_DB,
+        VP_MAX_JITTER_PCT,
+        VP_MAX_SHIMMER_PCT,
+        VP_MAX_ENERGY_VARIANCE_STD,
+        VP_MAX_F0_STDDEV_RATIO,
+        VP_TARGET_DURATION_MIN,
+        VP_TARGET_DURATION_MAX,
+        VP_PROVISIONAL_IF_BELOW,
     )
 
     log_prefix = f"[{conversation_id[:8]}:{speaker_label}]"
@@ -91,7 +97,9 @@ def run_quality_gate(
             continue
         candidates.append({"index": i, **seg})
 
-    logger.info(f"{log_prefix} Step 1: {len(candidates)}/{len(segments)} segments pass duration filter")
+    logger.info(
+        f"{log_prefix} Step 1: {len(candidates)}/{len(segments)} segments pass duration filter"
+    )
 
     if not candidates:
         return QualityGateResult(
@@ -99,8 +107,10 @@ def run_quality_gate(
             total_candidate_segments=len(segments),
             segments_passed=0,
             total_clean_duration=0.0,
-            avg_snr_db=None, avg_hnr_db=None,
-            f0_stddev_ratio=None, f0_unimodal=True,
+            avg_snr_db=None,
+            avg_hnr_db=None,
+            f0_stddev_ratio=None,
+            f0_unimodal=True,
             status="rejected",
             rejection_reason=f"No segments >= {VP_MIN_SEGMENT_DURATION}s duration",
         )
@@ -112,16 +122,23 @@ def run_quality_gate(
         features = seg.get("features", {})
         metrics = _score_signal_quality(
             features,
-            VP_MIN_SNR_DB, VP_MIN_HNR_DB, VP_MAX_JITTER_PCT,
-            VP_MAX_SHIMMER_PCT, VP_MAX_ENERGY_VARIANCE_STD,
+            VP_MIN_SNR_DB,
+            VP_MIN_HNR_DB,
+            VP_MAX_JITTER_PCT,
+            VP_MAX_SHIMMER_PCT,
+            VP_MAX_ENERGY_VARIANCE_STD,
         )
         metrics.duration = seg["end"] - seg["start"]
         if metrics.passed:
             quality_segments.append({**seg, "metrics": metrics})
         else:
-            logger.debug(f"{log_prefix} Segment {seg['index']} rejected: {metrics.rejection_reasons}")
+            logger.debug(
+                f"{log_prefix} Segment {seg['index']} rejected: {metrics.rejection_reasons}"
+            )
 
-    logger.info(f"{log_prefix} Step 2: {len(quality_segments)}/{len(candidates)} pass quality gate")
+    logger.info(
+        f"{log_prefix} Step 2: {len(quality_segments)}/{len(candidates)} pass quality gate"
+    )
 
     if not quality_segments:
         return QualityGateResult(
@@ -129,8 +146,10 @@ def run_quality_gate(
             total_candidate_segments=len(segments),
             segments_passed=0,
             total_clean_duration=0.0,
-            avg_snr_db=None, avg_hnr_db=None,
-            f0_stddev_ratio=None, f0_unimodal=True,
+            avg_snr_db=None,
+            avg_hnr_db=None,
+            f0_stddev_ratio=None,
+            f0_unimodal=True,
             status="rejected",
             rejection_reason="No segments pass signal quality thresholds",
         )
@@ -159,10 +178,15 @@ def run_quality_gate(
     if not f0_unimodal:
         # Store as provisional with contamination flag
         _store_candidate(
-            conn, conversation_id, speaker_label, quality_segments,
-            diarization_embeddings, "provisional",
+            conn,
+            conversation_id,
+            speaker_label,
+            quality_segments,
+            diarization_embeddings,
+            "provisional",
             f"F0 distribution non-unimodal (stddev/mean={f0_stddev_ratio:.2f})",
-            f0_stddev_ratio, f0_unimodal,
+            f0_stddev_ratio,
+            f0_unimodal,
         )
         return QualityGateResult(
             speaker_label=speaker_label,
@@ -192,19 +216,29 @@ def run_quality_gate(
         total_duration += seg["metrics"].duration
 
     total_clean = sum(s["metrics"].duration for s in selected)
-    logger.info(f"{log_prefix} Step 4: Selected {len(selected)} segments, {total_clean:.1f}s clean audio")
+    logger.info(
+        f"{log_prefix} Step 4: Selected {len(selected)} segments, {total_clean:.1f}s clean audio"
+    )
 
     if total_clean < VP_PROVISIONAL_IF_BELOW:
         status = "provisional"
-        reason = f"Only {total_clean:.1f}s of clean audio (need {VP_TARGET_DURATION_MIN}s)"
+        reason = (
+            f"Only {total_clean:.1f}s of clean audio (need {VP_TARGET_DURATION_MIN}s)"
+        )
     else:
         status = "accepted_for_review"
         reason = None
 
     _store_candidate(
-        conn, conversation_id, speaker_label, selected,
-        diarization_embeddings, status, reason,
-        f0_stddev_ratio, f0_unimodal,
+        conn,
+        conversation_id,
+        speaker_label,
+        selected,
+        diarization_embeddings,
+        status,
+        reason,
+        f0_stddev_ratio,
+        f0_unimodal,
     )
 
     return QualityGateResult(
@@ -258,8 +292,12 @@ def accept_voiceprint_candidate(conn, candidate_id: str, tracker_person_id: str)
             """UPDATE speaker_voice_profiles
                SET embedding = ?, quality_score = ?, source_conversation_id = ?
                WHERE id = ?""",
-            (embedding_bytes, candidate["quality_score"], candidate["conversation_id"],
-             existing["id"]),
+            (
+                embedding_bytes,
+                candidate["quality_score"],
+                candidate["conversation_id"],
+                existing["id"],
+            ),
         )
         logger.info(f"Re-enrolled voiceprint for person {tracker_person_id[:8]}")
     else:
@@ -268,8 +306,13 @@ def accept_voiceprint_candidate(conn, candidate_id: str, tracker_person_id: str)
             """INSERT INTO speaker_voice_profiles
                (id, tracker_person_id, embedding, source_conversation_id, quality_score)
                VALUES (?, ?, ?, ?, ?)""",
-            (str(uuid.uuid4()), tracker_person_id, embedding_bytes,
-             candidate["conversation_id"], candidate["quality_score"]),
+            (
+                str(uuid.uuid4()),
+                tracker_person_id,
+                embedding_bytes,
+                candidate["conversation_id"],
+                candidate["quality_score"],
+            ),
         )
         logger.info(f"Created voiceprint for person {tracker_person_id[:8]}")
 
@@ -294,8 +337,11 @@ def reject_voiceprint_candidate(conn, candidate_id: str, reason: str = ""):
 
 def _score_signal_quality(
     features: dict,
-    min_snr: float, min_hnr: float, max_jitter: float,
-    max_shimmer: float, max_energy_var_std: float,
+    min_snr: float,
+    min_hnr: float,
+    max_jitter: float,
+    max_shimmer: float,
+    max_energy_var_std: float,
 ) -> QualityMetrics:
     """Score a segment's signal quality against thresholds."""
     metrics = QualityMetrics()
@@ -346,9 +392,15 @@ def _score_signal_quality(
 
 
 def _store_candidate(
-    conn, conversation_id, speaker_label, selected_segments,
-    diarization_embeddings, status, rejection_reason,
-    f0_stddev_ratio, f0_unimodal,
+    conn,
+    conversation_id,
+    speaker_label,
+    selected_segments,
+    diarization_embeddings,
+    status,
+    rejection_reason,
+    f0_stddev_ratio,
+    f0_unimodal,
 ):
     """Store voiceprint candidate in DB for human review."""
     now = datetime.now(timezone.utc).isoformat()
@@ -372,13 +424,15 @@ def _store_candidate(
         "total_duration": round(total_duration, 1),
         "avg_snr_db": _avg_metric(selected_segments, "snr_db"),
         "avg_hnr_db": _avg_metric(selected_segments, "hnr_db"),
-        "f0_stddev_ratio": round(f0_stddev_ratio, 3) if f0_stddev_ratio is not None else None,
+        "f0_stddev_ratio": round(f0_stddev_ratio, 3)
+        if f0_stddev_ratio is not None
+        else None,
         "f0_unimodal": f0_unimodal,
     }
 
-    segment_ranges = json.dumps([
-        {"start": s["start"], "end": s["end"]} for s in selected_segments
-    ])
+    segment_ranges = json.dumps(
+        [{"start": s["start"], "end": s["end"]} for s in selected_segments]
+    )
 
     conn.execute(
         """INSERT INTO voiceprint_candidates
@@ -387,11 +441,18 @@ def _store_candidate(
             status, rejection_reason, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
-            str(uuid.uuid4()), conversation_id, speaker_label,
-            embedding_bytes, quality_score,
-            total_duration, len(selected_segments), segment_ranges,
+            str(uuid.uuid4()),
+            conversation_id,
+            speaker_label,
+            embedding_bytes,
+            quality_score,
+            total_duration,
+            len(selected_segments),
+            segment_ranges,
             json.dumps(metrics_summary),
-            status, rejection_reason, now,
+            status,
+            rejection_reason,
+            now,
         ),
     )
 

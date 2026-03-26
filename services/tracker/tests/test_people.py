@@ -1,13 +1,17 @@
 """Comprehensive tests for the people router."""
+
 import uuid
 from tests.conftest import (
-    seed_person, seed_organization, make_id,
+    seed_person,
+    seed_organization,
+    make_id,
 )
 
 
 # ---------------------------------------------------------------------------
 # List / filter / sort / paginate
 # ---------------------------------------------------------------------------
+
 
 def test_list_people_empty(client, auth_headers):
     """GET /tracker/people returns empty list when no people exist."""
@@ -43,7 +47,9 @@ def test_list_people_filter_organization(client, auth_headers, db):
     org = seed_organization(db, name="CFTC")
     seed_person(db, full_name="Inside", organization_id=org["id"])
     seed_person(db, full_name="Outside")
-    resp = client.get(f"/tracker/people?organization_id={org['id']}", headers=auth_headers)
+    resp = client.get(
+        f"/tracker/people?organization_id={org['id']}", headers=auth_headers
+    )
     data = resp.json()
     assert data["total"] == 1
     assert data["items"][0]["full_name"] == "Inside"
@@ -73,6 +79,7 @@ def test_list_people_pagination(client, auth_headers, db):
 # Get single person
 # ---------------------------------------------------------------------------
 
+
 def test_get_person_success(client, auth_headers, db):
     """GET /tracker/people/{id} returns full detail with sub-resources."""
     p = seed_person(db)
@@ -96,11 +103,12 @@ def test_get_person_not_found(client, auth_headers):
 # Create person
 # ---------------------------------------------------------------------------
 
+
 def test_create_person_success(client, auth_headers):
     """POST /tracker/people creates a new person."""
-    resp = client.post("/tracker/people",
-                       json={"full_name": "New Person"},
-                       headers=auth_headers)
+    resp = client.post(
+        "/tracker/people", json={"full_name": "New Person"}, headers=auth_headers
+    )
     assert resp.status_code == 200
     assert "id" in resp.json()
 
@@ -125,20 +133,24 @@ def test_create_person_idempotency(client, auth_headers):
 # Update person
 # ---------------------------------------------------------------------------
 
+
 def test_update_person_success(client, auth_headers, db):
     """PUT /tracker/people/{id} updates the person."""
     p = seed_person(db)
-    resp = client.put(f"/tracker/people/{p['id']}",
-                      json={"title": "Senior Director"},
-                      headers=auth_headers)
+    resp = client.put(
+        f"/tracker/people/{p['id']}",
+        json={"title": "Senior Director"},
+        headers=auth_headers,
+    )
     assert resp.status_code == 200
     assert resp.json()["updated"] is True
 
 
 def test_update_person_not_found(client, auth_headers):
     """PUT /tracker/people/{id} returns 404 for missing person."""
-    resp = client.put(f"/tracker/people/{make_id()}",
-                      json={"title": "X"}, headers=auth_headers)
+    resp = client.put(
+        f"/tracker/people/{make_id()}", json={"title": "X"}, headers=auth_headers
+    )
     assert resp.status_code == 404
 
 
@@ -152,6 +164,7 @@ def test_update_person_empty_body(client, auth_headers, db):
 # ---------------------------------------------------------------------------
 # Delete (soft-deactivate) person
 # ---------------------------------------------------------------------------
+
 
 def test_delete_person_success(client, auth_headers, db):
     """DELETE /tracker/people/{id} soft-deletes by setting is_active=0."""
@@ -173,6 +186,7 @@ def test_delete_person_not_found(client, auth_headers):
 # Person profile
 # ---------------------------------------------------------------------------
 
+
 def test_get_profile_empty(client, auth_headers, db):
     """GET /tracker/people/{id}/profile returns empty structure when no profile."""
     p = seed_person(db)
@@ -187,16 +201,20 @@ def test_upsert_profile_create_then_update(client, auth_headers, db):
     """PUT /tracker/people/{id}/profile creates then updates profile."""
     p = seed_person(db)
     # Create
-    resp1 = client.put(f"/tracker/people/{p['id']}/profile",
-                       json={"birthday": "1980-01-15", "hometown": "Chicago"},
-                       headers=auth_headers)
+    resp1 = client.put(
+        f"/tracker/people/{p['id']}/profile",
+        json={"birthday": "1980-01-15", "hometown": "Chicago"},
+        headers=auth_headers,
+    )
     assert resp1.status_code == 200
     assert resp1.json()["birthday"] == "1980-01-15"
 
     # Update
-    resp2 = client.put(f"/tracker/people/{p['id']}/profile",
-                       json={"interests": "sailing"},
-                       headers=auth_headers)
+    resp2 = client.put(
+        f"/tracker/people/{p['id']}/profile",
+        json={"interests": "sailing"},
+        headers=auth_headers,
+    )
     assert resp2.status_code == 200
     data = resp2.json()
     assert data["interests"] == "sailing"
@@ -213,6 +231,7 @@ def test_profile_404_for_missing_person(client, auth_headers):
 # ---------------------------------------------------------------------------
 # Auth required
 # ---------------------------------------------------------------------------
+
 
 def test_people_auth_required(client):
     """People endpoints reject unauthenticated requests."""

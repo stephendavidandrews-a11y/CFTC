@@ -11,6 +11,7 @@ Covers:
 8.  Upload validation — bad format, empty body
 9.  Audio streaming — not-found, missing file on disk
 """
+
 import json
 import uuid
 from unittest.mock import patch, AsyncMock
@@ -20,7 +21,10 @@ PREFIX = "/ai/api/communications"
 
 # ── Helpers ──
 
-def _seed_communication(db, comm_id=None, status="complete", archived=False, source_type="audio"):
+
+def _seed_communication(
+    db, comm_id=None, status="complete", archived=False, source_type="audio"
+):
     """Insert a minimal communication row and return its ID."""
     cid = comm_id or str(uuid.uuid4())
     db.execute(
@@ -90,8 +94,13 @@ def _seed_for_undo(db, comm_id=None, status="complete", add_writebacks=True):
                (id, communication_id, bundle_id, target_table, target_record_id,
                 write_type, written_data, previous_data, reversed)
                VALUES (?, ?, ?, 'people', ?, 'insert', ?, NULL, 0)""",
-            (wb_id, cid, bundle_id, str(uuid.uuid4()),
-             json.dumps({"name": "Test Person", "email": "test@example.com"})),
+            (
+                wb_id,
+                cid,
+                bundle_id,
+                str(uuid.uuid4()),
+                json.dumps({"name": "Test Person", "email": "test@example.com"}),
+            ),
         )
         db.commit()
 
@@ -101,6 +110,7 @@ def _seed_for_undo(db, comm_id=None, status="complete", add_writebacks=True):
 # ===================================================================
 # 1. List endpoint
 # ===================================================================
+
 
 def test_list_empty(client):
     resp = client.get(PREFIX)
@@ -169,13 +179,20 @@ def test_list_response_shape(client, db):
     assert set(data.keys()) >= {"items", "total", "offset", "limit"}
 
     item = data["items"][0]
-    expected_keys = {"id", "source_type", "processing_status", "created_at", "updated_at"}
+    expected_keys = {
+        "id",
+        "source_type",
+        "processing_status",
+        "created_at",
+        "updated_at",
+    }
     assert set(item.keys()) >= expected_keys
 
 
 # ===================================================================
 # 2. Detail endpoint
 # ===================================================================
+
 
 def test_get_detail_with_children(client, db):
     cid = _seed_with_children(db)
@@ -201,10 +218,16 @@ def test_get_detail_response_shape(client, db):
     resp = client.get(f"{PREFIX}/{cid}")
     data = resp.json()
     expected = {
-        "id", "source_type", "processing_status",
-        "created_at", "updated_at",
-        "audio_files", "participants", "transcript_count",
-        "messages", "artifacts",
+        "id",
+        "source_type",
+        "processing_status",
+        "created_at",
+        "updated_at",
+        "audio_files",
+        "participants",
+        "transcript_count",
+        "messages",
+        "artifacts",
     }
     assert set(data.keys()) >= expected
 
@@ -212,6 +235,7 @@ def test_get_detail_response_shape(client, db):
 # ===================================================================
 # 3. Retry endpoint
 # ===================================================================
+
 
 def test_retry_from_error(client, db):
     cid = str(uuid.uuid4())
@@ -230,7 +254,10 @@ def test_retry_from_error(client, db):
     assert data["from_stage"] == "extraction"
     assert data["previous_state"] == "error"
 
-    row = db.execute("SELECT processing_status, error_message FROM communications WHERE id = ?", (cid,)).fetchone()
+    row = db.execute(
+        "SELECT processing_status, error_message FROM communications WHERE id = ?",
+        (cid,),
+    ).fetchone()
     assert row["processing_status"] == "extraction"
     assert row["error_message"] is None
 
@@ -271,6 +298,7 @@ def test_retry_not_found(client):
 # 4. Archive / Unarchive endpoints
 # ===================================================================
 
+
 def test_archive_and_idempotency(client, db):
     cid = _seed_communication(db, status="complete")
 
@@ -278,7 +306,9 @@ def test_archive_and_idempotency(client, db):
     assert resp.status_code == 200
     assert resp.json()["status"] == "archived"
 
-    row = db.execute("SELECT archived_at FROM communications WHERE id = ?", (cid,)).fetchone()
+    row = db.execute(
+        "SELECT archived_at FROM communications WHERE id = ?", (cid,)
+    ).fetchone()
     assert row["archived_at"] is not None
 
     resp = client.post(f"{PREFIX}/{cid}/archive")
@@ -297,7 +327,9 @@ def test_unarchive(client, db):
     assert resp.status_code == 200
     assert resp.json()["status"] == "unarchived"
 
-    row = db.execute("SELECT archived_at FROM communications WHERE id = ?", (cid,)).fetchone()
+    row = db.execute(
+        "SELECT archived_at FROM communications WHERE id = ?", (cid,)
+    ).fetchone()
     assert row["archived_at"] is None
 
 
@@ -310,6 +342,7 @@ def test_unarchive_not_found(client):
 # 5. Delete endpoint
 # ===================================================================
 
+
 def test_delete_communication(client, db):
     cid = _seed_with_children(db)
 
@@ -320,9 +353,25 @@ def test_delete_communication(client, db):
     row = db.execute("SELECT id FROM communications WHERE id = ?", (cid,)).fetchone()
     assert row is None
 
-    assert db.execute("SELECT COUNT(*) as c FROM audio_files WHERE communication_id = ?", (cid,)).fetchone()["c"] == 0
-    assert db.execute("SELECT COUNT(*) as c FROM communication_participants WHERE communication_id = ?", (cid,)).fetchone()["c"] == 0
-    assert db.execute("SELECT COUNT(*) as c FROM transcripts WHERE communication_id = ?", (cid,)).fetchone()["c"] == 0
+    assert (
+        db.execute(
+            "SELECT COUNT(*) as c FROM audio_files WHERE communication_id = ?", (cid,)
+        ).fetchone()["c"]
+        == 0
+    )
+    assert (
+        db.execute(
+            "SELECT COUNT(*) as c FROM communication_participants WHERE communication_id = ?",
+            (cid,),
+        ).fetchone()["c"]
+        == 0
+    )
+    assert (
+        db.execute(
+            "SELECT COUNT(*) as c FROM transcripts WHERE communication_id = ?", (cid,)
+        ).fetchone()["c"]
+        == 0
+    )
 
 
 def test_delete_not_found(client):
@@ -333,6 +382,7 @@ def test_delete_not_found(client):
 # ===================================================================
 # 6. Undo endpoint — HTTP status mapping
 # ===================================================================
+
 
 def test_undo_not_found(client):
     """Undo on nonexistent communication should return 404."""
@@ -374,7 +424,9 @@ def test_undo_success(mock_delete, mock_get, client, db):
     assert data["status"] == "undone"
     assert data["reversed_count"] >= 1
 
-    row = db.execute("SELECT processing_status FROM communications WHERE id = ?", (cid,)).fetchone()
+    row = db.execute(
+        "SELECT processing_status FROM communications WHERE id = ?", (cid,)
+    ).fetchone()
     assert row["processing_status"] == "reviewed"
 
 
@@ -408,6 +460,7 @@ def test_undo_force_overrides_conflict(mock_delete, mock_get, client, db):
 # ===================================================================
 # 7. Upload validation
 # ===================================================================
+
 
 def test_audio_upload_rejects_bad_format(client):
     """Upload with unsupported format should return 400."""
@@ -458,6 +511,7 @@ def test_email_upload_rejects_empty_file(client):
 # ===================================================================
 # 8. Audio streaming endpoint
 # ===================================================================
+
 
 def test_audio_stream_not_found_no_communication(client):
     """Audio stream for nonexistent communication returns 404."""

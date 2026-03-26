@@ -2,6 +2,7 @@
 Database connection manager for the Tracker module.
 WAL mode, foreign keys ON, Row factory for dict-like access.
 """
+
 import sqlite3
 from pathlib import Path
 from contextlib import contextmanager

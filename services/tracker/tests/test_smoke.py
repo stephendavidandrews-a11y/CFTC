@@ -1,4 +1,5 @@
 """Smoke test: verify conftest fixtures work."""
+
 from tests.conftest import seed_matter
 
 
@@ -11,9 +12,18 @@ def test_schema_creates_tables(db):
         ).fetchall()
     }
     for expected in [
-        "organizations", "people", "matters", "tasks", "meetings",
-        "documents", "decisions", "system_events", "idempotency_keys",
-        "context_notes", "context_note_links", "matter_people",
+        "organizations",
+        "people",
+        "matters",
+        "tasks",
+        "meetings",
+        "documents",
+        "decisions",
+        "system_events",
+        "idempotency_keys",
+        "context_notes",
+        "context_note_links",
+        "matter_people",
     ]:
         assert expected in tables, f"Missing table: {expected}"
 

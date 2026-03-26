@@ -1,13 +1,18 @@
 """Comprehensive tests for the tasks router."""
+
 import uuid
 from tests.conftest import (
-    seed_matter, seed_person, seed_task, make_id,
+    seed_matter,
+    seed_person,
+    seed_task,
+    make_id,
 )
 
 
 # ---------------------------------------------------------------------------
 # List / filter / sort / paginate
 # ---------------------------------------------------------------------------
+
 
 def test_list_tasks_empty(client, auth_headers):
     """GET /tracker/tasks returns empty list when no tasks exist."""
@@ -99,6 +104,7 @@ def test_list_tasks_pagination(client, auth_headers, db):
 # Get single task
 # ---------------------------------------------------------------------------
 
+
 def test_get_task_success(client, auth_headers, db):
     """GET /tracker/tasks/{id} returns full detail."""
     m = seed_matter(db)
@@ -121,6 +127,7 @@ def test_get_task_not_found(client, auth_headers):
 # Create task
 # ---------------------------------------------------------------------------
 
+
 def test_create_task_success(client, auth_headers, db):
     """POST /tracker/tasks creates a new task."""
     m = seed_matter(db)
@@ -138,19 +145,27 @@ def test_create_task_success(client, auth_headers, db):
 def test_create_task_missing_title(client, auth_headers, db):
     """POST /tracker/tasks returns 422 when title is missing."""
     m = seed_matter(db)
-    resp = client.post("/tracker/tasks",
-                       json={"matter_id": m["id"], "status": "not started", "task_mode": "action"},
-                       headers=auth_headers)
+    resp = client.post(
+        "/tracker/tasks",
+        json={"matter_id": m["id"], "status": "not started", "task_mode": "action"},
+        headers=auth_headers,
+    )
     assert resp.status_code == 422
 
 
 def test_create_task_invalid_mode(client, auth_headers, db):
     """POST /tracker/tasks returns 422 for invalid task_mode literal."""
     m = seed_matter(db)
-    resp = client.post("/tracker/tasks",
-                       json={"title": "Bad", "matter_id": m["id"],
-                             "status": "not started", "task_mode": "invalid_mode"},
-                       headers=auth_headers)
+    resp = client.post(
+        "/tracker/tasks",
+        json={
+            "title": "Bad",
+            "matter_id": m["id"],
+            "status": "not started",
+            "task_mode": "invalid_mode",
+        },
+        headers=auth_headers,
+    )
     assert resp.status_code == 422
 
 
@@ -158,8 +173,12 @@ def test_create_task_idempotency(client, auth_headers, db):
     """Same idempotency key returns cached result."""
     m = seed_matter(db)
     idem_key = str(uuid.uuid4())
-    payload = {"title": "Idem Task", "matter_id": m["id"],
-               "status": "not started", "task_mode": "action"}
+    payload = {
+        "title": "Idem Task",
+        "matter_id": m["id"],
+        "status": "not started",
+        "task_mode": "action",
+    }
     headers = {**auth_headers, "idempotency-key": idem_key}
     resp1 = client.post("/tracker/tasks", json=payload, headers=headers)
     resp2 = client.post("/tracker/tasks", json=payload, headers=headers)
@@ -170,21 +189,25 @@ def test_create_task_idempotency(client, auth_headers, db):
 # Update task
 # ---------------------------------------------------------------------------
 
+
 def test_update_task_success(client, auth_headers, db):
     """PUT /tracker/tasks/{id} updates the task."""
     m = seed_matter(db)
     t = seed_task(db, m["id"])
-    resp = client.put(f"/tracker/tasks/{t['id']}",
-                      json={"title": "Updated Task"},
-                      headers=auth_headers)
+    resp = client.put(
+        f"/tracker/tasks/{t['id']}",
+        json={"title": "Updated Task"},
+        headers=auth_headers,
+    )
     assert resp.status_code == 200
     assert resp.json()["updated"] is True
 
 
 def test_update_task_not_found(client, auth_headers):
     """PUT /tracker/tasks/{id} returns 404 for missing task."""
-    resp = client.put(f"/tracker/tasks/{make_id()}",
-                      json={"title": "X"}, headers=auth_headers)
+    resp = client.put(
+        f"/tracker/tasks/{make_id()}", json={"title": "X"}, headers=auth_headers
+    )
     assert resp.status_code == 404
 
 
@@ -201,27 +224,40 @@ def test_update_task_completion_transitions_tracking(client, auth_headers, db):
     m = seed_matter(db)
     p = seed_person(db)
     # The tracked (delegated) task
-    tracked = seed_task(db, m["id"], title="Delegated work", status="in progress",
-                        assigned_to_person_id=p["id"])
+    tracked = seed_task(
+        db,
+        m["id"],
+        title="Delegated work",
+        status="in progress",
+        assigned_to_person_id=p["id"],
+    )
     # The follow_up that tracks it
-    tracker = seed_task(db, m["id"], title="Follow up on delegation",
-                        status="waiting on others", task_mode="follow_up",
-                        tracks_task_id=tracked["id"])
+    tracker = seed_task(
+        db,
+        m["id"],
+        title="Follow up on delegation",
+        status="waiting on others",
+        task_mode="follow_up",
+        tracks_task_id=tracked["id"],
+    )
 
     # Complete the tracked task
-    resp = client.put(f"/tracker/tasks/{tracked['id']}",
-                      json={"status": "done"},
-                      headers=auth_headers)
+    resp = client.put(
+        f"/tracker/tasks/{tracked['id']}", json={"status": "done"}, headers=auth_headers
+    )
     assert resp.status_code == 200
 
     # Verify the tracker task transitioned
-    row = db.execute("SELECT status FROM tasks WHERE id = ?", (tracker["id"],)).fetchone()
+    row = db.execute(
+        "SELECT status FROM tasks WHERE id = ?", (tracker["id"],)
+    ).fetchone()
     assert row["status"] == "needs review"
 
 
 # ---------------------------------------------------------------------------
 # Delete task
 # ---------------------------------------------------------------------------
+
 
 def test_delete_task_success(client, auth_headers, db):
     """DELETE /tracker/tasks/{id} hard-deletes the task."""
@@ -243,6 +279,7 @@ def test_delete_task_not_found(client, auth_headers):
 # ---------------------------------------------------------------------------
 # Auth required
 # ---------------------------------------------------------------------------
+
 
 def test_tasks_auth_required(client):
     """Task endpoints reject unauthenticated requests."""

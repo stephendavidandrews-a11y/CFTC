@@ -1,4 +1,5 @@
 """Intake test fixtures."""
+
 import os
 import sys
 from pathlib import Path
@@ -20,6 +21,7 @@ def client():
     """FastAPI TestClient for intake service."""
     from main import app
     from fastapi.testclient import TestClient
+
     with TestClient(app) as c:
         yield c
 
@@ -28,6 +30,7 @@ def client():
 def auth_headers():
     """Valid auth headers for intake tests."""
     import base64
+
     creds = base64.b64encode(b"testpipeline:testpipelinepass").decode()
     return {"Authorization": f"Basic {creds}"}
 
@@ -36,5 +39,6 @@ def auth_headers():
 def bad_auth_headers():
     """Invalid auth headers."""
     import base64
+
     creds = base64.b64encode(b"wrong:wrong").decode()
     return {"Authorization": f"Basic {creds}"}

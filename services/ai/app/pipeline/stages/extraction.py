@@ -79,7 +79,8 @@ MAX_SONNET_ATTEMPTS = 3
 # 8. Sonnet extraction with retry (internal helper)
 # ═══════════════════════════════════════════════════════════════════════════
 
-MAX_SONNET_ATTEMPTS = 3   # Sonnet self-correction retries (parse/validation)
+MAX_SONNET_ATTEMPTS = 3  # Sonnet self-correction retries (parse/validation)
+
 
 async def _run_sonnet_extraction(
     db,
@@ -99,7 +100,8 @@ async def _run_sonnet_extraction(
     Raises BudgetExceededError (let orchestrator handle).
     """
     from app.pipeline.stages.escalation import (
-        ExtractionAttemptResult, ExtractionFailureType,
+        ExtractionAttemptResult,
+        ExtractionFailureType,
     )
 
     last_error = None
@@ -108,10 +110,14 @@ async def _run_sonnet_extraction(
 
     for attempt in range(1, MAX_SONNET_ATTEMPTS + 1):
         try:
-            prompt_for_attempt = user_prompt if attempt == 1 else (
-                user_prompt + f"\n\n## Retry Note\n"
-                f"Previous attempt failed to produce valid JSON. "
-                f"Error: {last_error}\nReturn ONLY the JSON object."
+            prompt_for_attempt = (
+                user_prompt
+                if attempt == 1
+                else (
+                    user_prompt + f"\n\n## Retry Note\n"
+                    f"Previous attempt failed to produce valid JSON. "
+                    f"Error: {last_error}\nReturn ONLY the JSON object."
+                )
             )
 
             response = await call_llm(
@@ -121,7 +127,7 @@ async def _run_sonnet_extraction(
                 model=sonnet_model,
                 system_prompt=system_prompt,
                 user_prompt=prompt_for_attempt,
-                max_tokens=8192,
+                max_tokens=64000,
                 temperature=0.0,
             )
             total_cost += response.usage.cost_usd
@@ -133,13 +139,19 @@ async def _run_sonnet_extraction(
 
             # Post-process
             processed = _post_process(
-                extraction, full_context, policy, db, communication_id,
+                extraction,
+                full_context,
+                policy,
+                db,
+                communication_id,
             )
 
             logger.info(
                 "[%s] Sonnet attempt %d succeeded: %d bundles, $%.4f",
-                communication_id[:8], attempt,
-                len(processed["bundles"]), response.usage.cost_usd,
+                communication_id[:8],
+                attempt,
+                len(processed["bundles"]),
+                response.usage.cost_usd,
             )
 
             return ExtractionAttemptResult(
@@ -162,13 +174,17 @@ async def _run_sonnet_extraction(
             last_error = f"JSON parse error: {e}"
             logger.warning(
                 "[%s] Sonnet attempt %d parse failed: %s",
-                communication_id[:8], attempt, e,
+                communication_id[:8],
+                attempt,
+                e,
             )
         except ValidationError as e:
             last_error = f"Validation error: {e.error_count()} errors"
             logger.warning(
                 "[%s] Sonnet attempt %d validation failed: %s",
-                communication_id[:8], attempt, e,
+                communication_id[:8],
+                attempt,
+                e,
             )
         except BudgetExceededError:
             raise
@@ -178,7 +194,9 @@ async def _run_sonnet_extraction(
             last_error = str(e)
             logger.warning(
                 "[%s] Sonnet attempt %d LLM error: %s",
-                communication_id[:8], attempt, e,
+                communication_id[:8],
+                attempt,
+                e,
             )
 
     # All Sonnet attempts failed
@@ -203,6 +221,7 @@ async def _run_sonnet_extraction(
 # 9. Opus escalation attempt (Original Phase 5)
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 async def _run_opus_escalation(
     db,
     communication_id: str,
@@ -225,7 +244,8 @@ async def _run_opus_escalation(
     Raises BudgetExceededError (let orchestrator handle).
     """
     from app.pipeline.stages.escalation import (
-        ExtractionAttemptResult, ExtractionFailureType,
+        ExtractionAttemptResult,
+        ExtractionFailureType,
         build_opus_meta_instruction,
     )
 
@@ -242,7 +262,7 @@ async def _run_opus_escalation(
             model=opus_model,
             system_prompt=system_prompt,
             user_prompt=opus_prompt,
-            max_tokens=8192,
+            max_tokens=64000,
             temperature=0.0,
         )
 
@@ -252,13 +272,18 @@ async def _run_opus_escalation(
 
         # Post-process (same rules as Sonnet)
         processed = _post_process(
-            extraction, full_context, policy, db, communication_id,
+            extraction,
+            full_context,
+            policy,
+            db,
+            communication_id,
         )
 
         logger.info(
             "[%s] Opus escalation succeeded: %d bundles, $%.4f",
             communication_id[:8],
-            len(processed["bundles"]), response.usage.cost_usd,
+            len(processed["bundles"]),
+            response.usage.cost_usd,
         )
 
         return ExtractionAttemptResult(
@@ -281,7 +306,8 @@ async def _run_opus_escalation(
     except json.JSONDecodeError as e:
         logger.warning(
             "[%s] Opus escalation parse failed: %s",
-            communication_id[:8], e,
+            communication_id[:8],
+            e,
         )
         return ExtractionAttemptResult(
             success=False,
@@ -295,7 +321,8 @@ async def _run_opus_escalation(
     except ValidationError as e:
         logger.warning(
             "[%s] Opus escalation validation failed: %s",
-            communication_id[:8], e,
+            communication_id[:8],
+            e,
         )
         return ExtractionAttemptResult(
             success=False,
@@ -310,7 +337,9 @@ async def _run_opus_escalation(
         raise
     except LLMError as e:
         logger.warning(
-            "[%s] Opus escalation LLM error: %s", communication_id[:8], e,
+            "[%s] Opus escalation LLM error: %s",
+            communication_id[:8],
+            e,
         )
         return ExtractionAttemptResult(
             success=False,
@@ -326,6 +355,7 @@ async def _run_opus_escalation(
 # ═══════════════════════════════════════════════════════════════════════════
 # 10. Main entry point — extraction with escalation (Phase 4B + Phase 5)
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 async def run_extraction_stage(db, communication_id: str) -> dict:
     """Run extraction: Sonnet first, then Opus escalation if triggered.
@@ -387,8 +417,15 @@ async def run_extraction_stage(db, communication_id: str) -> dict:
 
     # ── Step 1: Sonnet extraction ──
     sonnet_result = await _run_sonnet_extraction(
-        db, communication_id, sonnet_model, system_prompt, user_prompt,
-        full_context, full_context_json, policy, prompt_version,
+        db,
+        communication_id,
+        sonnet_model,
+        system_prompt,
+        user_prompt,
+        full_context,
+        full_context_json,
+        policy,
+        prompt_version,
     )
 
     # ── Step 2: Check escalation triggers (Original Phase 5) ──
@@ -429,16 +466,27 @@ async def run_extraction_stage(db, communication_id: str) -> dict:
     final_extraction_id = sonnet_extraction_id
 
     if escalation_decision.should_escalate:
-        await publish_event("stage_progress", {
-            "communication_id": communication_id,
-            "stage": "extracting",
-            "message": f"Escalating to Opus ({escalation_decision.reason})...",
-        })
+        await publish_event(
+            "stage_progress",
+            {
+                "communication_id": communication_id,
+                "stage": "extracting",
+                "message": f"Escalating to Opus ({escalation_decision.reason})...",
+            },
+        )
 
         opus_result = await _run_opus_escalation(
-            db, communication_id, opus_model, system_prompt, user_prompt,
-            full_context, full_context_json, policy, prompt_version,
-            sonnet_result, triggers,
+            db,
+            communication_id,
+            opus_model,
+            system_prompt,
+            user_prompt,
+            full_context,
+            full_context_json,
+            policy,
+            prompt_version,
+            sonnet_result,
+            triggers,
         )
 
         if opus_result.success:
@@ -447,7 +495,11 @@ async def run_extraction_stage(db, communication_id: str) -> dict:
                 _clear_bundles_for_communication(db, communication_id)
 
             # Persist Opus result as the authoritative extraction
-            opus_attempt = (sonnet_result.attempt_number + 1) if sonnet_result.success else (MAX_SONNET_ATTEMPTS + 1)
+            opus_attempt = (
+                (sonnet_result.attempt_number + 1)
+                if sonnet_result.success
+                else (MAX_SONNET_ATTEMPTS + 1)
+            )
             final_extraction_id = _persist_extraction(
                 db=db,
                 communication_id=communication_id,
@@ -472,10 +524,13 @@ async def run_extraction_stage(db, communication_id: str) -> dict:
             # Opus failed — fall back to Sonnet if available
             if sonnet_result.success:
                 # Mark Sonnet extraction as the final success
-                db.execute("""
+                db.execute(
+                    """
                     UPDATE ai_extractions SET success = 1
                     WHERE id = ? AND communication_id = ?
-                """, (sonnet_extraction_id, communication_id))
+                """,
+                    (sonnet_extraction_id, communication_id),
+                )
                 db.commit()
                 logger.warning(
                     "[%s] Opus escalation failed — falling back to Sonnet result",
@@ -484,8 +539,12 @@ async def run_extraction_stage(db, communication_id: str) -> dict:
             else:
                 # Both failed — persist Opus failure for audit, then error
                 _persist_failed_extraction(
-                    db, communication_id, opus_model, opus_result,
-                    prompt_version, full_context_json,
+                    db,
+                    communication_id,
+                    opus_model,
+                    opus_result,
+                    prompt_version,
+                    full_context_json,
                 )
                 raise RuntimeError(
                     f"Extraction failed: Sonnet ({sonnet_result.failure_detail}) "
@@ -504,8 +563,12 @@ async def run_extraction_stage(db, communication_id: str) -> dict:
     elif not sonnet_result.success:
         # No escalation available, Sonnet failed
         _persist_failed_extraction(
-            db, communication_id, sonnet_model, sonnet_result,
-            prompt_version, full_context_json,
+            db,
+            communication_id,
+            sonnet_model,
+            sonnet_result,
+            prompt_version,
+            full_context_json,
         )
         raise RuntimeError(
             f"Extraction failed after {MAX_SONNET_ATTEMPTS} Sonnet attempts "
@@ -525,7 +588,9 @@ async def run_extraction_stage(db, communication_id: str) -> dict:
     logger.info(
         "[%s] Extraction stage complete: %d bundles, %d items, "
         "model=%s, escalated=%s, cost=$%.4f",
-        communication_id[:8], len(bundles), total_items,
+        communication_id[:8],
+        len(bundles),
+        total_items,
         winner.model.split("-")[1],
         bool(opus_result and opus_result.success),
         sonnet_cost + opus_cost,

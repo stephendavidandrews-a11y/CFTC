@@ -60,8 +60,16 @@ def test_converter_outputs_match_tracker_contract():
                 "category": "policy_operating_rule",
                 "body": "Major rules should come with options and deadlines.",
                 "linked_entities": [
-                    {"entity_type": "matter", "entity_id": "matter-001", "relationship_role": "subject"},
-                    {"entity_type": "organization", "entity_id": "org-001", "relationship_role": "source"},
+                    {
+                        "entity_type": "matter",
+                        "entity_id": "matter-001",
+                        "relationship_role": "subject",
+                    },
+                    {
+                        "entity_type": "organization",
+                        "entity_id": "org-001",
+                        "relationship_role": "source",
+                    },
                 ],
             },
         },
@@ -117,7 +125,9 @@ def test_converter_outputs_match_tracker_contract():
         data = op.get("data", {})
         assert set(data.keys()).issubset(columns_by_table[table])
 
-        for column, enum_name in TRACKER_CONTRACTS.AI_WRITABLE_ENUM_COLUMNS.get(table, {}).items():
+        for column, enum_name in TRACKER_CONTRACTS.AI_WRITABLE_ENUM_COLUMNS.get(
+            table, {}
+        ).items():
             value = data.get(column)
             if value is not None:
                 assert value in TRACKER_CONTRACTS.ENUMS[enum_name]

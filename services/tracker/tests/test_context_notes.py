@@ -1,6 +1,8 @@
 """Tests for context_notes router — CRUD, links, by-entity queries."""
+
 from tests.conftest import (
-    seed_person, make_id,
+    seed_person,
+    make_id,
 )
 
 
@@ -80,9 +82,7 @@ def test_list_context_notes_search(client, auth_headers, db):
     """GET /tracker/context-notes?search= filters by title/body."""
     _seed_context_note(db, title="Important Insight", body="x")
     _seed_context_note(db, title="Other Note", body="y")
-    resp = client.get(
-        "/tracker/context-notes?search=Important", headers=auth_headers
-    )
+    resp = client.get("/tracker/context-notes?search=Important", headers=auth_headers)
     assert resp.status_code == 200
     assert resp.json()["total"] == 1
 

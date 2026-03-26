@@ -56,11 +56,14 @@ def get_detail(db, communication_id: str) -> dict:
     Returns bundles with nested items, extraction metadata, suppression
     visibility, provenance, and readiness-to-complete assessment.
     """
-    comm = db.execute("""
+    comm = db.execute(
+        """
         SELECT id, processing_status, title, original_filename, duration_seconds,
                topic_segments_json, sensitivity_flags, created_at
         FROM communications WHERE id = ?
-    """, (communication_id,)).fetchone()
+    """,
+        (communication_id,),
+    ).fetchone()
     if not comm:
         raise HTTPException(404, detail={"error_type": "not_found"})
 
@@ -83,13 +86,16 @@ def get_detail(db, communication_id: str) -> dict:
             pass
 
     # Get extraction metadata
-    extraction = db.execute("""
+    extraction = db.execute(
+        """
         SELECT id, model_used, prompt_version, raw_output, input_tokens,
                output_tokens, processing_seconds, extracted_at
         FROM ai_extractions
         WHERE communication_id = ?
         ORDER BY extracted_at DESC LIMIT 1
-    """, (communication_id,)).fetchone()
+    """,
+        (communication_id,),
+    ).fetchone()
 
     extraction_meta = None
     suppressed_observations = []
@@ -128,8 +134,12 @@ def get_detail(db, communication_id: str) -> dict:
     total_items_by_type = {}
     for b in bundles:
         for item in b.get("items", []):
-            total_items_by_status[item["status"]] = total_items_by_status.get(item["status"], 0) + 1
-            total_items_by_type[item["item_type"]] = total_items_by_type.get(item["item_type"], 0) + 1
+            total_items_by_status[item["status"]] = (
+                total_items_by_status.get(item["status"], 0) + 1
+            )
+            total_items_by_type[item["item_type"]] = (
+                total_items_by_type.get(item["item_type"], 0) + 1
+            )
 
     bundle_counts = {
         "total": len(bundles),
@@ -171,7 +181,8 @@ def _build_bundle_tree(db, communication_id: str) -> list[dict]:
     This function is reusable: Phase 5 writeback can call it to
     read accepted/edited items for tracker commit formatting.
     """
-    bundle_rows = db.execute("""
+    bundle_rows = db.execute(
+        """
         SELECT id, bundle_type, target_matter_id, target_matter_title,
                proposed_matter_json, status, confidence, rationale,
                intelligence_notes, sort_order, reviewed_by, reviewed_at,
@@ -179,7 +190,9 @@ def _build_bundle_tree(db, communication_id: str) -> list[dict]:
         FROM review_bundles
         WHERE communication_id = ?
         ORDER BY sort_order, created_at
-    """, (communication_id,)).fetchall()
+    """,
+        (communication_id,),
+    ).fetchall()
 
     bundles = []
     for br in bundle_rows:
@@ -200,7 +213,8 @@ def _build_bundle_tree(db, communication_id: str) -> list[dict]:
         )
 
         # Get items for this bundle
-        item_rows = db.execute("""
+        item_rows = db.execute(
+            """
             SELECT id, item_type, status, proposed_data, original_proposed_data,
                    confidence, rationale, source_excerpt,
                    source_transcript_id, source_start_time, source_end_time,
@@ -209,12 +223,18 @@ def _build_bundle_tree(db, communication_id: str) -> list[dict]:
             FROM review_bundle_items
             WHERE bundle_id = ?
             ORDER BY sort_order, created_at
-        """, (br["id"],)).fetchall()
+        """,
+            (br["id"],),
+        ).fetchall()
 
         items = []
         for ir in item_rows:
             item = dict(ir)
-            for jf in ("proposed_data", "original_proposed_data", "source_locator_json"):
+            for jf in (
+                "proposed_data",
+                "original_proposed_data",
+                "source_locator_json",
+            ):
                 if item[jf]:
                     try:
                         item[jf] = json.loads(item[jf])
@@ -223,15 +243,17 @@ def _build_bundle_tree(db, communication_id: str) -> list[dict]:
 
             # Detect reviewer-created items
             item["reviewer_created"] = (
-                item.get("confidence") is None
-                and item.get("source_excerpt") is None
+                item.get("confidence") is None and item.get("source_excerpt") is None
             )
 
             # Warnings
             item["warnings"] = []
             if item.get("rationale") and "[DEDUP WARNING" in item["rationale"]:
                 item["warnings"].append("dedup_warning")
-            if item.get("rationale") and "[Note: some references were cleaned" in item["rationale"]:
+            if (
+                item.get("rationale")
+                and "[Note: some references were cleaned" in item["rationale"]
+            ):
                 item["warnings"].append("references_cleaned")
 
             items.append(item)

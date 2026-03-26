@@ -1,6 +1,9 @@
 """Tests for documents router — CRUD, file upload, download."""
+
 from tests.conftest import (
-    seed_matter, seed_document, make_id,
+    seed_matter,
+    seed_document,
+    make_id,
 )
 
 

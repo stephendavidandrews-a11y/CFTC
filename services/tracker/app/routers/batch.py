@@ -55,12 +55,16 @@ def _normalize_upsert_by(upsert_by):
         return ()
     if isinstance(upsert_by, str):
         return (upsert_by,)
-    if isinstance(upsert_by, (list, tuple)) and all(isinstance(column, str) for column in upsert_by):
+    if isinstance(upsert_by, (list, tuple)) and all(
+        isinstance(column, str) for column in upsert_by
+    ):
         return tuple(upsert_by)
     raise ValueError("upsert_by must be a string or list of strings")
 
 
-def _validate_meta(meta, op_type: str, table: str, valid_columns: set[str], data: dict, op_index: int):
+def _validate_meta(
+    meta, op_type: str, table: str, valid_columns: set[str], data: dict, op_index: int
+):
     if not meta:
         return
 
@@ -116,7 +120,9 @@ def _validate_meta(meta, op_type: str, table: str, valid_columns: set[str], data
             f"Upsert columns missing from {table} insert: {missing_data}",
         )
 
-    invalid_upsert_columns = [column for column in upsert_columns if column not in valid_columns]
+    invalid_upsert_columns = [
+        column for column in upsert_columns if column not in valid_columns
+    ]
     if invalid_upsert_columns:
         raise _typed_error(
             400,
@@ -148,8 +154,9 @@ def _with_source_default(valid_columns: set[str], data: dict, source: str) -> di
 
 
 @router.post("")
-async def batch_write(body: dict, db=Depends(get_db),
-                      write_source: str = Depends(get_write_source)):
+async def batch_write(
+    body: dict, db=Depends(get_db), write_source: str = Depends(get_write_source)
+):
     """
     Execute an ordered array of write operations atomically.
 
@@ -167,41 +174,61 @@ async def batch_write(body: dict, db=Depends(get_db),
     idempotency_key = body.get("idempotency_key")
 
     if not operations:
-        raise HTTPException(status_code=400, detail={
-            "error_type": "validation_failure",
-            "message": "No operations provided"
-        })
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error_type": "validation_failure",
+                "message": "No operations provided",
+            },
+        )
     if source not in ENUMS["source"]:
-        raise HTTPException(status_code=400, detail={
-            "error_type": "validation_failure",
-            "message": f"Invalid source: {source!r}. Allowed values: {ENUMS['source']}",
-        })
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error_type": "validation_failure",
+                "message": f"Invalid source: {source!r}. Allowed values: {ENUMS['source']}",
+            },
+        )
 
     if idempotency_key:
-        body_hash = _hash_body({"operations": operations, "source": source,
-                                "source_metadata": source_metadata})
+        body_hash = _hash_body(
+            {
+                "operations": operations,
+                "source": source,
+                "source_metadata": source_metadata,
+            }
+        )
         existing = db.execute(
             "SELECT request_hash, status_code, response_body FROM idempotency_keys WHERE key = ?",
-            (idempotency_key,)
+            (idempotency_key,),
         ).fetchone()
 
         if existing:
             if existing["request_hash"] != body_hash:
-                raise HTTPException(status_code=409, detail={
-                    "error_type": "conflict",
-                    "message": "Idempotency key used with different payload"
-                })
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "error_type": "conflict",
+                        "message": "Idempotency key used with different payload",
+                    },
+                )
             if existing["status_code"] is not None:
                 return json.loads(existing["response_body"])
-            raise HTTPException(status_code=409, detail={
-                "error_type": "conflict",
-                "message": "Batch is still being processed (pending)"
-            })
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error_type": "conflict",
+                    "message": "Batch is still being processed (pending)",
+                },
+            )
 
-        db.execute("""
+        db.execute(
+            """
             INSERT INTO idempotency_keys (key, method, path, request_hash, status_code, response_body)
             VALUES (?, 'POST', '/tracker/batch', ?, NULL, NULL)
-        """, (idempotency_key, body_hash))
+        """,
+            (idempotency_key, body_hash),
+        )
         db.commit()
 
     column_cache = {}
@@ -212,28 +239,47 @@ async def batch_write(body: dict, db=Depends(get_db),
         meta = op.get("_meta") or {}
 
         if table not in ALLOWED_TABLES:
-            raise _typed_error(400, "forbidden_table", i,
-                               f"Table '{table}' not allowed in batch")
+            raise _typed_error(
+                400, "forbidden_table", i, f"Table '{table}' not allowed in batch"
+            )
         if op_type not in ("insert", "update", "delete"):
-            raise _typed_error(400, "validation_failure", i,
-                               "op must be 'insert', 'update', or 'delete'")
+            raise _typed_error(
+                400,
+                "validation_failure",
+                i,
+                "op must be 'insert', 'update', or 'delete'",
+            )
         if op_type in ("update", "delete") and not op.get("record_id"):
-            raise _typed_error(400, "validation_failure", i,
-                               f"'{op_type}' requires record_id")
-        if op_type == "delete" and table not in DELETE_ALLOWED_TABLES and table not in SOFT_DELETE_TABLES:
-            raise _typed_error(400, "forbidden_table", i,
-                               f"Delete not allowed on '{table}'")
+            raise _typed_error(
+                400, "validation_failure", i, f"'{op_type}' requires record_id"
+            )
+        if (
+            op_type == "delete"
+            and table not in DELETE_ALLOWED_TABLES
+            and table not in SOFT_DELETE_TABLES
+        ):
+            raise _typed_error(
+                400, "forbidden_table", i, f"Delete not allowed on '{table}'"
+            )
 
         if table not in column_cache:
             column_cache[table] = _get_table_columns(db, table)
         valid_columns = column_cache[table]
 
         if data:
-            invalid = set(data.keys()) - valid_columns - {"id", "created_at", "updated_at"}
+            invalid = (
+                set(data.keys()) - valid_columns - {"id", "created_at", "updated_at"}
+            )
             if invalid:
-                raise _typed_error(400, "schema_mismatch", i,
-                                   f"Invalid columns for {table}: {sorted(invalid)}")
-            _validate_enum_values(table, _with_source_default(valid_columns, data, source), i)
+                raise _typed_error(
+                    400,
+                    "schema_mismatch",
+                    i,
+                    f"Invalid columns for {table}: {sorted(invalid)}",
+                )
+            _validate_enum_values(
+                table, _with_source_default(valid_columns, data, source), i
+            )
 
         _validate_meta(meta, op_type, table, valid_columns, data, i)
 
@@ -256,8 +302,12 @@ async def batch_write(body: dict, db=Depends(get_db),
                 if isinstance(value, str) and value.startswith("$ref:"):
                     ref_key = value[5:]
                     if ref_key not in id_map:
-                        raise _typed_error(400, "reference_resolution_failure", i,
-                                           f"Unresolved reference '{ref_key}'")
+                        raise _typed_error(
+                            400,
+                            "reference_resolution_failure",
+                            i,
+                            f"Unresolved reference '{ref_key}'",
+                        )
                     data[key] = id_map[ref_key]
 
             now = datetime.now().isoformat()
@@ -265,7 +315,9 @@ async def batch_write(body: dict, db=Depends(get_db),
             if op_type == "insert":
                 upsert_columns = _normalize_upsert_by(meta.get("upsert_by"))
                 if upsert_columns:
-                    where_clause = " AND ".join(f"{column} = ?" for column in upsert_columns)
+                    where_clause = " AND ".join(
+                        f"{column} = ?" for column in upsert_columns
+                    )
                     existing = db.execute(
                         f"SELECT * FROM {table} WHERE {where_clause}",
                         [data[column] for column in upsert_columns],
@@ -279,7 +331,9 @@ async def batch_write(body: dict, db=Depends(get_db),
 
                         sets = [f"{key} = ?" for key in update_data]
                         params = list(update_data.values()) + [record_id]
-                        db.execute(f"UPDATE {table} SET {', '.join(sets)} WHERE id = ?", params)
+                        db.execute(
+                            f"UPDATE {table} SET {', '.join(sets)} WHERE id = ?", params
+                        )
 
                         if op.get("client_id"):
                             id_map[op["client_id"]] = record_id
@@ -294,13 +348,15 @@ async def batch_write(body: dict, db=Depends(get_db),
                             new_data=update_data,
                         )
 
-                        results.append({
-                            "op": "update",
-                            "table": table,
-                            "record_id": record_id,
-                            "client_id": op.get("client_id"),
-                            "previous_data": previous_data,
-                        })
+                        results.append(
+                            {
+                                "op": "update",
+                                "table": table,
+                                "record_id": record_id,
+                                "client_id": op.get("client_id"),
+                                "previous_data": previous_data,
+                            }
+                        )
                         continue
 
                 record_id = str(uuid.uuid4())
@@ -316,29 +372,43 @@ async def batch_write(body: dict, db=Depends(get_db),
                 placeholders = ", ".join(["?"] * len(data))
                 db.execute(
                     f"INSERT INTO {table} ({columns}) VALUES ({placeholders})",
-                    list(data.values())
+                    list(data.values()),
                 )
 
                 if op.get("client_id"):
                     id_map[op["client_id"]] = record_id
 
-                log_event(db, table_name=table, record_id=record_id,
-                          action="create", source=source, new_data=data)
+                log_event(
+                    db,
+                    table_name=table,
+                    record_id=record_id,
+                    action="create",
+                    source=source,
+                    new_data=data,
+                )
 
-                results.append({
-                    "op": "insert",
-                    "table": table,
-                    "record_id": record_id,
-                    "client_id": op.get("client_id"),
-                    "previous_data": None,
-                })
+                results.append(
+                    {
+                        "op": "insert",
+                        "table": table,
+                        "record_id": record_id,
+                        "client_id": op.get("client_id"),
+                        "previous_data": None,
+                    }
+                )
 
             elif op_type == "update":
                 record_id = op["record_id"]
-                old = db.execute(f"SELECT * FROM {table} WHERE id = ?", (record_id,)).fetchone()
+                old = db.execute(
+                    f"SELECT * FROM {table} WHERE id = ?", (record_id,)
+                ).fetchone()
                 if not old:
-                    raise _typed_error(404, "missing_record", i,
-                                       f"Record {record_id} not found in {table}")
+                    raise _typed_error(
+                        404,
+                        "missing_record",
+                        i,
+                        f"Record {record_id} not found in {table}",
+                    )
                 previous_data = dict(old)
 
                 if "updated_at" in valid_columns:
@@ -361,24 +431,41 @@ async def batch_write(body: dict, db=Depends(get_db),
                             f"(expected updated_at={expected_updated_at})",
                         )
                 else:
-                    db.execute(f"UPDATE {table} SET {', '.join(sets)} WHERE id = ?", params)
+                    db.execute(
+                        f"UPDATE {table} SET {', '.join(sets)} WHERE id = ?", params
+                    )
 
-                log_event(db, table_name=table, record_id=record_id,
-                          action="update", source=source, old_record=old, new_data=data)
+                log_event(
+                    db,
+                    table_name=table,
+                    record_id=record_id,
+                    action="update",
+                    source=source,
+                    old_record=old,
+                    new_data=data,
+                )
 
-                results.append({
-                    "op": "update",
-                    "table": table,
-                    "record_id": record_id,
-                    "previous_data": previous_data,
-                })
+                results.append(
+                    {
+                        "op": "update",
+                        "table": table,
+                        "record_id": record_id,
+                        "previous_data": previous_data,
+                    }
+                )
 
             elif op_type == "delete":
                 record_id = op["record_id"]
-                old = db.execute(f"SELECT * FROM {table} WHERE id = ?", (record_id,)).fetchone()
+                old = db.execute(
+                    f"SELECT * FROM {table} WHERE id = ?", (record_id,)
+                ).fetchone()
                 if not old:
-                    raise _typed_error(404, "missing_record", i,
-                                       f"Record {record_id} not found in {table}")
+                    raise _typed_error(
+                        404,
+                        "missing_record",
+                        i,
+                        f"Record {record_id} not found in {table}",
+                    )
                 previous_data = dict(old)
 
                 if table in DELETE_ALLOWED_TABLES:
@@ -400,24 +487,35 @@ async def batch_write(body: dict, db=Depends(get_db),
                                 (value, record_id),
                             )
 
-                log_event(db, table_name=table, record_id=record_id,
-                          action="delete", source=source, old_record=old)
+                log_event(
+                    db,
+                    table_name=table,
+                    record_id=record_id,
+                    action="delete",
+                    source=source,
+                    old_record=old,
+                )
 
-                results.append({
-                    "op": "delete",
-                    "table": table,
-                    "record_id": record_id,
-                    "previous_data": previous_data,
-                })
+                results.append(
+                    {
+                        "op": "delete",
+                        "table": table,
+                        "record_id": record_id,
+                        "previous_data": previous_data,
+                    }
+                )
 
         db.commit()
         response = {"success": True, "results": results}
 
         if idempotency_key:
-            db.execute("""
+            db.execute(
+                """
                 UPDATE idempotency_keys SET status_code = ?, response_body = ?
                 WHERE key = ? AND status_code IS NULL
-            """, (200, json.dumps(response, default=str), idempotency_key))
+            """,
+                (200, json.dumps(response, default=str), idempotency_key),
+            )
             db.commit()
 
         return response
@@ -428,15 +526,19 @@ async def batch_write(body: dict, db=Depends(get_db),
     except Exception as exc:
         db.rollback()
         logger.error("Batch failed at operation %d: %s", current_op, str(exc))
-        raise HTTPException(status_code=500, detail={
-            "error_type": "internal_error",
-            "message": f"Batch failed at operation {current_op}: {str(exc)}",
-            "operation_index": current_op,
-        }) from exc
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error_type": "internal_error",
+                "message": f"Batch failed at operation {current_op}: {str(exc)}",
+                "operation_index": current_op,
+            },
+        ) from exc
 
 
-def _typed_error(status_code: int, error_type: str, operation_index: int,
-                 message: str) -> HTTPException:
+def _typed_error(
+    status_code: int, error_type: str, operation_index: int, message: str
+) -> HTTPException:
     """Create a typed error response for batch operations."""
     return HTTPException(
         status_code=status_code,
@@ -444,5 +546,5 @@ def _typed_error(status_code: int, error_type: str, operation_index: int,
             "error_type": error_type,
             "message": message,
             "operation_index": operation_index,
-        }
+        },
     )

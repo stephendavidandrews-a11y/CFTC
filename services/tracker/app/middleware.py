@@ -10,6 +10,7 @@ Adds to every request:
   - In-memory metrics (request count, latency by endpoint)
   - Per-IP rate limiting (configurable requests-per-minute)
 """
+
 import time
 import uuid
 from collections import defaultdict
@@ -27,13 +28,14 @@ API_VERSION = "1.0"
 # In-memory metrics store
 # ---------------------------------------------------------------------------
 
+
 class RequestMetrics:
     """Simple in-memory request metrics. Thread-safe enough for single-process."""
 
     def __init__(self):
-        self.counts = defaultdict(int)       # (method, path, status) -> count
-        self.latencies = defaultdict(list)    # (method, path) -> [ms, ...]
-        self._max_latencies = 1000           # keep last N per endpoint
+        self.counts = defaultdict(int)  # (method, path, status) -> count
+        self.latencies = defaultdict(list)  # (method, path) -> [ms, ...]
+        self._max_latencies = 1000  # keep last N per endpoint
 
     def record(self, method: str, path: str, status: int, duration_ms: float):
         key = (method, path, status)
@@ -42,7 +44,7 @@ class RequestMetrics:
         bucket = self.latencies[lat_key]
         bucket.append(duration_ms)
         if len(bucket) > self._max_latencies:
-            self.latencies[lat_key] = bucket[-self._max_latencies:]
+            self.latencies[lat_key] = bucket[-self._max_latencies :]
 
     def snapshot(self) -> dict:
         """Return a JSON-serializable snapshot of current metrics."""
@@ -76,6 +78,7 @@ metrics = RequestMetrics()
 # ---------------------------------------------------------------------------
 # In-memory rate limiter (sliding window per IP)
 # ---------------------------------------------------------------------------
+
 
 class RateLimiter:
     """Simple sliding-window rate limiter keyed by client IP.
@@ -144,6 +147,7 @@ class RateLimiter:
 # ---------------------------------------------------------------------------
 # Middleware
 # ---------------------------------------------------------------------------
+
 
 class RequestIDMiddleware(BaseHTTPMiddleware):
     """Adds request ID, API version, logging, metrics, and rate limiting."""

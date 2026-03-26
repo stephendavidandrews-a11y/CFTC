@@ -108,8 +108,13 @@ def _normalize_pass1_payload(parsed: dict[str, Any]) -> dict[str, Any]:
             observation["observation_type"] = obs_type
 
         subtype = observation.get("observation_subtype")
-        if obs_type in _PASS1_SUBTYPE_ALIASES and subtype in _PASS1_SUBTYPE_ALIASES[obs_type]:
-            observation["observation_subtype"] = _PASS1_SUBTYPE_ALIASES[obs_type][subtype]
+        if (
+            obs_type in _PASS1_SUBTYPE_ALIASES
+            and subtype in _PASS1_SUBTYPE_ALIASES[obs_type]
+        ):
+            observation["observation_subtype"] = _PASS1_SUBTYPE_ALIASES[obs_type][
+                subtype
+            ]
 
         directness = observation.get("directness")
         if directness in _DIRECTNESS_ALIASES:
@@ -170,7 +175,9 @@ def _token_set(value: Optional[str]) -> set[str]:
 
 def _json_block(data: Any) -> str:
     """Format data as pretty JSON for prompts."""
-    return f"```json\n{json.dumps(data, indent=2, ensure_ascii=False, default=str)}\n```"
+    return (
+        f"```json\n{json.dumps(data, indent=2, ensure_ascii=False, default=str)}\n```"
+    )
 
 
 def _preferred_message_text(message: dict[str, Any]) -> tuple[str, str]:
@@ -199,7 +206,9 @@ def _scan_for_identifiers(text: str, hits: dict[str, set[str]]):
         hits["rin"].add(match.group(1))
     for match in re.finditer(r"(?i)\bdocket\s*(?:no\.?\s*)?([A-Z0-9-]+)", text):
         hits["docket"].add(match.group(1))
-    for match in re.finditer(r"\b(\d+\s*CFR\s*(?:Part\s*)?\d+(?:\.\d+)?)\b", text, re.IGNORECASE):
+    for match in re.finditer(
+        r"\b(\d+\s*CFR\s*(?:Part\s*)?\d+(?:\.\d+)?)\b", text, re.IGNORECASE
+    ):
         hits["cfr"].add(match.group(1))
 
 
@@ -213,7 +222,9 @@ def gather_v3_routing_seeds(db, communication_id: str) -> dict[str, Any]:
         """,
         (communication_id,),
     ).fetchall()
-    speaker_person_ids = {row["tracker_person_id"] for row in speaker_rows if row["tracker_person_id"]}
+    speaker_person_ids = {
+        row["tracker_person_id"] for row in speaker_rows if row["tracker_person_id"]
+    }
 
     entity_rows = db.execute(
         """
@@ -272,7 +283,8 @@ def _build_communication_packet(db, communication_id: str) -> dict[str, Any]:
     source_type = communication_dict.get("source_type") or "audio"
 
     participants = [
-        dict(row) for row in db.execute(
+        dict(row)
+        for row in db.execute(
             """
             SELECT speaker_label, tracker_person_id, proposed_name, proposed_title,
                    proposed_org, proposed_org_id, participant_email,
@@ -286,7 +298,8 @@ def _build_communication_packet(db, communication_id: str) -> dict[str, Any]:
     ]
 
     entities = [
-        dict(row) for row in db.execute(
+        dict(row)
+        for row in db.execute(
             """
             SELECT mention_text, entity_type, tracker_person_id, tracker_org_id,
                    proposed_name, proposed_title, proposed_org,
@@ -312,7 +325,7 @@ def _build_communication_packet(db, communication_id: str) -> dict[str, Any]:
     if source_type == "email":
         messages = []
         for row in db.execute(
-                """
+            """
                 SELECT id, message_index, sender_email, sender_name,
                        recipient_emails, cc_emails, timestamp,
                        subject, body_text, enriched_text, is_new, is_from_user
@@ -320,8 +333,8 @@ def _build_communication_packet(db, communication_id: str) -> dict[str, Any]:
                 WHERE communication_id = ?
                 ORDER BY message_index
                 """,
-                (communication_id,),
-            ).fetchall():
+            (communication_id,),
+        ).fetchall():
             message = dict(row)
             prompt_text, prompt_text_source = _preferred_message_text(message)
             messages.append(
@@ -341,7 +354,8 @@ def _build_communication_packet(db, communication_id: str) -> dict[str, Any]:
                 }
             )
         attachments = [
-            dict(row) for row in db.execute(
+            dict(row)
+            for row in db.execute(
                 """
                 SELECT id, message_id, original_filename, mime_type,
                        file_size_bytes, extracted_text, text_extraction_status
@@ -356,15 +370,15 @@ def _build_communication_packet(db, communication_id: str) -> dict[str, Any]:
     else:
         transcripts = []
         for row in db.execute(
-                """
+            """
                 SELECT id, speaker_label, start_time, end_time,
                        cleaned_text, raw_text, enriched_text, confidence
                 FROM transcripts
                 WHERE communication_id = ?
                 ORDER BY start_time
                 """,
-                (communication_id,),
-            ).fetchall():
+            (communication_id,),
+        ).fetchall():
             transcript = dict(row)
             prompt_text, prompt_text_source = _preferred_transcript_text(transcript)
             transcripts.append(
@@ -435,27 +449,37 @@ def build_v3_pass2_user_prompt(
     return "\n\n".join(sections)
 
 
-def _resolve_person_name(name: str, people: list[dict[str, Any]]) -> tuple[Optional[str], float, str]:
+def _resolve_person_name(
+    name: str, people: list[dict[str, Any]]
+) -> tuple[Optional[str], float, str]:
     """Resolve a person name against tracker people."""
     if not name:
         return None, 0.0, "no_name"
 
     target = _normalize_text(name)
-    exact_matches = [person for person in people if _normalize_text(person.get("full_name")) == target]
+    exact_matches = [
+        person
+        for person in people
+        if _normalize_text(person.get("full_name")) == target
+    ]
     if len(exact_matches) == 1:
         return exact_matches[0]["id"], 0.95, "exact_name"
     return None, 0.0, "unresolved"
 
 
-def _resolve_org_name(name: str, organizations: list[dict[str, Any]]) -> tuple[Optional[str], float, str]:
+def _resolve_org_name(
+    name: str, organizations: list[dict[str, Any]]
+) -> tuple[Optional[str], float, str]:
     """Resolve an organization name or short name against tracker organizations."""
     if not name:
         return None, 0.0, "no_name"
 
     target = _normalize_text(name)
     exact_matches = [
-        organization for organization in organizations
-        if target in {
+        organization
+        for organization in organizations
+        if target
+        in {
             _normalize_text(organization.get("name")),
             _normalize_text(organization.get("short_name")),
         }
@@ -473,9 +497,16 @@ def _dedupe_resolved_people(
     seen_ids: set[str] = set()
     resolved: list[ResolvedPerson] = []
 
-    def add_candidate(name: Optional[str], tracker_person_id: Optional[str], source: str, confidence: float):
+    def add_candidate(
+        name: Optional[str],
+        tracker_person_id: Optional[str],
+        source: str,
+        confidence: float,
+    ):
         if tracker_person_id:
-            person = next((entry for entry in people if entry["id"] == tracker_person_id), None)
+            person = next(
+                (entry for entry in people if entry["id"] == tracker_person_id), None
+            )
             display_name = name or (person or {}).get("full_name")
             if person and display_name and tracker_person_id not in seen_ids:
                 seen_ids.add(tracker_person_id)
@@ -492,7 +523,9 @@ def _dedupe_resolved_people(
         if not name:
             return
 
-        resolved_id, resolved_confidence, resolved_source = _resolve_person_name(name, people)
+        resolved_id, resolved_confidence, resolved_source = _resolve_person_name(
+            name, people
+        )
         if resolved_id and resolved_id not in seen_ids:
             seen_ids.add(resolved_id)
             resolved.append(
@@ -505,14 +538,29 @@ def _dedupe_resolved_people(
             )
 
     for participant in pass1_output.participants:
-        add_candidate(participant.display_name, participant.tracker_person_id, "participant", participant.confidence)
+        add_candidate(
+            participant.display_name,
+            participant.tracker_person_id,
+            "participant",
+            participant.confidence,
+        )
 
     for observation in pass1_output.observations:
         for speaker_ref in observation.speaker_refs:
-            add_candidate(speaker_ref.name, speaker_ref.tracker_person_id, "observation_speaker", observation.confidence)
+            add_candidate(
+                speaker_ref.name,
+                speaker_ref.tracker_person_id,
+                "observation_speaker",
+                observation.confidence,
+            )
         for entity_ref in observation.entity_refs:
             if entity_ref.entity_type == "person":
-                add_candidate(entity_ref.name, entity_ref.tracker_id, "observation_entity", observation.confidence)
+                add_candidate(
+                    entity_ref.name,
+                    entity_ref.tracker_id,
+                    "observation_entity",
+                    observation.confidence,
+                )
 
     return resolved
 
@@ -525,9 +573,17 @@ def _dedupe_resolved_organizations(
     seen_ids: set[str] = set()
     resolved: list[ResolvedOrganization] = []
 
-    def add_candidate(name: Optional[str], tracker_org_id: Optional[str], source: str, confidence: float):
+    def add_candidate(
+        name: Optional[str],
+        tracker_org_id: Optional[str],
+        source: str,
+        confidence: float,
+    ):
         if tracker_org_id:
-            organization = next((entry for entry in organizations if entry["id"] == tracker_org_id), None)
+            organization = next(
+                (entry for entry in organizations if entry["id"] == tracker_org_id),
+                None,
+            )
             display_name = name or (organization or {}).get("name")
             if organization and display_name and tracker_org_id not in seen_ids:
                 seen_ids.add(tracker_org_id)
@@ -544,7 +600,9 @@ def _dedupe_resolved_organizations(
         if not name:
             return
 
-        resolved_id, resolved_confidence, resolved_source = _resolve_org_name(name, organizations)
+        resolved_id, resolved_confidence, resolved_source = _resolve_org_name(
+            name, organizations
+        )
         if resolved_id and resolved_id not in seen_ids:
             seen_ids.add(resolved_id)
             resolved.append(
@@ -557,22 +615,40 @@ def _dedupe_resolved_organizations(
             )
 
     for participant in pass1_output.participants:
-        add_candidate(participant.organization_name, participant.tracker_org_id, "participant", participant.confidence)
+        add_candidate(
+            participant.organization_name,
+            participant.tracker_org_id,
+            "participant",
+            participant.confidence,
+        )
 
     for observation in pass1_output.observations:
         for entity_ref in observation.entity_refs:
             if entity_ref.entity_type == "organization":
-                add_candidate(entity_ref.name, entity_ref.tracker_id, "observation_entity", observation.confidence)
+                add_candidate(
+                    entity_ref.name,
+                    entity_ref.tracker_id,
+                    "observation_entity",
+                    observation.confidence,
+                )
 
     return resolved
 
 
-def _index_full_context(full_context: dict[str, Any]) -> dict[str, dict[str, dict[str, Any]]]:
+def _index_full_context(
+    full_context: dict[str, Any],
+) -> dict[str, dict[str, dict[str, Any]]]:
     """Index tracker context records by type and id."""
     matters = {matter["id"]: dict(matter) for matter in full_context.get("matters", [])}
     people = {person["id"]: dict(person) for person in full_context.get("people", [])}
-    organizations = {organization["id"]: dict(organization) for organization in full_context.get("organizations", [])}
-    meetings = {meeting["id"]: dict(meeting) for meeting in full_context.get("recent_meetings", [])}
+    organizations = {
+        organization["id"]: dict(organization)
+        for organization in full_context.get("organizations", [])
+    }
+    meetings = {
+        meeting["id"]: dict(meeting)
+        for meeting in full_context.get("recent_meetings", [])
+    }
 
     tasks: dict[str, dict[str, Any]] = {}
     decisions: dict[str, dict[str, Any]] = {}
@@ -696,11 +772,23 @@ def _build_record_matches(
                 )
 
         if observation.observation_type == "task_signal":
-            _maybe_add_title_based_matches(observation, indices["task"], grouped["task"], minimum_overlap=0.6)
+            _maybe_add_title_based_matches(
+                observation, indices["task"], grouped["task"], minimum_overlap=0.6
+            )
         elif observation.observation_type == "decision_signal":
-            _maybe_add_title_based_matches(observation, indices["decision"], grouped["decision"], minimum_overlap=0.6)
+            _maybe_add_title_based_matches(
+                observation,
+                indices["decision"],
+                grouped["decision"],
+                minimum_overlap=0.6,
+            )
         elif observation.observation_type == "document_signal":
-            _maybe_add_title_based_matches(observation, indices["document"], grouped["document"], minimum_overlap=0.7)
+            _maybe_add_title_based_matches(
+                observation,
+                indices["document"],
+                grouped["document"],
+                minimum_overlap=0.7,
+            )
 
     return RecordMatches(
         tasks=list(grouped["task"].values()),
@@ -721,7 +809,9 @@ def _compute_seed_matter_hits(
     speaker_person_ids = routing_seeds.get("speaker_person_ids", set())
     entity_person_ids = routing_seeds.get("entity_person_ids", set())
     entity_org_ids = routing_seeds.get("entity_org_ids", set())
-    identifier_hits = routing_seeds.get("identifier_hits", {"rin": set(), "docket": set(), "cfr": set()})
+    identifier_hits = routing_seeds.get(
+        "identifier_hits", {"rin": set(), "docket": set(), "cfr": set()}
+    )
 
     people_ids = set(speaker_person_ids) | set(entity_person_ids)
     seed_hits: dict[str, list[str]] = {}
@@ -729,31 +819,52 @@ def _compute_seed_matter_hits(
     for matter in full_context.get("matters", []):
         reasons: list[str] = []
 
-        for field in ("assigned_to_person_id", "supervisor_person_id", "next_step_assigned_to_person_id"):
+        for field in (
+            "assigned_to_person_id",
+            "supervisor_person_id",
+            "next_step_assigned_to_person_id",
+        ):
             if matter.get(field) in people_ids and matter.get(field):
                 reasons.append(f"{field} overlaps a confirmed participant/entity")
 
         for stakeholder in matter.get("stakeholders", []):
-            if stakeholder.get("person_id") in people_ids and stakeholder.get("person_id"):
-                reasons.append("confirmed participant/entity is already a matter stakeholder")
+            if stakeholder.get("person_id") in people_ids and stakeholder.get(
+                "person_id"
+            ):
+                reasons.append(
+                    "confirmed participant/entity is already a matter stakeholder"
+                )
 
-        for field in ("requesting_organization_id", "client_organization_id", "reviewing_organization_id", "lead_external_org_id"):
+        for field in (
+            "requesting_organization_id",
+            "client_organization_id",
+            "reviewing_organization_id",
+            "lead_external_org_id",
+        ):
             if matter.get(field) in entity_org_ids and matter.get(field):
                 reasons.append(f"{field} overlaps a confirmed organization")
 
         for organization in matter.get("organizations", []):
-            if organization.get("organization_id") in entity_org_ids and organization.get("organization_id"):
+            if organization.get(
+                "organization_id"
+            ) in entity_org_ids and organization.get("organization_id"):
                 reasons.append("confirmed organization is already linked to the matter")
 
         if matter.get("rin") and matter["rin"] in identifier_hits.get("rin", set()):
             reasons.append("RIN mentioned in the communication matches this matter")
-        if matter.get("docket_number") and matter["docket_number"] in identifier_hits.get("docket", set()):
-            reasons.append("docket number mentioned in the communication matches this matter")
+        if matter.get("docket_number") and matter[
+            "docket_number"
+        ] in identifier_hits.get("docket", set()):
+            reasons.append(
+                "docket number mentioned in the communication matches this matter"
+            )
 
         matter_cfr = _normalize_text(matter.get("cfr_citation"))
         for cfr_hit in identifier_hits.get("cfr", set()):
             if matter_cfr and _normalize_text(cfr_hit) in matter_cfr:
-                reasons.append("CFR citation mentioned in the communication matches this matter")
+                reasons.append(
+                    "CFR citation mentioned in the communication matches this matter"
+                )
                 break
 
         if reasons:
@@ -786,43 +897,69 @@ def _score_matter_candidates(
 
     for observation in pass1_output.observations:
         for candidate in observation.candidate_matter_refs:
-            add_score(candidate.matter_id, candidate.score, f"pass1 candidate matter ref: {candidate.reason}")
+            add_score(
+                candidate.matter_id,
+                candidate.score,
+                f"pass1 candidate matter ref: {candidate.reason}",
+            )
 
         observation_text_tokens = _token_set(_observation_text(observation))
         for matter in full_context.get("matters", []):
             title_tokens = _token_set(matter.get("title"))
             if len(title_tokens) >= 2:
-                overlap = len(title_tokens & observation_text_tokens) / len(title_tokens)
+                overlap = len(title_tokens & observation_text_tokens) / len(
+                    title_tokens
+                )
                 if overlap >= 0.8:
-                    add_score(matter["id"], 0.25, "observation text strongly overlaps the matter title")
+                    add_score(
+                        matter["id"],
+                        0.25,
+                        "observation text strongly overlaps the matter title",
+                    )
 
     indices = _index_full_context(full_context)
     for match in record_matches.tasks:
         task = indices["task"].get(match.record_id)
         if task and task.get("matter_id"):
-            add_score(task["matter_id"], 0.8 * match.match_score, "matched open task already linked to the matter")
+            add_score(
+                task["matter_id"],
+                0.8 * match.match_score,
+                "matched open task already linked to the matter",
+            )
 
     for match in record_matches.decisions:
         decision = indices["decision"].get(match.record_id)
         if decision and decision.get("matter_id"):
-            add_score(decision["matter_id"], 0.8 * match.match_score, "matched open decision already linked to the matter")
+            add_score(
+                decision["matter_id"],
+                0.8 * match.match_score,
+                "matched open decision already linked to the matter",
+            )
 
     for match in record_matches.documents:
         document = indices["document"].get(match.record_id)
         if document and document.get("matter_id"):
-            add_score(document["matter_id"], 0.8 * match.match_score, "matched document already linked to the matter")
+            add_score(
+                document["matter_id"],
+                0.8 * match.match_score,
+                "matched document already linked to the matter",
+            )
 
     return matter_scores, matter_basis
 
 
-def _is_new_matter_candidate(pass1_output: CommunicationUnderstandingOutput, matter_scores: dict[str, float]) -> bool:
+def _is_new_matter_candidate(
+    pass1_output: CommunicationUnderstandingOutput, matter_scores: dict[str, float]
+) -> bool:
     """Heuristic for likely new workstreams when nothing routes cleanly."""
     if matter_scores:
         return False
 
     durable_operational_signals = [
-        observation for observation in pass1_output.observations
-        if observation.observation_type in {"task_signal", "decision_signal", "matter_signal", "document_signal"}
+        observation
+        for observation in pass1_output.observations
+        if observation.observation_type
+        in {"task_signal", "decision_signal", "matter_signal", "document_signal"}
         and observation.durability != "ephemeral"
     ]
     return len(durable_operational_signals) >= 2
@@ -835,7 +972,9 @@ def _build_matter_routing_assessment(
     record_matches: RecordMatches,
 ) -> MatterRoutingAssessment:
     """Classify matter routing using deterministic scores."""
-    matter_scores, matter_basis = _score_matter_candidates(pass1_output, full_context, routing_seeds, record_matches)
+    matter_scores, matter_basis = _score_matter_candidates(
+        pass1_output, full_context, routing_seeds, record_matches
+    )
     ranked = sorted(matter_scores.items(), key=lambda item: item[1], reverse=True)
     new_matter_candidate = _is_new_matter_candidate(pass1_output, matter_scores)
 
@@ -854,19 +993,27 @@ def _build_matter_routing_assessment(
         )
 
     primary_matter_id, primary_score = ranked[0]
-    secondary_candidates = [matter_id for matter_id, score in ranked[1:] if score >= 0.9]
+    secondary_candidates = [
+        matter_id for matter_id, score in ranked[1:] if score >= 0.9
+    ]
     second_score = ranked[1][1] if len(ranked) > 1 else 0.0
 
     if primary_score >= 1.5 and primary_score >= second_score + 0.35:
         confidence = "high"
-    elif primary_score >= 0.9 and secondary_candidates and second_score >= primary_score * 0.8:
+    elif (
+        primary_score >= 0.9
+        and secondary_candidates
+        and second_score >= primary_score * 0.8
+    ):
         confidence = "multi"
     elif primary_score >= 0.9:
         confidence = "medium"
     elif new_matter_candidate:
         return MatterRoutingAssessment(
             routing_confidence="new_matter_candidate",
-            routing_basis=["existing matches were weaker than the new-matter threshold"],
+            routing_basis=[
+                "existing matches were weaker than the new-matter threshold"
+            ],
             new_matter_candidate=True,
         )
     else:
@@ -887,7 +1034,9 @@ def _build_matter_routing_assessment(
     )
 
 
-def _select_records_by_ids(index: dict[str, dict[str, Any]], ids: Iterable[str]) -> list[dict[str, Any]]:
+def _select_records_by_ids(
+    index: dict[str, dict[str, Any]], ids: Iterable[str]
+) -> list[dict[str, Any]]:
     """Select indexed records by id, preserving uniqueness and order."""
     seen: set[str] = set()
     records: list[dict[str, Any]] = []
@@ -919,16 +1068,26 @@ def _build_relevant_tracker_context(
     matched_meeting_ids = [match.record_id for match in record_matches.meetings]
 
     people_ids = [person.tracker_person_id for person in resolved_people]
-    organization_ids = [organization.tracker_org_id for organization in resolved_organizations]
+    organization_ids = [
+        organization.tracker_org_id for organization in resolved_organizations
+    ]
 
     return {
         "matters": _select_records_by_ids(indices["matter"], matter_ids),
         "matched_tasks": _select_records_by_ids(indices["task"], matched_task_ids),
-        "matched_decisions": _select_records_by_ids(indices["decision"], matched_decision_ids),
-        "matched_documents": _select_records_by_ids(indices["document"], matched_document_ids),
-        "recent_meetings": _select_records_by_ids(indices["meeting"], matched_meeting_ids),
+        "matched_decisions": _select_records_by_ids(
+            indices["decision"], matched_decision_ids
+        ),
+        "matched_documents": _select_records_by_ids(
+            indices["document"], matched_document_ids
+        ),
+        "recent_meetings": _select_records_by_ids(
+            indices["meeting"], matched_meeting_ids
+        ),
         "people": _select_records_by_ids(indices["person"], people_ids),
-        "organizations": _select_records_by_ids(indices["organization"], organization_ids),
+        "organizations": _select_records_by_ids(
+            indices["organization"], organization_ids
+        ),
     }
 
 
@@ -951,7 +1110,9 @@ def build_routing_resolution_package_from_context(
     resolved_people = _dedupe_resolved_people(pass1_output, people)
     resolved_organizations = _dedupe_resolved_organizations(pass1_output, organizations)
     record_matches = _build_record_matches(pass1_output, full_context)
-    matter_routing = _build_matter_routing_assessment(pass1_output, full_context, routing_seeds, record_matches)
+    matter_routing = _build_matter_routing_assessment(
+        pass1_output, full_context, routing_seeds, record_matches
+    )
     relevant_tracker_context = _build_relevant_tracker_context(
         full_context,
         matter_routing,
@@ -1002,11 +1163,15 @@ async def _call_v3_json_model(
 
     last_error: Optional[str] = None
     for attempt in range(1, MAX_V3_ATTEMPTS + 1):
-        prompt_for_attempt = user_prompt if attempt == 1 else (
+        prompt_for_attempt = (
             user_prompt
-            + "\n\n## Retry Note\n"
-            + f"Previous attempt failed validation or JSON parsing: {last_error}\n"
-            + "Return ONLY the JSON object."
+            if attempt == 1
+            else (
+                user_prompt
+                + "\n\n## Retry Note\n"
+                + f"Previous attempt failed validation or JSON parsing: {last_error}\n"
+                + "Return ONLY the JSON object."
+            )
         )
         try:
             response = await call_llm(
@@ -1037,7 +1202,9 @@ async def _call_v3_json_model(
         except (json.JSONDecodeError, ValidationError, LLMError) as exc:
             last_error = str(exc)
             if attempt == MAX_V3_ATTEMPTS:
-                raise RuntimeError(f"{stage} failed after {attempt} attempts: {exc}") from exc
+                raise RuntimeError(
+                    f"{stage} failed after {attempt} attempts: {exc}"
+                ) from exc
 
     raise RuntimeError(f"{stage} failed unexpectedly")
 
@@ -1080,8 +1247,12 @@ async def run_v3_extraction_offline(
         output_model=CommunicationUnderstandingOutput,
     )
 
-    routing_package = build_routing_resolution_package(db, communication_id, pass1_output, full_context)
-    pass2_user_prompt = build_v3_pass2_user_prompt(db, communication_id, pass1_output, routing_package)
+    routing_package = build_routing_resolution_package(
+        db, communication_id, pass1_output, full_context
+    )
+    pass2_user_prompt = build_v3_pass2_user_prompt(
+        db, communication_id, pass1_output, routing_package
+    )
 
     pass2_output, pass2_raw, pass2_usage = await _call_v3_json_model(
         db=db,
@@ -1096,8 +1267,12 @@ async def run_v3_extraction_offline(
     return {
         "communication_id": communication_id,
         "prompts": {
-            "pass1": f"{pass1_prompt_name}.md" if not pass1_prompt_name.endswith(".md") else pass1_prompt_name,
-            "pass2": f"{pass2_prompt_name}.md" if not pass2_prompt_name.endswith(".md") else pass2_prompt_name,
+            "pass1": f"{pass1_prompt_name}.md"
+            if not pass1_prompt_name.endswith(".md")
+            else pass1_prompt_name,
+            "pass2": f"{pass2_prompt_name}.md"
+            if not pass2_prompt_name.endswith(".md")
+            else pass2_prompt_name,
         },
         "models": {"pass1": pass1_model, "pass2": pass2_model},
         "usage": {"pass1": pass1_usage, "pass2": pass2_usage},

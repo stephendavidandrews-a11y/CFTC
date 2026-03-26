@@ -1,6 +1,9 @@
 """Tests for dashboard endpoints — stats and summary data."""
+
 from tests.conftest import (
-    seed_matter, seed_task, seed_decision,
+    seed_matter,
+    seed_task,
+    seed_decision,
 )
 
 
@@ -10,10 +13,16 @@ def test_dashboard_returns_structure(client, auth_headers):
     assert resp.status_code == 200
     body = resp.json()
     expected_keys = {
-        "total_open_matters", "total_open_tasks", "overdue_tasks",
-        "matters_by_status", "matters_by_priority",
-        "upcoming_deadlines", "recent_matters", "recent_updates",
-        "tasks_due_soon", "pending_decisions",
+        "total_open_matters",
+        "total_open_tasks",
+        "overdue_tasks",
+        "matters_by_status",
+        "matters_by_priority",
+        "upcoming_deadlines",
+        "recent_matters",
+        "recent_updates",
+        "tasks_due_soon",
+        "pending_decisions",
     }
     assert expected_keys <= set(body.keys())
 

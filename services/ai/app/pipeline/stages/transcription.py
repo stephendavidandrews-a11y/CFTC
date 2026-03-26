@@ -28,6 +28,7 @@ For Phase 1, the worker abstraction allows:
 
 If the native worker is unavailable, the stage fails cleanly with a typed error.
 """
+
 import json
 import logging
 import uuid
@@ -46,13 +47,13 @@ NATIVE_WORKER_TIMEOUT = 4800  # 80 minutes max for long audio
 
 # Fallback for local dev (not in Docker)
 import os
+
 if os.environ.get("APP_ENV") == "development":
-    NATIVE_WORKER_BASE = os.environ.get(
-        "NATIVE_WORKER_URL", "http://localhost:8005"
-    )
+    NATIVE_WORKER_BASE = os.environ.get("NATIVE_WORKER_URL", "http://localhost:8005")
 
 
 # ── Data classes for transcription results ──
+
 
 @dataclass
 class WordTimestamp:
@@ -86,8 +87,13 @@ class TranscriptionResult:
 
 class TranscriptionError(Exception):
     """Typed error for transcription failures."""
-    def __init__(self, message: str, error_type: str = "transcription_error",
-                 recoverable: bool = False):
+
+    def __init__(
+        self,
+        message: str,
+        error_type: str = "transcription_error",
+        recoverable: bool = False,
+    ):
         super().__init__(message)
         self.error_type = error_type
         self.recoverable = recoverable
@@ -115,7 +121,8 @@ async def transcribe_via_native_worker(
     """
     logger.info(
         "[%s] Sending to native worker for transcription: %s",
-        communication_id[:8], audio_path.name,
+        communication_id[:8],
+        audio_path.name,
     )
 
     # The native worker needs the file path as seen from the host.
@@ -187,20 +194,24 @@ def _parse_worker_response(data: dict, communication_id: str) -> TranscriptionRe
 
         words = []
         for w in seg.get("words", []):
-            words.append(WordTimestamp(
-                word=w.get("word", ""),
-                start=float(w.get("start", 0)),
-                end=float(w.get("end", 0)),
-                probability=float(w.get("probability", 0)),
-            ))
+            words.append(
+                WordTimestamp(
+                    word=w.get("word", ""),
+                    start=float(w.get("start", 0)),
+                    end=float(w.get("end", 0)),
+                    probability=float(w.get("probability", 0)),
+                )
+            )
 
-        segments.append(TranscriptSegment(
-            speaker=speaker,
-            start=float(seg.get("start", 0)),
-            end=float(seg.get("end", 0)),
-            text=seg.get("text", ""),
-            words=words,
-        ))
+        segments.append(
+            TranscriptSegment(
+                speaker=speaker,
+                start=float(seg.get("start", 0)),
+                end=float(seg.get("end", 0)),
+                text=seg.get("text", ""),
+                words=words,
+            )
+        )
 
     speakers = sorted(speakers_set)
     duration = float(data.get("duration", 0))
@@ -212,13 +223,17 @@ def _parse_worker_response(data: dict, communication_id: str) -> TranscriptionRe
     for label, emb_data in data.get("embeddings", {}).items():
         if isinstance(emb_data, str):
             import base64
+
             embeddings[label] = base64.b64decode(emb_data)
         elif isinstance(emb_data, bytes):
             embeddings[label] = emb_data
 
     logger.info(
         "[%s] Transcription result: %d segments, %d speakers, %.1fs",
-        communication_id[:8], len(segments), len(speakers), duration,
+        communication_id[:8],
+        len(segments),
+        len(speakers),
+        duration,
     )
 
     # Parse vocal features, overlap regions, and embedding quality from intake service
@@ -258,69 +273,105 @@ def store_transcript(db, communication_id: str, result: TranscriptionResult):
 
     # Store transcript segments
     for seg in result.segments:
-        word_timestamps = json.dumps([
-            {"word": w.word, "start": w.start, "end": w.end, "probability": w.probability}
-            for w in seg.words
-        ]) if seg.words else None
+        word_timestamps = (
+            json.dumps(
+                [
+                    {
+                        "word": w.word,
+                        "start": w.start,
+                        "end": w.end,
+                        "probability": w.probability,
+                    }
+                    for w in seg.words
+                ]
+            )
+            if seg.words
+            else None
+        )
 
-        db.execute("""
+        db.execute(
+            """
             INSERT INTO transcripts (id, communication_id, speaker_label,
                 start_time, end_time, raw_text, word_timestamps, confidence)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            str(uuid.uuid4()), communication_id, seg.speaker,
-            seg.start, seg.end, seg.text, word_timestamps,
-            min(w.probability for w in seg.words) if seg.words else None,
-        ))
+        """,
+            (
+                str(uuid.uuid4()),
+                communication_id,
+                seg.speaker,
+                seg.start,
+                seg.end,
+                seg.text,
+                word_timestamps,
+                min(w.probability for w in seg.words) if seg.words else None,
+            ),
+        )
 
     # Create participant records (one per unique speaker)
     for speaker in result.speakers:
-        db.execute("""
+        db.execute(
+            """
             INSERT INTO communication_participants
                 (id, communication_id, speaker_label, confirmed)
             VALUES (?, ?, ?, 0)
-        """, (str(uuid.uuid4()), communication_id, speaker))
+        """,
+            (str(uuid.uuid4()), communication_id, speaker),
+        )
 
     # Store voice embeddings
     for label, emb_bytes in result.embeddings.items():
-        db.execute("""
+        db.execute(
+            """
             INSERT INTO voice_samples (id, communication_id, speaker_label, embedding)
             VALUES (?, ?, ?, ?)
-        """, (str(uuid.uuid4()), communication_id, label, emb_bytes))
+        """,
+            (str(uuid.uuid4()), communication_id, label, emb_bytes),
+        )
 
     # Store embedding quality info on voice_samples
     for label, eq in result.embedding_quality.items():
-        db.execute("""
+        db.execute(
+            """
             UPDATE voice_samples
             SET embedding_filtered = ?,
                 embedding_quality_score = ?,
                 embedding_clean_duration = ?,
                 embedding_segments_used = ?
             WHERE communication_id = ? AND speaker_label = ?
-        """, (
-            1 if eq.get("filtered") else 0,
-            eq.get("quality_score", 0),
-            eq.get("clean_duration", 0),
-            eq.get("segments_used", 0),
-            communication_id, label,
-        ))
+        """,
+            (
+                1 if eq.get("filtered") else 0,
+                eq.get("quality_score", 0),
+                eq.get("clean_duration", 0),
+                eq.get("segments_used", 0),
+                communication_id,
+                label,
+            ),
+        )
 
     # Store vocal quality metrics on voice_samples
     for label, features in result.vocal_features.items():
-        db.execute("""
+        db.execute(
+            """
             UPDATE voice_samples
             SET vocal_quality_json = ?,
                 hnr_db = ?, jitter = ?, shimmer = ?,
                 pitch_mean = ?, pitch_std = ?,
                 speaking_rate_wpm = ?
             WHERE communication_id = ? AND speaker_label = ?
-        """, (
-            json.dumps(features),
-            features.get("hnr"), features.get("jitter"), features.get("shimmer"),
-            features.get("pitch_mean"), features.get("pitch_std"),
-            features.get("speaking_rate_wpm"),
-            communication_id, label,
-        ))
+        """,
+            (
+                json.dumps(features),
+                features.get("hnr"),
+                features.get("jitter"),
+                features.get("shimmer"),
+                features.get("pitch_mean"),
+                features.get("pitch_std"),
+                features.get("speaking_rate_wpm"),
+                communication_id,
+                label,
+            ),
+        )
 
     # Store overlap regions on communication
     if result.overlap_regions:

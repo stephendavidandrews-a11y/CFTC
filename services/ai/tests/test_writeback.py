@@ -41,7 +41,9 @@ COMM_ID = str(uuid.uuid4())
 BUNDLE_IDS = [str(uuid.uuid4()) for _ in range(5)]
 ITEM_IDS = {
     0: [str(uuid.uuid4()) for _ in range(3)],  # task, matter_update, stakeholder
-    1: [str(uuid.uuid4()) for _ in range(3)],  # task(follow_up), meeting_record, document
+    1: [
+        str(uuid.uuid4()) for _ in range(3)
+    ],  # task(follow_up), meeting_record, document
     2: [str(uuid.uuid4()) for _ in range(2)],  # task, new_person
     3: [str(uuid.uuid4()) for _ in range(1)],  # task (rejected bundle)
     4: [str(uuid.uuid4()) for _ in range(2)],  # original (moved), reviewer-added task
@@ -54,18 +56,23 @@ def _init_db(db: sqlite3.Connection):
     """Set up schema and seed fully-reviewed bundle data for writeback testing."""
     db.row_factory = sqlite3.Row
     from app.schema import init_schema
+
     init_schema(db)
 
     # Communication in 'reviewed' state (ready for committing)
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO communications (id, source_type, processing_status, original_filename,
                                     duration_seconds, created_at, updated_at)
         VALUES (?, 'audio', 'reviewed', 'writeback_test.wav', 600,
                 datetime('now'), datetime('now'))
-    """, (COMM_ID,))
+    """,
+        (COMM_ID,),
+    )
 
     # ── Bundle 0: matter bundle, accepted ──
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO review_bundles
             (id, communication_id, bundle_type, target_matter_id,
              target_matter_title, status, confidence, rationale,
@@ -73,21 +80,50 @@ def _init_db(db: sqlite3.Connection):
         VALUES (?, ?, 'matter', 'matter-001', 'DeFi Surveillance', 'accepted',
                 0.92, 'Strong match', 1, 'user', datetime('now'),
                 datetime('now'), datetime('now'))
-    """, (BUNDLE_IDS[0], COMM_ID))
+    """,
+        (BUNDLE_IDS[0], COMM_ID),
+    )
 
     # Items in bundle 0
-    _insert_item(db, ITEM_IDS[0][0], BUNDLE_IDS[0], "task", "accepted",
-                 {"title": "Draft surveillance memo", "priority": "high"}, 0.9, 1)
-    _insert_item(db, ITEM_IDS[0][1], BUNDLE_IDS[0], "matter_update", "edited",
-                 {"summary": "EDITED: Q3 framework confirmed", "significance": "high"},
-                 0.85, 2,
-                 original_data={"summary": "Q3 framework confirmed", "significance": "medium"})
-    _insert_item(db, ITEM_IDS[0][2], BUNDLE_IDS[0], "stakeholder_addition", "accepted",
-                 {"person_id": "person-003", "person_name": "Jane Smith",
-                  "role": "Technical Lead"}, 0.78, 3)
+    _insert_item(
+        db,
+        ITEM_IDS[0][0],
+        BUNDLE_IDS[0],
+        "task",
+        "accepted",
+        {"title": "Draft surveillance memo", "priority": "high"},
+        0.9,
+        1,
+    )
+    _insert_item(
+        db,
+        ITEM_IDS[0][1],
+        BUNDLE_IDS[0],
+        "matter_update",
+        "edited",
+        {"summary": "EDITED: Q3 framework confirmed", "significance": "high"},
+        0.85,
+        2,
+        original_data={"summary": "Q3 framework confirmed", "significance": "medium"},
+    )
+    _insert_item(
+        db,
+        ITEM_IDS[0][2],
+        BUNDLE_IDS[0],
+        "stakeholder_addition",
+        "accepted",
+        {
+            "person_id": "person-003",
+            "person_name": "Jane Smith",
+            "role": "Technical Lead",
+        },
+        0.78,
+        3,
+    )
 
     # ── Bundle 1: matter bundle, accepted (compound meeting_record) ──
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO review_bundles
             (id, communication_id, bundle_type, target_matter_id,
              target_matter_title, status, confidence, rationale,
@@ -95,23 +131,56 @@ def _init_db(db: sqlite3.Connection):
         VALUES (?, ?, 'matter', 'matter-002', 'Enforcement Coordination', 'accepted',
                 0.85, 'Enforcement discussion', 2, 'user', datetime('now'),
                 datetime('now'), datetime('now'))
-    """, (BUNDLE_IDS[1], COMM_ID))
+    """,
+        (BUNDLE_IDS[1], COMM_ID),
+    )
 
-    _insert_item(db, ITEM_IDS[1][0], BUNDLE_IDS[1], "task", "accepted",
-                 {"title": "Schedule coordination call", "due_date": "2026-03-25",
-                  "task_mode": "follow_up"}, 0.88, 1)
-    _insert_item(db, ITEM_IDS[1][1], BUNDLE_IDS[1], "meeting_record", "accepted",
-                 {"title": "Enforcement Strategy Sync", "date": "2026-03-18",
-                  "meeting_type": "internal",
-                  "participants": [
-                      {"person_id": "person-001", "meeting_role": "chair", "attended": True},
-                      {"person_id": "person-002", "meeting_role": "participant"},
-                  ]}, 0.82, 2)
-    _insert_item(db, ITEM_IDS[1][2], BUNDLE_IDS[1], "document", "rejected",
-                 {"title": "Playbook draft", "document_type": "internal"}, 0.7, 3)
+    _insert_item(
+        db,
+        ITEM_IDS[1][0],
+        BUNDLE_IDS[1],
+        "task",
+        "accepted",
+        {
+            "title": "Schedule coordination call",
+            "due_date": "2026-03-25",
+            "task_mode": "follow_up",
+        },
+        0.88,
+        1,
+    )
+    _insert_item(
+        db,
+        ITEM_IDS[1][1],
+        BUNDLE_IDS[1],
+        "meeting_record",
+        "accepted",
+        {
+            "title": "Enforcement Strategy Sync",
+            "date": "2026-03-18",
+            "meeting_type": "internal",
+            "participants": [
+                {"person_id": "person-001", "meeting_role": "chair", "attended": True},
+                {"person_id": "person-002", "meeting_role": "participant"},
+            ],
+        },
+        0.82,
+        2,
+    )
+    _insert_item(
+        db,
+        ITEM_IDS[1][2],
+        BUNDLE_IDS[1],
+        "document",
+        "rejected",
+        {"title": "Playbook draft", "document_type": "internal"},
+        0.7,
+        3,
+    )
 
     # ── Bundle 2: new_matter bundle, accepted ──
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO review_bundles
             (id, communication_id, bundle_type, target_matter_id,
              target_matter_title, proposed_matter_json, status, confidence, rationale,
@@ -119,71 +188,144 @@ def _init_db(db: sqlite3.Connection):
         VALUES (?, ?, 'new_matter', NULL, 'New Crypto Framework', ?,
                 'accepted', 0.75, 'New matter identified', 3,
                 'user', datetime('now'), datetime('now'), datetime('now'))
-    """, (BUNDLE_IDS[2], COMM_ID, json.dumps({
-        "title": "New Crypto Framework",
-        "matter_type": "policy",
-        "description": "Framework for crypto asset regulation",
-        "status": "active",
-        "priority": "high",
-    })))
+    """,
+        (
+            BUNDLE_IDS[2],
+            COMM_ID,
+            json.dumps(
+                {
+                    "title": "New Crypto Framework",
+                    "matter_type": "policy",
+                    "description": "Framework for crypto asset regulation",
+                    "status": "active",
+                    "priority": "high",
+                }
+            ),
+        ),
+    )
 
-    _insert_item(db, ITEM_IDS[2][0], BUNDLE_IDS[2], "task", "accepted",
-                 {"title": "Research crypto frameworks", "priority": "medium"}, 0.8, 1)
-    _insert_item(db, ITEM_IDS[2][1], BUNDLE_IDS[2], "new_person", "accepted",
-                 {"full_name": "Robert Chen", "title": "External Counsel",
-                  "organization_name": "Outside Law Firm"}, 0.65, 2)
+    _insert_item(
+        db,
+        ITEM_IDS[2][0],
+        BUNDLE_IDS[2],
+        "task",
+        "accepted",
+        {"title": "Research crypto frameworks", "priority": "medium"},
+        0.8,
+        1,
+    )
+    _insert_item(
+        db,
+        ITEM_IDS[2][1],
+        BUNDLE_IDS[2],
+        "new_person",
+        "accepted",
+        {
+            "full_name": "Robert Chen",
+            "title": "External Counsel",
+            "organization_name": "Outside Law Firm",
+        },
+        0.65,
+        2,
+    )
 
     # ── Bundle 3: rejected standalone (should be skipped entirely) ──
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO review_bundles
             (id, communication_id, bundle_type, status, confidence, rationale,
              sort_order, reviewed_by, reviewed_at, created_at, updated_at)
         VALUES (?, ?, 'standalone', 'rejected', 0.5, 'Not relevant', 4,
                 'user', datetime('now'), datetime('now'), datetime('now'))
-    """, (BUNDLE_IDS[3], COMM_ID))
+    """,
+        (BUNDLE_IDS[3], COMM_ID),
+    )
 
-    _insert_item(db, ITEM_IDS[3][0], BUNDLE_IDS[3], "task", "rejected",
-                 {"title": "Irrelevant task"}, 0.5, 1)
+    _insert_item(
+        db,
+        ITEM_IDS[3][0],
+        BUNDLE_IDS[3],
+        "task",
+        "rejected",
+        {"title": "Irrelevant task"},
+        0.5,
+        1,
+    )
 
     # ── Bundle 4: standalone accepted, has a moved original + reviewer-created item ──
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO review_bundles
             (id, communication_id, bundle_type, status, confidence, rationale,
              sort_order, reviewed_by, reviewed_at, created_at, updated_at)
         VALUES (?, ?, 'standalone', 'accepted', NULL, 'Reviewer-created bundle', 5,
                 'user', datetime('now'), datetime('now'), datetime('now'))
-    """, (BUNDLE_IDS[4], COMM_ID))
+    """,
+        (BUNDLE_IDS[4], COMM_ID),
+    )
 
     # Moved original — should NOT be committed
-    _insert_item(db, ITEM_IDS[4][0], BUNDLE_IDS[4], "task", "moved",
-                 {"title": "Moved task"}, 0.7, 1)
+    _insert_item(
+        db,
+        ITEM_IDS[4][0],
+        BUNDLE_IDS[4],
+        "task",
+        "moved",
+        {"title": "Moved task"},
+        0.7,
+        1,
+    )
     # Reviewer-created item — NULL confidence, should be committed
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO review_bundle_items
             (id, bundle_id, item_type, status, proposed_data,
              confidence, rationale, source_excerpt,
              sort_order, created_at, updated_at)
         VALUES (?, ?, 'task', 'accepted', ?, NULL, 'Reviewer-created item',
                 NULL, 2, datetime('now'), datetime('now'))
-    """, (ITEM_IDS[4][1], BUNDLE_IDS[4],
-          json.dumps({"title": "Reviewer-added follow-up", "priority": "low"})))
+    """,
+        (
+            ITEM_IDS[4][1],
+            BUNDLE_IDS[4],
+            json.dumps({"title": "Reviewer-added follow-up", "priority": "low"}),
+        ),
+    )
 
     db.commit()
 
 
-def _insert_item(db, item_id, bundle_id, item_type, status, proposed_data,
-                 confidence, sort_order, original_data=None):
-    db.execute("""
+def _insert_item(
+    db,
+    item_id,
+    bundle_id,
+    item_type,
+    status,
+    proposed_data,
+    confidence,
+    sort_order,
+    original_data=None,
+):
+    db.execute(
+        """
         INSERT INTO review_bundle_items
             (id, bundle_id, item_type, status, proposed_data, original_proposed_data,
              confidence, rationale, source_excerpt,
              source_locator_json, sort_order, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, 'Test rationale', 'test excerpt',
                 '{"type":"transcript","segment_index":1}', ?, datetime('now'), datetime('now'))
-    """, (item_id, bundle_id, item_type, status,
-          json.dumps(proposed_data),
-          json.dumps(original_data) if original_data else None,
-          confidence, sort_order))
+    """,
+        (
+            item_id,
+            bundle_id,
+            item_type,
+            status,
+            json.dumps(proposed_data),
+            json.dumps(original_data) if original_data else None,
+            confidence,
+            sort_order,
+        ),
+    )
 
 
 # -----------------------------------------------------------------------
@@ -201,6 +343,7 @@ def _get_test_db():
 def _create_app():
     from app.main import app
     from app.db import get_db
+
     app.dependency_overrides[get_db] = _get_test_db
     return app
 
@@ -208,6 +351,7 @@ def _create_app():
 _app = _create_app()
 
 from fastapi.testclient import TestClient
+
 client = TestClient(_app)
 PREFIX = "/ai/api/bundle-review"
 
@@ -216,12 +360,14 @@ def _make_tracker_response(operations):
     """Build a mock tracker batch response from operations."""
     results = []
     for i, op in enumerate(operations):
-        results.append({
-            "op": op.get("op", "insert"),
-            "table": op.get("table", ""),
-            "record_id": str(uuid.uuid4()),
-            "previous_data": None,
-        })
+        results.append(
+            {
+                "op": op.get("op", "insert"),
+                "table": op.get("table", ""),
+                "record_id": str(uuid.uuid4()),
+                "previous_data": None,
+            }
+        )
     return {"results": results, "operations_count": len(operations)}
 
 
@@ -229,9 +375,11 @@ def _make_tracker_response(operations):
 # 1. STATE MAPPING — reviewed states to batch ops
 # =====================================================================
 
+
 def test_1_01_build_bundle_tree_reflects_review_state():
     """_build_bundle_tree returns correct statuses for all bundles/items."""
     from app.bundle_review.retrieval import _build_bundle_tree
+
     bundles = _build_bundle_tree(_shared_db, COMM_ID)
 
     assert len(bundles) == 5
@@ -275,8 +423,7 @@ def test_1_03_rejected_bundle_skipped():
 
     # Simulate committer logic — rejected bundle should be skipped
     bundles = _shared_db.execute(
-        "SELECT id, status FROM review_bundles WHERE communication_id = ?",
-        (COMM_ID,)
+        "SELECT id, status FROM review_bundles WHERE communication_id = ?", (COMM_ID,)
     ).fetchall()
     rejected = [b for b in bundles if b["status"] == "rejected"]
     assert len(rejected) >= 1  # Bundle 3
@@ -288,6 +435,7 @@ def test_1_03_rejected_bundle_skipped():
 # =====================================================================
 # 2. WRITE ORDER — dependency ordering
 # =====================================================================
+
 
 def test_2_01_ordering_new_org_before_person():
     from app.writeback.ordering import order_items
@@ -321,6 +469,7 @@ def test_2_02_ordering_preserves_sort_within_tier():
 # 3. FULL COMMIT — mock tracker, verify end-to-end
 # =====================================================================
 
+
 def test_3_01_commit_communication_full():
     """Full commit: mock tracker, verify all bundle results."""
     from app.writeback.committer import commit_communication
@@ -328,12 +477,14 @@ def test_3_01_commit_communication_full():
     call_log = []
 
     async def mock_post_batch(operations, source, source_metadata, idempotency_key):
-        call_log.append({
-            "ops": operations,
-            "source": source,
-            "meta": source_metadata,
-            "idem_key": idempotency_key,
-        })
+        call_log.append(
+            {
+                "ops": operations,
+                "source": source,
+                "meta": source_metadata,
+                "idem_key": idempotency_key,
+            }
+        )
         return _make_tracker_response(operations)
 
     with patch("app.writeback.committer.post_batch", side_effect=mock_post_batch):
@@ -346,7 +497,9 @@ def test_3_01_commit_communication_full():
 
     # 3 accepted bundles committed (0, 1, 2, 4), 1 rejected skipped (3)
     assert result.bundles_committed == 4, f"Expected 4, got {result.bundles_committed}"
-    assert result.bundles_skipped == 1, f"Expected 1 skipped, got {result.bundles_skipped}"
+    assert result.bundles_skipped == 1, (
+        f"Expected 1 skipped, got {result.bundles_skipped}"
+    )
     assert result.bundles_failed == 0
     assert result.all_succeeded is True
 
@@ -465,11 +618,11 @@ def test_3_07_bundle_4_moved_excluded_reviewer_included():
 # 4. TRACKER_WRITEBACKS RECORDS
 # =====================================================================
 
+
 def test_4_01_writebacks_recorded():
     """tracker_writebacks has entries for every operation result."""
     rows = _shared_db.execute(
-        "SELECT * FROM tracker_writebacks WHERE communication_id = ?",
-        (COMM_ID,)
+        "SELECT * FROM tracker_writebacks WHERE communication_id = ?", (COMM_ID,)
     ).fetchall()
 
     assert len(rows) > 0
@@ -493,17 +646,18 @@ def test_4_02_writebacks_per_bundle():
         expected_count = len(call["ops"])
         actual = _shared_db.execute(
             "SELECT COUNT(*) as cnt FROM tracker_writebacks WHERE bundle_id = ?",
-            (bundle_id,)
+            (bundle_id,),
         ).fetchone()["cnt"]
-        assert actual == expected_count, \
+        assert actual == expected_count, (
             f"Bundle {bundle_id[:8]}: expected {expected_count} writebacks, got {actual}"
+        )
 
 
 def test_4_03_writebacks_written_data_json():
     """written_data in tracker_writebacks is valid JSON matching the operation."""
     rows = _shared_db.execute(
         "SELECT written_data FROM tracker_writebacks WHERE communication_id = ?",
-        (COMM_ID,)
+        (COMM_ID,),
     ).fetchall()
 
     for r in rows:
@@ -515,7 +669,7 @@ def test_4_04_no_writebacks_for_rejected_bundle():
     """Rejected bundle (3) has zero writebacks."""
     count = _shared_db.execute(
         "SELECT COUNT(*) as cnt FROM tracker_writebacks WHERE bundle_id = ?",
-        (BUNDLE_IDS[3],)
+        (BUNDLE_IDS[3],),
     ).fetchone()["cnt"]
     assert count == 0
 
@@ -524,13 +678,17 @@ def test_4_04_no_writebacks_for_rejected_bundle():
 # 5. AUDIT TRAIL
 # =====================================================================
 
+
 def test_5_01_commit_audit_entries():
     """Audit log has commit_started and commit_complete entries."""
-    rows = _shared_db.execute("""
+    rows = _shared_db.execute(
+        """
         SELECT action_type, details FROM review_action_log
         WHERE communication_id = ? AND action_type LIKE 'commit%'
         ORDER BY created_at
-    """, (COMM_ID,)).fetchall()
+    """,
+        (COMM_ID,),
+    ).fetchall()
 
     action_types = [r["action_type"] for r in rows]
     assert "commit_started" in action_types
@@ -546,10 +704,13 @@ def test_5_01_commit_audit_entries():
 
 def test_5_02_bundle_committed_audit():
     """Each committed bundle has a bundle_committed audit entry."""
-    rows = _shared_db.execute("""
+    rows = _shared_db.execute(
+        """
         SELECT bundle_id, details FROM review_action_log
         WHERE communication_id = ? AND action_type = 'bundle_committed'
-    """, (COMM_ID,)).fetchall()
+    """,
+        (COMM_ID,),
+    ).fetchall()
 
     committed_bundle_ids = {r["bundle_id"] for r in rows}
     for bid in [BUNDLE_IDS[0], BUNDLE_IDS[1], BUNDLE_IDS[2], BUNDLE_IDS[4]]:
@@ -566,6 +727,7 @@ def test_5_02_bundle_committed_audit():
 # 6. EDITED ITEMS — uses edited proposed_data, not original
 # =====================================================================
 
+
 def test_6_01_edited_item_uses_current_data():
     """Edited items commit with their current proposed_data, not original."""
     call_log = _state["call_log"]
@@ -580,6 +742,7 @@ def test_6_01_edited_item_uses_current_data():
 # =====================================================================
 # 7. ITEM CONVERTER UNIT TESTS
 # =====================================================================
+
 
 def test_7_01_convert_new_matter_registers_ref():
     """convert_new_matter_bundle puts $matter in refs dict."""
@@ -621,8 +784,12 @@ def test_7_02_convert_meeting_record_compound():
             ],
         },
     }
-    bundle = {"id": "b1", "bundle_type": "matter", "target_matter_id": "m1",
-              "_communication_id": "c1"}
+    bundle = {
+        "id": "b1",
+        "bundle_type": "matter",
+        "target_matter_id": "m1",
+        "_communication_id": "c1",
+    }
     refs = {}
     ops = convert_meeting_record(item, bundle, refs)
 
@@ -646,8 +813,12 @@ def test_7_03_convert_status_change_uses_update():
             "new_value": "on_hold",
         },
     }
-    bundle = {"id": "b1", "bundle_type": "matter", "target_matter_id": "matter-001",
-              "_communication_id": "c1"}
+    bundle = {
+        "id": "b1",
+        "bundle_type": "matter",
+        "target_matter_id": "matter-001",
+        "_communication_id": "c1",
+    }
     refs = {}
     ops = convert_status_change(item, bundle, refs)
     assert len(ops) == 1
@@ -690,8 +861,12 @@ def test_7_05_stakeholder_org_only():
             "role": "counterparty",
         },
     }
-    bundle = {"id": "b1", "bundle_type": "matter", "target_matter_id": "m1",
-              "_communication_id": "c1"}
+    bundle = {
+        "id": "b1",
+        "bundle_type": "matter",
+        "target_matter_id": "m1",
+        "_communication_id": "c1",
+    }
     refs = {}
     ops = convert_stakeholder_addition(item, bundle, refs)
     assert len(ops) == 1
@@ -701,6 +876,7 @@ def test_7_05_stakeholder_org_only():
 # =====================================================================
 # 8. ERROR / PARTIAL FAILURE
 # =====================================================================
+
 
 def test_8_01_partial_failure_recorded():
     """If one bundle fails, CommitResult reflects partial failure."""
@@ -712,24 +888,33 @@ def test_8_01_partial_failure_recorded():
     err_bundle_id = str(uuid.uuid4())
     err_item_id = str(uuid.uuid4())
 
-    _shared_db.execute("""
+    _shared_db.execute(
+        """
         INSERT INTO communications (id, source_type, processing_status, created_at, updated_at)
         VALUES (?, 'audio', 'reviewed', datetime('now'), datetime('now'))
-    """, (err_comm_id,))
-    _shared_db.execute("""
+    """,
+        (err_comm_id,),
+    )
+    _shared_db.execute(
+        """
         INSERT INTO review_bundles
             (id, communication_id, bundle_type, status, sort_order, reviewed_by,
              reviewed_at, created_at, updated_at)
         VALUES (?, ?, 'standalone', 'accepted', 1, 'user', datetime('now'),
                 datetime('now'), datetime('now'))
-    """, (err_bundle_id, err_comm_id))
-    _shared_db.execute("""
+    """,
+        (err_bundle_id, err_comm_id),
+    )
+    _shared_db.execute(
+        """
         INSERT INTO review_bundle_items
             (id, bundle_id, item_type, status, proposed_data, confidence,
              sort_order, created_at, updated_at)
         VALUES (?, ?, 'task', 'accepted', '{"title":"fail task"}', 0.9,
                 1, datetime('now'), datetime('now'))
-    """, (err_item_id, err_bundle_id))
+    """,
+        (err_item_id, err_bundle_id),
+    )
     _shared_db.commit()
 
     async def mock_fail(*args, **kwargs):
@@ -744,10 +929,13 @@ def test_8_01_partial_failure_recorded():
     assert result.all_succeeded is False
 
     # Audit records the failure
-    fail_audit = _shared_db.execute("""
+    fail_audit = _shared_db.execute(
+        """
         SELECT details FROM review_action_log
         WHERE communication_id = ? AND action_type = 'bundle_commit_failed'
-    """, (err_comm_id,)).fetchone()
+    """,
+        (err_comm_id,),
+    ).fetchone()
     assert fail_audit is not None
     d = json.loads(fail_audit["details"])
     assert d["error_type"] == "server_error"
@@ -756,6 +944,7 @@ def test_8_01_partial_failure_recorded():
 # =====================================================================
 # 9. ORCHESTRATOR DISPATCH
 # =====================================================================
+
 
 def test_9_01_handle_committing_returns_complete():
     """_handle_committing calls commit_communication and returns 'complete'."""
@@ -769,24 +958,33 @@ def test_9_01_handle_committing_returns_complete():
     orch_bundle_id = str(uuid.uuid4())
     orch_item_id = str(uuid.uuid4())
 
-    _shared_db.execute("""
+    _shared_db.execute(
+        """
         INSERT INTO communications (id, source_type, processing_status, created_at, updated_at)
         VALUES (?, 'audio', 'reviewed', datetime('now'), datetime('now'))
-    """, (orch_comm_id,))
-    _shared_db.execute("""
+    """,
+        (orch_comm_id,),
+    )
+    _shared_db.execute(
+        """
         INSERT INTO review_bundles
             (id, communication_id, bundle_type, status, sort_order, reviewed_by,
              reviewed_at, created_at, updated_at)
         VALUES (?, ?, 'standalone', 'accepted', 1, 'user', datetime('now'),
                 datetime('now'), datetime('now'))
-    """, (orch_bundle_id, orch_comm_id))
-    _shared_db.execute("""
+    """,
+        (orch_bundle_id, orch_comm_id),
+    )
+    _shared_db.execute(
+        """
         INSERT INTO review_bundle_items
             (id, bundle_id, item_type, status, proposed_data, confidence,
              sort_order, created_at, updated_at)
         VALUES (?, ?, 'task', 'accepted', '{"title":"orch test"}', 0.9,
                 1, datetime('now'), datetime('now'))
-    """, (orch_item_id, orch_bundle_id))
+    """,
+        (orch_item_id, orch_bundle_id),
+    )
     _shared_db.commit()
 
     with patch("app.writeback.committer.post_batch", side_effect=mock_post_batch):
@@ -807,24 +1005,33 @@ def test_9_02_handle_committing_raises_on_failure():
     fail_bundle_id = str(uuid.uuid4())
     fail_item_id = str(uuid.uuid4())
 
-    _shared_db.execute("""
+    _shared_db.execute(
+        """
         INSERT INTO communications (id, source_type, processing_status, created_at, updated_at)
         VALUES (?, 'audio', 'reviewed', datetime('now'), datetime('now'))
-    """, (fail_comm_id,))
-    _shared_db.execute("""
+    """,
+        (fail_comm_id,),
+    )
+    _shared_db.execute(
+        """
         INSERT INTO review_bundles
             (id, communication_id, bundle_type, status, sort_order, reviewed_by,
              reviewed_at, created_at, updated_at)
         VALUES (?, ?, 'standalone', 'accepted', 1, 'user', datetime('now'),
                 datetime('now'), datetime('now'))
-    """, (fail_bundle_id, fail_comm_id))
-    _shared_db.execute("""
+    """,
+        (fail_bundle_id, fail_comm_id),
+    )
+    _shared_db.execute(
+        """
         INSERT INTO review_bundle_items
             (id, bundle_id, item_type, status, proposed_data, confidence,
              sort_order, created_at, updated_at)
         VALUES (?, ?, 'task', 'accepted', '{"title":"fail test"}', 0.9,
                 1, datetime('now'), datetime('now'))
-    """, (fail_item_id, fail_bundle_id))
+    """,
+        (fail_item_id, fail_bundle_id),
+    )
     _shared_db.commit()
 
     async def mock_fail(*args, **kwargs):
@@ -847,6 +1054,7 @@ def test_9_02_handle_committing_raises_on_failure():
 # =====================================================================
 # 10. REGRESSION — bundle review still works
 # =====================================================================
+
 
 def test_10_01_review_endpoints_still_work():
     """Health and config endpoints unaffected."""
@@ -882,14 +1090,18 @@ def test_10_03_review_queue_excludes_committed():
 # RUNNER
 # =====================================================================
 
+
 def run_all():
     """Run all tests in order and report results."""
     import traceback
 
     test_funcs = sorted(
-        [(name, obj) for name, obj in globals().items()
-         if name.startswith("test_") and callable(obj)],
-        key=lambda x: x[0]
+        [
+            (name, obj)
+            for name, obj in globals().items()
+            if name.startswith("test_") and callable(obj)
+        ],
+        key=lambda x: x[0],
     )
 
     total = 0
@@ -912,9 +1124,9 @@ def run_all():
             errors.append((name, str(e), traceback.format_exc()))
             print(f"  FAIL {name}: {type(e).__name__}: {e}")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"RESULTS: {passed}/{total} passed, {failed} failed")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     if errors:
         print("\nFAILURES:")

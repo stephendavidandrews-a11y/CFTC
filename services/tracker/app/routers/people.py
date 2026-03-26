@@ -1,4 +1,5 @@
 """People CRUD endpoints."""
+
 import uuid
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -13,6 +14,7 @@ from app.concurrency import get_etag, check_etag
 from app.idempotency import claim_idempotency_key, finalize_idempotency_key
 
 router = APIRouter(prefix="/people", tags=["people"])
+
 
 @router.get("")
 async def list_people(
@@ -33,7 +35,9 @@ async def list_people(
         conditions.append("p.is_active = ?")
         params.append(1 if is_active else 0)
     if search:
-        conditions.append("(p.full_name LIKE ? OR p.email LIKE ? OR p.title LIKE ? OR o.name LIKE ? OR o.short_name LIKE ? OR p.relationship_category LIKE ?)")
+        conditions.append(
+            "(p.full_name LIKE ? OR p.email LIKE ? OR p.title LIKE ? OR o.name LIKE ? OR o.short_name LIKE ? OR p.relationship_category LIKE ?)"
+        )
         params.extend([f"%{search}%"] * 6)
     if organization_id:
         conditions.append("p.organization_id = ?")
@@ -46,22 +50,34 @@ async def list_people(
         params.append(1 if include_in_team else 0)
 
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
-    allowed_sorts = {"full_name", "title", "organization_id", "last_interaction_date",
-                     "next_interaction_needed_date", "created_at", "active_matters", "open_tasks"}
+    allowed_sorts = {
+        "full_name",
+        "title",
+        "organization_id",
+        "last_interaction_date",
+        "next_interaction_needed_date",
+        "created_at",
+        "active_matters",
+        "open_tasks",
+    }
     if sort_by not in allowed_sorts:
         sort_by = "full_name"
     direction = "DESC" if sort_dir.lower() == "desc" else "ASC"
 
-    total = db.execute(f"""
+    total = db.execute(
+        f"""
         SELECT COUNT(*) as c FROM people p
         LEFT JOIN organizations o ON p.organization_id = o.id
         {where}
-    """, params).fetchone()["c"]
+    """,
+        params,
+    ).fetchone()["c"]
     order_expr = {
         "active_matters": "active_matters",
         "open_tasks": "open_tasks",
     }.get(sort_by, f"p.{sort_by}")
-    rows = db.execute(f"""
+    rows = db.execute(
+        f"""
         SELECT p.*, o.name as org_name, o.short_name as org_short_name,
             (SELECT COUNT(DISTINCT mp.matter_id) FROM matter_people mp
              JOIN matters m ON mp.matter_id = m.id
@@ -73,7 +89,9 @@ async def list_people(
         {where}
         ORDER BY {order_expr} {direction}
         LIMIT ? OFFSET ?
-    """, params + [limit, offset]).fetchall()
+    """,
+        params + [limit, offset],
+    ).fetchall()
 
     items = [dict(row) for row in rows]
 
@@ -93,19 +111,28 @@ async def list_people(
         "follow_up_needed": summary_rows["follow_up_needed"] or 0,
     }
 
-    return {"items": items, "total": total, "limit": limit, "offset": offset, "summary": summary}
+    return {
+        "items": items,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "summary": summary,
+    }
 
 
 @router.get("/{person_id}")
 async def get_person(person_id: str, db=Depends(get_db)):
-    row = db.execute("""
+    row = db.execute(
+        """
         SELECT p.*, o.name as org_name, o.short_name as org_short_name,
                mgr.full_name as manager_name
         FROM people p
         LEFT JOIN organizations o ON p.organization_id = o.id
         LEFT JOIN people mgr ON p.manager_person_id = mgr.id
         WHERE p.id = ?
-    """, (person_id,)).fetchone()
+    """,
+        (person_id,),
+    ).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Person not found")
 
@@ -115,23 +142,34 @@ async def get_person(person_id: str, db=Depends(get_db)):
     if result.get("relationship_assigned_to_person_id"):
         owner_row = db.execute(
             "SELECT full_name FROM people WHERE id = ?",
-            (result["relationship_assigned_to_person_id"],)
+            (result["relationship_assigned_to_person_id"],),
         ).fetchone()
-        result["relationship_owner_name"] = owner_row["full_name"] if owner_row else None
+        result["relationship_owner_name"] = (
+            owner_row["full_name"] if owner_row else None
+        )
     else:
         result["relationship_owner_name"] = None
 
     # Matters this person is on
-    result["matters"] = [dict(r) for r in db.execute("""
+    result["matters"] = [
+        dict(r)
+        for r in db.execute(
+            """
         SELECT mp.matter_role, mp.engagement_level, m.id, m.title, m.matter_number, m.status, m.priority
         FROM matter_people mp
         JOIN matters m ON mp.matter_id = m.id
         WHERE mp.person_id = ? AND m.status != 'closed'
         ORDER BY m.priority, m.updated_at DESC
-    """, (person_id,))]
+    """,
+            (person_id,),
+        )
+    ]
 
     # Tasks assigned
-    result["tasks"] = [dict(r) for r in db.execute("""
+    result["tasks"] = [
+        dict(r)
+        for r in db.execute(
+            """
         SELECT t.id, t.title, t.status, t.due_date, t.priority,
                t.expected_output, t.waiting_on_description,
                m.title as matter_title,
@@ -141,39 +179,60 @@ async def get_person(person_id: str, db=Depends(get_db)):
         LEFT JOIN people wp ON t.waiting_on_person_id = wp.id
         WHERE t.assigned_to_person_id = ? AND t.status NOT IN ('done', 'deferred')
         ORDER BY t.due_date
-    """, (person_id,))]
+    """,
+            (person_id,),
+        )
+    ]
 
     # Recent meetings
-    result["meetings"] = [dict(r) for r in db.execute("""
+    result["meetings"] = [
+        dict(r)
+        for r in db.execute(
+            """
         SELECT mtg.id, mtg.title, mtg.date_time_start, mtg.meeting_type, mp.meeting_role
         FROM meeting_participants mp
         JOIN meetings mtg ON mp.meeting_id = mtg.id
         WHERE mp.person_id = ?
         ORDER BY mtg.date_time_start DESC
         LIMIT 10
-    """, (person_id,))]
+    """,
+            (person_id,),
+        )
+    ]
 
     return JSONResponse(content=result, headers={"ETag": get_etag(row)})
 
 
 @router.post("")
-async def create_person(body: CreatePerson, request: Request, db=Depends(get_db),
-                      write_source: str = Depends(get_write_source)):
+async def create_person(
+    body: CreatePerson,
+    request: Request,
+    db=Depends(get_db),
+    write_source: str = Depends(get_write_source),
+):
     idem_key = request.headers.get("idempotency-key")
     cached = claim_idempotency_key(db, idem_key, body.model_dump(), "/tracker/people")
     if cached == "conflict":
         raise HTTPException(409, detail="Idempotency key reused with different payload")
     if cached == "pending":
-        raise HTTPException(409, detail="Request with this idempotency key is still in progress")
+        raise HTTPException(
+            409, detail="Request with this idempotency key is still in progress"
+        )
     if isinstance(cached, dict):
-        return JSONResponse(status_code=cached["status_code"], content=json.loads(cached["body"]))
+        return JSONResponse(
+            status_code=cached["status_code"], content=json.loads(cached["body"])
+        )
     pid = str(uuid.uuid4())
     now = datetime.now().isoformat()
     source_val = write_source if body.source == "manual" else body.source
     # Auto-set include_in_team_workload for Direct reports
-    if body.relationship_category in ("Direct report", "Indirect report") and body.include_in_team_workload is None:
+    if (
+        body.relationship_category in ("Direct report", "Indirect report")
+        and body.include_in_team_workload is None
+    ):
         body.include_in_team_workload = 1
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO people (id, full_name, first_name, last_name, title, organization_id,
             email, phone, assistant_name, assistant_contact,
             substantive_areas, relationship_category,
@@ -182,23 +241,47 @@ async def create_person(body: CreatePerson, request: Request, db=Depends(get_db)
             relationship_assigned_to_person_id, is_active,
             source, source_id, external_refs, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        pid, body.full_name, body.first_name, body.last_name,
-        body.title, body.organization_id,
-        body.email, body.phone, body.assistant_name,
-        body.assistant_contact,
-        body.substantive_areas, body.relationship_category,
-        body.last_interaction_date, body.next_interaction_needed_date,
-        body.next_interaction_type, body.next_interaction_purpose,
-        body.manager_person_id, body.include_in_team_workload,
-        body.relationship_assigned_to_person_id, body.is_active,
-        source_val, body.source_id, body.external_refs,
-        now, now,
-    ))
+    """,
+        (
+            pid,
+            body.full_name,
+            body.first_name,
+            body.last_name,
+            body.title,
+            body.organization_id,
+            body.email,
+            body.phone,
+            body.assistant_name,
+            body.assistant_contact,
+            body.substantive_areas,
+            body.relationship_category,
+            body.last_interaction_date,
+            body.next_interaction_needed_date,
+            body.next_interaction_type,
+            body.next_interaction_purpose,
+            body.manager_person_id,
+            body.include_in_team_workload,
+            body.relationship_assigned_to_person_id,
+            body.is_active,
+            source_val,
+            body.source_id,
+            body.external_refs,
+            now,
+            now,
+        ),
+    )
     new_data = body.model_dump()
-    new_data.update({"id": pid, "source": source_val, "created_at": now, "updated_at": now})
-    log_event(db, table_name="people", record_id=pid, action="create",
-              source=write_source, new_data=new_data)
+    new_data.update(
+        {"id": pid, "source": source_val, "created_at": now, "updated_at": now}
+    )
+    log_event(
+        db,
+        table_name="people",
+        record_id=pid,
+        action="create",
+        source=write_source,
+        new_data=new_data,
+    )
     result = {"id": pid}
     finalize_idempotency_key(db, idem_key, 200, result)
     db.commit()
@@ -206,8 +289,13 @@ async def create_person(body: CreatePerson, request: Request, db=Depends(get_db)
 
 
 @router.put("/{person_id}")
-async def update_person(person_id: str, body: UpdatePerson, request: Request, db=Depends(get_db),
-                      write_source: str = Depends(get_write_source)):
+async def update_person(
+    person_id: str,
+    body: UpdatePerson,
+    request: Request,
+    db=Depends(get_db),
+    write_source: str = Depends(get_write_source),
+):
     old = db.execute("SELECT * FROM people WHERE id = ?", (person_id,)).fetchone()
     if not old:
         raise HTTPException(status_code=404, detail="Person not found")
@@ -217,7 +305,10 @@ async def update_person(person_id: str, body: UpdatePerson, request: Request, db
         raise HTTPException(status_code=400, detail="No fields to update")
     # Auto-set include_in_team_workload for Direct reports (only if not explicitly set in payload or DB)
     if data.get("relationship_category") in ("Direct report", "Indirect report"):
-        if "include_in_team_workload" not in data and not old["include_in_team_workload"]:
+        if (
+            "include_in_team_workload" not in data
+            and not old["include_in_team_workload"]
+        ):
             data["include_in_team_workload"] = 1
     sets = [f"{k} = ?" for k in data]
     params = list(data.values())
@@ -225,14 +316,21 @@ async def update_person(person_id: str, body: UpdatePerson, request: Request, db
     sets.append("updated_at = ?")
     params.extend([now, person_id])
     db.execute(f"UPDATE people SET {', '.join(sets)} WHERE id = ?", params)
-    log_event(db, table_name="people", record_id=person_id, action="update",
-              source=write_source, old_record=old, new_data=data)
+    log_event(
+        db,
+        table_name="people",
+        record_id=person_id,
+        action="update",
+        source=write_source,
+        old_record=old,
+        new_data=data,
+    )
     db.commit()
     return {"id": person_id, "updated": True}
 
 
-
 # ── Person Profile ───────────────────────────────────────────────────────────
+
 
 @router.get("/{person_id}/profile")
 async def get_person_profile(person_id: str, db=Depends(get_db)):
@@ -241,26 +339,41 @@ async def get_person_profile(person_id: str, db=Depends(get_db)):
     if not person:
         raise HTTPException(status_code=404, detail="Person not found")
 
-    row = db.execute("SELECT * FROM person_profiles WHERE person_id = ?", (person_id,)).fetchone()
+    row = db.execute(
+        "SELECT * FROM person_profiles WHERE person_id = ?", (person_id,)
+    ).fetchone()
     if row:
         return dict(row)
 
     # Return empty profile structure
     return {
-        "id": None, "person_id": person_id,
-        "birthday": None, "spouse_name": None, "children_count": None,
-        "children_names": None, "hometown": None, "current_city": None,
-        "prior_roles_summary": None, "education_summary": None,
-        "interests": None, "personal_notes_summary": None,
-        "scheduling_notes": None, "relationship_preferences": None,
+        "id": None,
+        "person_id": person_id,
+        "birthday": None,
+        "spouse_name": None,
+        "children_count": None,
+        "children_names": None,
+        "hometown": None,
+        "current_city": None,
+        "prior_roles_summary": None,
+        "education_summary": None,
+        "interests": None,
+        "personal_notes_summary": None,
+        "scheduling_notes": None,
+        "relationship_preferences": None,
         "leadership_notes": None,
-        "created_at": None, "updated_at": None,
+        "created_at": None,
+        "updated_at": None,
     }
 
 
 @router.put("/{person_id}/profile")
-async def update_person_profile(person_id: str, body: UpdatePersonProfile,
-                                 db=Depends(get_db), write_source: str = Depends(get_write_source)):
+async def update_person_profile(
+    person_id: str,
+    body: UpdatePersonProfile,
+    db=Depends(get_db),
+    write_source: str = Depends(get_write_source),
+):
     """Upsert person profile — create row if missing, update only provided fields."""
     person = db.execute("SELECT id FROM people WHERE id = ?", (person_id,)).fetchone()
     if not person:
@@ -271,7 +384,9 @@ async def update_person_profile(person_id: str, body: UpdatePersonProfile,
         raise HTTPException(status_code=400, detail="No fields to update")
 
     now = datetime.now().isoformat()
-    existing = db.execute("SELECT * FROM person_profiles WHERE person_id = ?", (person_id,)).fetchone()
+    existing = db.execute(
+        "SELECT * FROM person_profiles WHERE person_id = ?", (person_id,)
+    ).fetchone()
 
     if existing:
         # Update only provided fields
@@ -280,15 +395,25 @@ async def update_person_profile(person_id: str, body: UpdatePersonProfile,
         sets.append("updated_at = ?")
         params.extend([now, existing["id"]])
         db.execute(f"UPDATE person_profiles SET {', '.join(sets)} WHERE id = ?", params)
-        log_event(db, table_name="person_profiles", record_id=existing["id"],
-                  action="update", source=write_source, old_record=existing, new_data=data)
+        log_event(
+            db,
+            table_name="person_profiles",
+            record_id=existing["id"],
+            action="update",
+            source=write_source,
+            old_record=existing,
+            new_data=data,
+        )
         db.commit()
         # Return current state
-        updated = db.execute("SELECT * FROM person_profiles WHERE person_id = ?", (person_id,)).fetchone()
+        updated = db.execute(
+            "SELECT * FROM person_profiles WHERE person_id = ?", (person_id,)
+        ).fetchone()
         return dict(updated)
     else:
         # Create new profile row
         import uuid as _uuid
+
         pid = str(_uuid.uuid4())
         data["id"] = pid
         data["person_id"] = person_id
@@ -296,18 +421,32 @@ async def update_person_profile(person_id: str, body: UpdatePersonProfile,
         data["updated_at"] = now
         columns = ", ".join(data.keys())
         placeholders = ", ".join(["?"] * len(data))
-        db.execute(f"INSERT INTO person_profiles ({columns}) VALUES ({placeholders})",
-                   list(data.values()))
-        log_event(db, table_name="person_profiles", record_id=pid,
-                  action="create", source=write_source, new_data=data)
+        db.execute(
+            f"INSERT INTO person_profiles ({columns}) VALUES ({placeholders})",
+            list(data.values()),
+        )
+        log_event(
+            db,
+            table_name="person_profiles",
+            record_id=pid,
+            action="create",
+            source=write_source,
+            new_data=data,
+        )
         db.commit()
-        created = db.execute("SELECT * FROM person_profiles WHERE person_id = ?", (person_id,)).fetchone()
+        created = db.execute(
+            "SELECT * FROM person_profiles WHERE person_id = ?", (person_id,)
+        ).fetchone()
         return dict(created)
 
 
 @router.delete("/{person_id}")
-async def delete_person(person_id: str, request: Request, db=Depends(get_db),
-                      write_source: str = Depends(get_write_source)):
+async def delete_person(
+    person_id: str,
+    request: Request,
+    db=Depends(get_db),
+    write_source: str = Depends(get_write_source),
+):
     """Soft-delete a person by setting is_active = 0."""
     old = db.execute("SELECT * FROM people WHERE id = ?", (person_id,)).fetchone()
     if not old:
@@ -315,10 +454,15 @@ async def delete_person(person_id: str, request: Request, db=Depends(get_db),
     check_etag(request, old)
     now = datetime.now().isoformat()
     db.execute(
-        "UPDATE people SET is_active = 0, updated_at = ? WHERE id = ?",
-        (now, person_id)
+        "UPDATE people SET is_active = 0, updated_at = ? WHERE id = ?", (now, person_id)
     )
-    log_event(db, table_name="people", record_id=person_id, action="delete",
-              source=write_source, old_record=old)
+    log_event(
+        db,
+        table_name="people",
+        record_id=person_id,
+        action="delete",
+        source=write_source,
+        old_record=old,
+    )
     db.commit()
     return {"id": person_id, "deleted": True}

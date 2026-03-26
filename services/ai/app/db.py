@@ -2,6 +2,7 @@
 Database connection manager for ai.db.
 WAL mode, foreign keys ON, Row factory.
 """
+
 import sqlite3
 import logging
 from pathlib import Path

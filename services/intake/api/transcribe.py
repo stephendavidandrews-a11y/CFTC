@@ -21,6 +21,7 @@ Response shape:
     "baseline_deviations": {...}   # optional, if ENABLE_VOCAL_ANALYSIS
 }
 """
+
 import base64
 import logging
 import shutil
@@ -62,7 +63,12 @@ async def transcribe_audio(
     if len(content) > 200 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="File too large (max 200MB)")
 
-    logger.info("[%s] Transcribe request: %s (%.1f MB)", correlation, filename, len(content) / 1024 / 1024)
+    logger.info(
+        "[%s] Transcribe request: %s (%.1f MB)",
+        correlation,
+        filename,
+        len(content) / 1024 / 1024,
+    )
 
     work_dir = Path(tempfile.mkdtemp(prefix="ai_transcribe_"))
     input_path = work_dir / filename
@@ -73,29 +79,38 @@ async def transcribe_audio(
         # Stage 0: Audio preprocessing
         t0 = time.time()
         from voice.pipeline.audio_prep import prepare_audio
+
         try:
             prepared_path = prepare_audio(input_path, cache_dir=work_dir)
         except Exception as e:
-            logger.warning("[%s] Audio prep failed (%s) -- using original", correlation, e)
+            logger.warning(
+                "[%s] Audio prep failed (%s) -- using original", correlation, e
+            )
             prepared_path = input_path
         prep_time = time.time() - t0
 
         # Stage 1: Transcription (faster-whisper + Silero VAD)
         t0 = time.time()
         from voice.pipeline.transcriber import transcribe
+
         transcription = transcribe(prepared_path)
         transcribe_time = time.time() - t0
 
         # Stage 2: Diarization (pyannote 3.1 on MPS)
         t0 = time.time()
         from voice.pipeline.diarizer import diarize, DiarizationResult, SpeakerSegment
+
         try:
             diarization = diarize(prepared_path)
         except Exception as e:
-            logger.warning("[%s] Diarization failed -- single-speaker fallback: %s", correlation, e)
+            logger.warning(
+                "[%s] Diarization failed -- single-speaker fallback: %s", correlation, e
+            )
             duration = transcription.duration
             diarization = DiarizationResult(
-                segments=[SpeakerSegment(speaker="SPEAKER_00", start=0.0, end=duration)],
+                segments=[
+                    SpeakerSegment(speaker="SPEAKER_00", start=0.0, end=duration)
+                ],
                 embeddings={},
                 num_speakers=1,
             )
@@ -104,6 +119,7 @@ async def transcribe_audio(
         # Stage 3: Forced alignment + speaker assignment (wav2vec2)
         t0 = time.time()
         from voice.pipeline.aligner import align
+
         aligned = align(transcription, diarization, prepared_path)
         align_time = time.time() - t0
 
@@ -112,20 +128,24 @@ async def transcribe_audio(
         for seg in aligned.segments:
             words = []
             for w in seg.words:
-                words.append({
-                    "word": w.word,
-                    "start": round(w.start, 3),
-                    "end": round(w.end, 3),
-                    "probability": round(w.probability, 4),
-                })
-            segments.append({
-                "speaker": seg.speaker,
-                "is_overlap": seg.is_overlap,
-                "start": round(seg.start, 3),
-                "end": round(seg.end, 3),
-                "text": seg.text,
-                "words": words,
-            })
+                words.append(
+                    {
+                        "word": w.word,
+                        "start": round(w.start, 3),
+                        "end": round(w.end, 3),
+                        "probability": round(w.probability, 4),
+                    }
+                )
+            segments.append(
+                {
+                    "speaker": seg.speaker,
+                    "is_overlap": seg.is_overlap,
+                    "start": round(seg.start, 3),
+                    "end": round(seg.end, 3),
+                    "text": seg.text,
+                    "words": words,
+                }
+            )
 
         # Encode embeddings as base64
         embeddings = {}
@@ -141,8 +161,12 @@ async def transcribe_audio(
             "language": transcription.language,
             "num_speakers": len(aligned.speakers),
             "overlap_regions": [
-                {"start": round(o.start, 3), "end": round(o.end, 3), "speakers": o.speakers}
-                for o in getattr(aligned, 'overlap_regions', [])
+                {
+                    "start": round(o.start, 3),
+                    "end": round(o.end, 3),
+                    "speakers": o.speakers,
+                }
+                for o in getattr(aligned, "overlap_regions", [])
             ],
             "embeddings": embeddings,
             "timing": {
@@ -156,6 +180,7 @@ async def transcribe_audio(
 
         # Optional: Vocal analysis
         from config import ENABLE_VOCAL_ANALYSIS
+
         if ENABLE_VOCAL_ANALYSIS:
             t0 = time.time()
             vocal_data = _run_vocal_analysis(aligned, prepared_path)
@@ -169,6 +194,7 @@ async def transcribe_audio(
         # Quality-filtered embeddings: replace raw pyannote embeddings with
         # embeddings computed from only the highest-quality audio segments
         from config import ENABLE_VOCAL_ANALYSIS
+
         if ENABLE_VOCAL_ANALYSIS and vocal_data:
             try:
                 t0 = time.time()
@@ -179,7 +205,9 @@ async def transcribe_audio(
                 for seg in aligned.segments:
                     if seg.speaker not in speaker_segments:
                         speaker_segments[seg.speaker] = []
-                    speaker_segments[seg.speaker].append({"start": seg.start, "end": seg.end})
+                    speaker_segments[seg.speaker].append(
+                        {"start": seg.start, "end": seg.end}
+                    )
 
                 # Per-segment features from vocal analysis
                 speaker_features = {}
@@ -188,22 +216,30 @@ async def transcribe_audio(
 
                 # Raw pyannote embeddings (before filtering)
                 import numpy as np
+
                 raw_embs = {}
                 for label, emb_b64 in embeddings.items():
                     raw_embs[label] = np.frombuffer(
-                        base64.b64decode(emb_b64) if isinstance(emb_b64, str) else emb_b64,
+                        base64.b64decode(emb_b64)
+                        if isinstance(emb_b64, str)
+                        else emb_b64,
                         dtype=np.float32,
                     )
 
                 filtered = compute_filtered_embeddings(
-                    prepared_path, speaker_segments, speaker_features, raw_embs,
+                    prepared_path,
+                    speaker_segments,
+                    speaker_features,
+                    raw_embs,
                 )
 
                 # Replace embeddings in response with filtered ones
                 for label, info in filtered.items():
                     if info["filtered"] and info["embedding"] is not None:
                         emb_bytes = info["embedding"].astype(np.float32).tobytes()
-                        response["embeddings"][label] = base64.b64encode(emb_bytes).decode("ascii")
+                        response["embeddings"][label] = base64.b64encode(
+                            emb_bytes
+                        ).decode("ascii")
 
                 # Add quality metadata to response
                 response["embedding_quality"] = {
@@ -226,18 +262,26 @@ async def transcribe_audio(
 
                 parts = []
                 for l, info in filtered.items():
-                    cd = info.get('clean_duration', 0)
-                    td = info.get('total_duration', 0)
+                    cd = info.get("clean_duration", 0)
+                    td = info.get("total_duration", 0)
                     parts.append(f"{l}: {cd:.0f}s clean/{td:.0f}s total")
                 logger.info("[%s] Embedding filter: %s", correlation, ", ".join(parts))
             except Exception as e:
-                logger.warning("[%s] Embedding filter failed (non-fatal): %s", correlation, e)
+                logger.warning(
+                    "[%s] Embedding filter failed (non-fatal): %s", correlation, e
+                )
 
         logger.info(
             "[%s] Transcription complete: %d segments, %d speakers, %.1fs duration "
             "(prep=%.1fs, transcribe=%.1fs, diarize=%.1fs, align=%.1fs, total=%.1fs)",
-            correlation, len(segments), len(aligned.speakers), aligned.duration,
-            prep_time, transcribe_time, diarize_time, align_time,
+            correlation,
+            len(segments),
+            len(aligned.speakers),
+            aligned.duration,
+            prep_time,
+            transcribe_time,
+            diarize_time,
+            align_time,
             response["timing"]["total_seconds"],
         )
 
@@ -270,7 +314,10 @@ def _run_vocal_analysis(aligned, audio_path):
     """
     try:
         from config import VOCAL_MIN_SEGMENT_SECONDS
-        from voice.analysis.vocal_analyzer import extract_vocal_features, aggregate_speaker_features
+        from voice.analysis.vocal_analyzer import (
+            extract_vocal_features,
+            aggregate_speaker_features,
+        )
 
         speaker_segments = {}
         for seg in aligned.segments:
@@ -287,22 +334,30 @@ def _run_vocal_analysis(aligned, audio_path):
             seg_features = []
             for seg in segs:
                 feat = extract_vocal_features(audio_path, seg["start"], seg["end"])
-                seg_features.append({
-                    "start": seg["start"],
-                    "end": seg["end"],
-                    "features": feat,
-                })
+                seg_features.append(
+                    {
+                        "start": seg["start"],
+                        "end": seg["end"],
+                        "features": feat,
+                    }
+                )
             per_segment[speaker_label] = seg_features
 
             # Aggregated features (for API response)
-            agg = aggregate_speaker_features(audio_path, segs, VOCAL_MIN_SEGMENT_SECONDS)
+            agg = aggregate_speaker_features(
+                audio_path, segs, VOCAL_MIN_SEGMENT_SECONDS
+            )
             if agg:
                 feat_response = {k: v for k, v in agg.items() if k != "mfcc_means"}
                 features[speaker_label] = feat_response
                 deviations[speaker_label] = {}
 
         if features or per_segment:
-            return {"features": features, "deviations": deviations, "per_segment": per_segment}
+            return {
+                "features": features,
+                "deviations": deviations,
+                "per_segment": per_segment,
+            }
     except Exception as e:
         logger.warning("Vocal analysis failed in stateless endpoint (non-fatal): %s", e)
 

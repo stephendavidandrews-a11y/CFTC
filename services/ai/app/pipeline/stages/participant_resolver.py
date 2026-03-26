@@ -6,6 +6,7 @@ Collects all unique email addresses from communication_messages, attempts to mat
 against tracker people, creates communication_participants records.
 Auto-confirms exact email matches. Leaves fuzzy/no matches for human review.
 """
+
 import json
 import logging
 import uuid
@@ -24,12 +25,15 @@ async def resolve_participants(db, communication_id: str) -> dict:
     Returns dict with resolution stats and whether all are auto-confirmed.
     """
     # Collect all unique email addresses with their roles
-    messages = db.execute("""
+    messages = db.execute(
+        """
         SELECT sender_email, sender_name, recipient_emails, cc_emails, is_new
         FROM communication_messages
         WHERE communication_id = ?
         ORDER BY message_index
-    """, (communication_id,)).fetchall()
+    """,
+        (communication_id,),
+    ).fetchall()
 
     # Build participant map: email -> {name, roles}
     participants = {}  # email -> {name, header_roles, is_sender}
@@ -75,12 +79,21 @@ async def resolve_participants(db, communication_id: str) -> dict:
                 pass
 
     if not participants:
-        logger.warning("[%s] No participants found in email messages", communication_id[:8])
-        return {"total": 0, "auto_confirmed": 0, "needs_review": 0, "all_confirmed": True}
+        logger.warning(
+            "[%s] No participants found in email messages", communication_id[:8]
+        )
+        return {
+            "total": 0,
+            "auto_confirmed": 0,
+            "needs_review": 0,
+            "all_confirmed": True,
+        }
 
     # Check user config for is_from_user
     policy = load_policy()
-    user_emails = {e.lower() for e in policy.get("user_config", {}).get("email_addresses", [])}
+    user_emails = {
+        e.lower() for e in policy.get("user_config", {}).get("email_addresses", [])
+    }
 
     # Try to match against tracker people
     auto_confirmed = 0
@@ -106,21 +119,34 @@ async def resolve_participants(db, communication_id: str) -> dict:
             else:
                 needs_review += 1
         except Exception as e:
-            logger.warning("[%s] Tracker email lookup failed for %s: %s",
-                          communication_id[:8], email_addr, e)
+            logger.warning(
+                "[%s] Tracker email lookup failed for %s: %s",
+                communication_id[:8],
+                email_addr,
+                e,
+            )
             needs_review += 1
 
-        db.execute("""
+        db.execute(
+            """
             INSERT INTO communication_participants
                 (id, communication_id, participant_email, proposed_name,
                  header_role, participant_role, tracker_person_id,
                  match_source, confirmed, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-        """, (
-            part_id, communication_id, email_addr, proposed_name,
-            info["header_role"], info["participant_role"],
-            tracker_person_id, match_source, confirmed,
-        ))
+        """,
+            (
+                part_id,
+                communication_id,
+                email_addr,
+                proposed_name,
+                info["header_role"],
+                info["participant_role"],
+                tracker_person_id,
+                match_source,
+                confirmed,
+            ),
+        )
 
     db.commit()
 
@@ -128,7 +154,10 @@ async def resolve_participants(db, communication_id: str) -> dict:
 
     logger.info(
         "[%s] Participant resolution: %d total, %d auto-confirmed, %d need review",
-        communication_id[:8], len(participants), auto_confirmed, needs_review,
+        communication_id[:8],
+        len(participants),
+        auto_confirmed,
+        needs_review,
     )
 
     return {

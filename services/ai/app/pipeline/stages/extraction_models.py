@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field, model_validator
 
 # ── Source provenance ──
 
+
 class SourceTimeRange(BaseModel):
     start: float
     end: float
@@ -23,6 +24,7 @@ class SourceTimeRange(BaseModel):
 
 class SourceEvidence(BaseModel):
     """A single piece of source evidence (v2 format)."""
+
     excerpt: str = Field(..., min_length=1)
     segments: list[str] = Field(default_factory=list)
     time_range: Optional[SourceTimeRange] = None
@@ -31,15 +33,17 @@ class SourceEvidence(BaseModel):
 
 # ── Bundle items ──
 
+
 class ExtractionItem(BaseModel):
     """A single proposed tracker write."""
+
     item_type: str = Field(
         ...,
         description="One of: task, task_update, decision, decision_update, "
-                    "matter_update, meeting_record, stakeholder_addition, "
-                    "status_change, document, context_note, "
-                    "person_detail_update, new_person, new_organization, "
-                    "org_detail_update",
+        "matter_update, meeting_record, stakeholder_addition, "
+        "status_change, document, context_note, "
+        "person_detail_update, new_person, new_organization, "
+        "org_detail_update",
     )
     proposed_data: dict = Field(..., description="Item-type-specific fields")
     confidence: float = Field(..., ge=0.0, le=1.0)
@@ -83,11 +87,13 @@ class ExtractionItem(BaseModel):
                 self.source_time_range = first.time_range
         elif self.source_excerpt:
             # v1 only — build source_evidence for uniformity
-            self.source_evidence = [SourceEvidence(
-                excerpt=self.source_excerpt,
-                segments=self.source_segments or [],
-                time_range=self.source_time_range,
-            )]
+            self.source_evidence = [
+                SourceEvidence(
+                    excerpt=self.source_excerpt,
+                    segments=self.source_segments or [],
+                    time_range=self.source_time_range,
+                )
+            ]
 
         # Ensure v1 fields have defaults for post-processing
         if not self.source_excerpt:
@@ -102,8 +108,10 @@ class ExtractionItem(BaseModel):
 
 # ── Bundles ──
 
+
 class ExtractionBundle(BaseModel):
     """A cluster of proposals grouped by target matter."""
+
     bundle_type: str = Field(
         ...,
         description="matter | new_matter | standalone",
@@ -120,6 +128,7 @@ class ExtractionBundle(BaseModel):
 
 # ── Matter associations ──
 
+
 class MatterAssociation(BaseModel):
     matter_id: str
     matter_title: str
@@ -128,6 +137,7 @@ class MatterAssociation(BaseModel):
 
 
 # ── Suppressed observations ──
+
 
 class SuppressedObservation(BaseModel):
     item_type: str
@@ -140,8 +150,10 @@ class SuppressedObservation(BaseModel):
 
 # ── Top-level extraction response ──
 
+
 class ExtractionOutput(BaseModel):
     """Full validated extraction response from Sonnet."""
+
     extraction_version: str = "2.0.0"
     communication_id: str
     extraction_summary: str
@@ -156,11 +168,21 @@ class ExtractionOutput(BaseModel):
 VALID_BUNDLE_TYPES = {"matter", "new_matter", "standalone"}
 
 VALID_ITEM_TYPES = {
-    "task", "task_update", "decision", "decision_update",
-    "matter_update", "meeting_record", "stakeholder_addition",
-    "status_change", "document", "context_note",
-    "person_detail_update", "new_person", "new_organization",
+    "task",
+    "task_update",
+    "decision",
+    "decision_update",
+    "matter_update",
+    "meeting_record",
+    "stakeholder_addition",
+    "status_change",
+    "document",
+    "context_note",
+    "person_detail_update",
+    "new_person",
+    "new_organization",
     "org_detail_update",
+    "directive_update",
 }
 
 # Maps extraction_policy toggle names to item_type values.
@@ -177,21 +199,34 @@ POLICY_TOGGLE_MAP = {
     "propose_new_organizations": "new_organization",
     "propose_context_notes": "context_note",
     "propose_person_details": "person_detail_update",
+    "propose_directive_updates": "directive_update",
 }
 # Note: task_update, decision_update, org_detail_update are always-on by design.
 # Disabling them would cause the model to create duplicate records instead of updates.
 
 # Allowed fields for task_update changes
 TASK_UPDATE_ALLOWED_FIELDS = {
-    "status", "priority", "due_date", "deadline_type",
-    "assigned_to_person_id", "waiting_on_person_id",
-    "waiting_on_org_id", "waiting_on_description",
-    "next_follow_up_date", "description", "expected_output",
+    "status",
+    "priority",
+    "due_date",
+    "deadline_type",
+    "assigned_to_person_id",
+    "waiting_on_person_id",
+    "waiting_on_org_id",
+    "waiting_on_description",
+    "next_follow_up_date",
+    "description",
+    "expected_output",
 }
 
 # Allowed fields for decision_update changes
 DECISION_UPDATE_ALLOWED_FIELDS = {
-    "status", "decision_assigned_to_person_id", "decision_due_date",
-    "options_summary", "recommended_option", "decision_result",
-    "made_at", "notes",
+    "status",
+    "decision_assigned_to_person_id",
+    "decision_due_date",
+    "options_summary",
+    "recommended_option",
+    "decision_result",
+    "made_at",
+    "notes",
 }

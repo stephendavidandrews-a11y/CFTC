@@ -28,11 +28,23 @@ TASK_CUSTODY_MEMO_ID = "dddddddd-4444-4000-8000-000000000001"
 
 FULL_CONTEXT = {
     "people": [
-        {"id": PERSON_TYLER_ID, "full_name": "Tyler S. Badgley", "title": "General Counsel"},
-        {"id": PERSON_PRIYA_ID, "full_name": "Priya Sharma", "title": "Attorney-Advisor"},
+        {
+            "id": PERSON_TYLER_ID,
+            "full_name": "Tyler S. Badgley",
+            "title": "General Counsel",
+        },
+        {
+            "id": PERSON_PRIYA_ID,
+            "full_name": "Priya Sharma",
+            "title": "Attorney-Advisor",
+        },
     ],
     "organizations": [
-        {"id": ORG_SEC_ID, "name": "Securities and Exchange Commission", "short_name": "SEC"},
+        {
+            "id": ORG_SEC_ID,
+            "name": "Securities and Exchange Commission",
+            "short_name": "SEC",
+        },
     ],
     "matters": [
         {
@@ -42,10 +54,18 @@ FULL_CONTEXT = {
             "status": "draft in progress",
             "priority": "critical this week",
             "stakeholders": [
-                {"person_id": PERSON_TYLER_ID, "full_name": "Tyler S. Badgley", "role": "supervisor"},
+                {
+                    "person_id": PERSON_TYLER_ID,
+                    "full_name": "Tyler S. Badgley",
+                    "role": "supervisor",
+                },
             ],
             "organizations": [
-                {"organization_id": ORG_SEC_ID, "name": "Securities and Exchange Commission", "organization_role": "partner agency"},
+                {
+                    "organization_id": ORG_SEC_ID,
+                    "name": "Securities and Exchange Commission",
+                    "organization_role": "partner agency",
+                },
             ],
             "open_tasks": [
                 {
@@ -91,10 +111,20 @@ def _base_pass1_payload() -> dict:
                 "confidence": 0.95,
                 "durability": "working",
                 "memory_value": "none",
-                "speaker_refs": [{"name": "Tyler S. Badgley", "tracker_person_id": PERSON_TYLER_ID}],
+                "speaker_refs": [
+                    {"name": "Tyler S. Badgley", "tracker_person_id": PERSON_TYLER_ID}
+                ],
                 "entity_refs": [
-                    {"entity_type": "person", "name": "Priya Sharma", "tracker_id": PERSON_PRIYA_ID},
-                    {"entity_type": "organization", "name": "SEC", "tracker_id": ORG_SEC_ID},
+                    {
+                        "entity_type": "person",
+                        "name": "Priya Sharma",
+                        "tracker_id": PERSON_PRIYA_ID,
+                    },
+                    {
+                        "entity_type": "organization",
+                        "name": "SEC",
+                        "tracker_id": ORG_SEC_ID,
+                    },
                 ],
                 "candidate_matter_refs": [
                     {
@@ -113,7 +143,9 @@ def _base_pass1_payload() -> dict:
                     }
                 ],
                 "field_hints": {"due_date": "2026-04-15", "priority": "high"},
-                "evidence": [{"excerpt": "I need it by the 15th now.", "segments": ["seg-001"]}],
+                "evidence": [
+                    {"excerpt": "I need it by the 15th now.", "segments": ["seg-001"]}
+                ],
             },
             {
                 "id": "obs-person-memory",
@@ -124,12 +156,27 @@ def _base_pass1_payload() -> dict:
                 "confidence": 0.91,
                 "durability": "durable",
                 "memory_value": "high",
-                "speaker_refs": [{"name": "Tyler S. Badgley", "tracker_person_id": PERSON_TYLER_ID}],
-                "entity_refs": [{"entity_type": "person", "name": "Tyler S. Badgley", "tracker_id": PERSON_TYLER_ID}],
+                "speaker_refs": [
+                    {"name": "Tyler S. Badgley", "tracker_person_id": PERSON_TYLER_ID}
+                ],
+                "entity_refs": [
+                    {
+                        "entity_type": "person",
+                        "name": "Tyler S. Badgley",
+                        "tracker_id": PERSON_TYLER_ID,
+                    }
+                ],
                 "candidate_matter_refs": [],
                 "candidate_record_refs": [],
-                "field_hints": {"prior_roles_summary": "Approximately eight years at the SEC"},
-                "evidence": [{"excerpt": "Before this I spent about eight years at the SEC.", "segments": ["seg-002"]}],
+                "field_hints": {
+                    "prior_roles_summary": "Approximately eight years at the SEC"
+                },
+                "evidence": [
+                    {
+                        "excerpt": "Before this I spent about eight years at the SEC.",
+                        "segments": ["seg-002"],
+                    }
+                ],
             },
         ],
     }
@@ -153,11 +200,23 @@ def test_v3_routing_package_resolves_entities_and_routes_to_existing_matter():
 
     assert package.matter_routing.primary_matter_id == MATTER_CRYPTO_ID
     assert package.matter_routing.routing_confidence == "high"
-    assert any(match.record_id == TASK_CUSTODY_MEMO_ID for match in package.record_matches.tasks)
-    assert {person.tracker_person_id for person in package.resolved_people} == {PERSON_TYLER_ID, PERSON_PRIYA_ID}
-    assert {organization.tracker_org_id for organization in package.resolved_organizations} == {ORG_SEC_ID}
-    assert [matter["id"] for matter in package.relevant_tracker_context["matters"]] == [MATTER_CRYPTO_ID]
-    assert [task["id"] for task in package.relevant_tracker_context["matched_tasks"]] == [TASK_CUSTODY_MEMO_ID]
+    assert any(
+        match.record_id == TASK_CUSTODY_MEMO_ID
+        for match in package.record_matches.tasks
+    )
+    assert {person.tracker_person_id for person in package.resolved_people} == {
+        PERSON_TYLER_ID,
+        PERSON_PRIYA_ID,
+    }
+    assert {
+        organization.tracker_org_id for organization in package.resolved_organizations
+    } == {ORG_SEC_ID}
+    assert [matter["id"] for matter in package.relevant_tracker_context["matters"]] == [
+        MATTER_CRYPTO_ID
+    ]
+    assert [
+        task["id"] for task in package.relevant_tracker_context["matched_tasks"]
+    ] == [TASK_CUSTODY_MEMO_ID]
 
 
 def test_v3_prefers_enriched_transcript_text():
@@ -265,7 +324,12 @@ def test_v3_routing_package_stays_standalone_for_memory_only_signal():
         communication_id="comm-standalone",
         pass1_output=pass1_output,
         full_context=FULL_CONTEXT,
-        routing_seeds={"speaker_person_ids": set(), "entity_person_ids": set(), "entity_org_ids": set(), "identifier_hits": {"rin": set(), "docket": set(), "cfr": set()}},
+        routing_seeds={
+            "speaker_person_ids": set(),
+            "entity_person_ids": set(),
+            "entity_org_ids": set(),
+            "identifier_hits": {"rin": set(), "docket": set(), "cfr": set()},
+        },
     )
 
     assert package.matter_routing.routing_confidence == "standalone"
@@ -290,7 +354,9 @@ def test_v3_routing_package_flags_new_matter_candidate_when_no_existing_match():
             "candidate_matter_refs": [],
             "candidate_record_refs": [],
             "field_hints": {"expected_output": "Outline for digital assets briefing"},
-            "evidence": [{"excerpt": "I'll draft an outline for that.", "segments": ["seg-a"]}],
+            "evidence": [
+                {"excerpt": "I'll draft an outline for that.", "segments": ["seg-a"]}
+            ],
         },
         {
             "id": "obs-b",
@@ -306,7 +372,12 @@ def test_v3_routing_package_flags_new_matter_candidate_when_no_existing_match():
             "candidate_matter_refs": [],
             "candidate_record_refs": [],
             "field_hints": {},
-            "evidence": [{"excerpt": "This should become a briefing for leadership.", "segments": ["seg-b"]}],
+            "evidence": [
+                {
+                    "excerpt": "This should become a briefing for leadership.",
+                    "segments": ["seg-b"],
+                }
+            ],
         },
     ]
 
@@ -314,7 +385,13 @@ def test_v3_routing_package_flags_new_matter_candidate_when_no_existing_match():
     package = build_routing_resolution_package_from_context(
         communication_id="comm-new-matter",
         pass1_output=pass1_output,
-        full_context={"people": [], "organizations": [], "matters": [], "standalone_tasks": [], "recent_meetings": []},
+        full_context={
+            "people": [],
+            "organizations": [],
+            "matters": [],
+            "standalone_tasks": [],
+            "recent_meetings": [],
+        },
     )
 
     assert package.matter_routing.routing_confidence == "new_matter_candidate"

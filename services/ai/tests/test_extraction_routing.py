@@ -21,7 +21,9 @@ def test_tier_context_promotes_matters_via_stakeholders_and_org_links():
                 "matter_type": "rulemaking",
                 "status": "draft in progress",
                 "priority": "important this month",
-                "stakeholders": [{"person_id": "person-1", "full_name": "Tyler S. Badgley"}],
+                "stakeholders": [
+                    {"person_id": "person-1", "full_name": "Tyler S. Badgley"}
+                ],
                 "organizations": [],
                 "tags": [],
             },

@@ -8,6 +8,7 @@ Conservative approach:
 
 Adapted from services/intake/voice/pipeline/audio_prep.py for the AI service.
 """
+
 import json
 import logging
 import shutil
@@ -24,14 +25,29 @@ TARGET_CHANNELS = 1
 
 # Accepted audio formats on ingestion
 ACCEPTED_FORMATS = {
-    ".wav", ".flac", ".mp3", ".m4a", ".mp4", ".aac",
-    ".ogg", ".opus", ".wma", ".webm",
+    ".wav",
+    ".flac",
+    ".mp3",
+    ".m4a",
+    ".mp4",
+    ".aac",
+    ".ogg",
+    ".opus",
+    ".wma",
+    ".webm",
 }
 
 # Formats that always need conversion (not already PCM WAV)
 COMPRESSED_FORMATS = {
-    ".m4a", ".mp4", ".aac", ".mp3", ".ogg", ".opus",
-    ".flac", ".wma", ".webm",
+    ".m4a",
+    ".mp4",
+    ".aac",
+    ".mp3",
+    ".ogg",
+    ".opus",
+    ".flac",
+    ".wma",
+    ".webm",
 }
 
 
@@ -70,6 +86,7 @@ def _is_target_format(wav_path: Path) -> bool:
     # Try Python wave module first (works for standard PCM WAV)
     try:
         import wave
+
         with wave.open(str(wav_path), "rb") as wf:
             sr = wf.getframerate()
             ch = wf.getnchannels()
@@ -82,8 +99,11 @@ def _is_target_format(wav_path: Path) -> bool:
     try:
         ffprobe = _find_ffprobe()
         cmd = [
-            ffprobe, "-v", "quiet",
-            "-print_format", "json",
+            ffprobe,
+            "-v",
+            "quiet",
+            "-print_format",
+            "json",
             "-show_streams",
             str(wav_path),
         ]
@@ -96,7 +116,11 @@ def _is_target_format(wav_path: Path) -> bool:
                 sr = int(stream.get("sample_rate", 0))
                 ch = int(stream.get("channels", 0))
                 codec = stream.get("codec_name", "")
-                return sr == TARGET_SAMPLE_RATE and ch == TARGET_CHANNELS and codec == "pcm_s16le"
+                return (
+                    sr == TARGET_SAMPLE_RATE
+                    and ch == TARGET_CHANNELS
+                    and codec == "pcm_s16le"
+                )
         return False
     except Exception:
         return False
@@ -110,6 +134,7 @@ def get_audio_metadata(audio_path: Path) -> dict:
     if suffix == ".wav":
         try:
             import wave
+
             with wave.open(str(audio_path), "rb") as wf:
                 frames = wf.getnframes()
                 sr = wf.getframerate()
@@ -120,7 +145,7 @@ def get_audio_metadata(audio_path: Path) -> dict:
                     "duration_seconds": round(duration, 2),
                     "file_size_bytes": audio_path.stat().st_size,
                     "format_name": "wav",
-                    "codec": "pcm_s16le" if sw == 2 else f"pcm_s{sw*8}le",
+                    "codec": "pcm_s16le" if sw == 2 else f"pcm_s{sw * 8}le",
                     "sample_rate": sr,
                     "channels": ch,
                     "bits_per_sample": sw * 8,
@@ -132,9 +157,13 @@ def get_audio_metadata(audio_path: Path) -> dict:
     try:
         ffprobe = _find_ffprobe()
         cmd = [
-            ffprobe, "-v", "quiet",
-            "-print_format", "json",
-            "-show_format", "-show_streams",
+            ffprobe,
+            "-v",
+            "quiet",
+            "-print_format",
+            "json",
+            "-show_format",
+            "-show_streams",
             str(audio_path),
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
@@ -156,12 +185,14 @@ def get_audio_metadata(audio_path: Path) -> dict:
             "bit_rate": int(fmt.get("bit_rate", 0)),
         }
         if audio_stream:
-            meta.update({
-                "codec": audio_stream.get("codec_name", "unknown"),
-                "sample_rate": int(audio_stream.get("sample_rate", 0)),
-                "channels": int(audio_stream.get("channels", 0)),
-                "bits_per_sample": int(audio_stream.get("bits_per_sample", 0)),
-            })
+            meta.update(
+                {
+                    "codec": audio_stream.get("codec_name", "unknown"),
+                    "sample_rate": int(audio_stream.get("sample_rate", 0)),
+                    "channels": int(audio_stream.get("channels", 0)),
+                    "bits_per_sample": int(audio_stream.get("bits_per_sample", 0)),
+                }
+            )
 
         # Extract creation_time from format tags (embedded by recording devices)
         tags = fmt.get("tags", {})
@@ -228,16 +259,23 @@ def preprocess_audio(
     # Convert with ffmpeg — conservative settings only
     logger.info(
         "Preprocessing %s -> 16kHz mono PCM WAV: %s",
-        suffix, original_path.name,
+        suffix,
+        original_path.name,
     )
     ffmpeg = _find_ffmpeg()
     cmd = [
-        ffmpeg, "-y",                        # overwrite output
-        "-i", str(original_path),            # input
-        "-ac", str(TARGET_CHANNELS),         # mono
-        "-ar", str(TARGET_SAMPLE_RATE),      # 16 kHz
-        "-sample_fmt", "s16",                # 16-bit PCM
-        "-acodec", "pcm_s16le",              # explicit PCM codec
+        ffmpeg,
+        "-y",  # overwrite output
+        "-i",
+        str(original_path),  # input
+        "-ac",
+        str(TARGET_CHANNELS),  # mono
+        "-ar",
+        str(TARGET_SAMPLE_RATE),  # 16 kHz
+        "-sample_fmt",
+        "s16",  # 16-bit PCM
+        "-acodec",
+        "pcm_s16le",  # explicit PCM codec
         str(normalized_path),
     ]
 
@@ -266,7 +304,9 @@ def preprocess_audio(
     output_size = normalized_path.stat().st_size
     logger.info(
         "Preprocessed: %s -> %s (%.1f MB)",
-        original_path.name, normalized_path.name, output_size / 1024 / 1024,
+        original_path.name,
+        normalized_path.name,
+        output_size / 1024 / 1024,
     )
 
     return normalized_path, source_meta

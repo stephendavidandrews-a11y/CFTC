@@ -1,13 +1,18 @@
 """Comprehensive tests for the matters router."""
+
 import uuid
 from tests.conftest import (
-    seed_matter, seed_person, seed_organization, make_id,
+    seed_matter,
+    seed_person,
+    seed_organization,
+    make_id,
 )
 
 
 # ---------------------------------------------------------------------------
 # List / filter / sort / paginate
 # ---------------------------------------------------------------------------
+
 
 def test_list_matters_empty(client, auth_headers):
     """GET /tracker/matters returns empty list when no matters exist."""
@@ -64,8 +69,10 @@ def test_list_matters_pagination(client, auth_headers, db):
     """Pagination with limit and offset."""
     for i in range(5):
         seed_matter(db, title=f"Matter {i}")
-    resp = client.get("/tracker/matters?limit=2&offset=0&sort_by=title&sort_dir=asc",
-                      headers=auth_headers)
+    resp = client.get(
+        "/tracker/matters?limit=2&offset=0&sort_by=title&sort_dir=asc",
+        headers=auth_headers,
+    )
     data = resp.json()
     assert data["total"] == 5
     assert len(data["items"]) == 2
@@ -75,7 +82,9 @@ def test_list_matters_sort_asc(client, auth_headers, db):
     """Sort by title ascending."""
     seed_matter(db, title="Zeta Matter")
     seed_matter(db, title="Alpha Matter")
-    resp = client.get("/tracker/matters?sort_by=title&sort_dir=asc", headers=auth_headers)
+    resp = client.get(
+        "/tracker/matters?sort_by=title&sort_dir=asc", headers=auth_headers
+    )
     items = resp.json()["items"]
     assert items[0]["title"] == "Alpha Matter"
     assert items[1]["title"] == "Zeta Matter"
@@ -94,6 +103,7 @@ def test_list_matters_summary_counts(client, auth_headers, db):
 # ---------------------------------------------------------------------------
 # Get single matter
 # ---------------------------------------------------------------------------
+
 
 def test_get_matter_success(client, auth_headers, db):
     """GET /tracker/matters/{id} returns full detail with sub-resources."""
@@ -118,6 +128,7 @@ def test_get_matter_not_found(client, auth_headers):
 # ---------------------------------------------------------------------------
 # Create matter
 # ---------------------------------------------------------------------------
+
 
 def test_create_matter_success(client, auth_headers):
     """POST /tracker/matters creates a new matter."""
@@ -169,19 +180,24 @@ def test_create_matter_idempotency(client, auth_headers):
 # Update matter
 # ---------------------------------------------------------------------------
 
+
 def test_update_matter_success(client, auth_headers, db):
     """PUT /tracker/matters/{id} updates the matter."""
     m = seed_matter(db)
-    resp = client.put(f"/tracker/matters/{m['id']}",
-                      json={"title": "Updated Title"}, headers=auth_headers)
+    resp = client.put(
+        f"/tracker/matters/{m['id']}",
+        json={"title": "Updated Title"},
+        headers=auth_headers,
+    )
     assert resp.status_code == 200
     assert resp.json()["updated"] is True
 
 
 def test_update_matter_not_found(client, auth_headers):
     """PUT /tracker/matters/{id} returns 404 for missing matter."""
-    resp = client.put(f"/tracker/matters/{make_id()}",
-                      json={"title": "X"}, headers=auth_headers)
+    resp = client.put(
+        f"/tracker/matters/{make_id()}", json={"title": "X"}, headers=auth_headers
+    )
     assert resp.status_code == 404
 
 
@@ -195,6 +211,7 @@ def test_update_matter_empty_body(client, auth_headers, db):
 # ---------------------------------------------------------------------------
 # Delete (soft-close) matter
 # ---------------------------------------------------------------------------
+
 
 def test_delete_matter_success(client, auth_headers, db):
     """DELETE /tracker/matters/{id} soft-deletes by setting status=closed."""
@@ -216,13 +233,16 @@ def test_delete_matter_not_found(client, auth_headers):
 # Stakeholders (matter_people)
 # ---------------------------------------------------------------------------
 
+
 def test_add_and_list_matter_person(client, auth_headers, db):
     """POST + GET /tracker/matters/{id}/people manages stakeholders."""
     m = seed_matter(db)
     p = seed_person(db)
-    resp = client.post(f"/tracker/matters/{m['id']}/people",
-                       json={"person_id": p["id"], "matter_role": "lead attorney"},
-                       headers=auth_headers)
+    resp = client.post(
+        f"/tracker/matters/{m['id']}/people",
+        json={"person_id": p["id"], "matter_role": "lead attorney"},
+        headers=auth_headers,
+    )
     assert resp.status_code == 200
     mp_id = resp.json()["id"]
 
@@ -233,8 +253,9 @@ def test_add_and_list_matter_person(client, auth_headers, db):
     assert items[0]["person_id"] == p["id"]
 
     # Remove
-    resp3 = client.delete(f"/tracker/matters/{m['id']}/people/{mp_id}",
-                          headers=auth_headers)
+    resp3 = client.delete(
+        f"/tracker/matters/{m['id']}/people/{mp_id}", headers=auth_headers
+    )
     assert resp3.status_code == 200
     assert resp3.json()["deleted"] is True
 
@@ -243,21 +264,25 @@ def test_add_and_list_matter_person(client, auth_headers, db):
 # Organizations (matter_organizations)
 # ---------------------------------------------------------------------------
 
+
 def test_add_and_list_matter_org(client, auth_headers, db):
     """POST + GET /tracker/matters/{id}/orgs manages linked orgs."""
     m = seed_matter(db)
     org = seed_organization(db)
-    resp = client.post(f"/tracker/matters/{m['id']}/orgs",
-                       json={"organization_id": org["id"], "organization_role": "client office"},
-                       headers=auth_headers)
+    resp = client.post(
+        f"/tracker/matters/{m['id']}/orgs",
+        json={"organization_id": org["id"], "organization_role": "client office"},
+        headers=auth_headers,
+    )
     assert resp.status_code == 200
     mo_id = resp.json()["id"]
 
     resp2 = client.get(f"/tracker/matters/{m['id']}/orgs", headers=auth_headers)
     assert len(resp2.json()) == 1
 
-    resp3 = client.delete(f"/tracker/matters/{m['id']}/orgs/{mo_id}",
-                          headers=auth_headers)
+    resp3 = client.delete(
+        f"/tracker/matters/{m['id']}/orgs/{mo_id}", headers=auth_headers
+    )
     assert resp3.json()["deleted"] is True
 
 
@@ -265,12 +290,15 @@ def test_add_and_list_matter_org(client, auth_headers, db):
 # Updates (matter_updates)
 # ---------------------------------------------------------------------------
 
+
 def test_add_and_list_matter_update(client, auth_headers, db):
     """POST + GET /tracker/matters/{id}/updates manages update history."""
     m = seed_matter(db)
-    resp = client.post(f"/tracker/matters/{m['id']}/updates",
-                       json={"summary": "Completed initial review", "update_type": "status update"},
-                       headers=auth_headers)
+    resp = client.post(
+        f"/tracker/matters/{m['id']}/updates",
+        json={"summary": "Completed initial review", "update_type": "status update"},
+        headers=auth_headers,
+    )
     assert resp.status_code == 200
 
     resp2 = client.get(f"/tracker/matters/{m['id']}/updates", headers=auth_headers)
@@ -283,37 +311,48 @@ def test_add_and_list_matter_update(client, auth_headers, db):
 # Tags (matter_tags)
 # ---------------------------------------------------------------------------
 
+
 def test_add_and_list_matter_tag(client, auth_headers, db):
     """POST + GET + DELETE /tracker/matters/{id}/tags manages tags."""
     m = seed_matter(db)
     tag_id = make_id()
-    db.execute("INSERT INTO tags (id, name, tag_type) VALUES (?, ?, ?)",
-               (tag_id, "urgent", "priority"))
+    db.execute(
+        "INSERT INTO tags (id, name, tag_type) VALUES (?, ?, ?)",
+        (tag_id, "urgent", "priority"),
+    )
     db.commit()
 
-    resp = client.post(f"/tracker/matters/{m['id']}/tags",
-                       json={"tag_id": tag_id}, headers=auth_headers)
+    resp = client.post(
+        f"/tracker/matters/{m['id']}/tags",
+        json={"tag_id": tag_id},
+        headers=auth_headers,
+    )
     assert resp.status_code == 200
     assert resp.json()["added"] is True
 
     # Duplicate add returns exists
-    resp2 = client.post(f"/tracker/matters/{m['id']}/tags",
-                        json={"tag_id": tag_id}, headers=auth_headers)
+    resp2 = client.post(
+        f"/tracker/matters/{m['id']}/tags",
+        json={"tag_id": tag_id},
+        headers=auth_headers,
+    )
     assert resp2.json()["exists"] is True
 
     resp3 = client.get(f"/tracker/matters/{m['id']}/tags", headers=auth_headers)
     assert len(resp3.json()) == 1
 
-    resp4 = client.delete(f"/tracker/matters/{m['id']}/tags/{tag_id}",
-                          headers=auth_headers)
+    resp4 = client.delete(
+        f"/tracker/matters/{m['id']}/tags/{tag_id}", headers=auth_headers
+    )
     assert resp4.json()["deleted"] is True
 
 
 def test_add_tag_missing_tag_id(client, auth_headers, db):
     """POST /tracker/matters/{id}/tags without tag_id returns 400."""
     m = seed_matter(db)
-    resp = client.post(f"/tracker/matters/{m['id']}/tags",
-                       json={}, headers=auth_headers)
+    resp = client.post(
+        f"/tracker/matters/{m['id']}/tags", json={}, headers=auth_headers
+    )
     assert resp.status_code == 400
 
 
@@ -321,32 +360,38 @@ def test_add_tag_missing_tag_id(client, auth_headers, db):
 # Dependencies (matter_dependencies)
 # ---------------------------------------------------------------------------
 
+
 def test_add_and_remove_dependency(client, auth_headers, db):
     """POST + DELETE /tracker/matters/{id}/dependencies manages deps."""
     m1 = seed_matter(db, title="Upstream")
     m2 = seed_matter(db, title="Downstream")
-    resp = client.post(f"/tracker/matters/{m2['id']}/dependencies",
-                       json={"depends_on_matter_id": m1["id"]},
-                       headers=auth_headers)
+    resp = client.post(
+        f"/tracker/matters/{m2['id']}/dependencies",
+        json={"depends_on_matter_id": m1["id"]},
+        headers=auth_headers,
+    )
     assert resp.status_code == 200
     dep_id = resp.json()["id"]
 
-    resp2 = client.delete(f"/tracker/matters/{m2['id']}/dependencies/{dep_id}",
-                          headers=auth_headers)
+    resp2 = client.delete(
+        f"/tracker/matters/{m2['id']}/dependencies/{dep_id}", headers=auth_headers
+    )
     assert resp2.json()["deleted"] is True
 
 
 def test_add_dependency_missing_field(client, auth_headers, db):
     """POST /tracker/matters/{id}/dependencies without depends_on returns 400."""
     m = seed_matter(db)
-    resp = client.post(f"/tracker/matters/{m['id']}/dependencies",
-                       json={}, headers=auth_headers)
+    resp = client.post(
+        f"/tracker/matters/{m['id']}/dependencies", json={}, headers=auth_headers
+    )
     assert resp.status_code == 400
 
 
 # ---------------------------------------------------------------------------
 # Auth required
 # ---------------------------------------------------------------------------
+
 
 def test_matters_auth_required(client):
     """All matter endpoints reject unauthenticated requests."""

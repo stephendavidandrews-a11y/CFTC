@@ -60,7 +60,9 @@ def process_conversation(conversation_id: str) -> bool:
         ).fetchone()["cnt"]
 
         if existing_count > 0:
-            logger.info(f"[{conversation_id[:8]}] Reusing {existing_count} existing transcript segments")
+            logger.info(
+                f"[{conversation_id[:8]}] Reusing {existing_count} existing transcript segments"
+            )
             _update_status(conn, conversation_id, "awaiting_speaker_review")
             conn.commit()
             return True
@@ -70,11 +72,15 @@ def process_conversation(conversation_id: str) -> bool:
             cache_dir = audio_path.parent / ".prepared"
             prepared_path = prepare_audio(audio_path, cache_dir=cache_dir)
         except Exception as e:
-            logger.warning(f"Audio prep failed ({type(e).__name__}: {e}) -- using original")
+            logger.warning(
+                f"Audio prep failed ({type(e).__name__}: {e}) -- using original"
+            )
             prepared_path = audio_path
 
         # Stage 1: Transcription (faster-whisper + Silero VAD)
-        logger.info(f"[{conversation_id[:8]}] Stage 1: Transcribing (faster-whisper)...")
+        logger.info(
+            f"[{conversation_id[:8]}] Stage 1: Transcribing (faster-whisper)..."
+        )
         transcription = transcribe(prepared_path)
 
         conn.execute(
@@ -87,7 +93,9 @@ def process_conversation(conversation_id: str) -> bool:
         try:
             diarization = diarize(prepared_path)
         except Exception:
-            logger.warning(f"[{conversation_id[:8]}] Diarization failed -- single-speaker fallback")
+            logger.warning(
+                f"[{conversation_id[:8]}] Diarization failed -- single-speaker fallback"
+            )
             diarization = _single_speaker_fallback(transcription.duration)
 
         # Stage 3: Forced alignment + speaker assignment (wav2vec2)
@@ -95,7 +103,9 @@ def process_conversation(conversation_id: str) -> bool:
         aligned = align(transcription, diarization, prepared_path)
 
         # Stage 4: Store transcript + voice samples
-        logger.info(f"[{conversation_id[:8]}] Stage 4: Storing {len(aligned.segments)} segments...")
+        logger.info(
+            f"[{conversation_id[:8]}] Stage 4: Storing {len(aligned.segments)} segments..."
+        )
         _store_transcript(conn, conversation_id, aligned)
         _store_voice_samples(conn, conversation_id, diarization)
 
@@ -103,13 +113,19 @@ def process_conversation(conversation_id: str) -> bool:
         suggestions = {}
         try:
             from voice.speakers.resolver import auto_suggest_speakers
-            suggestions = auto_suggest_speakers(conn, conversation_id, diarization.embeddings)
+
+            suggestions = auto_suggest_speakers(
+                conn, conversation_id, diarization.embeddings
+            )
         except Exception as e:
-            logger.warning(f"[{conversation_id[:8]}] Auto-suggest failed (non-fatal): {e}")
+            logger.warning(
+                f"[{conversation_id[:8]}] Auto-suggest failed (non-fatal): {e}"
+            )
 
         # Stage 5: Vocal analysis (optional)
         vocal_data = {}  # speaker_label -> {features, segments_with_features}
         from config import ENABLE_VOCAL_ANALYSIS
+
         if ENABLE_VOCAL_ANALYSIS:
             vocal_data = _run_vocal_analysis(
                 conn, conversation_id, aligned, diarization, prepared_path, suggestions
@@ -118,11 +134,18 @@ def process_conversation(conversation_id: str) -> bool:
         # Stage 6: Voiceprint quality gate
         # For speakers WITHOUT an existing voiceprint profile, run quality gate
         _run_voiceprint_quality_gate(
-            conn, conversation_id, aligned, diarization, vocal_data, prepared_path, suggestions
+            conn,
+            conversation_id,
+            aligned,
+            diarization,
+            vocal_data,
+            prepared_path,
+            suggestions,
         )
 
         # Stage 7: Auto-advance check (optional)
         from config import ENABLE_AUTO_ADVANCE
+
         if ENABLE_AUTO_ADVANCE and _all_speakers_resolved(conn, conversation_id):
             _update_status(conn, conversation_id, "speakers_confirmed")
             conn.execute(
@@ -130,7 +153,9 @@ def process_conversation(conversation_id: str) -> bool:
                 (conversation_id,),
             )
             _log_auto_advance(conn, conversation_id)
-            logger.info(f"[{conversation_id[:8]}] Auto-advanced: all speakers resolved at >=0.85")
+            logger.info(
+                f"[{conversation_id[:8]}] Auto-advanced: all speakers resolved at >=0.85"
+            )
         else:
             _update_status(conn, conversation_id, "awaiting_speaker_review")
 
@@ -176,7 +201,9 @@ def process_pending():
         process_conversation(row["id"])
 
 
-def _run_vocal_analysis(conn, conversation_id, aligned, diarization, audio_path, suggestions):
+def _run_vocal_analysis(
+    conn, conversation_id, aligned, diarization, audio_path, suggestions
+):
     """Stage 5: Extract vocal features for each speaker.
 
     Returns dict of speaker_label -> {features: dict, segments: list[dict with features]}
@@ -187,7 +214,10 @@ def _run_vocal_analysis(conn, conversation_id, aligned, diarization, audio_path,
     vocal_data = {}
 
     try:
-        from voice.analysis.vocal_analyzer import extract_vocal_features, aggregate_speaker_features
+        from voice.analysis.vocal_analyzer import (
+            extract_vocal_features,
+            aggregate_speaker_features,
+        )
         from voice.analysis.baseline_tracker import update_baseline, compare_to_baseline
 
         # Group segments by speaker
@@ -202,16 +232,22 @@ def _run_vocal_analysis(conn, conversation_id, aligned, diarization, audio_path,
             segments_with_features = []
             for seg in segs:
                 features = extract_vocal_features(audio_path, seg["start"], seg["end"])
-                segments_with_features.append({
-                    "start": seg["start"],
-                    "end": seg["end"],
-                    "features": features,
-                })
+                segments_with_features.append(
+                    {
+                        "start": seg["start"],
+                        "end": seg["end"],
+                        "features": features,
+                    }
+                )
 
             # Aggregate for storage
-            agg_features = aggregate_speaker_features(audio_path, segs, VOCAL_MIN_SEGMENT_SECONDS)
+            agg_features = aggregate_speaker_features(
+                audio_path, segs, VOCAL_MIN_SEGMENT_SECONDS
+            )
             if agg_features:
-                _store_vocal_features(conn, conversation_id, speaker_label, agg_features)
+                _store_vocal_features(
+                    conn, conversation_id, speaker_label, agg_features
+                )
 
                 # Baseline update for resolved speakers
                 suggestion = suggestions.get(speaker_label)
@@ -227,9 +263,13 @@ def _run_vocal_analysis(conn, conversation_id, aligned, diarization, audio_path,
                 "deviations": {},
             }
 
-        logger.info(f"[{conversation_id[:8]}] Vocal analysis complete: {len(vocal_data)} speakers")
+        logger.info(
+            f"[{conversation_id[:8]}] Vocal analysis complete: {len(vocal_data)} speakers"
+        )
     except Exception as e:
-        logger.warning(f"[{conversation_id[:8]}] Vocal analysis failed (non-fatal): {e}")
+        logger.warning(
+            f"[{conversation_id[:8]}] Vocal analysis failed (non-fatal): {e}"
+        )
 
     return vocal_data
 
@@ -262,8 +302,12 @@ def _run_voiceprint_quality_gate(
                 ]
 
             result = run_quality_gate(
-                conn, conversation_id, speaker_label,
-                segments, audio_path, diarization.embeddings,
+                conn,
+                conversation_id,
+                speaker_label,
+                segments,
+                audio_path,
+                diarization.embeddings,
             )
 
             logger.info(
@@ -273,7 +317,9 @@ def _run_voiceprint_quality_gate(
             )
 
     except Exception as e:
-        logger.warning(f"[{conversation_id[:8]}] Voiceprint quality gate failed (non-fatal): {e}")
+        logger.warning(
+            f"[{conversation_id[:8]}] Voiceprint quality gate failed (non-fatal): {e}"
+        )
 
 
 def _all_speakers_resolved(conn, conversation_id: str) -> bool:
@@ -341,15 +387,30 @@ def _update_status(conn, conversation_id: str, status: str):
 def _store_transcript(conn, conversation_id: str, aligned: AlignedTranscript):
     """Write aligned segments to transcripts table."""
     for seg in aligned.segments:
-        word_timestamps = json.dumps([
-            {"word": w.word, "start": w.start, "end": w.end, "probability": w.probability}
-            for w in seg.words
-        ])
+        word_timestamps = json.dumps(
+            [
+                {
+                    "word": w.word,
+                    "start": w.start,
+                    "end": w.end,
+                    "probability": w.probability,
+                }
+                for w in seg.words
+            ]
+        )
         conn.execute(
             """INSERT INTO transcripts (id, conversation_id, speaker_label, start_time, end_time, text, word_timestamps, is_overlap)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (str(uuid.uuid4()), conversation_id, seg.speaker,
-             seg.start, seg.end, seg.text, word_timestamps, seg.is_overlap),
+            (
+                str(uuid.uuid4()),
+                conversation_id,
+                seg.speaker,
+                seg.start,
+                seg.end,
+                seg.text,
+                word_timestamps,
+                seg.is_overlap,
+            ),
         )
 
 
@@ -363,7 +424,9 @@ def _store_voice_samples(conn, conversation_id: str, diarization):
         )
 
 
-def _store_vocal_features(conn, conversation_id: str, speaker_label: str, features: dict):
+def _store_vocal_features(
+    conn, conversation_id: str, speaker_label: str, features: dict
+):
     """Store aggregated vocal features for a speaker."""
     conn.execute(
         """INSERT INTO vocal_features (
@@ -375,15 +438,26 @@ def _store_vocal_features(conn, conversation_id: str, speaker_label: str, featur
             speaking_rate_wpm
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
-            str(uuid.uuid4()), conversation_id, speaker_label,
-            features.get("pitch_mean"), features.get("pitch_std"),
-            features.get("pitch_min"), features.get("pitch_max"),
-            features.get("jitter"), features.get("shimmer"),
-            features.get("hnr"), features.get("intensity_mean"),
-            features.get("f1_mean"), features.get("f2_mean"), features.get("f3_mean"),
-            features.get("mfcc_means"), features.get("rms_mean"),
-            features.get("spectral_centroid"), features.get("zcr_mean"),
-            features.get("spectral_rolloff"), features.get("speaking_rate_wpm"),
+            str(uuid.uuid4()),
+            conversation_id,
+            speaker_label,
+            features.get("pitch_mean"),
+            features.get("pitch_std"),
+            features.get("pitch_min"),
+            features.get("pitch_max"),
+            features.get("jitter"),
+            features.get("shimmer"),
+            features.get("hnr"),
+            features.get("intensity_mean"),
+            features.get("f1_mean"),
+            features.get("f2_mean"),
+            features.get("f3_mean"),
+            features.get("mfcc_means"),
+            features.get("rms_mean"),
+            features.get("spectral_centroid"),
+            features.get("zcr_mean"),
+            features.get("spectral_rolloff"),
+            features.get("speaking_rate_wpm"),
         ),
     )
 
@@ -422,13 +496,15 @@ def _reconstruct_from_db(conn, conversation_id: str):
             try:
                 word_data = json.loads(row["word_timestamps"])
                 for w in word_data:
-                    words.append(AlignedWord(
-                        word=w["word"],
-                        start=w["start"],
-                        end=w["end"],
-                        speaker=speaker,
-                        probability=w.get("probability", 1.0),
-                    ))
+                    words.append(
+                        AlignedWord(
+                            word=w["word"],
+                            start=w["start"],
+                            end=w["end"],
+                            speaker=speaker,
+                            probability=w.get("probability", 1.0),
+                        )
+                    )
             except (json.JSONDecodeError, KeyError):
                 pass
 
@@ -436,16 +512,25 @@ def _reconstruct_from_db(conn, conversation_id: str):
         end = float(row["end_time"] or 0)
         max_end = max(max_end, end)
 
-        segments.append(AlignedSegment(
-            speaker=speaker, start=start, end=end,
-            text=row["text"] or "", words=words,
-        ))
+        segments.append(
+            AlignedSegment(
+                speaker=speaker,
+                start=start,
+                end=end,
+                text=row["text"] or "",
+                words=words,
+            )
+        )
 
     dur_row = conn.execute(
         "SELECT duration_seconds FROM conversations WHERE id = ?",
         (conversation_id,),
     ).fetchone()
-    duration = float(dur_row["duration_seconds"]) if dur_row and dur_row["duration_seconds"] else max_end
+    duration = (
+        float(dur_row["duration_seconds"])
+        if dur_row and dur_row["duration_seconds"]
+        else max_end
+    )
 
     return AlignedTranscript(
         segments=segments,
@@ -457,6 +542,7 @@ def _reconstruct_from_db(conn, conversation_id: str):
 def _load_stored_embeddings(conn, conversation_id: str) -> dict:
     """Load speaker embeddings from voice_samples table."""
     import numpy as np
+
     rows = conn.execute(
         "SELECT speaker_label, embedding FROM voice_samples WHERE source_conversation_id = ? AND embedding IS NOT NULL",
         (conversation_id,),

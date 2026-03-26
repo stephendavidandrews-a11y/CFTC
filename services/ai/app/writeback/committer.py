@@ -57,6 +57,76 @@ class CommitResult:
         return self.bundles_failed == 0
 
 
+def _backfill_provisional_entities(
+    db, communication_id: str, items: list, results: list
+):
+    """Backfill tracker IDs on provisional entities after new_person/new_org writeback.
+
+    When a new_person or new_organization item is committed, the tracker creates
+    a new record and returns the ID. We backfill that ID onto the corresponding
+    provisional communication_entity so the linkage is complete.
+    """
+    for item in items:
+        item_type = item.get("item_type")
+        proposed_data = item.get("proposed_data", {})
+        item_id = item.get("id")
+
+        if item_type == "new_person":
+            # Find the writeback record for this item to get the tracker ID
+            wb = db.execute(
+                """SELECT target_record_id FROM tracker_writebacks
+                   WHERE bundle_item_id = ? AND target_table = 'people'
+                   ORDER BY written_at DESC LIMIT 1""",
+                (item_id,),
+            ).fetchone()
+            if wb and wb["target_record_id"]:
+                new_id = wb["target_record_id"]
+                name = proposed_data.get("full_name") or proposed_data.get(
+                    "first_name", ""
+                )
+                if name:
+                    updated = db.execute(
+                        """UPDATE communication_entities
+                           SET tracker_person_id = ?
+                           WHERE communication_id = ? AND proposed_name = ?
+                           AND tracker_person_id IS NULL AND confirmed = 1""",
+                        (new_id, communication_id, name),
+                    ).rowcount
+                    if updated:
+                        logger.info(
+                            "[%s] Backfilled person %s -> entity proposed_name=%s",
+                            communication_id[:8],
+                            new_id[:8],
+                            name,
+                        )
+
+        elif item_type == "new_organization":
+            wb = db.execute(
+                """SELECT target_record_id FROM tracker_writebacks
+                   WHERE bundle_item_id = ? AND target_table = 'organizations'
+                   ORDER BY written_at DESC LIMIT 1""",
+                (item_id,),
+            ).fetchone()
+            if wb and wb["target_record_id"]:
+                new_id = wb["target_record_id"]
+                name = proposed_data.get("name", "")
+                if name:
+                    updated = db.execute(
+                        """UPDATE communication_entities
+                           SET tracker_org_id = ?
+                           WHERE communication_id = ? AND proposed_name = ?
+                           AND tracker_org_id IS NULL AND confirmed = 1""",
+                        (new_id, communication_id, name),
+                    ).rowcount
+                    if updated:
+                        logger.info(
+                            "[%s] Backfilled org %s -> entity proposed_name=%s",
+                            communication_id[:8],
+                            new_id[:8],
+                            name,
+                        )
+
+
 async def commit_communication(db, communication_id: str) -> CommitResult:
     """Commit all accepted bundles for a communication to the tracker.
 
@@ -74,7 +144,7 @@ async def commit_communication(db, communication_id: str) -> CommitResult:
     # Check if already committed (idempotency at the communication level)
     existing_writebacks = db.execute(
         "SELECT COUNT(*) as cnt FROM tracker_writebacks WHERE communication_id = ?",
-        (communication_id,)
+        (communication_id,),
     ).fetchone()["cnt"]
 
     for bundle in bundles:
@@ -89,20 +159,28 @@ async def commit_communication(db, communication_id: str) -> CommitResult:
         # Skip bundles that aren't accepted (shouldn't happen post-review, but defensive)
         if bundle["status"] != "accepted":
             result.bundles_skipped += 1
-            logger.warning("[%s] Skipping non-accepted bundle %s (status=%s)",
-                           communication_id[:8], bundle["id"][:8], bundle["status"])
+            logger.warning(
+                "[%s] Skipping non-accepted bundle %s (status=%s)",
+                communication_id[:8],
+                bundle["id"][:8],
+                bundle["status"],
+            )
             continue
 
         # Filter to committable items
         committable_items = [
-            item for item in bundle.get("items", [])
+            item
+            for item in bundle.get("items", [])
             if item["status"] in COMMITTABLE_ITEM_STATUSES
         ]
 
         if not committable_items:
             result.bundles_skipped += 1
-            logger.info("[%s] Bundle %s has no committable items — skipping",
-                        communication_id[:8], bundle["id"][:8])
+            logger.info(
+                "[%s] Bundle %s has no committable items — skipping",
+                communication_id[:8],
+                bundle["id"][:8],
+            )
             continue
 
         # Commit this bundle
@@ -116,21 +194,39 @@ async def commit_communication(db, communication_id: str) -> CommitResult:
             result.bundles_failed += 1
 
     # Audit the final result
-    write_audit(db, communication_id, None, None,
-                "commit_complete" if result.all_succeeded else "commit_partial_failure",
-                {
-                    "bundles_committed": result.bundles_committed,
-                    "bundles_skipped": result.bundles_skipped,
-                    "bundles_failed": result.bundles_failed,
-                    "total_records": result.total_records,
-                })
+    write_audit(
+        db,
+        communication_id,
+        None,
+        None,
+        "commit_complete" if result.all_succeeded else "commit_partial_failure",
+        {
+            "bundles_committed": result.bundles_committed,
+            "bundles_skipped": result.bundles_skipped,
+            "bundles_failed": result.bundles_failed,
+            "total_records": result.total_records,
+        },
+    )
     db.commit()
+
+    # Backfill provisional entity tracker IDs from new_person/new_org writebacks
+    for bundle in bundles:
+        items = bundle.get("items", [])
+        has_new = any(
+            i.get("item_type") in ("new_person", "new_organization")
+            and i.get("status") in ("accepted", "edited")
+            for i in items
+        )
+        if has_new:
+            _backfill_provisional_entities(db, communication_id, items, [])
+            db.commit()
 
     return result
 
 
-async def _commit_bundle(db, communication_id: str, bundle: dict,
-                         items: list[dict]) -> BundleCommitResult:
+async def _commit_bundle(
+    db, communication_id: str, bundle: dict, items: list[dict]
+) -> BundleCommitResult:
     """Commit a single bundle's items to the tracker."""
     bundle_id = bundle["id"]
     br = BundleCommitResult(
@@ -144,17 +240,28 @@ async def _commit_bundle(db, communication_id: str, bundle: dict,
         # Check if this bundle was already committed (skip if writebacks exist)
         existing = db.execute(
             "SELECT COUNT(*) as cnt FROM tracker_writebacks WHERE bundle_id = ?",
-            (bundle_id,)
+            (bundle_id,),
         ).fetchone()["cnt"]
         if existing > 0:
-            logger.info("[%s] Bundle %s already has %d writebacks — skipping (already committed)",
-                        communication_id[:8], bundle_id[:8], existing)
+            logger.info(
+                "[%s] Bundle %s already has %d writebacks — skipping (already committed)",
+                communication_id[:8],
+                bundle_id[:8],
+                existing,
+            )
             br.success = True
             br.records_written = existing
             br.operations_sent = 0
-            write_audit(db, communication_id, bundle_id, None, "bundle_skip_already_committed", {
-                "existing_writebacks": existing,
-            })
+            write_audit(
+                db,
+                communication_id,
+                bundle_id,
+                None,
+                "bundle_skip_already_committed",
+                {
+                    "existing_writebacks": existing,
+                },
+            )
             db.commit()
             return br
 
@@ -210,68 +317,109 @@ async def _commit_bundle(db, communication_id: str, bundle: dict,
         for i, tracker_result in enumerate(results):
             wb_item_id = item_ids[i] if i < len(item_ids) else None
             _record_writeback(
-                db, communication_id, bundle_id, wb_item_id,
-                tracker_result, operations[i] if i < len(operations) else {},
+                db,
+                communication_id,
+                bundle_id,
+                wb_item_id,
+                tracker_result,
+                operations[i] if i < len(operations) else {},
             )
 
-        write_audit(db, communication_id, bundle_id, None, "bundle_committed", {
-            "operations_sent": br.operations_sent,
-            "records_written": br.records_written,
-            "target_matter": bundle.get("target_matter_title"),
-        })
+        write_audit(
+            db,
+            communication_id,
+            bundle_id,
+            None,
+            "bundle_committed",
+            {
+                "operations_sent": br.operations_sent,
+                "records_written": br.records_written,
+                "target_matter": bundle.get("target_matter_title"),
+            },
+        )
         db.commit()
 
         br.success = True
-        logger.info("[%s] Bundle %s committed: %d ops → %d records",
-                    communication_id[:8], bundle_id[:8],
-                    br.operations_sent, br.records_written)
+        logger.info(
+            "[%s] Bundle %s committed: %d ops → %d records",
+            communication_id[:8],
+            bundle_id[:8],
+            br.operations_sent,
+            br.records_written,
+        )
 
     except TrackerBatchError as e:
         br.error = str(e)
         br.error_type = e.error_type
-        write_audit(db, communication_id, bundle_id, None, "bundle_commit_failed", {
-            "error": str(e),
-            "error_type": e.error_type,
-            "status_code": e.status_code,
-            "operation_index": e.operation_index,
-        })
+        write_audit(
+            db,
+            communication_id,
+            bundle_id,
+            None,
+            "bundle_commit_failed",
+            {
+                "error": str(e),
+                "error_type": e.error_type,
+                "status_code": e.status_code,
+                "operation_index": e.operation_index,
+            },
+        )
         db.commit()
-        logger.error("[%s] Bundle %s commit failed: %s",
-                     communication_id[:8], bundle_id[:8], e)
+        logger.error(
+            "[%s] Bundle %s commit failed: %s", communication_id[:8], bundle_id[:8], e
+        )
 
     except Exception as e:
         br.error = str(e)
         br.error_type = "internal_error"
-        write_audit(db, communication_id, bundle_id, None, "bundle_commit_failed", {
-            "error": str(e),
-            "error_type": "internal_error",
-        })
+        write_audit(
+            db,
+            communication_id,
+            bundle_id,
+            None,
+            "bundle_commit_failed",
+            {
+                "error": str(e),
+                "error_type": "internal_error",
+            },
+        )
         db.commit()
-        logger.exception("[%s] Bundle %s commit unexpected error",
-                         communication_id[:8], bundle_id[:8])
+        logger.exception(
+            "[%s] Bundle %s commit unexpected error",
+            communication_id[:8],
+            bundle_id[:8],
+        )
 
     return br
 
 
-def _record_writeback(db, communication_id: str, bundle_id: str,
-                      item_id: str | None, tracker_result: dict,
-                      operation: dict):
+def _record_writeback(
+    db,
+    communication_id: str,
+    bundle_id: str,
+    item_id: str | None,
+    tracker_result: dict,
+    operation: dict,
+):
     """Record a single tracker_writebacks row."""
     wb_id = str(uuid_mod.uuid4())
-    db.execute("""
+    db.execute(
+        """
         INSERT OR IGNORE INTO tracker_writebacks
             (id, communication_id, bundle_id, bundle_item_id,
              target_table, target_record_id, write_type,
              written_data, previous_data, auto_committed, written_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, datetime('now'))
-    """, (
-        wb_id,
-        communication_id,
-        bundle_id,
-        item_id,
-        tracker_result.get("table", operation.get("table", "")),
-        tracker_result.get("record_id", ""),
-        tracker_result.get("op", operation.get("op", "")),
-        json.dumps(operation.get("data", {}), default=str),
-        json.dumps(tracker_result.get("previous_data"), default=str),
-    ))
+    """,
+        (
+            wb_id,
+            communication_id,
+            bundle_id,
+            item_id,
+            tracker_result.get("table", operation.get("table", "")),
+            tracker_result.get("record_id", ""),
+            tracker_result.get("op", operation.get("op", "")),
+            json.dumps(operation.get("data", {}), default=str),
+            json.dumps(tracker_result.get("previous_data"), default=str),
+        ),
+    )

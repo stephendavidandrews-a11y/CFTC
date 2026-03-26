@@ -1,4 +1,5 @@
 """Configuration API — read/update ai_policy.json with audit logging."""
+
 import logging
 from fastapi import APIRouter, Depends, HTTPException
 from app.db import get_db
@@ -29,12 +30,15 @@ async def update_config_section(section: str, body: dict, db=Depends(get_db)):
 @router.get("/audit")
 async def get_config_audit(db=Depends(get_db), limit: int = 100):
     """Return recent config change history."""
-    rows = db.execute("""
+    rows = db.execute(
+        """
         SELECT id, section, field, old_value, new_value, created_at
         FROM config_audit_log
         ORDER BY created_at DESC
         LIMIT ?
-    """, (limit,)).fetchall()
+    """,
+        (limit,),
+    ).fetchall()
     return [dict(r) for r in rows]
 
 

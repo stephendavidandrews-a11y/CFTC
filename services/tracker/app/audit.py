@@ -1,9 +1,11 @@
 """Audit logging helper for tracker mutations."""
+
 import json
 
 
-def log_event(db, *, table_name, record_id, action, source="human",
-              old_record=None, new_data=None):
+def log_event(
+    db, *, table_name, record_id, action, source="human", old_record=None, new_data=None
+):
     """Log a mutation to system_events. Call within the same transaction."""
     changed_fields = None
     old_values = None
@@ -36,9 +38,11 @@ def log_event(db, *, table_name, record_id, action, source="human",
         old_dict = dict(old_record) if hasattr(old_record, "keys") else old_record
         old_values = json.dumps(old_dict, default=str)
 
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO system_events (table_name, record_id, action, source,
             changed_fields, old_values, new_values)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (table_name, record_id, action, source,
-          changed_fields, old_values, new_values))
+    """,
+        (table_name, record_id, action, source, changed_fields, old_values, new_values),
+    )

@@ -3,6 +3,7 @@
 Tracks formal external mandates directed at the CFTC.
 Manual-only — not in AI_WRITABLE_TABLES.
 """
+
 import uuid
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -70,8 +71,11 @@ async def list_policy_directives(
     order_col = allowed_sort.get(sort_by, "pd.sort_order")
     direction = "DESC" if sort_dir.lower() == "desc" else "ASC"
 
-    total = db.execute(f"SELECT COUNT(*) as c FROM policy_directives pd {where}", params).fetchone()["c"]
-    rows = db.execute(f"""
+    total = db.execute(
+        f"SELECT COUNT(*) as c FROM policy_directives pd {where}", params
+    ).fetchone()["c"]
+    rows = db.execute(
+        f"""
         SELECT pd.*,
                p.full_name as assigned_to_name,
                (SELECT COUNT(*) FROM directive_matters dm WHERE dm.directive_id = pd.id) as linked_matter_count
@@ -80,8 +84,15 @@ async def list_policy_directives(
         {where}
         ORDER BY {order_col} {direction} NULLS LAST
         LIMIT ? OFFSET ?
-    """, params + [limit, offset]).fetchall()
-    return {"items": [dict(row) for row in rows], "total": total, "limit": limit, "offset": offset}
+    """,
+        params + [limit, offset],
+    ).fetchall()
+    return {
+        "items": [dict(row) for row in rows],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @router.post("")
@@ -92,19 +103,26 @@ async def create_policy_directive(
     write_source: str = Depends(get_write_source),
 ):
     idem_key = request.headers.get("idempotency-key")
-    cached = claim_idempotency_key(db, idem_key, body.model_dump(), "/tracker/policy-directives")
+    cached = claim_idempotency_key(
+        db, idem_key, body.model_dump(), "/tracker/policy-directives"
+    )
     if cached == "conflict":
         raise HTTPException(409, detail="Idempotency key reused with different payload")
     if cached == "pending":
-        raise HTTPException(409, detail="Request with this idempotency key is still in progress")
+        raise HTTPException(
+            409, detail="Request with this idempotency key is still in progress"
+        )
     if isinstance(cached, dict):
-        return JSONResponse(status_code=cached["status_code"], content=json.loads(cached["body"]))
+        return JSONResponse(
+            status_code=cached["status_code"], content=json.loads(cached["body"])
+        )
 
     did = str(uuid.uuid4())
     now = datetime.now().isoformat()
     source_val = write_source if body.source == "manual" else body.source
 
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO policy_directives (
             id, source_document, source_document_type, source_document_url,
             source_date, directive_label, directive_text, section_reference,
@@ -114,20 +132,47 @@ async def create_policy_directive(
             source, source_id, external_refs,
             created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (did, body.source_document, body.source_document_type,
-          body.source_document_url, body.source_date,
-          body.directive_label, body.directive_text, body.section_reference,
-          body.chapter, body.priority_tier, body.responsible_entity,
-          body.ogc_role, body.assigned_to_person_id,
-          body.implementation_status, body.implementation_notes,
-          body.target_date, body.completed_date, body.notes, body.sort_order,
-          source_val, body.source_id, body.external_refs,
-          now, now))
+    """,
+        (
+            did,
+            body.source_document,
+            body.source_document_type,
+            body.source_document_url,
+            body.source_date,
+            body.directive_label,
+            body.directive_text,
+            body.section_reference,
+            body.chapter,
+            body.priority_tier,
+            body.responsible_entity,
+            body.ogc_role,
+            body.assigned_to_person_id,
+            body.implementation_status,
+            body.implementation_notes,
+            body.target_date,
+            body.completed_date,
+            body.notes,
+            body.sort_order,
+            source_val,
+            body.source_id,
+            body.external_refs,
+            now,
+            now,
+        ),
+    )
 
     new_data = body.model_dump()
-    new_data.update({"id": did, "source": source_val, "created_at": now, "updated_at": now})
-    log_event(db, table_name="policy_directives", record_id=did, action="create",
-              source=write_source, new_data=new_data)
+    new_data.update(
+        {"id": did, "source": source_val, "created_at": now, "updated_at": now}
+    )
+    log_event(
+        db,
+        table_name="policy_directives",
+        record_id=did,
+        action="create",
+        source=write_source,
+        new_data=new_data,
+    )
 
     result = {"id": did}
     finalize_idempotency_key(db, idem_key, 200, result)
@@ -138,41 +183,51 @@ async def create_policy_directive(
 @router.get("/{directive_id}")
 async def get_policy_directive(directive_id: str, db=Depends(get_db)):
     """Get a directive with linked matters."""
-    row = db.execute("""
+    row = db.execute(
+        """
         SELECT pd.*, p.full_name as assigned_to_name
         FROM policy_directives pd
         LEFT JOIN people p ON pd.assigned_to_person_id = p.id
         WHERE pd.id = ?
-    """, (directive_id,)).fetchone()
+    """,
+        (directive_id,),
+    ).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Policy directive not found")
 
     directive = dict(row)
 
     # Fetch linked matters
-    links = db.execute("""
+    links = db.execute(
+        """
         SELECT dm.*, m.title as matter_title, m.matter_number, m.status as matter_status
         FROM directive_matters dm
         JOIN matters m ON dm.matter_id = m.id
         WHERE dm.directive_id = ?
         ORDER BY dm.created_at ASC
-    """, (directive_id,)).fetchall()
+    """,
+        (directive_id,),
+    ).fetchall()
     directive["linked_matters"] = [dict(lnk) for lnk in links]
 
     # Fetch research notes (regulation analysis)
     try:
-        notes = db.execute("""
+        notes = db.execute(
+            """
             SELECT * FROM directive_research_notes
             WHERE directive_id = ?
             ORDER BY composite_score DESC, fr_citation
-        """, (directive_id,)).fetchall()
+        """,
+            (directive_id,),
+        ).fetchall()
         directive["research_notes"] = [dict(n) for n in notes]
     except Exception:
         directive["research_notes"] = []
 
     # Fetch linked documents
     try:
-        docs = db.execute("""
+        docs = db.execute(
+            """
             SELECT dd.id as link_id, dd.relationship_type, dd.notes as link_notes,
                    d.id as document_id, d.title, d.document_type, d.status,
                    d.current_file_id, d.external_refs
@@ -180,7 +235,9 @@ async def get_policy_directive(directive_id: str, db=Depends(get_db)):
             JOIN documents d ON dd.document_id = d.id
             WHERE dd.directive_id = ?
             ORDER BY d.document_type, d.title
-        """, (directive_id,)).fetchall()
+        """,
+            (directive_id,),
+        ).fetchall()
         directive["linked_documents"] = [dict(doc) for doc in docs]
     except Exception:
         directive["linked_documents"] = []
@@ -196,7 +253,9 @@ async def update_policy_directive(
     db=Depends(get_db),
     write_source: str = Depends(get_write_source),
 ):
-    old = db.execute("SELECT * FROM policy_directives WHERE id = ?", (directive_id,)).fetchone()
+    old = db.execute(
+        "SELECT * FROM policy_directives WHERE id = ?", (directive_id,)
+    ).fetchone()
     if not old:
         raise HTTPException(status_code=404, detail="Policy directive not found")
     check_etag(request, old)
@@ -212,8 +271,15 @@ async def update_policy_directive(
     params.extend([now, directive_id])
 
     db.execute(f"UPDATE policy_directives SET {', '.join(sets)} WHERE id = ?", params)
-    log_event(db, table_name="policy_directives", record_id=directive_id, action="update",
-              source=write_source, old_record=old, new_data=data)
+    log_event(
+        db,
+        table_name="policy_directives",
+        record_id=directive_id,
+        action="update",
+        source=write_source,
+        old_record=old,
+        new_data=data,
+    )
     db.commit()
     return {"id": directive_id, "updated": True}
 
@@ -226,7 +292,9 @@ async def delete_policy_directive(
     write_source: str = Depends(get_write_source),
 ):
     """Delete a directive and its matter links."""
-    old = db.execute("SELECT * FROM policy_directives WHERE id = ?", (directive_id,)).fetchone()
+    old = db.execute(
+        "SELECT * FROM policy_directives WHERE id = ?", (directive_id,)
+    ).fetchone()
     if not old:
         raise HTTPException(status_code=404, detail="Policy directive not found")
     check_etag(request, old)
@@ -234,16 +302,24 @@ async def delete_policy_directive(
     # Cascade delete links
     link_count = db.execute(
         "SELECT COUNT(*) as c FROM directive_matters WHERE directive_id = ?",
-        (directive_id,)
+        (directive_id,),
     ).fetchone()["c"]
     db.execute("DELETE FROM directive_matters WHERE directive_id = ?", (directive_id,))
     db.execute("DELETE FROM policy_directives WHERE id = ?", (directive_id,))
 
-    log_event(db, table_name="policy_directives", record_id=directive_id, action="delete",
-              source=write_source, old_record=old,
-              new_data={"cascade_deleted_links": link_count})
+    log_event(
+        db,
+        table_name="policy_directives",
+        record_id=directive_id,
+        action="delete",
+        source=write_source,
+        old_record=old,
+        new_data={"cascade_deleted_links": link_count},
+    )
     db.commit()
     return {"id": directive_id, "deleted": True, "links_deleted": link_count}
 
+
 from app.routers.research_notes import register_research_notes
+
 register_research_notes(router)

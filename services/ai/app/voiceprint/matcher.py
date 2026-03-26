@@ -9,6 +9,7 @@ Conservative, human-in-the-loop design:
 Embedding format: 192-dim float32 from pyannote speaker-diarization-3.1
 Similarity metric: cosine similarity (standard for speaker embeddings)
 """
+
 import json
 import logging
 import struct
@@ -20,10 +21,10 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Thresholds — conservative, precision-first
 # ---------------------------------------------------------------------------
-SUGGEST_THRESHOLD = 0.60       # Below this = no candidate shown
-LOW_CONFIDENCE_CEIL = 0.70     # [0.60, 0.70) = low confidence
+SUGGEST_THRESHOLD = 0.60  # Below this = no candidate shown
+LOW_CONFIDENCE_CEIL = 0.70  # [0.60, 0.70) = low confidence
 MEDIUM_CONFIDENCE_CEIL = 0.80  # [0.70, 0.80) = medium confidence
-                               # >= 0.80       = high confidence
+# >= 0.80       = high confidence
 
 # Maximum candidates to return per speaker
 MAX_CANDIDATES = 3
@@ -36,6 +37,7 @@ EXPECTED_BLOB_SIZE = EMBEDDING_DIM * FLOAT32_SIZE  # 768 bytes
 # ---------------------------------------------------------------------------
 # Pure-Python cosine similarity (no numpy dependency required)
 # ---------------------------------------------------------------------------
+
 
 def _unpack_embedding(blob: bytes) -> Optional[list[float]]:
     """Unpack a BLOB into a list of float32 values. Returns None if invalid."""
@@ -74,6 +76,7 @@ def _label_confidence(score: float) -> str:
 # Main matching function
 # ---------------------------------------------------------------------------
 
+
 def match_speaker(
     db,
     communication_id: str,
@@ -96,8 +99,11 @@ def match_speaker(
     """
     sample_emb = _unpack_embedding(embedding_blob)
     if sample_emb is None:
-        logger.warning("[%s] Invalid embedding for %s — skipping match",
-                       communication_id[:8], speaker_label)
+        logger.warning(
+            "[%s] Invalid embedding for %s — skipping match",
+            communication_id[:8],
+            speaker_label,
+        )
         return {
             "speaker_label": speaker_label,
             "outcome": "no_candidate",
@@ -120,8 +126,15 @@ def match_speaker(
 
     if not profiles:
         # Log the attempt even with no profiles
-        log_id = _log_match(db, communication_id, speaker_label, sample_id,
-                            profiles_compared=0, candidates=[], outcome="no_profiles")
+        log_id = _log_match(
+            db,
+            communication_id,
+            speaker_label,
+            sample_id,
+            profiles_compared=0,
+            candidates=[],
+            outcome="no_profiles",
+        )
         return {
             "speaker_label": speaker_label,
             "outcome": "no_profiles",
@@ -138,11 +151,13 @@ def match_speaker(
             continue
         sim = _cosine_similarity(sample_emb, prof_emb)
         if sim >= SUGGEST_THRESHOLD:
-            scored.append({
-                "tracker_person_id": profile["tracker_person_id"],
-                "score": round(sim, 4),
-                "confidence_label": _label_confidence(sim),
-            })
+            scored.append(
+                {
+                    "tracker_person_id": profile["tracker_person_id"],
+                    "score": round(sim, 4),
+                    "confidence_label": _label_confidence(sim),
+                }
+            )
 
     # Sort by score descending, take top N
     scored.sort(key=lambda x: x["score"], reverse=True)
@@ -156,7 +171,10 @@ def match_speaker(
 
     # Audit log
     log_id = _log_match(
-        db, communication_id, speaker_label, sample_id,
+        db,
+        communication_id,
+        speaker_label,
+        sample_id,
         profiles_compared=len(profiles),
         candidates=candidates,
         outcome=outcome,
@@ -187,9 +205,7 @@ def match_all_speakers(db, communication_id: str) -> dict[str, dict]:
         label = sample["speaker_label"]
         if label in results:
             continue  # one match per speaker label
-        results[label] = match_speaker(
-            db, communication_id, label, sample["embedding"]
-        )
+        results[label] = match_speaker(db, communication_id, label, sample["embedding"])
 
     return results
 
@@ -197,6 +213,7 @@ def match_all_speakers(db, communication_id: str) -> dict[str, dict]:
 # ---------------------------------------------------------------------------
 # Audit logging
 # ---------------------------------------------------------------------------
+
 
 def _log_match(
     db,
@@ -212,17 +229,26 @@ def _log_match(
     top_person = candidates[0]["tracker_person_id"] if candidates else None
     top_score = candidates[0]["score"] if candidates else None
 
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO voiceprint_match_log
             (id, communication_id, speaker_label, sample_embedding_id,
              profiles_compared, top_candidate_person_id, top_candidate_score,
              candidate_list, threshold_used, outcome)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        log_id, communication_id, speaker_label, sample_embedding_id,
-        profiles_compared, top_person, top_score,
-        json.dumps(candidates) if candidates else None,
-        SUGGEST_THRESHOLD, outcome,
-    ))
+    """,
+        (
+            log_id,
+            communication_id,
+            speaker_label,
+            sample_embedding_id,
+            profiles_compared,
+            top_person,
+            top_score,
+            json.dumps(candidates) if candidates else None,
+            SUGGEST_THRESHOLD,
+            outcome,
+        ),
+    )
     db.commit()
     return log_id
