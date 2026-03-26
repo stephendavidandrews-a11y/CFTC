@@ -26,6 +26,7 @@ venv/
 
 # build artifacts
 frontend/build/
+frontend/dist/
 frontend/.htpasswd
 
 # runtime data — services
