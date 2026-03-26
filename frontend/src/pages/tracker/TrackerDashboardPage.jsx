@@ -293,6 +293,41 @@ export default function TrackerDashboardPage() {
         </div>
       </div>
 
+      {/* Row 6: Comment Periods + Blocked Matters */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+        <div style={cardStyle}>
+          <div style={sectionTitle}>Comment Periods</div>
+          {(d.comment_periods || []).length === 0 ? (
+            <div style={{ fontSize: 13, color: theme.text.faint }}>No open comment periods</div>
+          ) : (
+            (d.comment_periods || []).map(cp => (
+              <div key={cp.matter_id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #222" }}>
+                <a href={`/matters/${cp.matter_id}`} style={{ color: "#64b5f6", textDecoration: "none", fontSize: 13 }}>{cp.matter_number} — {cp.title}</a>
+                <span style={{ color: cp.days_remaining <= 3 ? "#ef5350" : cp.days_remaining <= 14 ? "#ffb74d" : "#888", fontSize: 13, fontWeight: 600 }}>
+                  {cp.days_remaining}d
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div style={cardStyle}>
+          <div style={sectionTitle}>Blocked</div>
+          {(d.blocked_matters || []).length === 0 ? (
+            <div style={{ fontSize: 13, color: theme.text.faint }}>No blocked matters</div>
+          ) : (
+            (d.blocked_matters || []).map(bm => (
+              <div key={bm.matter_id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #222" }}>
+                <a href={`/matters/${bm.matter_id}`} style={{ color: "#64b5f6", textDecoration: "none", fontSize: 13 }}>{bm.matter_number}</a>
+                <span style={{ color: "#ef5350", fontSize: 13, maxWidth: "60%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {bm.blocker}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
           </div>
   );
 }

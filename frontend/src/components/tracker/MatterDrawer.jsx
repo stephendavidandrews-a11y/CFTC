@@ -24,37 +24,42 @@ const EMPTY = {
   title: "",
   matter_type: "",
   description: "",
-  problem_statement: "",
-  why_it_matters: "",
-  status: "",
+  status: "active",
   priority: "",
   sensitivity: "",
-  boss_involvement_level: "",
-  risk_level: "",
   assigned_to_person_id: "",
-  supervisor_person_id: "",
   client_organization_id: "",
-  requesting_organization_id: "",
-  reviewing_organization_id: "",
   work_deadline: "",
   external_deadline: "",
-  decision_deadline: "",
   opened_date: "",
   next_step: "",
-  next_step_assigned_to_person_id: "",
-  pending_decision: "",
-  revisit_date: "",
+  blocker: "",
   outcome_summary: "",
   closed_at: "",
-  rin: "",
-  regulatory_stage: "",
-  federal_register_citation: "",
-  unified_agenda_priority: "",
-  docket_number: "",
   cfr_citation: "",
-  fr_doc_number: "",
-  lead_external_org_id: "",
+  extension: {},
 };
+
+const RULEMAKING_EXT = {
+  rin: "", regulatory_stage: "", workflow_status: "concept",
+  cfr_citation: "", docket_number: "", fr_doc_number: "",
+  federal_register_citation: "", unified_agenda_priority: "",
+  interagency_role: "", is_petition: 0, petition_disposition: "", review_trigger: "",
+};
+const GUIDANCE_EXT = {
+  instrument_type: "", workflow_status: "request_received", published_in_fr: 0,
+  cftc_letter_number: "", request_date: "", requestor_name: "",
+  requestor_organization_id: "", requestor_counsel: "", issuing_office_id: "",
+  signatory_person_id: "", staff_contact_person_id: "", cea_provisions: "",
+  cfr_provisions: "", legal_question: "", conditions_summary: "",
+  amends_matter_id: "", prior_letter_number: "", issuance_date: "", expiration_date: "",
+};
+const ENFORCEMENT_EXT = {
+  workflow_status: "intake", requesting_division_id: "", enforcement_reference: "",
+  legal_issue_type: "", support_type: "", litigation_stage: "", court_or_forum: "",
+  deadline_source: "", privilege_flags: "", is_confidential: 1,
+};
+const EXT_DEFAULTS = { rulemaking: RULEMAKING_EXT, guidance: GUIDANCE_EXT, enforcement: ENFORCEMENT_EXT };
 
 function FieldSection({ title, defaultOpen = true, children, visible = true }) {
   const [open, setOpen] = React.useState(defaultOpen);
@@ -100,22 +105,42 @@ export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
       getEnum("matter_status").catch(() => []),
       getEnum("matter_priority").catch(() => []),
       getEnum("matter_sensitivity").catch(() => []),
-      getEnum("boss_involvement_level").catch(() => []),
-      getEnum("regulatory_stage").catch(() => []),
-      getEnum("risk_level").catch(() => []),
+      getEnum("rulemaking_workflow_status").catch(() => []),
+      getEnum("guidance_workflow_status").catch(() => []),
+      getEnum("enforcement_workflow_status").catch(() => []),
+      getEnum("instrument_type").catch(() => []),
+      getEnum("enforcement_legal_issue_type").catch(() => []),
+      getEnum("enforcement_support_type").catch(() => []),
+      getEnum("enforcement_litigation_stage").catch(() => []),
+      getEnum("interagency_role").catch(() => []),
+      getEnum("petition_disposition").catch(() => []),
+      getEnum("review_trigger").catch(() => []),
       getEnum("unified_agenda_priority").catch(() => []),
+      getEnum("regulatory_stage").catch(() => []),
       listPeople({ limit: 100 }).catch(() => ({ items: [] })),
       listOrganizations({ limit: 100 }).catch(() => ({ items: [] })),
-    ]).then(([matterType, status, priority, sensitivity, boss, regStage, riskLevel, uaPriority, ppl, orgList]) => {
+    ]).then(([matterType, status, priority, sensitivity,
+      rmWorkflow, gdWorkflow, enWorkflow, instrumentType,
+      enLegalIssue, enSupportType, enLitStage, interagencyRole,
+      petitionDisp, reviewTrigger, uaPriority, regStage,
+      ppl, orgList]) => {
       setEnums({
         matter_type: matterType,
         status,
         priority,
         sensitivity,
-        boss_involvement: boss,
-        regulatory_stage: regStage,
-        risk_level: riskLevel,
+        rulemaking_workflow_status: rmWorkflow,
+        guidance_workflow_status: gdWorkflow,
+        enforcement_workflow_status: enWorkflow,
+        instrument_type: instrumentType,
+        enforcement_legal_issue_type: enLegalIssue,
+        enforcement_support_type: enSupportType,
+        enforcement_litigation_stage: enLitStage,
+        interagency_role: interagencyRole,
+        petition_disposition: petitionDisp,
+        review_trigger: reviewTrigger,
         unified_agenda_priority: uaPriority,
+        regulatory_stage: regStage,
       });
       setPeople(ppl.items || ppl || []);
       setOrgs(orgList.items || orgList || []);
@@ -129,36 +154,20 @@ export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
         title: matter.title || "",
         matter_type: matter.matter_type || "",
         description: matter.description || "",
-        problem_statement: matter.problem_statement || "",
-        why_it_matters: matter.why_it_matters || "",
         status: matter.status || "",
         priority: matter.priority || "",
         sensitivity: matter.sensitivity || "",
-        boss_involvement_level: matter.boss_involvement_level || "",
-        risk_level: matter.risk_level || "",
         assigned_to_person_id: matter.assigned_to_person_id || "",
-        supervisor_person_id: matter.supervisor_person_id || "",
         client_organization_id: matter.client_organization_id || "",
-        requesting_organization_id: matter.requesting_organization_id || "",
-        reviewing_organization_id: matter.reviewing_organization_id || "",
         work_deadline: (matter.work_deadline || "").slice(0, 10),
         external_deadline: (matter.external_deadline || "").slice(0, 10),
-        decision_deadline: (matter.decision_deadline || "").slice(0, 10),
         opened_date: (matter.opened_date || "").slice(0, 10),
         next_step: matter.next_step || "",
-        next_step_assigned_to_person_id: matter.next_step_assigned_to_person_id || "",
-        pending_decision: matter.pending_decision || "",
-        revisit_date: (matter.revisit_date || "").slice(0, 10),
+        blocker: matter.blocker || "",
         outcome_summary: matter.outcome_summary || "",
         closed_at: (matter.closed_at || "").slice(0, 10),
-        rin: matter.rin || "",
-        regulatory_stage: matter.regulatory_stage || "",
-        federal_register_citation: matter.federal_register_citation || "",
-        unified_agenda_priority: matter.unified_agenda_priority || "",
-        docket_number: matter.docket_number || "",
         cfr_citation: matter.cfr_citation || "",
-        fr_doc_number: matter.fr_doc_number || "",
-        lead_external_org_id: matter.lead_external_org_id || "",
+        extension: matter.extension || {},
       });
     } else {
       setEtag(null);
@@ -175,19 +184,40 @@ export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
     }
   }, [matter, isOpen]);
 
+  const [extCollapsed, setExtCollapsed] = React.useState(!!matter);
+
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+  const setExt = (field) => (e) => setForm((f) => ({ ...f, extension: { ...f.extension, [field]: e.target.value } }));
+  const setExtCheck = (field) => (e) => setForm((f) => ({ ...f, extension: { ...f.extension, [field]: e.target.checked ? 1 : 0 } }));
+
+  const handleTypeChange = (e) => {
+    const newType = e.target.value;
+    if (matter?.id) {
+      if (!window.confirm("Changing matter type will remove current type-specific details. Continue?")) return;
+    }
+    setForm((f) => ({
+      ...f,
+      matter_type: newType,
+      extension: !matter?.id ? (EXT_DEFAULTS[newType] ? { ...EXT_DEFAULTS[newType] } : {}) : f.extension,
+    }));
+  };
 
   const handleSave = async () => {
     setError(null);
     setFieldErrors({});
     setSaving(true);
     try {
-      const payload = { ...form };
+      const { extension, ...baseFields } = form;
+      const payload = { ...baseFields };
       // Convert empty strings to null for optional fields
       Object.keys(payload).forEach((k) => {
         if (payload[k] === "") payload[k] = null;
       });
       if (!matter?.id) { Object.keys(payload).forEach((k) => { if (payload[k] === null || payload[k] === undefined) delete payload[k]; }); }
+      // Nest extension fields
+      if (extension && Object.keys(extension).length > 0) {
+        payload.extension = { ...extension };
+      }
 
       const v = validate("matter", payload);
       if (!v.valid) { setFieldErrors(v.errors); setError(Object.values(v.errors).join(", ")); setSaving(false); return; }
@@ -238,15 +268,122 @@ export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
     </div>
   );
 
-  const isRulemaking = form.matter_type === "rulemaking";
   const orgOpts = orgs.map((o) => ({ value: o.id, label: o.name || `Org #${o.id}` }));
   const personOpts = people.map((p) => ({ value: p.id, label: `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.full_name || `Person #${p.id}` }));
+
+  const extSelect = (label, field, options) => (
+    <div style={{ marginBottom: 14 }}>
+      <label style={LABEL_STYLE}>{label}</label>
+      <select style={INPUT_STYLE} value={form.extension[field] || ""} onChange={setExt(field)}>
+        <option value="">--</option>
+        {(Array.isArray(options) ? options : []).map((v) => (
+          <option key={typeof v === "object" ? v.value : v} value={typeof v === "object" ? v.value : v}>
+            {typeof v === "object" ? v.label || v.value : v}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+
+  const extInput = (label, field, type = "text", extra = {}) => (
+    <div style={{ marginBottom: 14 }}>
+      <label style={LABEL_STYLE}>{label}</label>
+      <input style={INPUT_STYLE} type={type} value={form.extension[field] || ""} onChange={setExt(field)} {...extra} />
+    </div>
+  );
+
+  const extTextarea = (label, field, placeholder = "") => (
+    <div style={{ marginBottom: 14 }}>
+      <label style={LABEL_STYLE}>{label}</label>
+      <textarea style={{ ...INPUT_STYLE, minHeight: 60, resize: "vertical" }} value={form.extension[field] || ""} onChange={setExt(field)} placeholder={placeholder} />
+    </div>
+  );
+
+  const extCheckbox = (label, field) => (
+    <div style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+      <input type="checkbox" checked={!!form.extension[field]} onChange={setExtCheck(field)} />
+      <label style={{ ...LABEL_STYLE, marginBottom: 0 }}>{label}</label>
+    </div>
+  );
+
+  const renderExtensionFields = () => {
+    if (form.matter_type === "rulemaking") {
+      return (
+        <>
+          {extSelect("Workflow Status", "workflow_status", enums.rulemaking_workflow_status)}
+          {extInput("RIN", "rin")}
+          {extSelect("Regulatory Stage", "regulatory_stage", enums.regulatory_stage)}
+          {extInput("CFR Citation", "cfr_citation")}
+          {extInput("Docket Number", "docket_number")}
+          {extInput("FR Document Number", "fr_doc_number")}
+          {extInput("FR Citation", "federal_register_citation")}
+          {extSelect("Unified Agenda Priority", "unified_agenda_priority", enums.unified_agenda_priority)}
+          {extSelect("Interagency Role", "interagency_role", enums.interagency_role)}
+          {extCheckbox("Is Petition", "is_petition")}
+          {extSelect("Petition Disposition", "petition_disposition", enums.petition_disposition)}
+          {extSelect("Review Trigger", "review_trigger", enums.review_trigger)}
+        </>
+      );
+    }
+    if (form.matter_type === "guidance") {
+      return (
+        <>
+          {extSelect("Workflow Status", "workflow_status", enums.guidance_workflow_status)}
+          {extSelect("Instrument Type", "instrument_type", enums.instrument_type)}
+          {extCheckbox("Published in FR", "published_in_fr")}
+          {extInput("CFTC Letter Number", "cftc_letter_number")}
+          {extInput("Request Date", "request_date", "date")}
+          {extInput("Requestor Name", "requestor_name")}
+          {extSelect("Requestor Organization", "requestor_organization_id", orgOpts)}
+          {extInput("Requestor Counsel", "requestor_counsel")}
+          {extSelect("Issuing Office", "issuing_office_id", orgOpts)}
+          {extSelect("Signatory", "signatory_person_id", personOpts)}
+          {extSelect("Staff Contact", "staff_contact_person_id", personOpts)}
+          {extInput("CEA Provisions", "cea_provisions")}
+          {extInput("CFR Provisions", "cfr_provisions")}
+          {extTextarea("Legal Question", "legal_question", "What legal question does this guidance address?")}
+          {extTextarea("Conditions Summary", "conditions_summary", "Summary of conditions or limitations")}
+          {extInput("Amends Matter ID", "amends_matter_id")}
+          {extInput("Prior Letter Number", "prior_letter_number")}
+          {extInput("Issuance Date", "issuance_date", "date")}
+          {extInput("Expiration Date", "expiration_date", "date")}
+        </>
+      );
+    }
+    if (form.matter_type === "enforcement") {
+      return (
+        <>
+          {extSelect("Workflow Status", "workflow_status", enums.enforcement_workflow_status)}
+          {extSelect("Requesting Division", "requesting_division_id", orgOpts)}
+          {extInput("Enforcement Reference", "enforcement_reference")}
+          {extSelect("Legal Issue Type", "legal_issue_type", enums.enforcement_legal_issue_type)}
+          {extSelect("Support Type", "support_type", enums.enforcement_support_type)}
+          {extSelect("Litigation Stage", "litigation_stage", enums.enforcement_litigation_stage)}
+          {extInput("Court or Forum", "court_or_forum")}
+          {extInput("Deadline Source", "deadline_source")}
+          {extInput("Privilege Flags", "privilege_flags")}
+          {extCheckbox("Is Confidential", "is_confidential")}
+        </>
+      );
+    }
+    return null;
+  };
 
   return (
     <DrawerShell isOpen={isOpen} onClose={onClose} title={matter ? "Edit Matter" : "New Matter"}>
       {/* Core — always visible, no section wrapper */}
       {renderInput("Title *", "title", "text", { required: true })}
-      {renderSelect("Matter Type *", "matter_type", enums.matter_type)}
+      <div style={{ marginBottom: 14 }}>
+        <label style={LABEL_STYLE}>Matter Type *</label>
+        <select style={INPUT_STYLE} value={form.matter_type} onChange={handleTypeChange}>
+          <option value="">--</option>
+          {(Array.isArray(enums.matter_type) ? enums.matter_type : []).map((v) => (
+            <option key={typeof v === "object" ? v.value : v} value={typeof v === "object" ? v.value : v}>
+              {typeof v === "object" ? v.label || v.value : v}
+            </option>
+          ))}
+        </select>
+      </div>
       {renderSelect("Status", "status", enums.status)}
       {renderSelect("Priority", "priority", enums.priority)}
       {renderSelect("Owner", "assigned_to_person_id", personOpts)}
@@ -254,18 +391,13 @@ export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
       {/* Workflow section */}
       <FieldSection title="Workflow" defaultOpen={true}>
         {renderInput("Next Step", "next_step")}
-        {renderSelect("Next Step Owner", "next_step_assigned_to_person_id", personOpts)}
-        {form.status && form.status !== "closed" && !form.next_step_assigned_to_person_id && (
-          <div style={{ color: theme.accent.yellow, fontSize: 11, marginTop: -10, marginBottom: 10 }}>Consider assigning a next step owner</div>
-        )}
         <div style={{ marginBottom: 14 }}>
-          <label style={LABEL_STYLE}>Pending Decision</label>
-          <textarea style={{ ...INPUT_STYLE, minHeight: 60, resize: "vertical" }} value={form.pending_decision} onChange={set("pending_decision")} placeholder="What decision is pending?" />
+          <label style={LABEL_STYLE}>Blocker</label>
+          <input style={INPUT_STYLE} value={form.blocker || ""} onChange={set("blocker")}
+            placeholder="What's blocking progress? (leave empty if unblocked)" />
         </div>
         {renderInput("Work Deadline", "work_deadline", "date")}
-        {renderInput("Decision Deadline", "decision_deadline", "date")}
         {renderInput("External Deadline", "external_deadline", "date")}
-        {renderInput("Revisit Date", "revisit_date", "date")}
         {renderInput("Opened Date", "opened_date", "date")}
       </FieldSection>
 
@@ -275,43 +407,30 @@ export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
           <label style={LABEL_STYLE}>Description</label>
           <textarea style={{ ...INPUT_STYLE, minHeight: 80, resize: "vertical" }} value={form.description} onChange={set("description")} />
         </div>
-        <div style={{ marginBottom: 14 }}>
-          <label style={LABEL_STYLE}>Problem Statement</label>
-          <textarea style={{ ...INPUT_STYLE, minHeight: 80, resize: "vertical" }} value={form.problem_statement} onChange={set("problem_statement")} />
-        </div>
-        <div style={{ marginBottom: 14 }}>
-          <label style={LABEL_STYLE}>Why It Matters</label>
-          <textarea style={{ ...INPUT_STYLE, minHeight: 80, resize: "vertical" }} value={form.why_it_matters} onChange={set("why_it_matters")} />
-        </div>
         {renderSelect("Sensitivity", "sensitivity", enums.sensitivity)}
-        {renderSelect("Boss Involvement", "boss_involvement_level", enums.boss_involvement)}
-        {renderSelect("Risk Level", "risk_level", enums.risk_level)}
-        {renderSelect("Supervisor", "supervisor_person_id", personOpts)}
       </FieldSection>
 
       {/* Organizations section */}
       <FieldSection title="Organizations" defaultOpen={false}>
         {renderSelect("Client Organization", "client_organization_id", orgOpts)}
-        {renderSelect("Requesting Organization", "requesting_organization_id", orgOpts)}
-        {renderSelect("Reviewing Organization", "reviewing_organization_id", orgOpts)}
-        {renderSelect("Lead External Organization", "lead_external_org_id", orgOpts)}
       </FieldSection>
 
-      {/* Rulemaking section — only visible when matter_type === rulemaking */}
-      <FieldSection title="Rulemaking" defaultOpen={false} visible={isRulemaking}>
-        {renderInput("RIN", "rin")}
-        {renderSelect("Regulatory Stage", "regulatory_stage", enums.regulatory_stage)}
-        {renderInput("FR Citation", "federal_register_citation")}
-        {renderSelect("Unified Agenda Priority", "unified_agenda_priority", enums.unified_agenda_priority)}
-        {renderInput("Docket Number", "docket_number")}
-        {renderInput("CFR Citation", "cfr_citation")}
-        {renderInput("FR Document Number", "fr_doc_number")}
-      </FieldSection>
-
-      {/* Conditional banners and closed fields — no section wrapper */}
-      {form.status === "parked / monitoring" && !form.revisit_date && (
-        <div style={{ color: theme.accent.yellow, fontSize: 12, marginBottom: 10, padding: "6px 10px", background: "#422006", borderRadius: 6, border: "1px solid #854d0e" }}>Revisit date is recommended for parked/monitoring matters</div>
+      {/* Type-specific extension section */}
+      {["rulemaking", "guidance", "enforcement"].includes(form.matter_type) && (
+        <div style={{ marginTop: 16, borderLeft: `3px solid ${
+          form.matter_type === "rulemaking" ? "#ce93d8" :
+          form.matter_type === "guidance" ? "#64b5f6" : "#ef5350"
+        }`, paddingLeft: 16 }}>
+          <div onClick={() => setExtCollapsed(!extCollapsed)}
+            style={{ cursor: "pointer", fontWeight: 600, marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+            <span>{extCollapsed ? "\u25b8" : "\u25be"}</span>
+            <span>{form.matter_type === "rulemaking" ? "Rulemaking" : form.matter_type === "guidance" ? "Guidance" : "Enforcement"} Details</span>
+          </div>
+          {!extCollapsed && renderExtensionFields()}
+        </div>
       )}
+
+      {/* Closed fields */}
       {form.status === "closed" && (
         <>
           <div style={{ marginBottom: 14 }}>

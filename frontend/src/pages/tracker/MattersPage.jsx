@@ -34,21 +34,23 @@ function timeAgo(d) {
 
 // Saved view presets — client-side filters on the loaded data
 const isOpen = (m) => m.status !== "closed";
-const isActive = (m) => isOpen(m) && m.status !== "parked / monitoring";
+const isActive = (m) => isOpen(m) && m.status !== "paused";
 
 const SAVED_VIEWS = [
   { label: "All Open Matters", filter: isActive },
   { label: "Critical This Week", filter: (m) => isActive(m) && m.priority === "critical this week" },
-  { label: "Awaiting Decision", filter: (m) => isActive(m) && (m.status === "awaiting comments" || m.status === "awaiting decision" || (m.pending_decision && m.pending_decision.trim())) },
+  { label: "Has Pending Decisions", filter: (m) => isActive(m) && m.pending_decisions > 0 },
   { label: "Needs My Attention", filter: (m) => isActive(m) && (m.next_step_owner_name === "You" || m.owner_name === "You") },
-  { label: "Leadership-Sensitive", filter: (m) => isActive(m) && m.boss_involvement_level && m.boss_involvement_level !== "none" && m.boss_involvement_level !== "" },
+  { label: "High Sensitivity", filter: (m) => isActive(m) && ["leadership_sensitive", "enforcement_sensitive", "congressional_sensitive"].includes(m.sensitivity) },
   { label: "Stale Matters", filter: (m) => {
     if (!isOpen(m)) return false;
     if (!m.updated_at) return true;
     const diffDays = (Date.now() - new Date(m.updated_at).getTime()) / (1000 * 60 * 60 * 24);
     return diffDays > 14;
   }},
-  { label: "Parked / Monitoring", filter: (m) => isOpen(m) && m.status === "parked / monitoring" },
+  { label: "Paused", filter: (m) => isOpen(m) && m.status === "paused" },
+  { label: "Blocked", filter: (m) => isActive(m) && m.blocker },
+  { label: "Comment Period Open", filter: (m) => isActive(m) && m.comment_period_status === "open" },
 ];
 
 
@@ -84,17 +86,26 @@ export default function MattersPage() {
     const view = SAVED_VIEWS[activeView];
     let filtered = view ? rawMatters.filter(view.filter) : rawMatters;
     // Smart hybrid ranking: closed last, then by composite score desc
+    // Adds blocker penalty and comment-period urgency on top of base score
     return [...filtered].sort((a, b) => {
       const closedA = a.status === "closed" ? 1 : 0;
       const closedB = b.status === "closed" ? 1 : 0;
       if (closedA !== closedB) return closedA - closedB;
-      return matterRankScore(b) - matterRankScore(a);
+      let scoreA = matterRankScore(a);
+      let scoreB = matterRankScore(b);
+      // Blocker penalty: push blocked items higher
+      if (a.blocker) scoreA += 20;
+      if (b.blocker) scoreB += 20;
+      // Comment period urgency: boost when closing within 7 days
+      if (a.comment_period_status === "open" && a.comment_period_days_remaining != null && a.comment_period_days_remaining < 7) scoreA += 30;
+      if (b.comment_period_status === "open" && b.comment_period_days_remaining != null && b.comment_period_days_remaining < 7) scoreB += 30;
+      return scoreB - scoreA;
     });
   }, [rawMatters, activeView]);
 
-  const statusOpts = enums?.matter_status || enums?.status || [];
+  const statusOpts = ["active", "paused", "closed"];
   const priorityOpts = enums?.priority || [];
-  const typeOpts = enums?.matter_type || [];
+  const typeOpts = ["rulemaking", "guidance", "enforcement", "congressional", "briefing", "administrative", "inquiry", "other"];
 
   const columns = [
     {
@@ -116,16 +127,31 @@ export default function MattersPage() {
       },
     },
     {
-      key: "status", label: "Status", width: 140,
-      render: (val) => {
+      key: "status", label: "Status", width: 160,
+      render: (val, row) => {
         const s = theme.status[val] || { bg: theme.bg.input, text: theme.text.faint, label: val };
-        return <Badge bg={s.bg} text={s.text} label={s.label || val || "\u2014"} />;
+        return (
+          <div>
+            <Badge bg={s.bg} text={s.text} label={s.label || val || "\u2014"} />
+            {row.comment_period_status === "open" && (
+              <div style={{ fontSize: 10, color: "#ffb74d", marginTop: 3 }}>
+                Comments close {formatShortDate(row.comment_period_closes)}
+              </div>
+            )}
+            {row.comment_period_status === "closed" && row.comment_period_closes && (
+              <div style={{ fontSize: 10, color: theme.text.faint, marginTop: 3 }}>
+                Comments closed {formatShortDate(row.comment_period_closes)}
+              </div>
+            )}
+          </div>
+        );
       },
     },
     {
       key: "deadline", label: "Next Deadline", width: 100,
       render: (val, row) => {
-        const d = row.work_deadline || row.external_deadline || row.decision_deadline;
+        const candidates = [row.work_deadline, row.external_deadline, row.comment_period_closes].filter(Boolean);
+        const d = candidates.length ? candidates.reduce((a, b) => (a < b ? a : b)) : null;
         if (!d) return <span style={{ color: theme.text.faint }}>{"\u2014"}</span>;
         const isOverdue = new Date(d) < new Date();
         return <span style={{ fontWeight: 600, color: isOverdue ? theme.accent.red : theme.text.primary }}>{formatShortDate(d)}</span>;
@@ -140,14 +166,14 @@ export default function MattersPage() {
       ),
     },
     {
-      key: "next_step_owner_name", label: "Step Owner", width: 100,
-      render: (val) => <span style={{ color: theme.text.muted }}>{val || "\u2014"}</span>,
+      key: "workflow_status", label: "Workflow", width: 120,
+      render: (val) => <span style={{ color: theme.text.muted, fontSize: 12 }}>{val || "\u2014"}</span>,
     },
     {
-      key: "pending_decision", label: "Pending Decision", width: 180,
+      key: "blocker", label: "Blocker", width: 180,
       render: (val) => (
-        <div style={{ fontSize: 12, color: val ? theme.accent.yellowLight : theme.text.faint, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {val || "\u2014"}
+        <div style={{ fontSize: 12, color: val ? "#ef5350" : theme.text.faint, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {val || ""}
         </div>
       ),
     },

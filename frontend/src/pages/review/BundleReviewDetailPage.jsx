@@ -1070,7 +1070,7 @@ const FIELD_SCHEMAS = {
     { key: "update_type", label: "Update Type", type: "select", required: true, options: ["status update", "meeting readout", "document milestone", "decision made", "blocker identified", "deadline changed", "escalation", "closure note"] },
   ],
   status_change: [
-    { key: "field", label: "Field to Change", type: "select", required: true, options: ["status", "priority", "sensitivity", "boss_involvement_level", "next_step", "pending_decision", "risk_level", "regulatory_stage"] },
+    { key: "field", label: "Field to Change", type: "select", required: true, options: ["status", "priority", "sensitivity", "next_step", "blocker"] },
     { key: "old_value", label: "Old Value", type: "text" },
     { key: "new_value", label: "New Value", type: "text", required: true },
     { key: "change_summary", label: "Change Summary", type: "textarea", required: true },
@@ -1141,7 +1141,6 @@ const FIELD_SCHEMAS = {
     { key: "status", label: "Status", type: "select", options: ["new intake", "framing issue", "research in progress", "draft in progress", "internal review", "client review", "leadership review", "external coordination", "awaiting decision", "awaiting comments", "parked / monitoring", "closed"], defaultValue: "new intake" },
     { key: "priority", label: "Priority", type: "select", required: true, options: ["critical this week", "important this month", "strategic / slow burn", "monitoring only"] },
     { key: "sensitivity", label: "Sensitivity", type: "select", required: true, options: ["routine", "internal only", "leadership-sensitive", "deliberative / predecisional", "enforcement-sensitive", "congressional-sensitive"] },
-    { key: "boss_involvement_level", label: "Boss Involvement", type: "select", required: true, options: ["no boss involvement needed", "keep boss informed", "boss review required", "boss decision required", "boss will present / speak"] },
     { key: "next_step", label: "Next Step", type: "text", required: true },
     { key: "description", label: "Description", type: "textarea" },
     { key: "assigned_to_person_id", label: "Assigned To", type: "person_picker" },
