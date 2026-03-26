@@ -800,11 +800,11 @@ export default function MeetingDetailPage() {
     const matterIds = meeting.matters.map((m) => m.id);
 
     Promise.all(matterIds.map((mid) => listTasks({ matter_id: mid }).catch(() => [])))
-      .then((results) => setMatterTasks(results.flat()))
+      .then((results) => setMatterTasks(results.flatMap(r => r.items || r)))
       .catch(() => setMatterTasks([]));
 
     Promise.all(matterIds.map((mid) => listDecisions({ matter_id: mid }).catch(() => [])))
-      .then((results) => setMatterDecisions(results.flat()))
+      .then((results) => setMatterDecisions(results.flatMap(r => r.items || r)))
       .catch(() => setMatterDecisions([]));
   }, [meeting]);
 
