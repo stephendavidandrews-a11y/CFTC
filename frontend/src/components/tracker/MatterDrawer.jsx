@@ -45,6 +45,7 @@ const RULEMAKING_EXT = {
   cfr_citation: "", docket_number: "", fr_doc_number: "",
   federal_register_citation: "", unified_agenda_priority: "",
   interagency_role: "", is_petition: 0, petition_disposition: "", review_trigger: "",
+  current_comment_period_closes: "",
 };
 const GUIDANCE_EXT = {
   instrument_type: "", workflow_status: "request_received", published_in_fr: 0,
@@ -319,6 +320,7 @@ export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
           {extInput("FR Citation", "federal_register_citation")}
           {extSelect("Unified Agenda Priority", "unified_agenda_priority", enums.unified_agenda_priority)}
           {extSelect("Interagency Role", "interagency_role", enums.interagency_role)}
+          {extInput("Comment Period Closes", "current_comment_period_closes", "date")}
           {extCheckbox("Is Petition", "is_petition")}
           {extSelect("Petition Disposition", "petition_disposition", enums.petition_disposition)}
           {extSelect("Review Trigger", "review_trigger", enums.review_trigger)}
