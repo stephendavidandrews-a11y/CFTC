@@ -1,59 +1,97 @@
 import React from "react";
+import * as ToastPrimitive from "@radix-ui/react-toast";
 import theme from "../../styles/theme";
 
 const TOAST_STYLES = {
-  success: { bg: "#14532d", border: "#22c55e", icon: "\u2713", color: "#4ade80" },
-  error:   { bg: "#450a0a", border: "#ef4444", icon: "\u2717", color: "#f87171" },
-  warning: { bg: "#422006", border: "#f59e0b", icon: "\u26a0", color: "#fbbf24" },
-  info:    { bg: "#172554", border: "#3b82f6", icon: "\u2139", color: "#60a5fa" },
+  success: { background: "#14532d", borderColor: "#22c55e", iconColor: "#4ade80" },
+  error:   { background: "#450a0a", borderColor: "#ef4444", iconColor: "#f87171" },
+  warning: { background: "#422006", borderColor: "#f59e0b", iconColor: "#fbbf24" },
+  info:    { background: "#172554", borderColor: "#3b82f6", iconColor: "#60a5fa" },
 };
 
+const ICONS    = { success: "\u2713", error: "\u2717", warning: "\u26a0", info: "\u2139" };
+const DURATIONS = { success: 4000, error: 6000, warning: 5000, info: 4000 };
+
 function ToastItem({ toast, onRemove }) {
-  const s = TOAST_STYLES[toast.type] || TOAST_STYLES.info;
+  const colors = TOAST_STYLES[toast.type] || TOAST_STYLES.info;
+  const icon   = ICONS[toast.type]    || ICONS.info;
 
   return (
-    <div
+    <ToastPrimitive.Root
+      duration={DURATIONS[toast.type] || 4000}
+      onOpenChange={(open) => { if (!open) onRemove(toast.id); }}
       style={{
-        display: "flex", alignItems: "center", gap: 10,
-        padding: "12px 16px", borderRadius: 8,
-        background: s.bg, border: `1px solid ${s.border}40`,
+        background: colors.background,
+        border: `1px solid ${colors.borderColor}40`,
+        borderRadius: 8,
+        padding: "12px 16px",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
         boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
-        minWidth: 280, maxWidth: 420,
-        opacity: toast.entering || toast.leaving ? 0 : 1,
-        transform: toast.entering || toast.leaving ? "translateX(40px)" : "translateX(0)",
-        transition: "all 0.3s ease",
-        cursor: "pointer",
+        minWidth: 280,
+        maxWidth: 420,
       }}
-      onClick={() => onRemove(toast.id)}
     >
-      <span style={{ fontSize: 16, color: s.color, flexShrink: 0 }}>{s.icon}</span>
-      <span style={{
-        fontSize: 13, color: theme.text.primary, fontWeight: 500, flex: 1, lineHeight: 1.4,
-      }}>
-        {toast.message}
-      </span>
-      <button
-        onClick={(e) => { e.stopPropagation(); onRemove(toast.id); }}
+      <span style={{ fontSize: 16, color: colors.iconColor, flexShrink: 0 }}>{icon}</span>
+      <ToastPrimitive.Title
         style={{
-          background: "transparent", border: "none", color: theme.text.faint,
-          fontSize: 14, cursor: "pointer", padding: 2, flexShrink: 0,
+          flex: 1,
+          fontSize: 13,
+          fontWeight: 500,
+          color: theme.text.primary,
+          lineHeight: 1.4,
         }}
-      >x</button>
-    </div>
+      >
+        {toast.message}
+      </ToastPrimitive.Title>
+      <ToastPrimitive.Close
+        style={{
+          background: "none",
+          border: "none",
+          color: theme.text.faint,
+          cursor: "pointer",
+          fontSize: 14,
+          padding: 2,
+          flexShrink: 0,
+        }}
+      >
+        x
+      </ToastPrimitive.Close>
+    </ToastPrimitive.Root>
   );
 }
 
-export default function ToastContainer({ toasts, onRemove }) {
-  if (!toasts.length) return null;
-
+// Viewport exported so ToastContext can render it inside the provider
+export function ToastViewport() {
   return (
-    <div style={{
-      position: "fixed", top: 20, right: 20, zIndex: 9999,
-      display: "flex", flexDirection: "column", gap: 8,
-    }}>
+    <ToastPrimitive.Viewport
+      style={{
+        position: "fixed",
+        top: 20,
+        right: 20,
+        zIndex: 9999,
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+        width: 340,
+        maxWidth: "90vw",
+        listStyle: "none",
+        margin: 0,
+        padding: 0,
+        outline: "none",
+      }}
+    />
+  );
+}
+
+// ToastContainer renders the individual toasts; must be inside ToastProvider
+export default function ToastContainer({ toasts, onRemove }) {
+  return (
+    <>
       {toasts.map((t) => (
         <ToastItem key={t.id} toast={t} onRemove={onRemove} />
       ))}
-    </div>
+    </>
   );
 }
