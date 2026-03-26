@@ -524,7 +524,7 @@ async def update_matter(
             ext_model = UpdateMatterRulemaking(**ext_data)
             ext_fields = ext_model.model_dump(exclude_unset=True)
             if ext_fields:
-                existing = db.execute("SELECT id FROM matter_rulemaking WHERE matter_id = ?", (matter_id,)).fetchone()
+                existing = db.execute("SELECT matter_id FROM matter_rulemaking WHERE matter_id = ?", (matter_id,)).fetchone()
                 if existing:
                     ext_sets = [f"{k} = ?" for k in ext_fields]
                     ext_params = list(ext_fields.values()) + [matter_id]
@@ -539,7 +539,7 @@ async def update_matter(
             ext_model = UpdateMatterGuidance(**ext_data)
             ext_fields = ext_model.model_dump(exclude_unset=True)
             if ext_fields:
-                existing = db.execute("SELECT id FROM matter_guidance WHERE matter_id = ?", (matter_id,)).fetchone()
+                existing = db.execute("SELECT matter_id FROM matter_guidance WHERE matter_id = ?", (matter_id,)).fetchone()
                 if existing:
                     ext_sets = [f"{k} = ?" for k in ext_fields]
                     ext_params = list(ext_fields.values()) + [matter_id]
@@ -554,7 +554,7 @@ async def update_matter(
             ext_model = UpdateMatterEnforcement(**ext_data)
             ext_fields = ext_model.model_dump(exclude_unset=True)
             if ext_fields:
-                existing = db.execute("SELECT id FROM matter_enforcement WHERE matter_id = ?", (matter_id,)).fetchone()
+                existing = db.execute("SELECT matter_id FROM matter_enforcement WHERE matter_id = ?", (matter_id,)).fetchone()
                 if existing:
                     ext_sets = [f"{k} = ?" for k in ext_fields]
                     ext_params = list(ext_fields.values()) + [matter_id]
