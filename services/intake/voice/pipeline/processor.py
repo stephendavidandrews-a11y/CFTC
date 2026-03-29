@@ -1,9 +1,9 @@
 """Pipeline orchestrator -- stages 0-7.
 
 Stage 0: Audio prep (ffmpeg -> 16kHz mono WAV)
-Stage 1: Transcription (faster-whisper + Silero VAD)
+Stage 1: Transcription (Qwen3-ASR on MLX)
 Stage 2: Diarization (pyannote 3.1 on MPS)
-Stage 3: Forced alignment + speaker assignment (wav2vec2 via whisperx)
+Stage 3: Alignment + speaker assignment (Qwen3-ASR word timestamps + pyannote)
 Stage 4: Store transcript + voice samples
 Stage 5: Vocal analysis (Parselmouth + librosa, optional)
 Stage 6: Voiceprint quality gate (validates before commitment)
@@ -19,9 +19,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from db.connection import get_connection
-from .transcriber import transcribe
+from .transcriber_qwen3 import transcribe
 from .diarizer import diarize, DiarizationResult, SpeakerSegment
-from .aligner import align, AlignedTranscript, AlignedSegment, AlignedWord
+from .aligner_qwen3 import align, AlignedTranscript, AlignedSegment, AlignedWord
 from .audio_prep import prepare_audio
 
 logger = logging.getLogger(__name__)
@@ -77,9 +77,9 @@ def process_conversation(conversation_id: str) -> bool:
             )
             prepared_path = audio_path
 
-        # Stage 1: Transcription (faster-whisper + Silero VAD)
+        # Stage 1: Transcription (Qwen3-ASR on MLX)
         logger.info(
-            f"[{conversation_id[:8]}] Stage 1: Transcribing (faster-whisper)..."
+            f"[{conversation_id[:8]}] Stage 1: Transcribing (Qwen3-ASR)..."
         )
         transcription = transcribe(prepared_path)
 
@@ -98,9 +98,9 @@ def process_conversation(conversation_id: str) -> bool:
             )
             diarization = _single_speaker_fallback(transcription.duration)
 
-        # Stage 3: Forced alignment + speaker assignment (wav2vec2)
-        logger.info(f"[{conversation_id[:8]}] Stage 3: Aligning (wav2vec2)...")
-        aligned = align(transcription, diarization, prepared_path)
+        # Stage 3: Alignment + speaker assignment (Qwen3-ASR word timestamps + pyannote)
+        logger.info(f"[{conversation_id[:8]}] Stage 3: Aligning (Qwen3-ASR word timestamps)...")
+        aligned = align(transcription, diarization)
 
         # Stage 4: Store transcript + voice samples
         logger.info(

@@ -6,7 +6,7 @@ transcript as JSON. Does NOT create any intake DB records.
 
 This endpoint exists to let the containerized AI service (port 8006)
 delegate GPU-bound transcription to the native intake service (port 8005)
-which has access to faster-whisper + pyannote on the Mac Mini.
+which has access to Qwen3-ASR + pyannote on the Mac Mini.
 
 Response shape:
 {
@@ -89,9 +89,9 @@ async def transcribe_audio(
             prepared_path = input_path
         prep_time = time.time() - t0
 
-        # Stage 1: Transcription (faster-whisper + Silero VAD)
+        # Stage 1: Transcription (Qwen3-ASR on MLX)
         t0 = time.time()
-        from voice.pipeline.transcriber import transcribe
+        from voice.pipeline.transcriber_qwen3 import transcribe
 
         transcription = transcribe(prepared_path)
         transcribe_time = time.time() - t0
@@ -116,11 +116,11 @@ async def transcribe_audio(
             )
         diarize_time = time.time() - t0
 
-        # Stage 3: Forced alignment + speaker assignment (wav2vec2)
+        # Stage 3: Alignment + speaker assignment (Qwen3-ASR word timestamps + pyannote)
         t0 = time.time()
-        from voice.pipeline.aligner import align
+        from voice.pipeline.aligner_qwen3 import align
 
-        aligned = align(transcription, diarization, prepared_path)
+        aligned = align(transcription, diarization)
         align_time = time.time() - t0
 
         # Build response segments
