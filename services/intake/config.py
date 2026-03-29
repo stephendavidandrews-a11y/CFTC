@@ -18,24 +18,14 @@ SERVICE_PORT = 8005
 # -- Audio Formats --
 SUPPORTED_FORMATS = {".wav", ".flac", ".mp3", ".m4a", ".ogg", ".opus"}
 
-# -- ASR Engine --
-# faster-whisper with int8 quantization (replaces openai-whisper)
-WHISPER_MODEL = "medium.en"
-WHISPER_DEVICE = "cpu"
-WHISPER_COMPUTE_TYPE = "int8"
-WHISPER_CPU_THREADS = 8
-WHISPER_BEAM_SIZE = 5
+# -- ASR Engine (Qwen3-ASR on MLX / Apple Silicon) --
+QWEN3_ASR_MODEL = "Qwen/Qwen3-ASR-1.7B"
+QWEN3_DRAFT_MODEL = "Qwen/Qwen3-ASR-0.6B"
+ASR_CONTEXT = ""
 
-# -- VAD (Silero, built into faster-whisper) --
-VAD_THRESHOLD = 0.5
-VAD_MIN_SPEECH_MS = 250
-VAD_MIN_SILENCE_MS = 2000
-
-# -- Forced Alignment (wav2vec2 via whisperx) --
-ALIGNMENT_DEVICE = "cpu"
 
 # -- pyannote --
-PYANNOTE_PIPELINE = "pyannote/speaker-diarization-3.1"
+PYANNOTE_PIPELINE = "pyannote/speaker-diarization-community-1"
 
 # -- Diarization Tuning --
 DIARIZATION_MIN_SPEAKERS = 2
