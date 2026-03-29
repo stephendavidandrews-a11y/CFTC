@@ -52,6 +52,16 @@ CORS_ORIGINS = [
     "https://cftc.stephenandrews.org",
 ]
 
+# --- Capture Monitoring (ReSpeaker Pi) ---
+HEARTBEAT_INTERVAL_S = 15
+STALE_WARNING_S = 30
+OFFLINE_THRESHOLD_S = 60
+SILENCE_TIMEOUT_S = 30
+SILENCE_THRESHOLD_DB = -50
+CAPTURE_INGEST_TOKEN = os.environ.get("CAPTURE_INGEST_TOKEN", "")
+PI_SSH_HOST = "100.97.155.65"
+PI_SSH_USER = "stephen"
+
 
 def validate_config():
     """Validate required configuration at startup. Raises on missing required values."""
