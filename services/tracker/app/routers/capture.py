@@ -326,6 +326,17 @@ async def staleness_checker():
 
 # --- Timeline API ---
 
+@router.get("/api/capture/ws-token")
+async def capture_ws_token(_user=Depends(_verify_capture_auth)):
+    """Return the WebSocket auth token for the dashboard capture-status stream.
+
+    Protected by HTTP Basic auth (same as all tracker endpoints).
+    The frontend calls this once, then uses the token for the WS connection.
+    """
+    token = hashlib.sha256(f"{AUTH_USER}:{AUTH_PASS}".encode()).hexdigest()
+    return {"token": token}
+
+
 @router.get("/api/capture/timeline")
 async def capture_timeline(hours: int = 24, db=Depends(get_db), _user=Depends(_verify_capture_auth)):
     """Return time-bucketed capture status intervals for the timeline."""
