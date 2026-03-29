@@ -22,6 +22,11 @@ from app.config import (
 )
 from app.db import get_connection, get_db
 
+import asyncio as _asyncio_mod
+import subprocess
+import time as _time_mod
+from app.config import PI_SSH_HOST, PI_SSH_USER
+
 log = logging.getLogger(__name__)
 _security = HTTPBasic()
 
@@ -394,3 +399,214 @@ async def capture_timeline(hours: int = 24, db=Depends(get_db), _user=Depends(_v
         })
 
     return {"intervals": intervals, "hours": hours}
+
+
+# --- Remote Management Actions ---
+
+# Per-action cooldown tracker: action_name -> last_completed_timestamp
+_action_cooldowns: dict[str, float] = {}
+_ACTION_COOLDOWN_S = 60  # minimum seconds between same action
+_SSH_TIMEOUT_S = 10
+
+# Allowed actions and their commands (whitelist — no arbitrary execution)
+_ALLOWED_ACTIONS = {
+    "restart-heartbeat": {
+        "cmd": "sudo systemctl restart respeaker-heartbeat",
+        "description": "Restart the heartbeat daemon",
+        "verify_cmd": "systemctl is-active respeaker-heartbeat",
+    },
+    "restart-capture": {
+        "cmd": "sudo systemctl restart sauron-capture",
+        "description": "Restart the audio capture daemon",
+        "verify_cmd": "systemctl is-active sauron-capture",
+    },
+    "diagnose": {
+        "cmd": (
+            "echo '=== Services ===' && "
+            "systemctl is-active sauron-capture respeaker-heartbeat && "
+            "echo '=== Disk ===' && "
+            "df -h /home/stephen && "
+            "echo '=== Memory ===' && "
+            "free -h | head -2 && "
+            "echo '=== Uptime ===' && "
+            "uptime && "
+            "echo '=== Network ===' && "
+            "ip route get 100.87.51.75 2>/dev/null | head -1 && "
+            "echo '=== Tailscale ===' && "
+            "tailscale status --peers=false 2>/dev/null || echo 'tailscale not available' && "
+            "echo '=== Recent capture logs ===' && "
+            "journalctl -u sauron-capture --no-pager -n 5 2>/dev/null || echo 'no journal' && "
+            "echo '=== Recent heartbeat logs ===' && "
+            "journalctl -u respeaker-heartbeat --no-pager -n 5 2>/dev/null || echo 'no journal'"
+        ),
+        "description": "Gather diagnostic information from the Pi",
+        "verify_cmd": None,
+    },
+}
+
+
+def _check_cooldown(action: str) -> tuple[bool, int]:
+    """Check if action is within cooldown. Returns (allowed, seconds_remaining)."""
+    last = _action_cooldowns.get(action, 0)
+    elapsed = _time_mod.time() - last
+    if elapsed < _ACTION_COOLDOWN_S:
+        return False, int(_ACTION_COOLDOWN_S - elapsed)
+    return True, 0
+
+
+def _run_ssh_command(cmd: str) -> dict:
+    """Execute a command on the Pi via SSH. Returns structured result."""
+    ssh_cmd = [
+        "ssh",
+        "-o", "ConnectTimeout=5",
+        "-o", "StrictHostKeyChecking=no",
+        "-o", "BatchMode=yes",
+        f"{PI_SSH_USER}@{PI_SSH_HOST}",
+        cmd,
+    ]
+    start = _time_mod.time()
+    try:
+        result = subprocess.run(
+            ssh_cmd,
+            capture_output=True,
+            text=True,
+            timeout=_SSH_TIMEOUT_S,
+        )
+        duration_ms = int((_time_mod.time() - start) * 1000)
+        return {
+            "success": result.returncode == 0,
+            "exit_code": result.returncode,
+            "stdout": result.stdout[-2000:] if result.stdout else "",
+            "stderr": result.stderr[-500:] if result.stderr else "",
+            "duration_ms": duration_ms,
+        }
+    except subprocess.TimeoutExpired:
+        duration_ms = int((_time_mod.time() - start) * 1000)
+        return {
+            "success": False,
+            "exit_code": -1,
+            "stdout": "",
+            "stderr": f"SSH command timed out after {_SSH_TIMEOUT_S}s",
+            "duration_ms": duration_ms,
+        }
+    except Exception as e:
+        duration_ms = int((_time_mod.time() - start) * 1000)
+        return {
+            "success": False,
+            "exit_code": -1,
+            "stdout": "",
+            "stderr": str(e)[:500],
+            "duration_ms": duration_ms,
+        }
+
+
+def _log_action(db, action: str, user: str, status: str, result: dict, duration_ms: int):
+    """Record a management action in the audit log."""
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        db.execute(
+            """INSERT INTO capture_actions
+               (action, requested_by, requested_at, completed_at, status, result_summary, result_detail, pi_host, duration_ms)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                action,
+                user,
+                now,
+                now,
+                status,
+                result.get("stderr", "")[:200] if not result.get("success") else "OK",
+                json.dumps(result)[:4000],
+                PI_SSH_HOST,
+                duration_ms,
+            ),
+        )
+        db.commit()
+    except Exception:
+        log.exception("Failed to log action %s", action)
+
+
+@router.post("/api/capture/actions/{action_name}")
+async def execute_capture_action(
+    action_name: str,
+    force: bool = False,
+    db=Depends(get_db),
+    user=Depends(_verify_capture_auth),
+):
+    """Execute a safe, scoped management action on the Pi.
+
+    Allowed actions: diagnose, restart-heartbeat, restart-capture.
+    Rate-limited to one execution per action per 60 seconds.
+    For restart-capture: requires force=true if currently recording.
+    """
+    if action_name not in _ALLOWED_ACTIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown action: {action_name}. Allowed: {list(_ALLOWED_ACTIONS.keys())}",
+        )
+
+    action_def = _ALLOWED_ACTIONS[action_name]
+
+    # Safety: block restart-capture while recording unless force=true
+    if action_name == "restart-capture":
+        current_state = _last_status.get("state") if _last_status else None
+        if current_state == "recording" and not force:
+            raise HTTPException(
+                status_code=409,
+                detail="Capture is currently recording. Pass force=true to restart anyway (may lose in-progress segment).",
+            )
+
+    # Check cooldown
+    allowed, remaining = _check_cooldown(action_name)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Action '{action_name}' on cooldown. Retry in {remaining}s.",
+            headers={"Retry-After": str(remaining)},
+        )
+
+    log.info("User '%s' executing action: %s (force=%s)", user, action_name, force)
+
+    # Run the command
+    loop = _asyncio_mod.get_event_loop()
+    result = await loop.run_in_executor(None, _run_ssh_command, action_def["cmd"])
+
+    # Verify step (if applicable and main command succeeded)
+    verify_result = None
+    if result["success"] and action_def.get("verify_cmd"):
+        verify_result = await loop.run_in_executor(
+            None, _run_ssh_command, action_def["verify_cmd"]
+        )
+        result["verify_stdout"] = verify_result["stdout"].strip()
+        result["verify_success"] = verify_result["success"]
+
+    # Update cooldown
+    _action_cooldowns[action_name] = _time_mod.time()
+
+    # Log to DB
+    action_status = "success" if result["success"] else "failed"
+    _log_action(db, action_name, user, action_status, result, result["duration_ms"])
+
+    return {
+        "action": action_name,
+        "description": action_def["description"],
+        "status": action_status,
+        "result": result,
+    }
+
+
+@router.get("/api/capture/actions/log")
+async def get_action_log(
+    limit: int = 20,
+    db=Depends(get_db),
+    _user=Depends(_verify_capture_auth),
+):
+    """Return recent capture management actions for audit display."""
+    rows = db.execute(
+        """SELECT id, action, requested_by, requested_at, completed_at,
+                  status, result_summary, pi_host, duration_ms
+           FROM capture_actions
+           ORDER BY requested_at DESC
+           LIMIT ?""",
+        (min(limit, 100),),
+    ).fetchall()
+    return {"actions": [dict(row) for row in rows]}

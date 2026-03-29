@@ -1155,6 +1155,26 @@ MIGRATIONS = [
             )""",
         ],
     ),
+    (
+        9,
+        "capture_actions_log",
+        [
+            """CREATE TABLE IF NOT EXISTS capture_actions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                action TEXT NOT NULL,
+                requested_by TEXT NOT NULL,
+                requested_at TEXT NOT NULL,
+                completed_at TEXT,
+                status TEXT NOT NULL DEFAULT 'pending',
+                result_summary TEXT,
+                result_detail TEXT,
+                pi_host TEXT,
+                duration_ms INTEGER
+            )""",
+            """CREATE INDEX IF NOT EXISTS idx_capture_actions_requested_at
+               ON capture_actions(requested_at)""",
+        ],
+    ),
 ]
 
 
