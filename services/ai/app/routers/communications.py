@@ -719,34 +719,37 @@ async def delete_communication(communication_id: str, db=Depends(get_db)):
     if not row:
         raise HTTPException(404, detail={"error_type": "not_found"})
 
-    # Delete child records (order matters for foreign keys)
+    # Delete child records in FK-safe order (deepest children first)
+    # review_bundle_items must go before review_bundles (FK dependency)
+    # speaker_voice_profiles uses source_communication_id, not communication_id
     child_tables = [
-        "transcript_corrections",
-        "transcripts",
-        "voice_samples",
-        "voiceprint_match_log",
-        "review_action_log",
-        "review_bundles",
-        "commit_batches",
-        "tracker_writebacks",
-        "communication_entities",
-        "communication_participants",
-        "audio_files",
-        "ai_extractions",
-        "extraction_bundles",
-        "extraction_items",
-        "writeback_log",
-        "communication_messages",
-        "communication_artifacts",
-        "llm_usage",
+        # Deepest children first
+        ("review_bundle_items", "bundle_id IN (SELECT id FROM review_bundles WHERE communication_id = ?)"),
+        # Direct children (order doesn't matter among these)
+        ("transcripts", "communication_id = ?"),
+        ("voice_samples", "communication_id = ?"),
+        ("voiceprint_match_log", "communication_id = ?"),
+        ("speaker_voice_profiles", "source_communication_id = ?"),
+        ("review_action_log", "communication_id = ?"),
+        ("review_bundles", "communication_id = ?"),
+        ("commit_batches", "communication_id = ?"),
+        ("tracker_writebacks", "communication_id = ?"),
+        ("communication_entities", "communication_id = ?"),
+        ("communication_participants", "communication_id = ?"),
+        ("communication_matter_associations", "communication_id = ?"),
+        ("communication_directive_associations", "communication_id = ?"),
+        ("communication_error_log", "communication_id = ?"),
+        ("audio_files", "communication_id = ?"),
+        ("ai_extractions", "communication_id = ?"),
+        ("communication_messages", "communication_id = ?"),
+        ("communication_artifacts", "communication_id = ?"),
+        ("llm_usage", "communication_id = ?"),
     ]
-    for table in child_tables:
+    for table, where_clause in child_tables:
         try:
-            db.execute(
-                f"DELETE FROM {table} WHERE communication_id = ?", (communication_id,)
-            )
+            db.execute(f"DELETE FROM {table} WHERE {where_clause}", (communication_id,))
         except Exception:
-            pass  # Table may not exist yet
+            pass  # Table may not exist in older schema versions
 
     db.execute("DELETE FROM communications WHERE id = ?", (communication_id,))
     db.commit()
