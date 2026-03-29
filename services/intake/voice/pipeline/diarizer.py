@@ -5,7 +5,7 @@ Extracts speaker embeddings for voiceprint matching.
 """
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -80,6 +80,7 @@ class DiarizationResult:
     segments: list[SpeakerSegment]
     embeddings: dict[str, np.ndarray]
     num_speakers: int
+    exclusive_segments: list[SpeakerSegment] = field(default_factory=list)
 
     def to_dataframe(self):
         """Convert to pandas DataFrame for whisperx speaker assignment."""
@@ -135,6 +136,16 @@ def diarize(
             )
         )
 
+    # Exclusive diarization (one speaker per time point, no overlaps)
+    # Used by aligner for clean word->speaker assignment
+    exclusive_segments = []
+    if hasattr(result, "exclusive_speaker_diarization"):
+        exclusive_ann = result.exclusive_speaker_diarization
+        for turn, _, speaker in exclusive_ann.itertracks(yield_label=True):
+            exclusive_segments.append(
+                SpeakerSegment(speaker=speaker, start=turn.start, end=turn.end)
+            )
+
     embeddings = _extract_embeddings(result, segments)
 
     speakers = set(s.speaker for s in segments)
@@ -146,6 +157,7 @@ def diarize(
         segments=segments,
         embeddings=embeddings,
         num_speakers=len(speakers),
+        exclusive_segments=exclusive_segments,
     )
 
 
