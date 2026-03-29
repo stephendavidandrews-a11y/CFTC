@@ -4,6 +4,7 @@ CFTC Regulatory Ops Tracker — FastAPI Application
 
 import asyncio
 import logging
+from datetime import datetime, timedelta, timezone
 import sqlite3
 from contextlib import asynccontextmanager
 
@@ -41,6 +42,7 @@ from app.routers import (
     directive_documents,
     system_events,
 )
+from app.jobs.capture_rollup import rollup_and_prune
 from app.routers import capture
 from app.routers import config as config_router
 
@@ -82,6 +84,27 @@ def _check_db_integrity(db_path, label: str) -> bool:
         return False
 
 
+async def _rollup_scheduler():
+    """Run capture rollup daily at 2:00 AM UTC."""
+    while True:
+        now = datetime.now(timezone.utc)
+        target = now.replace(hour=2, minute=0, second=0, microsecond=0)
+        if target <= now:
+            target += timedelta(days=1)
+        wait_s = (target - now).total_seconds()
+        logger.info("Rollup scheduled in %.0f seconds (at %s)", wait_s, target.isoformat())
+        await asyncio.sleep(wait_s)
+        try:
+            db = get_connection()
+            try:
+                result = rollup_and_prune(db)
+                logger.info("Rollup result: %s", result)
+            finally:
+                db.close()
+        except Exception:
+            logger.exception("Rollup failed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize database on startup."""
@@ -114,8 +137,10 @@ async def lifespan(app: FastAPI):
     finally:
         conn.close()
     _staleness_task = asyncio.create_task(capture.staleness_checker())
+    _rollup_task = asyncio.create_task(_rollup_scheduler())
     yield
     _staleness_task.cancel()
+    _rollup_task.cancel()
     logger.info("Shutting down CFTC Tracker.")
 
 
