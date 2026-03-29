@@ -473,3 +473,12 @@ export function changeMatterType(matterId, newType) {
   });
 }
 
+
+
+// ── Capture Monitoring (ReSpeaker Pi) ─────────────────────────────────────
+export function getCaptureWsToken() {
+  return fetchJSON(`${P}/api/capture/ws-token`);
+}
+export function getCaptureTimeline(hours = 24) {
+  return fetchJSON(`${P}/api/capture/timeline?hours=${hours}`);
+}
