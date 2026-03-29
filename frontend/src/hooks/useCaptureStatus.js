@@ -5,6 +5,8 @@
  * connects to /tracker/ws/capture-status for live status updates.
  * Auto-reconnects with exponential backoff (5s → 60s cap).
  *
+ * Browser notifications on offline/error transitions (requires permission).
+ *
  * Returns:
  *   status      — latest normalized status_update from backend (or null)
  *   thresholds  — server-sent threshold constants from welcome message
@@ -18,6 +20,33 @@ import { fetchJSON } from "../api/client";
 const RECONNECT_BASE = 5000; // 5 seconds
 const RECONNECT_MAX = 60000; // 60 seconds cap
 
+// States that trigger a browser notification when entered
+const ALERT_STATES = new Set(["offline", "error"]);
+
+function notifyStateChange(newState, prevState) {
+  if (!ALERT_STATES.has(newState)) return;
+  if (prevState === newState) return; // no transition
+  if (typeof Notification === "undefined") return;
+  if (Notification.permission !== "granted") return;
+
+  const title = newState === "error"
+    ? "Capture Error"
+    : "Capture Offline";
+  const body = newState === "error"
+    ? "ReSpeaker Pi reported an error"
+    : "ReSpeaker Pi heartbeat lost";
+
+  try {
+    new Notification(title, {
+      body: body,
+      icon: "/favicon.ico",
+      tag: "capture-status", // replaces previous notification
+    });
+  } catch {
+    // Notification constructor can throw in some contexts
+  }
+}
+
 export default function useCaptureStatus() {
   const [status, setStatus] = useState(null);
   const [thresholds, setThresholds] = useState(null);
@@ -28,6 +57,14 @@ export default function useCaptureStatus() {
   const attemptRef = useRef(0);
   const tokenRef = useRef(null);
   const mountedRef = useRef(true);
+  const prevStateRef = useRef(null);
+
+  // Request notification permission once on mount
+  useEffect(() => {
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
 
   const fetchToken = useCallback(async () => {
     try {
@@ -62,7 +99,7 @@ export default function useCaptureStatus() {
         );
         attemptRef.current += 1;
         console.warn(
-          `[useCaptureStatus] No token — retrying in ${delay / 1000}s`
+          "[useCaptureStatus] No token \u2014 retrying in " + (delay / 1000) + "s"
         );
         reconnectTimer.current = setTimeout(connect, delay);
         return;
@@ -70,10 +107,10 @@ export default function useCaptureStatus() {
     }
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/tracker/ws/capture-status?token=${tokenRef.current}`;
+    const wsUrl = protocol + "//" + window.location.host + "/tracker/ws/capture-status?token=" + tokenRef.current;
 
     console.log(
-      `[useCaptureStatus] Connecting (attempt ${attemptRef.current + 1})...`
+      "[useCaptureStatus] Connecting (attempt " + (attemptRef.current + 1) + ")..."
     );
 
     const ws = new WebSocket(wsUrl);
@@ -93,8 +130,14 @@ export default function useCaptureStatus() {
 
         if (msg.type === "welcome") {
           if (msg.thresholds) setThresholds(msg.thresholds);
-          if (msg.last_status) setStatus(msg.last_status);
+          if (msg.last_status) {
+            setStatus(msg.last_status);
+            prevStateRef.current = msg.last_status.state || null;
+          }
         } else if (msg.type === "status_update") {
+          const newState = msg.state || "offline";
+          notifyStateChange(newState, prevStateRef.current);
+          prevStateRef.current = newState;
           setStatus(msg);
         }
       } catch {
@@ -108,7 +151,7 @@ export default function useCaptureStatus() {
       // If closed with 1008 (Unauthorized), token may be stale — clear it
       if (event.code === 1008) {
         tokenRef.current = null;
-        console.warn("[useCaptureStatus] Token rejected — will re-fetch");
+        console.warn("[useCaptureStatus] Token rejected \u2014 will re-fetch");
       }
 
       const delay = Math.min(
@@ -118,8 +161,8 @@ export default function useCaptureStatus() {
       attemptRef.current += 1;
       setConnectionState("disconnected");
       console.warn(
-        `[useCaptureStatus] Disconnected — reconnecting in ${delay / 1000}s ` +
-          `(attempt ${attemptRef.current})`
+        "[useCaptureStatus] Disconnected \u2014 reconnecting in " + (delay / 1000) + "s " +
+          "(attempt " + attemptRef.current + ")"
       );
       reconnectTimer.current = setTimeout(connect, delay);
     };
