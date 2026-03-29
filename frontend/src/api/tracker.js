@@ -482,3 +482,11 @@ export function getCaptureWsToken() {
 export function getCaptureTimeline(hours = 24) {
   return fetchJSON(`${P}/api/capture/timeline?hours=${hours}`);
 }
+
+export function executeCaptureAction(action, force = false) {
+  const params = force ? "?force=true" : "";
+  return fetchJSON(`${P}/api/capture/actions/${action}${params}`, { method: "POST" });
+}
+export function getCaptureActionLog(limit = 20) {
+  return fetchJSON(`${P}/api/capture/actions/log?limit=${limit}`);
+}

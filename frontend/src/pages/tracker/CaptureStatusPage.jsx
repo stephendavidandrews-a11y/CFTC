@@ -7,7 +7,7 @@ import theme from "../../styles/theme";
 import { titleStyle, subtitleStyle, cardStyle } from "../../styles/pageStyles";
 import useCaptureStatus from "../../hooks/useCaptureStatus";
 import useApi from "../../hooks/useApi";
-import { getCaptureTimeline } from "../../api/tracker";
+import { getCaptureTimeline, executeCaptureAction, getCaptureActionLog } from "../../api/tracker";
 
 const STATE_COLORS = {
   recording: { bg: "#052e16", text: "#22c55e", label: "Recording" },
@@ -184,6 +184,36 @@ export default function CaptureStatusPage() {
     return () => clearInterval(id);
   }, []);
 
+  // Management actions state
+  const [actionPending, setActionPending] = useState(null);
+  const [actionResult, setActionResult] = useState(null);
+  const [actionLog, setActionLog] = useState([]);
+  const [logLoading, setLogLoading] = useState(false);
+
+  // Load action log on mount
+  useEffect(() => {
+    setLogLoading(true);
+    getCaptureActionLog(10).then(data => {
+      setActionLog(data.actions || []);
+    }).catch(() => {}).finally(() => setLogLoading(false));
+  }, []);
+
+  const runAction = async (action, force) => {
+    setActionPending(action);
+    setActionResult(null);
+    try {
+      const result = await executeCaptureAction(action, force);
+      setActionResult(result);
+      // Refresh log
+      getCaptureActionLog(10).then(data => setActionLog(data.actions || [])).catch(() => {});
+    } catch (err) {
+      const detail = err.detail || err.message || "Request failed";
+      setActionResult({ action, status: "error", error: detail, httpStatus: err.status });
+    } finally {
+      setActionPending(null);
+    }
+  };
+
   const state = status?.state || "offline";
   const sc = STATE_COLORS[state] || STATE_COLORS.offline;
   const stats = useMemo(() => computeStats(timeline?.intervals), [timeline]);
@@ -292,6 +322,120 @@ export default function CaptureStatusPage() {
             value={stats.total > 0 ? Math.round(((stats.recording + stats.idle) / stats.total) * 100) + "%" : "\u2014"}
             color={theme.accent.green} />
         </div>
+      </div>
+
+      {/* == Management Actions == */}
+      <div style={{ ...cardStyle, marginBottom: 20 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: theme.text.secondary, marginBottom: 12 }}>Management Actions</div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+          {[
+            { key: "diagnose", label: "Diagnose", desc: "Gather Pi diagnostics" },
+            { key: "restart-heartbeat", label: "Restart Heartbeat", desc: "Restart heartbeat daemon" },
+            { key: "restart-capture", label: "Restart Capture", desc: "Restart audio capture" },
+          ].map(act => (
+            <button
+              key={act.key}
+              disabled={!!actionPending}
+              onClick={() => {
+                if (act.key === "restart-capture" && state === "recording") {
+                  if (!window.confirm("Capture is recording. Restart anyway? (may lose in-progress segment)")) return;
+                  runAction(act.key, true);
+                } else {
+                  runAction(act.key, false);
+                }
+              }}
+              style={{
+                padding: "8px 16px", borderRadius: 6, fontSize: 12, fontWeight: 600,
+                background: actionPending === act.key ? theme.accent.yellow : theme.bg.input,
+                color: actionPending === act.key ? "#000" : theme.text.secondary,
+                border: "1px solid " + theme.border.default,
+                cursor: actionPending ? "not-allowed" : "pointer",
+                opacity: actionPending && actionPending !== act.key ? 0.5 : 1,
+                transition: "all 0.2s",
+              }}
+              title={act.desc}
+            >
+              {actionPending === act.key ? "Running…" : act.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Action result */}
+        {actionResult && (
+          <div style={{
+            padding: "10px 14px", borderRadius: 6, fontSize: 12,
+            background: actionResult.status === "success" ? "rgba(34,197,94,0.08)" :
+                        actionResult.status === "error" && actionResult.httpStatus === 429 ? "rgba(234,179,8,0.08)" :
+                        "rgba(239,68,68,0.08)",
+            border: "1px solid " + (actionResult.status === "success" ? "rgba(34,197,94,0.2)" :
+                        actionResult.status === "error" && actionResult.httpStatus === 429 ? "rgba(234,179,8,0.2)" :
+                        "rgba(239,68,68,0.2)"),
+            marginBottom: 8,
+          }}>
+            <div style={{ fontWeight: 600, marginBottom: 4,
+              color: actionResult.status === "success" ? theme.accent.green :
+                     actionResult.status === "error" && actionResult.httpStatus === 429 ? theme.accent.yellow :
+                     theme.accent.red,
+            }}>
+              {actionResult.status === "success" ? "Success" :
+               actionResult.status === "error" && actionResult.httpStatus === 429 ? "Cooldown" :
+               "Failed"}
+              {actionResult.result && actionResult.result.duration_ms != null &&
+                " (" + actionResult.result.duration_ms + "ms)"}
+            </div>
+            {actionResult.error && (
+              <div style={{ color: theme.text.muted }}>{actionResult.error}</div>
+            )}
+            {actionResult.result && actionResult.result.stdout && (
+              <pre style={{
+                fontSize: 10, color: theme.text.dim, marginTop: 6,
+                whiteSpace: "pre-wrap", wordBreak: "break-all",
+                maxHeight: 200, overflow: "auto",
+                background: theme.bg.input, padding: 8, borderRadius: 4,
+              }}>{actionResult.result.stdout}</pre>
+            )}
+            {actionResult.result && actionResult.result.stderr && (
+              <div style={{ fontSize: 10, color: theme.accent.red, marginTop: 4 }}>
+                {actionResult.result.stderr}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* == Action Log == */}
+      <div style={{ ...cardStyle, marginBottom: 20 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: theme.text.secondary, marginBottom: 12 }}>Action Log</div>
+        {logLoading ? (
+          <div style={{ color: theme.text.faint, fontSize: 12 }}>Loading…</div>
+        ) : actionLog.length === 0 ? (
+          <div style={{ color: theme.text.faint, fontSize: 12 }}>No actions recorded</div>
+        ) : (
+          <div style={{ fontSize: 11 }}>
+            {actionLog.map(entry => (
+              <div key={entry.id} style={{
+                display: "flex", gap: 12, padding: "6px 0",
+                borderBottom: "1px solid " + theme.border.subtle,
+                alignItems: "center",
+              }}>
+                <span style={{
+                  width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+                  background: entry.status === "success" ? theme.accent.green : theme.accent.red,
+                }} />
+                <span style={{ color: theme.text.secondary, fontWeight: 600, minWidth: 120 }}>{entry.action}</span>
+                <span style={{ color: theme.text.muted, flex: 1 }}>
+                  {entry.result_summary ? entry.result_summary.slice(0, 60) : "—"}
+                </span>
+                <span style={{ color: theme.text.ghost, fontSize: 10, minWidth: 50, textAlign: "right" }}>
+                  {entry.duration_ms != null ? entry.duration_ms + "ms" : ""}
+                </span>
+                <span style={{ color: theme.text.ghost, fontSize: 10, minWidth: 80, textAlign: "right" }}>
+                  {entry.requested_at ? new Date(entry.requested_at).toLocaleTimeString() : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* == Thresholds Card == */}
