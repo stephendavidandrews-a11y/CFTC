@@ -9,6 +9,8 @@ import StatCard from "../../components/shared/StatCard";
 import Badge from "../../components/shared/Badge";
 import { formatDate } from "../../utils/dateUtils";
 import { matterRankScore } from "../../utils/ranking";
+import useCaptureStatus from "../../hooks/useCaptureStatus";
+import CaptureStatusWidget from "../../components/shared/CaptureStatusWidget";
 
 const TAG_COLORS = {
   BOSS:     { bg: "#7f1d1d", text: "#fca5a5" },
@@ -48,6 +50,7 @@ function formatShortDate(d) {
 export default function TodayPage() {
   useEffect(() => { document.title = "Today | Command Center"; }, []);
   const navigate = useNavigate();
+  const { status: captureStatus, connected: captureConnected } = useCaptureStatus();
 
   // Dashboard stats
   const { data: dashboard, loading } = useApi(() => getDashboard(), [], { refetchOnFocus: true });
@@ -55,7 +58,7 @@ export default function TodayPage() {
   // Open matters for priority ranking
   const { data: mattersData } = useApi(() => listMatters({ limit: 100 }), []);
 
-  // Today's brief (optional — fails silently if not generated yet)
+  // Today's brief (optional - fails silently if not generated yet)
   const [brief, setBrief] = useState(null);
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -89,6 +92,8 @@ export default function TodayPage() {
   const overdueCount  = stats.overdue_tasks || 0;
   const deadlines     = (d.upcoming_deadlines || []).slice(0, 7);
   const recentUpdates = (d.recent_updates    || []).slice(0, 8);
+  const commentPeriods = (d.comment_periods   || []).slice(0, 5);
+  const blockedMatters = (d.blocked_matters   || []).slice(0, 5);
 
   // Priority actions: top 7 non-closed matters by composite rank score
   const rawMatters = mattersData?.items || mattersData || [];
@@ -97,6 +102,9 @@ export default function TodayPage() {
     .sort((a, b) => matterRankScore(b) - matterRankScore(a))
     .slice(0, 7);
 
+  // Pipeline indicator count
+  const pipelineCount = rawMatters.filter(m => m.source === "fr_pipeline").length;
+
   return (
     <div style={{ padding: "24px 32px", maxWidth: 1200 }}>
       <div style={titleStyle}>Today</div>
@@ -104,8 +112,13 @@ export default function TodayPage() {
 
       {/* Section 1: Stat Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
-        <StatCard value={stats.open_matters}     label="Open Matters"     accent={theme.accent.blue} />
-        <StatCard value={stats.open_tasks}        label="Open Tasks"        accent={theme.accent.teal} />
+        <StatCard
+          value={stats.open_matters}
+          label="Open Matters"
+          accent={theme.accent.blue}
+          subtitle={pipelineCount > 0 ? `${pipelineCount} from FR Pipeline` : undefined}
+        />
+        <StatCard value={stats.open_tasks} label="Open Tasks" accent={theme.accent.teal} />
         <StatCard
           value={overdueCount}
           label="Overdue Tasks"
@@ -113,6 +126,11 @@ export default function TodayPage() {
           pulse={overdueCount > 0}
         />
         <StatCard value={stats.pending_decisions} label="Pending Decisions" accent={theme.accent.purple} />
+      </div>
+
+      {/* Capture Status Widget */}
+      <div style={{ marginBottom: 24 }}>
+        <CaptureStatusWidget status={captureStatus} connected={captureConnected} />
       </div>
 
       {/* Section 2: Priority Actions */}
@@ -239,7 +257,7 @@ export default function TodayPage() {
         {/* AI Daily Brief Preview */}
         <div style={cardStyle}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={sectionTitle}>Today's Brief</div>
+            <div style={sectionTitle}>{"Today's Brief"}</div>
             <span
               onClick={() => navigate("/intelligence/daily")}
               style={{ fontSize: 12, color: theme.accent.blueLight, cursor: "pointer" }}
@@ -300,15 +318,15 @@ export default function TodayPage() {
                   <div style={{ fontSize: 11, fontWeight: 700, color: theme.text.faint, textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 12, marginBottom: 6 }}>
                     Meetings
                   </div>
-                  {brief.meetings.map((m, i) => (
+                  {brief.meetings.map((mtg, i) => (
                     <div
                       key={i}
-                      style={{ padding: "5px 0", borderBottom: `1px solid ${theme.border.subtle}`, cursor: m.id ? "pointer" : "default" }}
-                      onClick={() => m.id && navigate(`/meetings/${m.id}`)}
+                      style={{ padding: "5px 0", borderBottom: `1px solid ${theme.border.subtle}`, cursor: mtg.id ? "pointer" : "default" }}
+                      onClick={() => mtg.id && navigate(`/meetings/${mtg.id}`)}
                     >
-                      <div style={{ fontSize: 12, fontWeight: 500, color: theme.text.secondary }}>{m.title}</div>
-                      {m.start_time && (
-                        <div style={{ fontSize: 11, color: theme.text.faint }}>{m.start_time.slice(0, 5)}</div>
+                      <div style={{ fontSize: 12, fontWeight: 500, color: theme.text.secondary }}>{mtg.title}</div>
+                      {mtg.start_time && (
+                        <div style={{ fontSize: 11, color: theme.text.faint }}>{mtg.start_time.slice(0, 5)}</div>
                       )}
                     </div>
                   ))}
@@ -319,7 +337,71 @@ export default function TodayPage() {
         </div>
       </div>
 
-      {/* Section 5: Recent Activity */}
+      {/* Section 5: Comment Periods + Blocked Matters */}
+      {(commentPeriods.length > 0 || blockedMatters.length > 0) && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+          <div style={{ ...cardStyle, borderLeft: `3px solid ${theme.accent.yellow}` }}>
+            <div style={sectionTitle}>Active Comment Periods</div>
+            {commentPeriods.length === 0 ? (
+              <div style={{ fontSize: 13, color: theme.text.faint }}>No open comment periods.</div>
+            ) : (
+              commentPeriods.map((cp) => {
+                const days = cp.days_until_close != null ? Math.ceil(cp.days_until_close) : null;
+                return (
+                  <div
+                    key={cp.id}
+                    onClick={() => navigate(`/matters/${cp.id}`)}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = theme.bg.cardHover)}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      padding: "8px 6px", borderBottom: `1px solid ${theme.border.subtle}`, cursor: "pointer",
+                    }}
+                  >
+                    <div style={{ fontSize: 12, color: theme.accent.blueLight, fontWeight: 500, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {cp.title}
+                    </div>
+                    {days != null && (
+                      <span style={{ fontSize: 12, fontWeight: 600, color: days <= 3 ? theme.accent.red : days <= 14 ? theme.accent.yellow : theme.text.muted, marginLeft: 12, flexShrink: 0 }}>
+                        {days <= 0 ? "Closed" : `${days}d left`}
+                      </span>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div style={{ ...cardStyle, borderLeft: `3px solid ${theme.accent.red}` }}>
+            <div style={sectionTitle}>Blocked Matters</div>
+            {blockedMatters.length === 0 ? (
+              <div style={{ fontSize: 13, color: theme.text.faint }}>No blocked matters.</div>
+            ) : (
+              blockedMatters.map((bm) => (
+                <div
+                  key={bm.id}
+                  onClick={() => navigate(`/matters/${bm.id}`)}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = theme.bg.cardHover)}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "8px 6px", borderBottom: `1px solid ${theme.border.subtle}`, cursor: "pointer",
+                  }}
+                >
+                  <div style={{ fontSize: 12, color: theme.accent.blueLight, fontWeight: 500, maxWidth: "40%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {bm.title}
+                  </div>
+                  <div style={{ fontSize: 11, color: theme.accent.red, maxWidth: "55%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {bm.blocker}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Section 6: Recent Activity */}
       <div style={cardStyle}>
         <div style={sectionTitle}>Recent Activity</div>
         {recentUpdates.length === 0 ? (
