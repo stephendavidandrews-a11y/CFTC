@@ -26,7 +26,6 @@ async def list_documents(
     status: str = Query(None),
     matter_id: str = Query(None),
     document_type: str = Query(None),
-    sort_by: str = Query("updated_at"),
     sort_dir: str = Query("desc"),
     limit: int = Query(100, le=500),
     offset: int = Query(0),

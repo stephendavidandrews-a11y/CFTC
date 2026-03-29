@@ -174,10 +174,9 @@ def test_batch_forward_reference(client, auth_headers, db):
                 "data": {
                     "title": "Ref Matter",
                     "matter_type": "rulemaking",
-                    "status": "framing issue",
+                    "status": "active",
                     "priority": "important this month",
                     "sensitivity": "routine",
-                    "boss_involvement_level": "keep boss informed",
                     "next_step": "Draft",
                 },
             },

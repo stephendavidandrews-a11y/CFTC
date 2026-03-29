@@ -360,6 +360,9 @@ async def delete_task(
     if not old:
         raise HTTPException(status_code=404, detail="Task not found")
     check_etag(request, old)
+    # Clean up child records before deleting task
+    db.execute("DELETE FROM task_updates WHERE task_id = ?", (task_id,))
+    db.execute("DELETE FROM task_dependencies WHERE task_id = ? OR depends_on_task_id = ?", (task_id, task_id))
     db.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
     log_event(
         db,

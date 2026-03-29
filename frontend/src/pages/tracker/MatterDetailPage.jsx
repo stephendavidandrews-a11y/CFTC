@@ -12,6 +12,7 @@ import {
   getEnums, deleteMatter,
   addRegulatoryId, removeRegulatoryId
 } from "../../api/tracker";
+import { cachedFetch } from "../../utils/apiCache";
 import { useDrawer } from "../../contexts/DrawerContext";
 import Badge from "../../components/shared/Badge";
 import Breadcrumb from "../../components/shared/Breadcrumb";
@@ -60,6 +61,33 @@ const btnSecondary = {
 const labelStyle = { fontSize: 11, fontWeight: 700, color: theme.text.faint, textTransform: "uppercase", letterSpacing: "0.05em" };
 const valStyle = { fontSize: 13, color: theme.text.secondary, marginTop: 2 };
 
+const STAGE_COLORS = {
+  proposed:          { bg: "rgba(59,130,246,0.15)", text: "#60a5fa" },
+  published:         { bg: "rgba(34,197,94,0.15)", text: "#22c55e" },
+  effective:         { bg: "rgba(34,197,94,0.15)", text: "#22c55e" },
+  withdrawn:         { bg: "rgba(239,68,68,0.15)", text: "#f87171" },
+  comment_analysis:  { bg: "rgba(245,158,11,0.15)", text: "#f59e0b" },
+  final_drafting:    { bg: "rgba(245,158,11,0.15)", text: "#f59e0b" },
+  internal_review:   { bg: "rgba(167,139,250,0.15)", text: "#a78bfa" },
+  drafting:          { bg: "rgba(100,116,139,0.15)", text: "#94a3b8" },
+};
+
+const REG_ID_TYPE_LABELS = {
+  fr_citation: "FR Citations",
+  rin: "RIN",
+  cfr_part: "CFR Parts",
+  docket_number: "Docket Numbers",
+  stage1_doc_id: "Stage 1 Doc IDs",
+  letter_number: "Letter Numbers",
+};
+
+function frCitationUrl(val) {
+  // Try to construct a Federal Register URL from citation like "89 FR 12345"
+  const match = val && val.match(/^(\d+)\s+FR\s+(\d+)/i);
+  if (match) return `https://www.federalregister.gov/citation/${match[1]}-FR-${match[2]}`;
+  return null;
+}
+
 
 export default function MatterDetailPage() {
   const { id } = useParams();
@@ -71,9 +99,9 @@ export default function MatterDetailPage() {
 
   const { data: matter, loading, error, refetch } = useApi(() => getMatter(id), [id]);
 
-  const { data: allPeople } = useApi(() => listPeople({ limit: 500 }), []);
-  const { data: allOrgs } = useApi(() => listOrganizations({ limit: 500 }), []);
-  const { data: allMatters } = useApi(() => listMatters({ limit: 500 }), []);
+  const { data: allPeople } = useApi(() => cachedFetch("people", listPeople, { limit: 500 }), []);
+  const { data: allOrgs } = useApi(() => cachedFetch("orgs", listOrganizations, { limit: 500 }), []);
+  const { data: allMatters } = useApi(() => cachedFetch("matters", listMatters, { limit: 500 }), []);
 
   const [tags, setTags] = useState([]);
   const [allTags, setAllTags] = useState([]);
@@ -194,6 +222,18 @@ export default function MatterDetailPage() {
     ...(matter?.matter_type === "rulemaking" ? [{ key: "Rulemaking", label: "Rulemaking" }] : []),
   ];
 
+  // Group regulatory IDs by type
+  const regIdsByType = {};
+  (matter.regulatory_ids || []).forEach((rid) => {
+    const key = rid.id_type || "other";
+    if (!regIdsByType[key]) regIdsByType[key] = [];
+    regIdsByType[key].push(rid);
+  });
+  const regIdTypeOrder = ["rin", "fr_citation", "cfr_part", "docket_number", "stage1_doc_id", "letter_number"];
+  const orderedRegIdTypes = regIdTypeOrder.filter(t => regIdsByType[t]);
+  // Add any types not in the predefined order
+  Object.keys(regIdsByType).forEach(t => { if (!orderedRegIdTypes.includes(t)) orderedRegIdTypes.push(t); });
+
   return (
     <div style={{ padding: "24px 32px", maxWidth: 1200 }}>
       {/* Header */}
@@ -248,6 +288,24 @@ export default function MatterDetailPage() {
         </button>
       </div>
 
+      {/* P4a: Context Section (Description + Outcome) ABOVE Info Grid */}
+      {(matter.description || matter.outcome_summary) && (
+        <div style={{ ...cardStyle, marginBottom: 24, borderLeft: `3px solid ${theme.accent.blue}` }}>
+          {matter.description && (
+            <div style={{ marginBottom: matter.outcome_summary ? 12 : 0 }}>
+              <div style={labelStyle}>Description</div>
+              <div style={{ ...valStyle, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{matter.description}</div>
+            </div>
+          )}
+          {matter.outcome_summary && (
+            <div>
+              <div style={labelStyle}>Outcome Summary</div>
+              <div style={{ ...valStyle, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{matter.outcome_summary}</div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Info Grid */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
         <div style={cardStyle}>
@@ -268,7 +326,7 @@ export default function MatterDetailPage() {
         </div>
       </div>
 
-      {/* Extension Section */}
+      {/* Extension Section with P4b (clickable FR links) and P4c (stage badge) */}
       {(() => {
         const extBorderColor =
           matter.matter_type === "rulemaking" ? "#ce93d8" :
@@ -303,17 +361,31 @@ export default function MatterDetailPage() {
               <h4 style={{ color: extBorderColor, marginBottom: 8 }}>{extLabel} Details</h4>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 24px" }}>
                 {matter.matter_type === "rulemaking" && (<>
-                  {ext.rin && <div><span style={{ color: "#888" }}>RIN</span> <span style={valStyle}>{ext.rin}</span></div>}
-                  {ext.regulatory_stage && <div><span style={{ color: "#888" }}>Regulatory Stage</span> <span style={valStyle}>{ext.regulatory_stage}</span></div>}
+                  {ext.rin && <div><span style={{ color: "#888" }}>RIN</span> <span style={{ ...valStyle, fontFamily: theme.font.mono, fontWeight: 600 }}>{ext.rin}</span></div>}
+                  {ext.regulatory_stage && (() => {
+                    const sc = STAGE_COLORS[ext.regulatory_stage] || { bg: "rgba(100,116,139,0.15)", text: "#94a3b8" };
+                    return <div><span style={{ color: "#888" }}>Regulatory Stage</span> <Badge bg={sc.bg} text={sc.text} label={ext.regulatory_stage.replace(/_/g, " ")} /></div>;
+                  })()}
                   {ext.workflow_status && <div><span style={{ color: "#888" }}>Workflow Status</span> <span style={valStyle}>{ext.workflow_status}</span></div>}
                   {commentBadge && <div style={{ gridColumn: "1 / -1" }}>{commentBadge}</div>}
                   {ext.cfr_citation && <div><span style={{ color: "#888" }}>CFR Citation</span> <span style={valStyle}>{ext.cfr_citation}</span></div>}
                   {ext.docket_number && <div><span style={{ color: "#888" }}>Docket Number</span> <span style={valStyle}>{ext.docket_number}</span></div>}
                   {ext.fr_doc_number && <div><span style={{ color: "#888" }}>FR Doc Number</span> <span style={valStyle}>{ext.fr_doc_number}</span></div>}
-                  {ext.federal_register_citation && <div><span style={{ color: "#888" }}>Federal Register Citation</span> <span style={valStyle}>{ext.federal_register_citation}</span></div>}
+                  {ext.federal_register_citation && (
+                    <div>
+                      <span style={{ color: "#888" }}>FR Citation</span>{" "}
+                      {(ext.fr_url || ext.federal_register_citation.startsWith("http")) ? (
+                        <a href={ext.fr_url || ext.federal_register_citation} target="_blank" rel="noopener noreferrer" style={{ ...valStyle, color: theme.accent.blueLight, textDecoration: "none" }}>
+                          {ext.federal_register_citation.startsWith("http") ? "View on Federal Register" : ext.federal_register_citation} &#8599;
+                        </a>
+                      ) : (
+                        <span style={valStyle}>{ext.federal_register_citation}</span>
+                      )}
+                    </div>
+                  )}
                   {ext.unified_agenda_priority && <div><span style={{ color: "#888" }}>Unified Agenda Priority</span> <span style={valStyle}>{ext.unified_agenda_priority}</span></div>}
                   {ext.interagency_role && <div><span style={{ color: "#888" }}>Interagency Role</span> <span style={valStyle}>{ext.interagency_role}</span></div>}
-                  {ext.is_petition && <div><Badge bg="rgba(239,83,80,0.15)" text="#ef5350" label="Petition" /></div>}
+                  {!!ext.is_petition && <div><Badge bg="rgba(239,83,80,0.15)" text="#ef5350" label="Petition" /></div>}
                   {ext.petition_disposition && <div><span style={{ color: "#888" }}>Petition Disposition</span> <span style={valStyle}>{ext.petition_disposition}</span></div>}
                   {ext.review_trigger && <div><span style={{ color: "#888" }}>Review Trigger</span> <span style={valStyle}>{ext.review_trigger}</span></div>}
                 </>)}
@@ -362,25 +434,6 @@ export default function MatterDetailPage() {
         return null;
       })()}
 
-      {/* Context Section */}
-      {(matter.description || matter.outcome_summary) && (
-        <div style={{ ...cardStyle, marginBottom: 24 }}>
-          <div style={sectionTitle}>Context</div>
-          {matter.description && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={labelStyle}>Description</div>
-              <div style={{ ...valStyle, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{matter.description}</div>
-            </div>
-          )}
-          {matter.outcome_summary && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={labelStyle}>Outcome Summary</div>
-              <div style={{ ...valStyle, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{matter.outcome_summary}</div>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Current State Card */}
       {matter.next_step && (
         <div style={{ ...cardStyle, marginBottom: 24, background: theme.bg.cardHover, borderLeft: `3px solid ${theme.accent.blue}` }}>
@@ -392,7 +445,7 @@ export default function MatterDetailPage() {
         </div>
       )}
 
-      {/* Regulatory IDs */}
+      {/* P5: Grouped Regulatory IDs */}
       <div style={{ ...cardStyle, marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
           <div style={sectionTitle}>Regulatory IDs</div>
@@ -400,20 +453,45 @@ export default function MatterDetailPage() {
             {showRegIdForm ? "Cancel" : "+ Add"}
           </button>
         </div>
-        {(matter.regulatory_ids && matter.regulatory_ids.length > 0) ? matter.regulatory_ids.map((rid) => (
-          <div key={rid.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-            <Badge bg="rgba(100,181,246,0.15)" text="#64b5f6" label={rid.id_type} />
-            <span style={valStyle}>{rid.id_value}</span>
-            {rid.relationship && <span style={{ fontSize: 11, color: "#888" }}>({rid.relationship})</span>}
-            <button
-              onClick={() => handleRemoveRegId(rid.id)}
-              style={{ background: "transparent", border: "none", cursor: "pointer", color: "#ef5350", fontSize: 14, padding: "0 4px", lineHeight: 1, opacity: 0.7 }}
-              title="Remove"
-            >&#128465;</button>
+
+        {orderedRegIdTypes.length > 0 ? (
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(orderedRegIdTypes.length, 4)}, 1fr)`, gap: 16 }}>
+            {orderedRegIdTypes.map((idType) => (
+              <div key={idType}>
+                <div style={{ ...labelStyle, marginBottom: 8 }}>{REG_ID_TYPE_LABELS[idType] || idType}</div>
+                {regIdsByType[idType].map((rid) => {
+                  const url = idType === "fr_citation" ? (frCitationUrl(rid.id_value) || null) : null;
+                  return (
+                    <div key={rid.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                      {url ? (
+                        <a href={url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: theme.accent.blueLight, textDecoration: "none", fontFamily: theme.font.mono }}>
+                          {rid.id_value} &#8599;
+                        </a>
+                      ) : (
+                        <span style={{ fontSize: 12, color: theme.text.secondary, fontFamily: idType === "rin" || idType === "cfr_part" ? theme.font.mono : "inherit" }}>
+                          {rid.id_value}
+                        </span>
+                      )}
+                      {rid.relationship && rid.relationship !== "primary" && (
+                        <span style={{ fontSize: 9, color: theme.text.faint, background: theme.bg.input, padding: "1px 5px", borderRadius: 3 }}>
+                          {rid.relationship}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => handleRemoveRegId(rid.id)}
+                        style={{ background: "transparent", border: "none", cursor: "pointer", color: "#ef5350", fontSize: 12, padding: "0 2px", lineHeight: 1, opacity: 0.5 }}
+                        title="Remove"
+                      >&#215;</button>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
-        )) : (
+        ) : (
           <div style={{ color: "#888", fontSize: 12 }}>No regulatory IDs linked.</div>
         )}
+
         {showRegIdForm && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
             <select style={{ ...inputStyle, width: 140, padding: "4px 8px", fontSize: 12 }} value={regIdType} onChange={(e) => setRegIdType(e.target.value)}>

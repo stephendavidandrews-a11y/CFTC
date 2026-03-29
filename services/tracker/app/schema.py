@@ -704,6 +704,10 @@ INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_people_next_interaction ON people(next_interaction_needed_date);",
     "CREATE INDEX IF NOT EXISTS idx_people_team_workload ON people(include_in_team_workload);",
     "CREATE INDEX IF NOT EXISTS idx_people_manager ON people(manager_person_id);",
+    "CREATE INDEX IF NOT EXISTS idx_people_email ON people(email);",
+    "CREATE INDEX IF NOT EXISTS idx_people_is_active ON people(is_active);",
+    "CREATE INDEX IF NOT EXISTS idx_people_last_name ON people(last_name);",
+    "CREATE INDEX IF NOT EXISTS idx_people_relationship_category ON people(relationship_category);",
     # -- organizations --
     "CREATE INDEX IF NOT EXISTS idx_orgs_type ON organizations(organization_type);",
     "CREATE INDEX IF NOT EXISTS idx_orgs_parent ON organizations(parent_organization_id);",
@@ -764,6 +768,8 @@ INDEXES = [
     # -- decisions --
     "CREATE INDEX IF NOT EXISTS idx_decisions_matter ON decisions(matter_id);",
     "CREATE INDEX IF NOT EXISTS idx_decisions_status ON decisions(status);",
+    "CREATE INDEX IF NOT EXISTS idx_decisions_assigned_to ON decisions(decision_assigned_to_person_id);",
+    "CREATE INDEX IF NOT EXISTS idx_decisions_due_date ON decisions(decision_due_date);",
     # -- comment_topics --
     "CREATE INDEX IF NOT EXISTS idx_comment_topics_matter ON comment_topics(matter_id);",
     "CREATE INDEX IF NOT EXISTS idx_comment_topics_status ON comment_topics(position_status);",

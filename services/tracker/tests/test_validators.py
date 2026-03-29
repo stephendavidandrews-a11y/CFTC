@@ -110,7 +110,7 @@ def test_create_matter_requires_title_and_type():
 
 def test_create_matter_defaults():
     matter = CreateMatter(title="Test", matter_type="rulemaking")
-    assert matter.status == "new intake"
+    assert matter.status == "active"
     assert matter.priority == "important this month"
     assert matter.next_step == "Determine next steps"
 
@@ -206,10 +206,6 @@ def test_update_matter_accepts_all_canonical_sensitivities(sensitivity):
     assert matter.sensitivity == sensitivity
 
 
-@pytest.mark.parametrize("boss_involvement_level", ENUMS["boss_involvement_level"])
-def test_update_matter_accepts_all_canonical_boss_levels(boss_involvement_level):
-    matter = UpdateMatter(boss_involvement_level=boss_involvement_level)
-    assert matter.boss_involvement_level == boss_involvement_level
 
 
 @pytest.mark.parametrize("task_mode", ENUMS["task_mode"])

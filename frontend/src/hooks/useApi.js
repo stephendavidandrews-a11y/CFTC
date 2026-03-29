@@ -1,5 +1,8 @@
 /**
  * Generic API fetching hook.
+ *
+ * Uses a request counter to prevent stale responses from overwriting
+ * fresh data when deps change rapidly (race condition guard).
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -9,15 +12,28 @@ export default function useApi(fetchFn, deps = [], { refetchOnFocus = false } = 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const hasFetched = useRef(false);
+  const requestId = useRef(0);
 
   const refetch = useCallback(() => {
+    const thisRequest = ++requestId.current;
     setLoading(true);
     setError(null);
     return fetchFn()
-      .then((result) => { setData(result); return result; })
-      .catch(setError)
+      .then((result) => {
+        if (thisRequest === requestId.current) {
+          setData(result);
+        }
+        return result;
+      })
+      .catch((err) => {
+        if (thisRequest === requestId.current) {
+          setError(err);
+        }
+      })
       .finally(() => {
-        setLoading(false);
+        if (thisRequest === requestId.current) {
+          setLoading(false);
+        }
         hasFetched.current = true;
       });
   // eslint-disable-next-line

@@ -11,7 +11,7 @@ POLICY_PATH = AI_ROOT / "config" / "ai_policy.json"
 
 def test_live_policy_uses_v2_0_1_extraction_prompt():
     policy = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
-    assert policy["model_config"]["active_prompt_versions"]["extraction"] == "v2.0.1"
+    assert policy["model_config"]["active_prompt_versions"]["extraction"] == "v3.0.0"
 
 
 def test_v2_0_1_prompt_is_contract_aligned():

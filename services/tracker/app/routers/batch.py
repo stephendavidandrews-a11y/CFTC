@@ -181,6 +181,15 @@ async def batch_write(
                 "message": "No operations provided",
             },
         )
+    MAX_BATCH_SIZE = 200
+    if len(operations) > MAX_BATCH_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error_type": "validation_failure",
+                "message": f"Batch too large: {len(operations)} operations (max {MAX_BATCH_SIZE})",
+            },
+        )
     if source not in ENUMS["source"]:
         raise HTTPException(
             status_code=400,

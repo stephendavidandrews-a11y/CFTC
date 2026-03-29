@@ -22,7 +22,6 @@ async def list_meetings(
     search: str = Query(None),
     meeting_type: str = Query(None),
     matter_id: str = Query(None),
-    sort_by: str = Query("date_time_start"),
     sort_dir: str = Query("desc"),
     limit: int = Query(100, le=500),
     offset: int = Query(0),

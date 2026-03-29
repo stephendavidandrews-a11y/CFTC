@@ -53,10 +53,10 @@ export default function TodayPage() {
   const { status: captureStatus, connected: captureConnected } = useCaptureStatus();
 
   // Dashboard stats
-  const { data: dashboard, loading } = useApi(() => getDashboard(), [], { refetchOnFocus: true });
+  const { data: dashboard, loading, error } = useApi(() => getDashboard(), [], { refetchOnFocus: true });
 
   // Open matters for priority ranking
-  const { data: mattersData } = useApi(() => listMatters({ limit: 100 }), []);
+  const { data: mattersData, error: mattersError } = useApi(() => listMatters({ limit: 100 }), []);
 
   // Today's brief (optional - fails silently if not generated yet)
   const [brief, setBrief] = useState(null);
@@ -76,6 +76,33 @@ export default function TodayPage() {
     return (
       <div style={{ padding: "60px 32px", textAlign: "center", color: theme.text.faint }}>
         Loading...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: "60px 32px", textAlign: "center" }}>
+        <div style={{ color: "#f87171", marginBottom: 12, fontSize: 16, fontWeight: 600 }}>
+          Failed to load dashboard
+        </div>
+        <div style={{ color: theme.text.faint, marginBottom: 16, fontSize: 14 }}>
+          {error.message || "Unable to reach the tracker service."}
+        </div>
+        <button
+          onClick={() => window.location.reload()}
+          style={{
+            padding: "8px 20px",
+            background: theme.accent,
+            color: "#fff",
+            border: "none",
+            borderRadius: 6,
+            cursor: "pointer",
+            fontSize: 14,
+          }}
+        >
+          Retry
+        </button>
       </div>
     );
   }

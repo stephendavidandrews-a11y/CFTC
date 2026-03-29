@@ -52,130 +52,15 @@ def _run(coro):
 
 
 def _make_db():
-    """Create in-memory DB with minimal schema for tests."""
+    """Create in-memory DB with canonical schema for tests."""
+    import sys
+    import os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    from app.schema import init_schema
     db = sqlite3.connect(":memory:")
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA foreign_keys = OFF")
-
-    db.execute("""CREATE TABLE communications (
-        id TEXT PRIMARY KEY,
-        source_type TEXT DEFAULT 'meeting',
-        processing_status TEXT DEFAULT 'extracting',
-        original_filename TEXT,
-        duration_seconds REAL,
-        topic_segments_json TEXT,
-        sensitivity_flags TEXT,
-        source_metadata TEXT,
-        error_message TEXT,
-        error_stage TEXT,
-        processing_lock_token TEXT,
-        locked_at TEXT,
-        lock_expires_at TEXT,
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
-    )""")
-    db.execute("""CREATE TABLE transcripts (
-        id TEXT PRIMARY KEY,
-        communication_id TEXT,
-        speaker_label TEXT,
-        start_time REAL,
-        end_time REAL,
-        raw_text TEXT,
-        cleaned_text TEXT,
-        reviewed_text TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
-    )""")
-    db.execute("""CREATE TABLE communication_participants (
-        id TEXT PRIMARY KEY,
-        communication_id TEXT,
-        speaker_label TEXT,
-        tracker_person_id TEXT,
-        proposed_name TEXT,
-        proposed_title TEXT,
-        proposed_org TEXT,
-        proposed_org_id TEXT,
-        participant_email TEXT,
-        header_role TEXT,
-        participant_role TEXT,
-        match_source TEXT,
-        confirmed INTEGER DEFAULT 0,
-        voiceprint_confidence REAL,
-        voiceprint_method TEXT
-    )""")
-    db.execute("""CREATE TABLE communication_entities (
-        id TEXT PRIMARY KEY,
-        communication_id TEXT,
-        mention_text TEXT,
-        entity_type TEXT,
-        tracker_person_id TEXT,
-        tracker_org_id TEXT,
-        proposed_name TEXT,
-        confidence REAL,
-        confirmed INTEGER DEFAULT 0,
-        mention_count INTEGER DEFAULT 1,
-        context_snippet TEXT
-    )""")
-    db.execute("""CREATE TABLE ai_extractions (
-        id TEXT PRIMARY KEY,
-        communication_id TEXT,
-        attempt_number INTEGER DEFAULT 1,
-        model_used TEXT,
-        prompt_version TEXT,
-        system_prompt TEXT,
-        user_prompt TEXT,
-        raw_output TEXT,
-        input_tokens INTEGER,
-        output_tokens INTEGER,
-        processing_seconds REAL,
-        tracker_context_snapshot TEXT,
-        escalation_reason TEXT,
-        success INTEGER DEFAULT 1,
-        extracted_at TEXT DEFAULT (datetime('now'))
-    )""")
-    db.execute("""CREATE TABLE review_bundles (
-        id TEXT PRIMARY KEY,
-        communication_id TEXT,
-        bundle_type TEXT,
-        target_matter_id TEXT,
-        target_matter_title TEXT,
-        proposed_matter_json TEXT,
-        status TEXT DEFAULT 'proposed',
-        confidence REAL,
-        rationale TEXT,
-        intelligence_notes TEXT,
-        sort_order INTEGER,
-        reviewed_by TEXT,
-        reviewed_at TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
-    )""")
-    db.execute("""CREATE TABLE review_bundle_items (
-        id TEXT PRIMARY KEY,
-        bundle_id TEXT,
-        item_type TEXT,
-        status TEXT DEFAULT 'proposed',
-        proposed_data TEXT,
-        original_proposed_data TEXT,
-        confidence REAL,
-        rationale TEXT,
-        source_excerpt TEXT,
-        source_transcript_id TEXT,
-        source_start_time REAL,
-        source_end_time REAL,
-        source_locator_json TEXT,
-        sort_order INTEGER,
-        moved_from_bundle_id TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
-    )""")
-    db.execute("""CREATE TABLE llm_usage (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        communication_id TEXT,
-        stage TEXT,
-        model TEXT,
-        input_tokens INTEGER,
-        output_tokens INTEGER,
-        cost_usd REAL,
-        created_at TEXT DEFAULT (datetime('now'))
-    )""")
+    init_schema(db)
     db.commit()
     return db
 
@@ -183,7 +68,7 @@ def _make_db():
 def _seed_communication(db, comm_id, duration=300, num_segments=50):
     """Seed a communication with transcript data."""
     db.execute(
-        "INSERT INTO communications (id, duration_seconds) VALUES (?, ?)",
+        "INSERT INTO communications (id, source_type, duration_seconds) VALUES (?, 'audio', ?)",
         (comm_id, duration),
     )
     for i in range(num_segments):

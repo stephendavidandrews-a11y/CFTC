@@ -8,6 +8,7 @@ import {
   listOrganizations,
   getMatter,
 } from "../../api/tracker";
+import { cachedFetch } from "../../utils/apiCache";
 import { validate } from "../../utils/validation";
 import theme from "../../styles/theme";
 
@@ -102,24 +103,24 @@ export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
   React.useEffect(() => {
     if (!isOpen) return;
     Promise.all([
-      getEnum("matter_type").catch(() => []),
-      getEnum("matter_status").catch(() => []),
-      getEnum("matter_priority").catch(() => []),
-      getEnum("matter_sensitivity").catch(() => []),
-      getEnum("rulemaking_workflow_status").catch(() => []),
-      getEnum("guidance_workflow_status").catch(() => []),
-      getEnum("enforcement_workflow_status").catch(() => []),
-      getEnum("instrument_type").catch(() => []),
-      getEnum("enforcement_legal_issue_type").catch(() => []),
-      getEnum("enforcement_support_type").catch(() => []),
-      getEnum("enforcement_litigation_stage").catch(() => []),
-      getEnum("interagency_role").catch(() => []),
-      getEnum("petition_disposition").catch(() => []),
-      getEnum("review_trigger").catch(() => []),
-      getEnum("unified_agenda_priority").catch(() => []),
-      getEnum("regulatory_stage").catch(() => []),
-      listPeople({ limit: 100 }).catch(() => ({ items: [] })),
-      listOrganizations({ limit: 100 }).catch(() => ({ items: [] })),
+      cachedFetch("enum", getEnum, "matter_type").catch(() => []),
+      cachedFetch("enum", getEnum, "matter_status").catch(() => []),
+      cachedFetch("enum", getEnum, "matter_priority").catch(() => []),
+      cachedFetch("enum", getEnum, "matter_sensitivity").catch(() => []),
+      cachedFetch("enum", getEnum, "rulemaking_workflow_status").catch(() => []),
+      cachedFetch("enum", getEnum, "guidance_workflow_status").catch(() => []),
+      cachedFetch("enum", getEnum, "enforcement_workflow_status").catch(() => []),
+      cachedFetch("enum", getEnum, "instrument_type").catch(() => []),
+      cachedFetch("enum", getEnum, "enforcement_legal_issue_type").catch(() => []),
+      cachedFetch("enum", getEnum, "enforcement_support_type").catch(() => []),
+      cachedFetch("enum", getEnum, "enforcement_litigation_stage").catch(() => []),
+      cachedFetch("enum", getEnum, "interagency_role").catch(() => []),
+      cachedFetch("enum", getEnum, "petition_disposition").catch(() => []),
+      cachedFetch("enum", getEnum, "review_trigger").catch(() => []),
+      cachedFetch("enum", getEnum, "unified_agenda_priority").catch(() => []),
+      cachedFetch("enum", getEnum, "regulatory_stage").catch(() => []),
+      cachedFetch("people", listPeople, { limit: 100 }).catch(() => ({ items: [] })),
+      cachedFetch("orgs", listOrganizations, { limit: 100 }).catch(() => ({ items: [] })),
     ]).then(([matterType, status, priority, sensitivity,
       rmWorkflow, gdWorkflow, enWorkflow, instrumentType,
       enLegalIssue, enSupportType, enLitStage, interagencyRole,
