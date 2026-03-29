@@ -27,6 +27,9 @@ def accept_item(
                 "message": f"Cannot accept item in '{item['status']}' state",
             },
         )
+    if item["status"] == "edited":
+        # Already implicitly accepted via edit -- no-op
+        return {"status": "ok", "item_id": item_id, "already_edited": True}
 
     # CAS: only update if item is still in expected state
     cursor = db.execute(
@@ -249,6 +252,17 @@ def add_item(
 
     Reviewer items have confidence=NULL and status='accepted'.
     """
+    # Guard: cannot add items to a rejected bundle
+    _bundle_row = db.execute(
+        "SELECT status FROM review_bundles WHERE id = ?", (bundle_id,)
+    ).fetchone()
+    if _bundle_row and _bundle_row["status"] == "rejected":
+        raise HTTPException(
+            status_code=400,
+            detail={"error_type": "invalid_state",
+                    "message": "Cannot add items to a rejected bundle"},
+        )
+
     if item_type not in VALID_ITEM_TYPES:
         raise HTTPException(
             400,

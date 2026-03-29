@@ -142,11 +142,19 @@ export default function CommitQueuePage() {
     []
   );
 
+  // Use refs to avoid recreating refetchAll on every render (SSE listener stability)
+  const readyRef = useRef(ready.refetch);
+  const committedRef = useRef(committed.refetch);
+  const failedRef = useRef(failed.refetch);
+  readyRef.current = ready.refetch;
+  committedRef.current = committed.refetch;
+  failedRef.current = failed.refetch;
+
   const refetchAll = useCallback(() => {
-    ready.refetch();
-    committed.refetch();
-    failed.refetch();
-  }, [ready, committed, failed]);
+    readyRef.current();
+    committedRef.current();
+    failedRef.current();
+  }, []);
 
   // Auto-refresh on SSE events
   useEffect(() => {

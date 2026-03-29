@@ -542,7 +542,7 @@ async def undo_communication(
         db.execute(
             """
             UPDATE communications
-            SET processing_status = 'reviewed',
+            SET processing_status = 'bundle_review_in_progress',
                 error_message = NULL,
                 error_stage = NULL,
                 updated_at = datetime('now')

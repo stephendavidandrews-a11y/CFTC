@@ -34,6 +34,19 @@ def move_item(
             },
         )
 
+    # Guard: cannot move items into a rejected bundle
+    _target = db.execute(
+        "SELECT status FROM review_bundles WHERE id = ?", (to_bundle_id,)
+    ).fetchone()
+    if not _target:
+        raise HTTPException(status_code=404, detail="Target bundle not found")
+    if _target["status"] == "rejected":
+        raise HTTPException(
+            status_code=400,
+            detail={"error_type": "invalid_state",
+                    "message": "Cannot move items into a rejected bundle"},
+        )
+
     if item["status"] == "moved":
         raise HTTPException(
             400,
@@ -181,6 +194,14 @@ def merge_bundles(
                 "error_type": "validation_failure",
                 "message": "Cannot merge a bundle into itself",
             },
+        )
+
+    # Guard: cannot merge into a rejected target bundle
+    if target["status"] == "rejected":
+        raise HTTPException(
+            status_code=400,
+            detail={"error_type": "invalid_state",
+                    "message": "Cannot merge into a rejected bundle"},
         )
 
     if source["status"] == "rejected":

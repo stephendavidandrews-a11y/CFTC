@@ -83,6 +83,7 @@ async def get_participant_review_queue(db=Depends(get_db)):
         FROM communications c
         WHERE c.processing_status IN ('awaiting_participant_review', 'participant_review_in_progress')
             AND c.source_type = 'email'
+            AND c.archived_at IS NULL
         ORDER BY c.created_at DESC
     """).fetchall()
 

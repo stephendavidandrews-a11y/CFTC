@@ -201,10 +201,17 @@ def edit_bundle(
     updates.append("updated_at = datetime('now')")
     params.append(bundle_id)
 
-    db.execute(
-        f"UPDATE review_bundles SET {', '.join(updates)} WHERE id = ?",
+    params.append(bundle["updated_at"])
+    cursor = db.execute(
+        f"UPDATE review_bundles SET {', '.join(updates)} WHERE id = ? AND updated_at = ?",
         params,
     )
+    if cursor.rowcount == 0:
+        raise HTTPException(
+            status_code=409,
+            detail={"error_type": "conflict",
+                    "message": "Bundle was modified concurrently. Refresh and retry."},
+        )
 
     new_values = {}
     for k, v in [

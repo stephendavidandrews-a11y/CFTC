@@ -353,6 +353,12 @@ _app = _create_app()
 from fastapi.testclient import TestClient
 
 client = TestClient(_app)
+
+# Set ready flag so integration tests get 200 from health/queue
+import app.main as _main_mod
+if hasattr(_main_mod, "_ready"):
+    _main_mod._ready = True
+
 PREFIX = "/ai/api/bundle-review"
 
 

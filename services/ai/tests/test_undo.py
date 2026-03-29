@@ -210,7 +210,7 @@ class TestInsertUndo:
             "SELECT processing_status FROM communications WHERE id = ?",
             (comm_id,),
         ).fetchone()["processing_status"]
-        assert status == "reviewed"
+        assert status == "bundle_review_in_progress"  # undo returns to reviewable state
 
         # Writeback marked reversed
         wb = db.execute(

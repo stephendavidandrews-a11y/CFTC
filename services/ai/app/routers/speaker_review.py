@@ -144,6 +144,7 @@ async def get_speaker_review_queue(db=Depends(get_db)):
                 WHERE cp.communication_id = c.id AND cp.confirmed = 1) as confirmed_count
         FROM communications c
         WHERE c.processing_status IN ('awaiting_speaker_review', 'speaker_review_in_progress')
+          AND c.archived_at IS NULL
         ORDER BY c.created_at ASC
     """).fetchall()
 
@@ -712,7 +713,7 @@ async def unlink_speaker(
     )
     db.commit()
 
-    return {"ok": True, "participant_id": req.participant_id}
+    return {"status": "ok", "participant_id": req.participant_id}
 
 
 @router.post("/{communication_id}/merge-speakers")
@@ -784,7 +785,7 @@ async def merge_speakers(
     )
     db.commit()
 
-    return {"ok": True, "merged": merged}
+    return {"status": "ok", "merged": merged}
 
 
 @router.post("/{communication_id}/complete")
@@ -971,10 +972,11 @@ async def edit_transcript_segment(
     communication_id: str, transcript_id: str, request: Request, db=Depends(get_db)
 ):
     """Save human-corrected text for a transcript segment."""
+    _check_review_state(db, communication_id, VALID_STATES, "speaker review")
     body = await request.json()
     reviewed_text = body.get("reviewed_text", "").strip()
     if not reviewed_text:
-        raise HTTPException(400, "reviewed_text is required")
+        raise HTTPException(400, detail={"error_type": "validation_failure", "message": "reviewed_text is required"})
 
     # Get current text
     seg = db.execute(
@@ -982,7 +984,7 @@ async def edit_transcript_segment(
         (transcript_id, communication_id),
     ).fetchone()
     if not seg:
-        raise HTTPException(404, "Transcript segment not found")
+        raise HTTPException(404, detail={"error_type": "not_found", "message": "Transcript segment not found"})
 
     original_text = seg["cleaned_text"] or seg["raw_text"] or ""
 
@@ -1050,6 +1052,7 @@ async def find_similar_corrections(
     communication_id: str, request: Request, db=Depends(get_db)
 ):
     """Find other segments with similar text that could receive the same correction."""
+    _check_review_state(db, communication_id, VALID_STATES, "speaker review")
     body = await request.json()
     correction_id = body.get("correction_id")
 
@@ -1117,6 +1120,7 @@ async def apply_corrections(
     communication_id: str, request: Request, db=Depends(get_db)
 ):
     """Bulk-apply reviewed_text corrections to selected segments."""
+    _check_review_state(db, communication_id, VALID_STATES, "speaker review")
     body = await request.json()
     corrections = body.get("corrections", [])
     correction_id = body.get("correction_id")  # original correction for logging

@@ -176,6 +176,7 @@ async def get_entity_review_queue(db=Depends(get_db)):
                 WHERE ce.communication_id = c.id AND ce.confirmed = -1) as rejected_count
         FROM communications c
         WHERE c.processing_status IN ('awaiting_association_review', 'association_review_in_progress')
+            AND c.archived_at IS NULL
         ORDER BY c.created_at DESC
     """).fetchall()
 

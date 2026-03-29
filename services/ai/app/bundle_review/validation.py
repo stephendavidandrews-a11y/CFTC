@@ -50,6 +50,18 @@ def validate_proposed_data(item_type: str, data: dict):
         required = {"full_name": str}
     elif item_type in ("new_organization",):
         required = {"name": str}
+    elif item_type == "task_update":
+        required = {"task_id": str}
+    elif item_type == "decision_update":
+        required = {"decision_id": str}
+    elif item_type == "context_note":
+        required = {"content": str}
+    elif item_type == "person_detail_update":
+        required = {"person_id": str}
+    elif item_type == "org_detail_update":
+        required = {"organization_id": str}
+    elif item_type == "directive_update":
+        required = {"directive_id": str}
 
     missing = [k for k in required if not data.get(k)]
     if missing:

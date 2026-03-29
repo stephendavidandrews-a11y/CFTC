@@ -427,7 +427,7 @@ def test_undo_success(mock_delete, mock_get, client, db):
     row = db.execute(
         "SELECT processing_status FROM communications WHERE id = ?", (cid,)
     ).fetchone()
-    assert row["processing_status"] == "reviewed"
+    assert row["processing_status"] == "bundle_review_in_progress"  # undo returns to reviewable state
 
 
 @patch("app.writeback.undo._tracker_get", new_callable=AsyncMock)
