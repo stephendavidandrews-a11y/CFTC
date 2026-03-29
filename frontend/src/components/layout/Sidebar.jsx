@@ -7,12 +7,14 @@ const SECTIONS = [
   { separator: true, label: "Operations" },
   { path: "/", label: "Today", icon: "\u25EB" },
   { path: "/matters", label: "Matters", icon: "\u25A4" },
+  { path: "/matters/pipeline", label: "Reg Pipeline", icon: "◇", indent: true },
   { path: "/tasks", label: "Tasks", icon: "\u2611" },
   { path: "/people", label: "People", icon: "\u22A1" },
   { path: "/organizations", label: "Organizations", icon: "\u229E" },
   { path: "/meetings", label: "Meetings", icon: "\u229E" },
   { path: "/decisions", label: "Decisions", icon: "\u2696" },
   { path: "/documents", label: "Documents", icon: "\u25DA" },
+  { path: "/capture", label: "Capture", icon: "\u25CF" },
 
   { separator: true, label: "Review Pipeline" },
   { path: "/review/communications", label: "Communications", icon: "\u25CE" },
@@ -135,7 +137,7 @@ export default function Sidebar({ isMobile = false, onNavigate }) {
                 onClick={handleItemClick}
                 style={{
                   display: "flex", alignItems: "center", gap: 10,
-                  width: "100%", padding: "9px 12px", borderRadius: 8,
+                  width: "100%", padding: s.indent ? "9px 12px 9px 28px" : "9px 12px", borderRadius: 8,
                   background: isActive ? "rgba(59,130,246,0.12)" : "transparent",
                   color: isActive ? theme.accent.blueLight : theme.text.dim,
                   border: isActive ? "1px solid rgba(59,130,246,0.2)" : "1px solid transparent",

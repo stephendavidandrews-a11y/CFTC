@@ -123,6 +123,8 @@ async def list_matters(
                p.full_name as owner_name,
                co.name as client_org_name,
                COALESCE(mr.workflow_status, mg.workflow_status, me.workflow_status) AS workflow_status,
+               mr.rin,
+               mr.regulatory_stage,
                mr.current_comment_period_closes,
                CASE
                    WHEN mr.current_comment_period_closes IS NULL THEN NULL
@@ -371,6 +373,54 @@ async def create_matter(
         return JSONResponse(
             status_code=cached["status_code"], content=json.loads(cached["body"])
         )
+    # --- RIN-based dedup for rulemaking matters ---
+    # If creating a rulemaking with a RIN that already exists, return the
+    # existing matter instead of creating a duplicate.
+    try:
+        raw_for_dedup = json.loads(await request.body())
+    except Exception:
+        raw_for_dedup = {}
+    ext_for_dedup = raw_for_dedup.get("extension", {})
+    if body.matter_type == "rulemaking" and ext_for_dedup.get("rin"):
+        rin_val = ext_for_dedup["rin"].strip()
+        existing = db.execute(
+            """SELECT mr.matter_id, m.matter_number
+               FROM matter_rulemaking mr
+               JOIN matters m ON m.id = mr.matter_id
+               WHERE mr.rin = ?""",
+            (rin_val,),
+        ).fetchone()
+        if existing:
+            result = {
+                "id": existing["matter_id"],
+                "matter_number": existing["matter_number"],
+                "deduplicated": True,
+                "message": f"Matter with RIN {rin_val} already exists",
+            }
+            finalize_idempotency_key(db, idem_key, 200, result)
+            db.commit()
+            return result
+
+    # --- Title-based dedup fallback for rulemaking matters without RIN ---
+    if body.matter_type == "rulemaking" and not ext_for_dedup.get("rin"):
+        existing = db.execute(
+            """SELECT m.id, m.matter_number
+               FROM matters m
+               WHERE m.title = ? AND m.matter_type = 'rulemaking' AND m.status != 'closed'
+               LIMIT 1""",
+            (body.title,),
+        ).fetchone()
+        if existing:
+            result = {
+                "id": existing["id"],
+                "matter_number": existing["matter_number"],
+                "deduplicated": True,
+                "message": "Rulemaking matter with this title already exists",
+            }
+            finalize_idempotency_key(db, idem_key, 200, result)
+            db.commit()
+            return result
+
     matter_id = str(uuid.uuid4())
     matter_number = next_matter_number(db)
     now = datetime.now().isoformat()
@@ -507,6 +557,10 @@ async def update_matter(
         raise HTTPException(status_code=400, detail="No fields to update")
 
     now = datetime.now().isoformat()
+
+    # Drop None values for NOT NULL columns (frontend sends "" -> null for empty selects)
+    _NOT_NULL_COLS = {"title", "matter_type", "status", "priority", "sensitivity", "next_step"}
+    data = {k: v for k, v in data.items() if not (v is None and k in _NOT_NULL_COLS)}
 
     # Update base matter fields if any
     if data:

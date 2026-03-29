@@ -8,6 +8,7 @@ import CommandPalette from "./components/shared/CommandPalette";
 // -- Tracker (Operations) --
 import MattersPage from "./pages/tracker/MattersPage";
 import MatterDetailPage from "./pages/tracker/MatterDetailPage";
+import MattersPipelinePage from "./pages/tracker/MattersPipelinePage";
 import TrackerTasksPage from "./pages/tracker/TasksPage";
 import PeoplePage from "./pages/tracker/PeoplePage";
 import PersonDetailPage from "./pages/tracker/PersonDetailPage";
@@ -48,6 +49,7 @@ import WeeklyBriefPage from "./pages/intelligence/WeeklyBriefPage";
 import DirectivesPage from "./pages/tracker/DirectivesPage";
 import DirectiveDetailPage from "./pages/tracker/DirectiveDetailPage";
 import TodayPage from "./pages/tracker/TodayPage";
+import CaptureStatusPage from "./pages/tracker/CaptureStatusPage";
 
 
 
@@ -61,7 +63,9 @@ export default function App() {
           {/* -- Operations (Tracker) -- */}
           <Route index element={<TodayPage />} />
           <Route path="/today" element={<TodayPage />} />
+          <Route path="/capture" element={<CaptureStatusPage />} />
           <Route path="/matters" element={<MattersPage />} />
+          <Route path="/matters/pipeline" element={<MattersPipelinePage />} />
           <Route path="/matters/:id" element={<MatterDetailPage />} />
             <Route path="/directives" element={<DirectivesPage />} />
             <Route path="/directives/:id" element={<DirectiveDetailPage />} />
