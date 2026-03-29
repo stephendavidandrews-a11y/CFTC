@@ -26,6 +26,7 @@ import asyncio as _asyncio_mod
 import subprocess
 import time as _time_mod
 from app.config import PI_SSH_HOST, PI_SSH_USER
+from app.jobs.capture_alerts import evaluate_alerts, get_open_alerts, get_alert_history
 
 log = logging.getLogger(__name__)
 _security = HTTPBasic()
@@ -610,3 +611,43 @@ async def get_action_log(
         (min(limit, 100),),
     ).fetchall()
     return {"actions": [dict(row) for row in rows]}
+
+
+
+# --- Alert Evaluator Background Task ---
+
+async def alert_evaluator():
+    """Background task: evaluate capture alert conditions every 30s."""
+    await _asyncio_mod.sleep(60)  # Wait for first heartbeat after startup
+    while True:
+        await _asyncio_mod.sleep(30)
+        try:
+            db = get_connection()
+            try:
+                changes = evaluate_alerts(db, _last_status, _last_heartbeat_received_at)
+                for change in changes:
+                    await _broadcast(change)
+            finally:
+                db.close()
+        except Exception:
+            log.exception("Alert evaluator error")
+
+
+# --- Alert API Endpoints ---
+
+@router.get("/api/capture/alerts")
+async def get_active_alerts(db=Depends(get_db), _user=Depends(_verify_capture_auth)):
+    """Return currently open capture alerts."""
+    alerts = get_open_alerts(db)
+    return {"alerts": alerts, "count": len(alerts)}
+
+
+@router.get("/api/capture/alerts/history")
+async def get_alerts_history(
+    limit: int = 50,
+    db=Depends(get_db),
+    _user=Depends(_verify_capture_auth),
+):
+    """Return recent alert history (open + resolved)."""
+    history = get_alert_history(db, min(limit, 200))
+    return {"alerts": history}

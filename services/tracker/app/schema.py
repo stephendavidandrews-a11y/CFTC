@@ -1175,6 +1175,25 @@ MIGRATIONS = [
                ON capture_actions(requested_at)""",
         ],
     ),
+    (
+        10,
+        "capture_alerts",
+        [
+            """CREATE TABLE IF NOT EXISTS capture_alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_type TEXT NOT NULL,
+                severity TEXT NOT NULL DEFAULT 'warning',
+                message TEXT NOT NULL,
+                detail TEXT,
+                opened_at TEXT NOT NULL,
+                resolved_at TEXT,
+                resolved_reason TEXT,
+                last_evaluated_at TEXT
+            )""",
+            """CREATE INDEX IF NOT EXISTS idx_capture_alerts_open
+               ON capture_alerts(resolved_at) WHERE resolved_at IS NULL""",
+        ],
+    ),
 ]
 
 

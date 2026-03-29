@@ -7,7 +7,7 @@ import theme from "../../styles/theme";
 import { titleStyle, subtitleStyle, cardStyle } from "../../styles/pageStyles";
 import useCaptureStatus from "../../hooks/useCaptureStatus";
 import useApi from "../../hooks/useApi";
-import { getCaptureTimeline, executeCaptureAction, getCaptureActionLog } from "../../api/tracker";
+import { getCaptureTimeline, executeCaptureAction, getCaptureActionLog, getCaptureAlerts } from "../../api/tracker";
 
 const STATE_COLORS = {
   recording: { bg: "#052e16", text: "#22c55e", label: "Recording" },
@@ -190,13 +190,22 @@ export default function CaptureStatusPage() {
   const [actionLog, setActionLog] = useState([]);
   const [logLoading, setLogLoading] = useState(false);
 
-  // Load action log on mount
+  // Load action log and alerts on mount
+  const [alerts, setAlerts] = useState([]);
   useEffect(() => {
     setLogLoading(true);
     getCaptureActionLog(10).then(data => {
       setActionLog(data.actions || []);
     }).catch(() => {}).finally(() => setLogLoading(false));
+    getCaptureAlerts().then(data => setAlerts(data.alerts || [])).catch(() => {});
   }, []);
+
+  // Refresh alerts when WS broadcasts alert changes
+  useEffect(() => {
+    if (status && (status.type === "alert_opened" || status.type === "alert_resolved")) {
+      getCaptureAlerts().then(data => setAlerts(data.alerts || [])).catch(() => {});
+    }
+  }, [status]);
 
   const runAction = async (action, force) => {
     setActionPending(action);
@@ -232,6 +241,37 @@ export default function CaptureStatusPage() {
         </span>
       </div>
       <div style={subtitleStyle}>ReSpeaker Pi 5 &middot; Office Capture System</div>
+
+      {/* == Active Alerts == */}
+      {alerts.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          {alerts.map(alert => (
+            <div key={alert.id} style={{
+              padding: "10px 14px", borderRadius: 6, marginBottom: 6,
+              background: alert.severity === "critical" ? "rgba(239,68,68,0.08)" : "rgba(234,179,8,0.08)",
+              border: "1px solid " + (alert.severity === "critical" ? "rgba(239,68,68,0.25)" : "rgba(234,179,8,0.25)"),
+              display: "flex", alignItems: "center", gap: 10,
+            }}>
+              <span style={{
+                fontSize: 16,
+                color: alert.severity === "critical" ? theme.accent.red : theme.accent.yellow,
+              }}>{alert.severity === "critical" ? "\u26a0" : "\u26a0"}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{
+                  fontSize: 12, fontWeight: 600,
+                  color: alert.severity === "critical" ? theme.accent.red : theme.accent.yellow,
+                }}>{alert.message}</div>
+                {alert.detail && (
+                  <div style={{ fontSize: 10, color: theme.text.faint, marginTop: 2 }}>{alert.detail}</div>
+                )}
+              </div>
+              <div style={{ fontSize: 10, color: theme.text.ghost }}>
+                {alert.opened_at ? new Date(alert.opened_at).toLocaleTimeString() : ""}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* == Live Status Card == */}
       <div style={{

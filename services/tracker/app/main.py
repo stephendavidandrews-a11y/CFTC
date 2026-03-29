@@ -138,9 +138,11 @@ async def lifespan(app: FastAPI):
         conn.close()
     _staleness_task = asyncio.create_task(capture.staleness_checker())
     _rollup_task = asyncio.create_task(_rollup_scheduler())
+    _alert_task = asyncio.create_task(capture.alert_evaluator())
     yield
     _staleness_task.cancel()
     _rollup_task.cancel()
+    _alert_task.cancel()
     logger.info("Shutting down CFTC Tracker.")
 
 

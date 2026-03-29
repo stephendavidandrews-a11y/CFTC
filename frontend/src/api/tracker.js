@@ -490,3 +490,10 @@ export function executeCaptureAction(action, force = false) {
 export function getCaptureActionLog(limit = 20) {
   return fetchJSON(`${P}/api/capture/actions/log?limit=${limit}`);
 }
+
+export function getCaptureAlerts() {
+  return fetchJSON(`${P}/api/capture/alerts`);
+}
+export function getCaptureAlertHistory(limit = 50) {
+  return fetchJSON(`${P}/api/capture/alerts/history?limit=${limit}`);
+}

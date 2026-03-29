@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import theme from "../../styles/theme";
 import useReviewCounts from "../../hooks/useReviewCounts";
+import { getCaptureAlerts } from "../../api/tracker";
 
 const SECTIONS = [
   { separator: true, label: "Operations" },
@@ -14,7 +15,7 @@ const SECTIONS = [
   { path: "/meetings", label: "Meetings", icon: "\u229E" },
   { path: "/decisions", label: "Decisions", icon: "\u2696" },
   { path: "/documents", label: "Documents", icon: "\u25DA" },
-  { path: "/capture", label: "Capture", icon: "\u25CF" },
+  { path: "/capture", label: "Capture", icon: "\u25CF", countKey: "capture" },
 
   { separator: true, label: "Review Pipeline" },
   { path: "/review/communications", label: "Communications", icon: "\u25CE" },
@@ -53,6 +54,15 @@ export default function Sidebar({ isMobile = false, onNavigate }) {
   const navigate = useNavigate();
   const location = useLocation();
   const reviewCounts = useReviewCounts();
+
+  // Capture alert count (poll every 60s)
+  const [captureAlertCount, setCaptureAlertCount] = useState(0);
+  useEffect(() => {
+    const fetch = () => getCaptureAlerts().then(d => setCaptureAlertCount(d.count || 0)).catch(() => {});
+    fetch();
+    const id = setInterval(fetch, 60000);
+    return () => clearInterval(id);
+  }, []);
 
   const handleClick = (path) => {
     navigate(path);
@@ -148,7 +158,7 @@ export default function Sidebar({ isMobile = false, onNavigate }) {
               >
                 <span style={{ fontSize: 14, width: 20, textAlign: "center" }}>{s.icon}</span>
                 <span style={{ flex: 1 }}>{s.label}</span>
-                {s.countKey && reviewCounts?.[s.countKey] > 0 && (
+                {(s.countKey === "capture" ? captureAlertCount > 0 : s.countKey && reviewCounts?.[s.countKey] > 0) && (
                   <span style={{
                     marginLeft: "auto",
                     background: "rgba(59,130,246,0.15)",
@@ -160,7 +170,7 @@ export default function Sidebar({ isMobile = false, onNavigate }) {
                     minWidth: 18,
                     textAlign: "center",
                   }}>
-                    {reviewCounts[s.countKey]}
+                    {s.countKey === "capture" ? captureAlertCount : reviewCounts[s.countKey]}
                   </span>
                 )}
                 {s.external && (
