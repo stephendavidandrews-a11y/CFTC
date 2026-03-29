@@ -2,6 +2,7 @@
 CFTC Regulatory Ops Tracker — FastAPI Application
 """
 
+import asyncio
 import logging
 import sqlite3
 from contextlib import asynccontextmanager
@@ -38,7 +39,9 @@ from app.routers import (
     policy_directives,
     directive_matters,
     directive_documents,
+    system_events,
 )
+from app.routers import capture
 from app.routers import config as config_router
 
 logger = logging.getLogger(__name__)
@@ -110,7 +113,9 @@ async def lifespan(app: FastAPI):
         logger.info("Database ready.")
     finally:
         conn.close()
+    _staleness_task = asyncio.create_task(capture.staleness_checker())
     yield
+    _staleness_task.cancel()
     logger.info("Shutting down CFTC Tracker.")
 
 
@@ -202,6 +207,11 @@ app.include_router(
 app.include_router(
     config_router.router, prefix=router_prefix, dependencies=[Depends(verify_auth)]
 )
+app.include_router(
+    system_events.router, prefix=router_prefix, dependencies=[Depends(verify_auth)]
+)
+# Capture monitoring: WS endpoints handle their own auth
+app.include_router(capture.router, prefix=router_prefix)
 
 
 # -- Global exception handler --
