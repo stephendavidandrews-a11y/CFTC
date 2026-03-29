@@ -1095,6 +1095,66 @@ MIGRATIONS = [
             END""",
         ],
     ),
+    # Version 6: UNIQUE constraint on matter_rulemaking.rin to prevent duplicates
+    (
+        6,
+        "rin_unique_constraint",
+        [
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_mr_rin_unique ON matter_rulemaking(rin) WHERE rin IS NOT NULL",
+        ],
+    ),
+    # Version 8: capture monitoring tables (ReSpeaker heartbeat storage + daily rollup)
+    (
+        8,
+        "capture_monitoring_tables",
+        [
+            """CREATE TABLE IF NOT EXISTS capture_status (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                seq INTEGER NOT NULL,
+                reported_at TEXT NOT NULL,
+                received_at TEXT NOT NULL,
+                recording_state TEXT NOT NULL,
+                segment_open INTEGER NOT NULL DEFAULT 0,
+                silence_seconds INTEGER NOT NULL DEFAULT 0,
+                segment_started_at TEXT,
+                segment_duration_seconds INTEGER,
+                last_speech_at TEXT,
+                last_segment_close_reason TEXT,
+                error_detail TEXT,
+                audio_level_db REAL,
+                audio_level_peak_db REAL,
+                wifi_rssi INTEGER,
+                wifi_ssid TEXT,
+                cpu_temp_c REAL,
+                disk_used_pct REAL,
+                memory_used_pct REAL,
+                uptime_seconds INTEGER,
+                capture_service TEXT,
+                last_rsync_at TEXT,
+                raw_payload TEXT,
+                UNIQUE(session_id, seq)
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_capture_status_reported_at ON capture_status(reported_at)",
+            "CREATE INDEX IF NOT EXISTS idx_capture_status_received_at ON capture_status(received_at)",
+            """CREATE TABLE IF NOT EXISTS capture_status_daily (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT NOT NULL UNIQUE,
+                recording_minutes INTEGER NOT NULL DEFAULT 0,
+                idle_minutes INTEGER NOT NULL DEFAULT 0,
+                offline_minutes INTEGER NOT NULL DEFAULT 0,
+                error_minutes INTEGER NOT NULL DEFAULT 0,
+                segment_count INTEGER NOT NULL DEFAULT 0,
+                avg_segment_duration_s REAL,
+                avg_wifi_rssi REAL,
+                min_wifi_rssi INTEGER,
+                avg_cpu_temp_c REAL,
+                max_cpu_temp_c REAL,
+                max_disk_used_pct REAL,
+                rsync_count INTEGER NOT NULL DEFAULT 0
+            )""",
+        ],
+    ),
 ]
 
 
