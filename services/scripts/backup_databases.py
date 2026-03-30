@@ -30,10 +30,11 @@ logging.basicConfig(
 logger = logging.getLogger("backup")
 
 # Databases to back up: (label, path)
+_base = Path(os.environ.get("CFTC_BASE", "/Users/stephen/Documents/Website/cftc"))
 DATABASES = [
-    ("tracker", Path("/Users/stephen/Documents/Website/cftc/services/tracker/data/tracker.db")),
-    ("ai", Path("/Users/stephen/Documents/Website/cftc/services/ai/data/ai.db")),
-    ("intake", Path("/Users/stephen/Documents/Website/cftc/services/intake/data/cftc_voice.db")),
+    ("tracker", Path(os.environ.get("TRACKER_DB_PATH", str(_base / "services/tracker/data/tracker.db")))),
+    ("ai", Path(os.environ.get("AI_DB_PATH", str(_base / "services/ai/data/ai.db")))),
+    ("intake", Path(os.environ.get("INTAKE_DB_PATH", str(_base / "services/intake/data/cftc_voice.db")))),
 ]
 
 DEFAULT_BACKUP_DIR = Path("/Users/stephen/backups/cftc")

@@ -21,11 +21,8 @@ from db.schema import init_db
 from voice.pipeline.watcher import InboxWatcher
 from voice.pipeline.processor import process_conversation
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-    handlers=[logging.StreamHandler()],
-)
+from logging_config import setup_logging
+setup_logging("cftc-intake")
 logger = logging.getLogger("cftc-intake")
 
 # Frontend served by Command Center - this service is API-only
@@ -64,6 +61,8 @@ def _on_new_file(conversation_id: str, path):
 async def lifespan(app: FastAPI):
     global _watcher
 
+    from config import validate_config
+    validate_config()
     # Initialize database
     init_db()
     logger.info("Database initialized")
@@ -136,6 +135,9 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-Write-Source", "X-Request-ID"],
 )
+from middleware import RequestIDMiddleware, metrics as _intake_metrics
+app.add_middleware(RequestIDMiddleware)
+
 
 # Register API routers
 from fastapi import Depends
@@ -154,6 +156,11 @@ app.include_router(audio_router,         prefix="/intake/api", dependencies=_aut
 app.include_router(pipeline_router,      prefix="/intake/api", dependencies=_auth)
 app.include_router(transcribe_router,    prefix="/intake/api", dependencies=_auth)
 
+
+
+@app.get("/intake/api/metrics")
+def intake_metrics():
+    return _intake_metrics.snapshot()
 
 @app.get("/intake/api/health")
 def health_check():

@@ -30,7 +30,7 @@ AI_AUDIO_WATCH_DIR = Path(
     os.environ.get("AI_AUDIO_WATCH_DIR", str(BASE_DIR / "audio-inbox"))
 )
 
-TRACKER_BASE_URL = os.environ.get("TRACKER_BASE_URL", "http://tracker:8004/tracker")
+TRACKER_BASE_URL = os.environ.get("TRACKER_BASE_URL", "http://127.0.0.1:8004/tracker")
 TRACKER_USER = os.environ.get("TRACKER_USER", "")
 TRACKER_PASS = os.environ.get("TRACKER_PASS", "")
 

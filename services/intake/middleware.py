@@ -159,7 +159,14 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         # ── Rate limiting ──
         if self.rate_limiter is not None:
-            client_ip = request.client.host if request.client else "unknown"
+            forwarded_for = request.headers.get("X-Forwarded-For")
+            real_ip = request.headers.get("X-Real-IP")
+            if forwarded_for:
+                client_ip = forwarded_for.split(",")[0].strip()
+            elif real_ip:
+                client_ip = real_ip
+            else:
+                client_ip = request.client.host if request.client else "unknown"
             path = request.url.path
             allowed, retry_after = self.rate_limiter.is_allowed(client_ip, path)
             if not allowed:
