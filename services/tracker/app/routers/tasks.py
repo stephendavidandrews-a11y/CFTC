@@ -64,7 +64,7 @@ async def list_tasks(
         conditions.append("t.source_id = ?")
         params.append(source_id)
     if exclude_done is True:
-        conditions.append("t.status NOT IN ('done', 'completed', 'deferred')")
+        conditions.append("t.status NOT IN ('done', 'deferred')")
 
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
     allowed_sorts = {
@@ -123,13 +123,13 @@ async def list_tasks(
     summary_rows = db.execute("""
         SELECT
             SUM(CASE WHEN t.due_date IS NOT NULL AND t.due_date <= date('now')
-                     AND t.status NOT IN ('done', 'completed', 'deferred') THEN 1 ELSE 0 END) as overdue,
+                     AND t.status NOT IN ('done', 'deferred') THEN 1 ELSE 0 END) as overdue,
             SUM(CASE WHEN t.due_date = date('now')
-                     AND t.status NOT IN ('done', 'completed', 'deferred') THEN 1 ELSE 0 END) as due_today,
+                     AND t.status NOT IN ('done', 'deferred') THEN 1 ELSE 0 END) as due_today,
             SUM(CASE WHEN t.status = 'waiting on others' THEN 1 ELSE 0 END) as waiting_on_others,
             SUM(CASE WHEN t.status = 'needs review' THEN 1 ELSE 0 END) as needs_review
         FROM tasks t
-        WHERE t.status NOT IN ('done', 'completed', 'deferred')
+        WHERE t.status NOT IN ('done', 'deferred')
     """).fetchone()
     summary = {
         "overdue": summary_rows["overdue"] or 0,

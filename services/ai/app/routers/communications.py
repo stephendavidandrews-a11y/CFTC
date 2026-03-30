@@ -748,8 +748,8 @@ async def delete_communication(communication_id: str, db=Depends(get_db)):
     for table, where_clause in child_tables:
         try:
             db.execute(f"DELETE FROM {table} WHERE {where_clause}", (communication_id,))
-        except Exception:
-            pass  # Table may not exist in older schema versions
+        except Exception as _e:
+            logger.warning("delete_communication: cleanup failed for %s: %s", table, _e)
 
     db.execute("DELETE FROM communications WHERE id = ?", (communication_id,))
     db.commit()

@@ -183,6 +183,7 @@ def init_db(db_path: Path = DB_PATH):
     """Initialize the database schema."""
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path))
+    conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript(SCHEMA_SQL)
     conn.commit()
     conn.close()
