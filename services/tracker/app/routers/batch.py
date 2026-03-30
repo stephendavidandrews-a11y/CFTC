@@ -10,6 +10,7 @@ Supports:
 """
 
 import hashlib
+import re
 import json
 import logging
 import uuid
@@ -42,6 +43,18 @@ def _get_table_columns(db, table):
     rows = db.execute(f"PRAGMA table_info({table})").fetchall()
     return {row["name"] for row in rows}
 
+
+_SAFE_IDENTIFIER_RE = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
+
+
+def _assert_safe_identifier(name: str, kind: str = 'identifier') -> None:
+    """Raise ValueError if name is not a safe SQL identifier.
+
+    Belt-and-suspenders guard — the allowlist check is the primary defense.
+    This prevents SQL injection if a future code change bypasses the allowlist.
+    """
+    if not _SAFE_IDENTIFIER_RE.match(name):
+        raise ValueError(f'Unsafe {kind}: {name!r}')
 
 def _hash_body(body):
     """Deterministic hash of the request body."""
@@ -247,10 +260,15 @@ async def batch_write(
         data = dict(op.get("data", {}))
         meta = op.get("_meta") or {}
 
-        if table not in ALLOWED_TABLES:
+        allowed_tables = ALLOWED_TABLES | DELETE_ALLOWED_TABLES if op_type == "delete" else ALLOWED_TABLES
+        if table not in allowed_tables:
             raise _typed_error(
                 400, "forbidden_table", i, f"Table '{table}' not allowed in batch"
             )
+        try:
+            _assert_safe_identifier(table, 'table')
+        except ValueError:
+            raise _typed_error(400, "forbidden_table", i, f"Unsafe table name: {table!r}")
         if op_type not in ("insert", "update", "delete"):
             raise _typed_error(
                 400,
@@ -369,7 +387,11 @@ async def batch_write(
                         continue
 
                 record_id = str(uuid.uuid4())
-                data["id"] = record_id
+                if "id" in valid_columns:
+                    data["id"] = record_id
+                else:
+                    # Extension tables (matter_rulemaking, etc.) use matter_id as PK
+                    record_id = data.get("matter_id", record_id)
                 if "created_at" in valid_columns:
                     data["created_at"] = now
                 if "updated_at" in valid_columns:
@@ -377,6 +399,8 @@ async def batch_write(
                 if "source" in valid_columns:
                     data.setdefault("source", source)
 
+                # Sanitize empty strings to None for FK-safe inserts
+                data = {k: (None if v == "" else v) for k, v in data.items()}
                 columns = ", ".join(data.keys())
                 placeholders = ", ".join(["?"] * len(data))
                 db.execute(
@@ -531,9 +555,27 @@ async def batch_write(
 
     except HTTPException:
         db.rollback()
+        if idempotency_key:
+            try:
+                db.execute(
+                    "DELETE FROM idempotency_keys WHERE key = ? AND status_code IS NULL",
+                    (idempotency_key,),
+                )
+                db.commit()
+            except Exception:
+                pass
         raise
     except Exception as exc:
         db.rollback()
+        if idempotency_key:
+            try:
+                db.execute(
+                    "DELETE FROM idempotency_keys WHERE key = ? AND status_code IS NULL",
+                    (idempotency_key,),
+                )
+                db.commit()
+            except Exception:
+                pass
         logger.error("Batch failed at operation %d: %s", current_op, str(exc))
         raise HTTPException(
             status_code=500,

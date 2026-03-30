@@ -1,5 +1,6 @@
 """CFTC Intake Service -- configuration."""
 
+import os
 from pathlib import Path
 
 # -- Paths --
@@ -11,6 +12,11 @@ INBOX_PI = INBOX_DIR / "pi"
 INBOX_PLAUD = INBOX_DIR / "plaud"
 INBOX_PHONE = INBOX_DIR / "phone"
 MODELS_DIR = DATA_DIR / "models"
+
+
+# -- Auth --
+PIPELINE_USER: str = os.environ.get("PIPELINE_USER", "")
+PIPELINE_PASS: str = os.environ.get("PIPELINE_PASS", "")
 
 # -- Service --
 SERVICE_PORT = 8005

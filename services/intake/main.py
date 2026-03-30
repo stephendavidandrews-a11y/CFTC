@@ -138,17 +138,21 @@ app.add_middleware(
 )
 
 # Register API routers
+from fastapi import Depends
+from deps import verify_auth
 from api.conversations import router as conversations_router
 from api.speakers import router as speakers_router
 from api.audio import router as audio_router
 from api.pipeline import router as pipeline_router
 from api.transcribe import router as transcribe_router
 
-app.include_router(conversations_router, prefix="/intake/api")
-app.include_router(speakers_router, prefix="/intake/api")
-app.include_router(audio_router, prefix="/intake/api")
-app.include_router(pipeline_router, prefix="/intake/api")
-app.include_router(transcribe_router, prefix="/intake/api")
+_auth = [Depends(verify_auth)]
+
+app.include_router(conversations_router, prefix="/intake/api", dependencies=_auth)
+app.include_router(speakers_router,      prefix="/intake/api", dependencies=_auth)
+app.include_router(audio_router,         prefix="/intake/api", dependencies=_auth)
+app.include_router(pipeline_router,      prefix="/intake/api", dependencies=_auth)
+app.include_router(transcribe_router,    prefix="/intake/api", dependencies=_auth)
 
 
 @app.get("/intake/api/health")

@@ -92,6 +92,7 @@ TABLES = [
         """CREATE TABLE IF NOT EXISTS tasks (
         id TEXT PRIMARY KEY,
         matter_id TEXT REFERENCES matters(id),
+        parent_task_id TEXT REFERENCES tasks(id),
         title TEXT NOT NULL,
         description TEXT,
         task_type TEXT,
@@ -693,6 +694,7 @@ INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_tasks_task_type ON tasks(task_type);",
     "CREATE INDEX IF NOT EXISTS idx_tasks_deadline_type ON tasks(deadline_type);",
     "CREATE INDEX IF NOT EXISTS idx_tasks_tracks_task_id ON tasks(tracks_task_id);",
+    "CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_task_id);",
     # -- documents --
     "CREATE INDEX IF NOT EXISTS idx_documents_matter ON documents(matter_id);",
     "CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status);",
@@ -1198,6 +1200,15 @@ MIGRATIONS = [
             )""",
             """CREATE INDEX IF NOT EXISTS idx_capture_alerts_open
                ON capture_alerts(resolved_at) WHERE resolved_at IS NULL""",
+        ],
+    ),
+    # Version 11: add parent_task_id to tasks for subtask support
+    (
+        11,
+        "tasks_parent_task_id",
+        [
+            "ALTER TABLE tasks ADD COLUMN parent_task_id TEXT REFERENCES tasks(id)",
+            "CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_task_id)",
         ],
     ),
 ]

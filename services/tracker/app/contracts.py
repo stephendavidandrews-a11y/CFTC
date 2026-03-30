@@ -11,7 +11,7 @@ TRACKER_SCHEMA_VERSION = "1.2.0"
 
 ENUMS = {
     "matter_type": [
-        "rulemaking", "guidance", "enforcement", "congressional",
+        "rulemaking", "guidance", "enforcement", "congressional", "policy",
         "briefing", "administrative", "inquiry", "other",
     ],
     "matter_status": [
@@ -492,7 +492,6 @@ BATCH_DELETE_ALLOWED_TABLES = (
     "directive_documents",
     "directive_research_notes",
     "policy_directives",
-    "directive_matters",
 )
 
 
