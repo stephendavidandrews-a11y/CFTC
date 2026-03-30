@@ -256,17 +256,30 @@ async def get_context_notes_by_entity(
         params + [limit, offset],
     ).fetchall()
 
+    if not rows:
+        return {"items": [], "total": 0}
+
+    # Batch fetch links for all notes (avoids N+1)
+    from collections import defaultdict
+    note_ids = [row["id"] for row in rows]
+    placeholders = ",".join("?" * len(note_ids))
+    links_by_note = defaultdict(list)
+    for link_row in db.execute(
+        f"""SELECT cnl.id, cnl.context_note_id, cnl.entity_type, cnl.entity_id, cnl.relationship_role
+            FROM context_note_links cnl WHERE cnl.context_note_id IN ({placeholders})""",
+        note_ids,
+    ).fetchall():
+        links_by_note[link_row["context_note_id"]].append({
+            "id": link_row["id"],
+            "entity_type": link_row["entity_type"],
+            "entity_id": link_row["entity_id"],
+            "relationship_role": link_row["relationship_role"],
+        })
+
     items = []
     for row in rows:
         item = dict(row)
-        links = db.execute(
-            """
-            SELECT cnl.id, cnl.entity_type, cnl.entity_id, cnl.relationship_role
-            FROM context_note_links cnl WHERE cnl.context_note_id = ?
-        """,
-            (item["id"],),
-        ).fetchall()
-        item["links"] = [dict(link) for link in links]
+        item["links"] = links_by_note.get(item["id"], [])
         items.append(item)
 
     return {"items": items, "total": len(items)}
