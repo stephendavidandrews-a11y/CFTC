@@ -53,6 +53,11 @@ security = HTTPBasic()
 
 def verify_auth(credentials: HTTPBasicCredentials = Depends(security)):
     """HTTP Basic Auth dependency — validates credentials directly."""
+    if not AUTH_USER or not AUTH_PASS:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication not configured — set TRACKER_USER and TRACKER_PASS",
+        )
     correct_user = secrets.compare_digest(
         credentials.username.encode(), AUTH_USER.encode()
     )
@@ -272,13 +277,12 @@ async def health():
         conn.close()
         checks["db"] = "ok"
     except Exception as e:
-        checks["db"] = "error: %s" % str(e)[:80]
+        checks["db"] = "error"
         status = "degraded"
 
     # Disk check
     try:
         usage = shutil.disk_usage("/")
-        checks["disk_free_mb"] = usage.free // (1024 * 1024)
         if usage.free < 200 * 1024 * 1024:
             checks["disk"] = "critical"
             status = "degraded"
@@ -296,7 +300,7 @@ async def health():
         if resp.status_code == 200:
             checks["ai_service"] = "ok"
         else:
-            checks["ai_service"] = "degraded (HTTP %d)" % resp.status_code
+            checks["ai_service"] = "degraded"
             if status == "ok":
                 status = "degraded"
     except Exception:

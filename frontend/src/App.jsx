@@ -1,6 +1,6 @@
 import ErrorBoundary from "./components/shared/ErrorBoundary";
 import React from "react";
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import { ToastProvider } from "./contexts/ToastContext";
 import AppShell from "./components/layout/AppShell";
 import CommandPalette from "./components/shared/CommandPalette";

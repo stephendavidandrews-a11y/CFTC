@@ -14,6 +14,10 @@ export default defineConfig({
         target: "http://localhost:8006",
         changeOrigin: true,
       },
+      "/intake": {
+        target: "http://localhost:8005",
+        changeOrigin: true,
+      },
     },
   },
   build: {

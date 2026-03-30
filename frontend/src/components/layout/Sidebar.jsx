@@ -1,8 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import theme from "../../styles/theme";
 import useReviewCounts from "../../hooks/useReviewCounts";
 import { getCaptureAlerts } from "../../api/tracker";
+
+const CFTCTOOLS_URL = import.meta.env.VITE_CFTCTOOLS_URL || "https://cftctools.stephenandrews.org";
 
 const SECTIONS = [
   { separator: true, label: "Operations" },
@@ -21,6 +23,7 @@ const SECTIONS = [
   { path: "/review/communications", label: "Communications", icon: "\u25CE" },
   { path: "/review/speakers", label: "Speaker Review", icon: "\u2460", countKey: "speakers" },
   { path: "/review/participants", label: "Participant & Entity", icon: "\u2461", countKey: "participants" },
+  { path: "/review/entities", label: "Entity & Association", icon: "③", countKey: "entities" },
   { path: "/review/bundles", label: "Bundle Review", icon: "\u25A4", countKey: "bundles" },
   { path: "/review/commit", label: "Ready to Commit", icon: "\u2611", countKey: "commit" },
 
