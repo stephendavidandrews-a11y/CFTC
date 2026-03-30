@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import theme from "../../styles/theme";
 import { fetchJSON } from "../../api/client";
+import Badge from "../../components/shared/Badge";
 
 const TAG_COLORS = {
   BOSS: { bg: "#7f1d1d", text: "#fca5a5" },
@@ -10,16 +11,6 @@ const TAG_COLORS = {
   OVERDUE: { bg: "#431407", text: "#fb923c" },
   REVIEW: { bg: "#1e3a5f", text: "#60a5fa" },
 };
-
-function Badge({ bg, text, label }) {
-  return (
-    <span style={{
-      display: "inline-block", padding: "2px 8px", borderRadius: 4,
-      fontSize: 10, fontWeight: 600, background: bg, color: text,
-      textTransform: "uppercase", letterSpacing: "0.04em",
-    }}>{label}</span>
-  );
-}
 
 function Section({ title, icon, count, children, defaultOpen = true }) {
   const [open, setOpen] = useState(defaultOpen);

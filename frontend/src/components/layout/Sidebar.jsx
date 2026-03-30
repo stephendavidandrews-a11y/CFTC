@@ -18,6 +18,7 @@ const SECTIONS = [
   { path: "/decisions", label: "Decisions", icon: "\u2696" },
   { path: "/documents", label: "Documents", icon: "\u25DA" },
   { path: "/capture", label: "Capture", icon: "\u25CF", countKey: "capture" },
+  { path: "/team-workload", label: "Team Workload", icon: "⊕" },
 
   { separator: true, label: "Review Pipeline" },
   { path: "/review/communications", label: "Communications", icon: "\u25CE" },
@@ -30,6 +31,7 @@ const SECTIONS = [
   { separator: true, label: "Reference" },
   { path: "/directives", label: "Directives", icon: "\u25B7" },
   { path: "/context-notes", label: "Context Notes", icon: "\u2261" },
+  { path: "/intelligence/daily", label: "Daily Brief", icon: "◉" },
   { path: "/intelligence/weekly", label: "Weekly Brief", icon: "\u25EB" },
   { path: "/settings/ai", label: "AI Configuration", icon: "\u2699" },
 

@@ -5,6 +5,7 @@ import useApi from "../../hooks/useApi";
 import { getContextNote, deleteContextNote } from "../../api/tracker";
 import Breadcrumb from "../../components/shared/Breadcrumb";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
+import Badge from "../../components/shared/Badge";
 import { useToastContext } from "../../contexts/ToastContext";
 import { formatDate, timeAgo } from "../../utils/dateUtils";
 
@@ -54,16 +55,6 @@ const valueStyle = {
   color: theme.text.primary,
   marginBottom: 12,
 };
-
-function Badge({ bg, text, label }) {
-  return (
-    <span style={{
-      display: "inline-block", padding: "2px 8px", borderRadius: 4,
-      fontSize: 10, fontWeight: 600, background: bg, color: text,
-      textTransform: "uppercase", letterSpacing: "0.04em",
-    }}>{label}</span>
-  );
-}
 
 function formatLabel(s) {
   return (s || "").replace(/_/g, " ");

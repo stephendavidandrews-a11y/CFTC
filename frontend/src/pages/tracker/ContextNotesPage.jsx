@@ -4,6 +4,7 @@ import theme from "../../styles/theme";
 import { titleStyle, subtitleStyle, inputStyle } from "../../styles/pageStyles";
 import { timeAgo } from "../../utils/dateUtils";
 import { listContextNotes, deleteContextNote } from "../../api/tracker";
+import Badge from "../../components/shared/Badge";
 
 const CATEGORY_COLORS = {
   people_insight: { bg: "#312e81", text: "#c4b5fd" },
@@ -22,16 +23,6 @@ const POSTURE_COLORS = {
   interpretive: { bg: "#1e1b4b", text: "#a78bfa" },
   sensitive: { bg: "#7f1d1d", text: "#fca5a5" },
 };
-
-function Badge({ bg, text, label }) {
-  return (
-    <span style={{
-      display: "inline-block", padding: "2px 8px", borderRadius: 4,
-      fontSize: 10, fontWeight: 600, background: bg, color: text,
-      textTransform: "uppercase", letterSpacing: "0.04em",
-    }}>{label}</span>
-  );
-}
 
 function formatLabel(s) {
   return (s || "").replace(/_/g, " ");
