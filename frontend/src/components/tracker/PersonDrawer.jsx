@@ -1,4 +1,6 @@
 import React from "react";
+import theme from "../../styles/theme";
+import { btnPrimary } from "../../styles/pageStyles";
 import DrawerShell from "./DrawerShell";
 import {
   createPerson,
@@ -21,7 +23,6 @@ const INPUT_STYLE = {
   boxSizing: "border-box",
 };
 const LABEL_STYLE = { display: "block", fontSize: 12, fontWeight: 600, color: "#94a3b8", marginBottom: 4 };
-const SAVE_BTN = { background: "#1e40af", color: "#fff", padding: "8px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" };
 const CANCEL_BTN = { background: "transparent", color: "#64748b", padding: "8px 20px", borderRadius: 8, fontSize: 13, border: "1px solid #1f2937", cursor: "pointer" };
 
 const EMPTY = {
@@ -215,7 +216,7 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
           checked={form.include_in_team_workload}
           onChange={setCheck("include_in_team_workload")}
           id="team-workload-chk"
-          style={{ accentColor: "#1e40af" }}
+          style={{ accentColor: theme.accent.blue }}
         />
         <label htmlFor="team-workload-chk" style={{ fontSize: 12, fontWeight: 600, color: "#94a3b8", cursor: "pointer" }}>
           Include in Team Workload
@@ -228,7 +229,7 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
           checked={form.is_active}
           onChange={setCheck("is_active")}
           id="is-active-chk"
-          style={{ accentColor: "#1e40af" }}
+          style={{ accentColor: theme.accent.blue }}
         />
         <label htmlFor="is-active-chk" style={{ fontSize: 12, fontWeight: 600, color: "#94a3b8", cursor: "pointer" }}>
           Active
@@ -246,7 +247,7 @@ export default function PersonDrawer({ isOpen, onClose, person, onSaved }) {
 
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", paddingTop: 16, borderTop: "1px solid #1f2937", marginTop: 10 }}>
         <button style={CANCEL_BTN} onClick={onClose}>Cancel</button>
-        <button style={{ ...SAVE_BTN, opacity: saving ? 0.6 : 1 }} onClick={handleSave} disabled={saving}>
+        <button style={{ ...btnPrimary, opacity: saving ? 0.6 : 1 }} onClick={handleSave} disabled={saving}>
           {saving ? "Saving..." : (person ? "Save Changes" : "Create Person")}
         </button>
       </div>

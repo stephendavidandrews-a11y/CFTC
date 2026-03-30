@@ -1,4 +1,6 @@
 import React from "react";
+import theme from "../../styles/theme";
+import { btnPrimary } from "../../styles/pageStyles";
 import DrawerShell from "./DrawerShell";
 import {
   createMeeting,
@@ -25,7 +27,6 @@ const INPUT_STYLE = {
   boxSizing: "border-box",
 };
 const LABEL_STYLE = { display: "block", fontSize: 12, fontWeight: 600, color: "#94a3b8", marginBottom: 4 };
-const SAVE_BTN = { background: "#1e40af", color: "#fff", padding: "8px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" };
 const CANCEL_BTN = { background: "transparent", color: "#64748b", padding: "8px 20px", borderRadius: 8, fontSize: 13, border: "1px solid #1f2937", cursor: "pointer" };
 const CHIP_STYLE = {
   display: "inline-flex",
@@ -51,7 +52,7 @@ const REMOVE_BTN = {
 };
 const ADD_ROW = { display: "flex", gap: 6, alignItems: "flex-end", marginTop: 6 };
 const ADD_BTN = {
-  background: "#1e40af",
+  background: theme.accent.blue,
   color: "#fff",
   border: "none",
   borderRadius: 6,
@@ -359,11 +360,11 @@ export default function MeetingDrawer({ isOpen, onClose, meeting, onSaved }) {
       {/* Checkboxes */}
       <div style={{ display: "flex", gap: 20, marginBottom: 14 }}>
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#e2e8f0", cursor: "pointer" }}>
-          <input type="checkbox" checked={form.boss_attends} onChange={setCheck("boss_attends")} style={{ accentColor: "#1e40af" }} />
+          <input type="checkbox" checked={form.boss_attends} onChange={setCheck("boss_attends")} style={{ accentColor: theme.accent.blue }} />
           Boss attends
         </label>
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#e2e8f0", cursor: "pointer" }}>
-          <input type="checkbox" checked={form.external_parties_attend} onChange={setCheck("external_parties_attend")} style={{ accentColor: "#1e40af" }} />
+          <input type="checkbox" checked={form.external_parties_attend} onChange={setCheck("external_parties_attend")} style={{ accentColor: theme.accent.blue }} />
           External parties attend
         </label>
       </div>
@@ -464,7 +465,7 @@ export default function MeetingDrawer({ isOpen, onClose, meeting, onSaved }) {
 
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", paddingTop: 16, borderTop: "1px solid #1f2937", marginTop: 10 }}>
         <button style={CANCEL_BTN} onClick={onClose}>Cancel</button>
-        <button style={{ ...SAVE_BTN, opacity: saving ? 0.6 : 1 }} onClick={handleSave} disabled={saving}>
+        <button style={{ ...btnPrimary, opacity: saving ? 0.6 : 1 }} onClick={handleSave} disabled={saving}>
           {saving ? "Saving..." : (isEdit ? "Save Changes" : "Create Meeting")}
         </button>
       </div>

@@ -1,4 +1,5 @@
 import React from "react";
+import { btnPrimary } from "../../styles/pageStyles";
 import DrawerShell from "./DrawerShell";
 import {
   createTask,
@@ -22,7 +23,6 @@ const INPUT_STYLE = {
   boxSizing: "border-box",
 };
 const LABEL_STYLE = { display: "block", fontSize: 12, fontWeight: 600, color: "#94a3b8", marginBottom: 4 };
-const SAVE_BTN = { background: "#1e40af", color: "#fff", padding: "8px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" };
 const CANCEL_BTN = { background: "transparent", color: "#64748b", padding: "8px 20px", borderRadius: 8, fontSize: 13, border: "1px solid #1f2937", cursor: "pointer" };
 
 const EMPTY = {
@@ -263,7 +263,7 @@ export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved })
 
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", paddingTop: 16, borderTop: "1px solid #1f2937", marginTop: 10 }}>
         <button style={CANCEL_BTN} onClick={onClose}>Cancel</button>
-        <button style={{ ...SAVE_BTN, opacity: saving ? 0.6 : 1 }} onClick={handleSave} disabled={saving}>
+        <button style={{ ...btnPrimary, opacity: saving ? 0.6 : 1 }} onClick={handleSave} disabled={saving}>
           {saving ? "Saving..." : (task ? "Save Changes" : "Create Task")}
         </button>
       </div>

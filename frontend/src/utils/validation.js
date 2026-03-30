@@ -25,6 +25,11 @@ const RULES = {
     title:         { required: true, label: "Title" },
     document_type: { required: true, label: "Document Type" },
   },
+  directive: {
+    source_document: { required: true, label: "Source Document" },
+    source_document_type: { required: true, label: "Document Type" },
+    directive_label: { required: true, label: "Label" },
+  },
   meeting: {
     title:           { required: true, label: "Title" },
     date_time_start: { required: true, label: "Start Time" },

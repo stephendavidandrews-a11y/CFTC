@@ -8,11 +8,14 @@ from datetime import datetime, timedelta, timezone
 import sqlite3
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+import hashlib
+import hmac
 import secrets
+import time
 
 from app.config import CORS_ORIGINS, AUTH_USER, AUTH_PASS, UPLOAD_DIR
 from app.db import get_connection
@@ -48,11 +51,60 @@ from app.routers import capture
 from app.routers import config as config_router
 
 logger = logging.getLogger(__name__)
-security = HTTPBasic()
+security = HTTPBasic(auto_error=False)
+
+_SESSION_COOKIE = "tracker_session"
+_SESSION_MAX_AGE = 7 * 24 * 3600  # 7 days
+# Derive a signing key from the credentials so cookie invalidates if creds change
+_SIGN_KEY = hashlib.sha256(f"{AUTH_USER}:{AUTH_PASS}".encode()).digest()
 
 
-def verify_auth(credentials: HTTPBasicCredentials = Depends(security)):
-    """HTTP Basic Auth dependency — validates credentials directly."""
+def _sign_session(username: str) -> str:
+    """Create a signed session token: username|expiry|signature."""
+    expiry = int(time.time()) + _SESSION_MAX_AGE
+    payload = f"{username}|{expiry}"
+    sig = hmac.new(_SIGN_KEY, payload.encode(), hashlib.sha256).hexdigest()[:32]
+    return f"{payload}|{sig}"
+
+
+def _verify_session(token: str) -> str | None:
+    """Verify a session token. Returns username if valid, None otherwise."""
+    try:
+        parts = token.split("|")
+        if len(parts) != 3:
+            return None
+        username, expiry_str, sig = parts
+        expiry = int(expiry_str)
+        if time.time() > expiry:
+            return None
+        expected_payload = f"{username}|{expiry_str}"
+        expected_sig = hmac.new(_SIGN_KEY, expected_payload.encode(), hashlib.sha256).hexdigest()[:32]
+        if not hmac.compare_digest(sig, expected_sig):
+            return None
+        return username
+    except Exception:
+        return None
+
+
+async def verify_auth(
+    request: Request,
+    credentials: HTTPBasicCredentials | None = Depends(security),
+):
+    """Check session cookie first, fall back to HTTP Basic Auth."""
+    # Check session cookie
+    cookie = request.cookies.get(_SESSION_COOKIE)
+    if cookie:
+        username = _verify_session(cookie)
+        if username:
+            return username
+
+    # No valid cookie — require Basic Auth
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Basic"},
+        )
     if not AUTH_USER or not AUTH_PASS:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -70,6 +122,8 @@ def verify_auth(credentials: HTTPBasicCredentials = Depends(security)):
             detail="Invalid credentials",
             headers={"WWW-Authenticate": "Basic"},
         )
+    # Valid Basic Auth — set session cookie on response
+    request.state.set_session_cookie = credentials.username
     return credentials.username
 
 
@@ -172,6 +226,24 @@ app.add_middleware(
         "If-Match",
     ],
 )
+
+
+@app.middleware("http")
+async def session_cookie_middleware(request: Request, call_next):
+    """Set session cookie after successful Basic Auth login."""
+    response = await call_next(request)
+    username = getattr(request.state, "set_session_cookie", None)
+    if username:
+        token = _sign_session(username)
+        response.set_cookie(
+            key=_SESSION_COOKIE,
+            value=token,
+            max_age=_SESSION_MAX_AGE,
+            httponly=True,
+            samesite="lax",
+            path="/",
+        )
+    return response
 
 # Mount routers — all under /tracker/ prefix, all require auth
 router_prefix = "/tracker"

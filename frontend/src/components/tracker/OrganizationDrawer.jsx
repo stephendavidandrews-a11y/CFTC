@@ -1,4 +1,6 @@
 import React from "react";
+import theme from "../../styles/theme";
+import { btnPrimary } from "../../styles/pageStyles";
 import DrawerShell from "./DrawerShell";
 import {
   createOrganization,
@@ -20,7 +22,6 @@ const INPUT_STYLE = {
   boxSizing: "border-box",
 };
 const LABEL_STYLE = { display: "block", fontSize: 12, fontWeight: 600, color: "#94a3b8", marginBottom: 4 };
-const SAVE_BTN = { background: "#1e40af", color: "#fff", padding: "8px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" };
 const CANCEL_BTN = { background: "transparent", color: "#64748b", padding: "8px 20px", borderRadius: 8, fontSize: 13, border: "1px solid #1f2937", cursor: "pointer" };
 
 const EMPTY = {
@@ -159,7 +160,7 @@ export default function OrganizationDrawer({ isOpen, onClose, organization, onSa
 
       <div style={{ display: "flex", gap: 20, marginBottom: 14 }}>
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#e2e8f0", cursor: "pointer" }}>
-          <input type="checkbox" checked={!!form.is_active} onChange={setCheck("is_active")} style={{ accentColor: "#1e40af" }} />
+          <input type="checkbox" checked={!!form.is_active} onChange={setCheck("is_active")} style={{ accentColor: theme.accent.blue }} />
           Active
         </label>
       </div>
@@ -168,7 +169,7 @@ export default function OrganizationDrawer({ isOpen, onClose, organization, onSa
 
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", paddingTop: 16, borderTop: "1px solid #1f2937", marginTop: 10 }}>
         <button style={CANCEL_BTN} onClick={onClose}>Cancel</button>
-        <button style={{ ...SAVE_BTN, opacity: saving ? 0.6 : 1 }} onClick={handleSave} disabled={saving}>
+        <button style={{ ...btnPrimary, opacity: saving ? 0.6 : 1 }} onClick={handleSave} disabled={saving}>
           {saving ? "Saving..." : (organization ? "Save Changes" : "Create Organization")}
         </button>
       </div>

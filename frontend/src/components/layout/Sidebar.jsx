@@ -58,7 +58,10 @@ export default function Sidebar({ isMobile = false, onNavigate }) {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const reviewCounts = useReviewCounts();
+  const onReviewPage = location.pathname.startsWith("/review") ||
+                        location.pathname.startsWith("/speaker") ||
+                        location.pathname.startsWith("/entity");
+  const reviewCounts = useReviewCounts(onReviewPage);
 
   // Capture alert count (poll every 60s)
   const [captureAlertCount, setCaptureAlertCount] = useState(0);

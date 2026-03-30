@@ -4,10 +4,11 @@ import { useState, useEffect, useCallback } from "react";
  * Fetches review pipeline stage counts from /ai/api/health.
  * Polls on mount + every 60s. Falls back gracefully if AI service is down.
  */
-export default function useReviewCounts() {
+export default function useReviewCounts(enabled = true) {
   const [counts, setCounts] = useState(null);
 
   const fetchCounts = useCallback(async () => {
+    if (!enabled) return;
     try {
       const res = await fetch("/ai/api/health");
       if (!res.ok) return;
@@ -23,13 +24,17 @@ export default function useReviewCounts() {
     } catch {
       setCounts(null);
     }
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
+    if (!enabled) {
+      setCounts(null);
+      return;
+    }
     fetchCounts();
     const interval = setInterval(fetchCounts, 60000);
     return () => clearInterval(interval);
-  }, [fetchCounts]);
+  }, [fetchCounts, enabled]);
 
   return counts;
 }

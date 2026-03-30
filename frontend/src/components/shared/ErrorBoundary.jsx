@@ -1,4 +1,5 @@
 import React from 'react';
+import theme from "../../styles/theme";
 
 /**
  * Global error boundary — catches unhandled render errors and shows a
@@ -31,7 +32,7 @@ class ErrorBoundary extends React.Component {
           alignItems: 'center',
           justifyContent: 'center',
           height: '100vh',
-          background: '#0a0f1a',
+          background: theme.bg.app,
           color: '#e5e7eb',
           fontFamily: 'system-ui, -apple-system, sans-serif',
           padding: '2rem',
@@ -48,7 +49,7 @@ class ErrorBoundary extends React.Component {
               onClick={() => window.location.reload()}
               style={{
                 padding: '0.5rem 1.5rem',
-                background: '#1e3a5f',
+                background: theme.bg.cardHover,
                 color: '#60a5fa',
                 border: '1px solid #2563eb',
                 borderRadius: '0.375rem',

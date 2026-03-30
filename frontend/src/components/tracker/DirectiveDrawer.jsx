@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import DrawerShell from "./DrawerShell";
 import theme from "../../styles/theme";
+import { validate } from "../../utils/validation";
 import { createPolicyDirective, updatePolicyDirective, getPolicyDirective, getEnums, listPeople } from "../../api/tracker";
 
 const inputStyle = {
@@ -47,8 +48,10 @@ export default function DirectiveDrawer({ isOpen, onClose, directive, onSaved })
   const set = (field) => (e) => setForm({ ...form, [field]: e.target.value });
 
   const handleSave = async () => {
-    if (!form.source_document || !form.source_document_type || !form.directive_label) {
-      setError("Source document, type, and label are required"); return;
+    const { valid, errors: _errs } = validate("directive", form);
+    if (!valid) {
+      setError(Object.values(_errs)[0]);
+      return;
     }
     setSaving(true); setError(null);
     try {

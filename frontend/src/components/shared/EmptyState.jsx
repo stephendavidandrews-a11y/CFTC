@@ -29,7 +29,7 @@ export default function EmptyState({ icon = "∅", title, message, actionLabel, 
           style={{
             marginTop: 8, padding: "8px 20px", borderRadius: 8,
             fontSize: 13, fontWeight: 600,
-            background: "#1e40af", color: "#fff",
+            background: theme.accent.blue, color: "#fff",
             border: "none", cursor: "pointer",
           }}
         >

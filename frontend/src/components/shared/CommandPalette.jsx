@@ -23,6 +23,11 @@ const PAGES = [
   { label: "Weekly Brief", path: "/intelligence/weekly", type: "page" },
   { label: "AI Configuration", path: "/settings/ai", type: "page" },
   { label: "Dev Console", path: "/developer", type: "page" },
+  { label: "Capture Status", path: "/capture", type: "page" },
+  { label: "Reg Pipeline", path: "/matters/pipeline", type: "page" },
+  { label: "Participant Review", path: "/review/participants", type: "page" },
+  { label: "Communications", path: "/review/communications", type: "page" },
+  { label: "Ready to Commit", path: "/review/commit", type: "page" },
 ];
 
 const TYPE_ICONS = { page: "\u25a4", matter: "\u25a4", person: "\u22a1", organization: "\u2b21" };

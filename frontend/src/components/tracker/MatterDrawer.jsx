@@ -37,7 +37,6 @@ const EMPTY = {
   blocker: "",
   outcome_summary: "",
   closed_at: "",
-  cfr_citation: "",
   extension: {},
 };
 
@@ -422,7 +421,7 @@ export default function MatterDrawer({ isOpen, onClose, matter, onSaved }) {
       {["rulemaking", "guidance", "enforcement"].includes(form.matter_type) && (
         <div style={{ marginTop: 16, borderLeft: `3px solid ${
           form.matter_type === "rulemaking" ? "#ce93d8" :
-          form.matter_type === "guidance" ? "#64b5f6" : "#ef5350"
+          form.matter_type === "guidance" ? theme.accent.blueLight : theme.accent.red
         }`, paddingLeft: 16 }}>
           <div onClick={() => setExtCollapsed(!extCollapsed)}
             style={{ cursor: "pointer", fontWeight: 600, marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
