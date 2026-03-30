@@ -742,26 +742,28 @@ async def global_exception_handler(request, exc):
 from app.config import AI_AUTH_USER, AI_AUTH_PASS, APP_ENV
 
 if AI_AUTH_USER and AI_AUTH_PASS:
-    from fastapi.security import HTTPBasic, HTTPBasicCredentials
-    from fastapi import Depends, HTTPException, status
+    from fastapi import Depends, HTTPException, Request as _Request, status
+    import base64 as _b64
     import secrets as _secrets
 
-    _security = HTTPBasic()
-
-    def _verify_ai_auth(credentials: HTTPBasicCredentials = Depends(_security)):
-        correct_user = _secrets.compare_digest(
-            credentials.username.encode(), AI_AUTH_USER.encode()
+    def _verify_ai_auth(request: _Request):
+        """Check Authorization header manually — no HTTPBasic to avoid WWW-Authenticate popups."""
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.startswith("Basic "):
+            try:
+                decoded = _b64.b64decode(auth_header[6:]).decode("utf-8")
+                username, password = decoded.split(":", 1)
+                if (
+                    _secrets.compare_digest(username.encode(), AI_AUTH_USER.encode())
+                    and _secrets.compare_digest(password.encode(), AI_AUTH_PASS.encode())
+                ):
+                    return username
+            except Exception:
+                pass
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
         )
-        correct_pass = _secrets.compare_digest(
-            credentials.password.encode(), AI_AUTH_PASS.encode()
-        )
-        if not (correct_user and correct_pass):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials",
-                headers={"WWW-Authenticate": "Basic"},
-            )
-        return credentials.username
 
     _ai_auth_dep = [Depends(_verify_ai_auth)]
     logger.info("AI service: HTTP Basic auth ENABLED")
