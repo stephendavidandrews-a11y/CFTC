@@ -329,10 +329,12 @@ async def update_participant(
 @router.delete("/{meeting_id}/participants/{participant_id}")
 async def remove_participant(meeting_id: str, participant_id: str, db=Depends(get_db)):
     """Remove a participant from a meeting."""
-    db.execute(
+    cursor = db.execute(
         "DELETE FROM meeting_participants WHERE id = ? AND meeting_id = ?",
         (participant_id, meeting_id),
     )
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Participant not found")
     db.commit()
     return {"deleted": True}
 

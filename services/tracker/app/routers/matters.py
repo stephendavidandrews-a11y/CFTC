@@ -29,6 +29,11 @@ from app.idempotency import claim_idempotency_key, finalize_idempotency_key
 router = APIRouter(prefix="/matters", tags=["matters"])
 
 
+def _sanitize_ext(cols: dict) -> dict:
+    """Convert empty strings to None for FK-safe INSERT/UPDATE."""
+    return {k: (None if v == "" else v) for k, v in cols.items()}
+
+
 def next_matter_number(db) -> str:
     """Generate MAT-YYYY-NNNN using atomic sequence table."""
     year = datetime.now().year
@@ -130,7 +135,13 @@ async def list_matters(
                    WHEN mr.current_comment_period_closes IS NULL THEN NULL
                    WHEN mr.current_comment_period_closes >= date('now') THEN 'open'
                    ELSE 'closed'
-               END AS comment_period_status
+               END AS comment_period_status,
+               mg.instrument_type,
+               mg.cftc_letter_number,
+               mg.issuance_date AS guidance_issuance_date,
+               me.enforcement_reference,
+               me.litigation_stage,
+               me.is_confidential
         FROM matters m
         LEFT JOIN people p ON m.assigned_to_person_id = p.id
         LEFT JOIN organizations co ON m.client_organization_id = co.id
@@ -475,35 +486,29 @@ async def create_matter(
         ),
     )
     # Insert extension row if applicable
-    raw_body = await request.json() if hasattr(request, '_body') else {}
-    # Re-parse raw body for extension fields
     try:
         raw_body = json.loads(await request.body())
     except Exception:
         raw_body = {}
     ext_data = raw_body.get("extension", {})
     if ext_data and isinstance(ext_data, dict):
-        ext_id = str(uuid.uuid4())
         if body.matter_type == "rulemaking":
             ext_model = CreateMatterRulemaking(**ext_data)
-            cols = ext_model.model_dump()
-            cols["id"] = ext_id
+            cols = _sanitize_ext(ext_model.model_dump())
             cols["matter_id"] = matter_id
             col_names = ", ".join(cols.keys())
             placeholders = ", ".join("?" * len(cols))
             db.execute(f"INSERT INTO matter_rulemaking ({col_names}) VALUES ({placeholders})", list(cols.values()))
         elif body.matter_type == "guidance":
             ext_model = CreateMatterGuidance(**ext_data)
-            cols = ext_model.model_dump()
-            cols["id"] = ext_id
+            cols = _sanitize_ext(ext_model.model_dump())
             cols["matter_id"] = matter_id
             col_names = ", ".join(cols.keys())
             placeholders = ", ".join("?" * len(cols))
             db.execute(f"INSERT INTO matter_guidance ({col_names}) VALUES ({placeholders})", list(cols.values()))
         elif body.matter_type == "enforcement":
             ext_model = CreateMatterEnforcement(**ext_data)
-            cols = ext_model.model_dump()
-            cols["id"] = ext_id
+            cols = _sanitize_ext(ext_model.model_dump())
             cols["matter_id"] = matter_id
             col_names = ", ".join(cols.keys())
             placeholders = ", ".join("?" * len(cols))
@@ -546,6 +551,14 @@ async def update_matter(
 
     data = body.model_dump(exclude_unset=True)
 
+    # Block matter_type changes -- extension tables are keyed to the original type
+    if "matter_type" in data and data["matter_type"] != old["matter_type"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot change matter_type from '{old['matter_type']}' to '{data['matter_type']}'. "
+                   "Create a new matter instead.",
+        )
+
     # Parse extension fields from raw body
     try:
         raw_body = json.loads(await request.body())
@@ -576,7 +589,7 @@ async def update_matter(
         mt = old["matter_type"]
         if mt == "rulemaking":
             ext_model = UpdateMatterRulemaking(**ext_data)
-            ext_fields = ext_model.model_dump(exclude_unset=True)
+            ext_fields = _sanitize_ext(ext_model.model_dump(exclude_unset=True))
             if ext_fields:
                 existing = db.execute("SELECT matter_id FROM matter_rulemaking WHERE matter_id = ?", (matter_id,)).fetchone()
                 if existing:
@@ -584,14 +597,13 @@ async def update_matter(
                     ext_params = list(ext_fields.values()) + [matter_id]
                     db.execute(f"UPDATE matter_rulemaking SET {', '.join(ext_sets)} WHERE matter_id = ?", ext_params)
                 else:
-                    ext_fields["id"] = str(uuid.uuid4())
                     ext_fields["matter_id"] = matter_id
                     col_names = ", ".join(ext_fields.keys())
                     placeholders = ", ".join("?" * len(ext_fields))
                     db.execute(f"INSERT INTO matter_rulemaking ({col_names}) VALUES ({placeholders})", list(ext_fields.values()))
         elif mt == "guidance":
             ext_model = UpdateMatterGuidance(**ext_data)
-            ext_fields = ext_model.model_dump(exclude_unset=True)
+            ext_fields = _sanitize_ext(ext_model.model_dump(exclude_unset=True))
             if ext_fields:
                 existing = db.execute("SELECT matter_id FROM matter_guidance WHERE matter_id = ?", (matter_id,)).fetchone()
                 if existing:
@@ -599,14 +611,13 @@ async def update_matter(
                     ext_params = list(ext_fields.values()) + [matter_id]
                     db.execute(f"UPDATE matter_guidance SET {', '.join(ext_sets)} WHERE matter_id = ?", ext_params)
                 else:
-                    ext_fields["id"] = str(uuid.uuid4())
                     ext_fields["matter_id"] = matter_id
                     col_names = ", ".join(ext_fields.keys())
                     placeholders = ", ".join("?" * len(ext_fields))
                     db.execute(f"INSERT INTO matter_guidance ({col_names}) VALUES ({placeholders})", list(ext_fields.values()))
         elif mt == "enforcement":
             ext_model = UpdateMatterEnforcement(**ext_data)
-            ext_fields = ext_model.model_dump(exclude_unset=True)
+            ext_fields = _sanitize_ext(ext_model.model_dump(exclude_unset=True))
             if ext_fields:
                 existing = db.execute("SELECT matter_id FROM matter_enforcement WHERE matter_id = ?", (matter_id,)).fetchone()
                 if existing:
@@ -614,11 +625,28 @@ async def update_matter(
                     ext_params = list(ext_fields.values()) + [matter_id]
                     db.execute(f"UPDATE matter_enforcement SET {', '.join(ext_sets)} WHERE matter_id = ?", ext_params)
                 else:
-                    ext_fields["id"] = str(uuid.uuid4())
                     ext_fields["matter_id"] = matter_id
                     col_names = ", ".join(ext_fields.keys())
                     placeholders = ", ".join("?" * len(ext_fields))
                     db.execute(f"INSERT INTO matter_enforcement ({col_names}) VALUES ({placeholders})", list(ext_fields.values()))
+
+    # Capture old extension for audit trail
+    old_ext = None
+    if ext_data:
+        mt_for_audit = old["matter_type"]
+        if mt_for_audit == "rulemaking":
+            row = db.execute("SELECT * FROM matter_rulemaking WHERE matter_id = ?", (matter_id,)).fetchone()
+            old_ext = dict(row) if row else None
+        elif mt_for_audit == "guidance":
+            row = db.execute("SELECT * FROM matter_guidance WHERE matter_id = ?", (matter_id,)).fetchone()
+            old_ext = dict(row) if row else None
+        elif mt_for_audit == "enforcement":
+            row = db.execute("SELECT * FROM matter_enforcement WHERE matter_id = ?", (matter_id,)).fetchone()
+            old_ext = dict(row) if row else None
+
+    old_record_with_ext = dict(old)
+    if old_ext:
+        old_record_with_ext["extension"] = old_ext
 
     log_event(
         db,
@@ -626,7 +654,7 @@ async def update_matter(
         record_id=matter_id,
         action="update",
         source=write_source,
-        old_record=old,
+        old_record=old_record_with_ext,
         new_data={**data, **({"extension": ext_data} if ext_data else {})},
     )
     db.commit()
@@ -712,9 +740,11 @@ async def add_matter_person(matter_id: str, body: AddMatterPerson, db=Depends(ge
 @router.delete("/{matter_id}/people/{mp_id}")
 async def remove_matter_person(matter_id: str, mp_id: str, db=Depends(get_db)):
     """Remove a stakeholder from a matter."""
-    db.execute(
+    cursor = db.execute(
         "DELETE FROM matter_people WHERE id = ? AND matter_id = ?", (mp_id, matter_id)
     )
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Stakeholder link not found")
     db.commit()
     return {"deleted": True}
 
@@ -765,10 +795,12 @@ async def add_matter_org(matter_id: str, body: AddMatterOrg, db=Depends(get_db))
 @router.delete("/{matter_id}/orgs/{mo_id}")
 async def remove_matter_org(matter_id: str, mo_id: str, db=Depends(get_db)):
     """Remove an organization from a matter."""
-    db.execute(
+    cursor = db.execute(
         "DELETE FROM matter_organizations WHERE id = ? AND matter_id = ?",
         (mo_id, matter_id),
     )
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Organization link not found")
     db.commit()
     return {"deleted": True}
 
@@ -860,10 +892,12 @@ async def add_matter_tag(matter_id: str, body: dict, db=Depends(get_db)):
 @router.delete("/{matter_id}/tags/{tag_id}")
 async def remove_matter_tag(matter_id: str, tag_id: str, db=Depends(get_db)):
     """Remove a tag from a matter."""
-    db.execute(
+    cursor = db.execute(
         "DELETE FROM matter_tags WHERE matter_id = ? AND tag_id = ?",
         (matter_id, tag_id),
     )
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Tag link not found")
     db.commit()
     return {"deleted": True}
 
@@ -898,10 +932,12 @@ async def add_matter_dependency(matter_id: str, body: dict, db=Depends(get_db)):
 @router.delete("/{matter_id}/dependencies/{dep_id}")
 async def remove_matter_dependency(matter_id: str, dep_id: str, db=Depends(get_db)):
     """Remove a dependency from a matter."""
-    db.execute(
+    cursor = db.execute(
         "DELETE FROM matter_dependencies WHERE id = ? AND matter_id = ?",
         (dep_id, matter_id),
     )
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Dependency not found")
     db.commit()
     return {"deleted": True}
 
@@ -940,9 +976,11 @@ async def add_matter_regulatory_id(
 @router.delete("/{matter_id}/regulatory-ids/{rid}")
 async def remove_matter_regulatory_id(matter_id: str, rid: str, db=Depends(get_db)):
     """Remove a regulatory ID from a matter."""
-    db.execute(
+    cursor = db.execute(
         "DELETE FROM matter_regulatory_ids WHERE id = ? AND matter_id = ?",
         (rid, matter_id),
     )
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Regulatory ID not found")
     db.commit()
     return {"deleted": True}

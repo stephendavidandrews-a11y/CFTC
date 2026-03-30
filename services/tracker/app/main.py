@@ -250,6 +250,9 @@ app.include_router(capture.router, prefix=router_prefix)
 # -- Global exception handler --
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
+    from fastapi import HTTPException as _HTTPException
+    if isinstance(exc, _HTTPException):
+        raise exc
     import traceback
 
     logger.error("Unhandled exception: %s\n%s", exc, traceback.format_exc())

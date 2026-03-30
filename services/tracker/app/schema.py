@@ -1281,7 +1281,15 @@ def migrate_schema(conn: sqlite3.Connection):
             continue
         logger.info("Applying migration v%d: %s", version, description)
         for sql in statements:
-            cursor.execute(sql)
+            try:
+                cursor.execute(sql)
+            except sqlite3.OperationalError as _e:
+                # Idempotency: skip duplicate column / index already exists errors
+                msg = str(_e).lower()
+                if "duplicate column name" in msg or "already exists" in msg:
+                    logger.debug("Migration v%d: skipping already-applied statement", version)
+                else:
+                    raise
         cursor.execute(
             "INSERT INTO schema_versions (version, description) VALUES (?, ?)",
             (version, description),
