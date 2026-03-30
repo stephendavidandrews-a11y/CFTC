@@ -19,6 +19,7 @@ with task_mode: "follow_up").
 """
 
 import json
+import re
 import logging
 
 logger = logging.getLogger(__name__)
@@ -57,13 +58,23 @@ def _resolve_matter_id(bundle: dict, refs: dict) -> str | None:
 
 
 def _resolve_ref(value: str | None, refs: dict, prefix: str) -> str | None:
-    """Resolve a value that might be a forward reference."""
+    """Resolve a value that might be a forward reference.
+
+    Returns the resolved $ref if found in refs, the raw value if it looks
+    like a UUID (already resolved), or None if it's an unresolvable name.
+    Returning raw names would cause FK constraint failures.
+    """
     if not value:
         return None
     key = f"{prefix}:{value}"
     if key in refs:
         return f"$ref:{refs[key]}"
-    return value
+    # If the value looks like a UUID, pass it through (already resolved)
+    _UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+    if _UUID_RE.match(value):
+        return value
+    # Not a UUID and not in refs — return None to avoid FK violations
+    return None
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -145,7 +156,7 @@ def convert_new_matter_bundle(
             "title": proposed.get("title"),
             "matter_type": proposed.get("matter_type"),
             "description": proposed.get("description"),
-            "status": proposed.get("status", "new intake"),
+            "status": proposed.get("status", "active"),
             "priority": proposed.get("priority"),
             "sensitivity": proposed.get("sensitivity"),
             "blocker": proposed.get("blocker"),

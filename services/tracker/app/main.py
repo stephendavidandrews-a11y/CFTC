@@ -9,9 +9,8 @@ import sqlite3
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends, HTTPException, Request, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
 import hashlib
 import hmac
 import secrets
@@ -51,7 +50,6 @@ from app.routers import capture
 from app.routers import config as config_router
 
 logger = logging.getLogger(__name__)
-security = HTTPBasic(auto_error=False)
 
 _SESSION_COOKIE = "tracker_session"
 _SESSION_MAX_AGE = 7 * 24 * 3600  # 7 days
@@ -86,11 +84,12 @@ def _verify_session(token: str) -> str | None:
         return None
 
 
-async def verify_auth(
-    request: Request,
-    credentials: HTTPBasicCredentials | None = Depends(security),
-):
-    """Check session cookie first, fall back to HTTP Basic Auth."""
+async def verify_auth(request: Request):
+    """Check session cookie first, fall back to HTTP Basic Auth header.
+
+    Does NOT use FastAPI's HTTPBasic scheme to avoid WWW-Authenticate
+    headers that trigger browser native auth popups.
+    """
     # Check session cookie
     cookie = request.cookies.get(_SESSION_COOKIE)
     if cookie:
@@ -98,33 +97,29 @@ async def verify_auth(
         if username:
             return username
 
-    # No valid cookie — require Basic Auth
-    if not credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    if not AUTH_USER or not AUTH_PASS:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Authentication not configured — set TRACKER_USER and TRACKER_PASS",
-        )
-    correct_user = secrets.compare_digest(
-        credentials.username.encode(), AUTH_USER.encode()
+    # Check Authorization header manually (for AI service, curl, etc.)
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.startswith("Basic "):
+        try:
+            import base64
+            decoded = base64.b64decode(auth_header[6:]).decode("utf-8")
+            username, password = decoded.split(":", 1)
+            if (
+                AUTH_USER
+                and AUTH_PASS
+                and secrets.compare_digest(username.encode(), AUTH_USER.encode())
+                and secrets.compare_digest(password.encode(), AUTH_PASS.encode())
+            ):
+                request.state.set_session_cookie = username
+                return username
+        except Exception:
+            pass
+
+    # No valid auth
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Authentication required",
     )
-    correct_pass = secrets.compare_digest(
-        credentials.password.encode(), AUTH_PASS.encode()
-    )
-    if not (correct_user and correct_pass):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    # Valid Basic Auth — set session cookie on response
-    request.state.set_session_cookie = credentials.username
-    return credentials.username
 
 
 def _check_db_integrity(db_path, label: str) -> bool:
@@ -228,6 +223,19 @@ app.add_middleware(
 )
 
 
+@app.exception_handler(401)
+async def auth_redirect_handler(request: Request, exc):
+    """Redirect browsers to login page on 401, return JSON for API clients."""
+    accept = request.headers.get("accept", "")
+    if "text/html" in accept and "/tracker/login" not in str(request.url):
+        from starlette.responses import RedirectResponse
+        return RedirectResponse(url="/tracker/login", status_code=303)
+    return JSONResponse(
+        status_code=401,
+        content={"detail": getattr(exc, "detail", "Authentication required")},
+    )
+
+
 @app.middleware("http")
 async def session_cookie_middleware(request: Request, call_next):
     """Set session cookie after successful Basic Auth login."""
@@ -244,6 +252,83 @@ async def session_cookie_middleware(request: Request, call_next):
             path="/",
         )
     return response
+
+# ── Login routes (no auth required) ──────────────────────────────────────
+
+_LOGIN_HTML = """<!DOCTYPE html>
+<html><head>
+<title>CFTC Command Center — Login</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { background: #0a0f1a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+         display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+  .card { background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 40px;
+          width: 340px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+  h1 { font-size: 18px; margin: 0 0 24px; color: #93c5fd; text-align: center; }
+  label { display: block; font-size: 12px; font-weight: 600; color: #94a3b8; margin-bottom: 4px; }
+  input { width: 100%; padding: 10px 12px; border-radius: 6px; border: 1px solid #334155;
+          background: #1e293b; color: #e2e8f0; font-size: 14px; box-sizing: border-box; margin-bottom: 16px; }
+  input:focus { outline: none; border-color: #3b82f6; }
+  button { width: 100%; padding: 10px; border-radius: 8px; border: none; background: #3b82f6;
+           color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+  button:hover { background: #2563eb; }
+  .error { color: #ef4444; font-size: 13px; text-align: center; margin-bottom: 12px; display: none; }
+</style></head><body>
+<div class="card">
+  <h1>CFTC Command Center</h1>
+  <div class="error" id="err">Invalid credentials</div>
+  <form method="POST" action="/tracker/login" id="form">
+    <label>Username</label><input name="username" autocomplete="username" required autofocus>
+    <label>Password</label><input name="password" type="password" autocomplete="current-password" required>
+    <button type="submit">Sign In</button>
+  </form>
+</div>
+<script>
+  const params = new URLSearchParams(location.search);
+  if (params.get('error') === '1') document.getElementById('err').style.display = 'block';
+</script>
+</body></html>"""
+
+
+@app.get("/tracker/login", response_class=HTMLResponse, include_in_schema=False)
+async def login_page():
+    return _LOGIN_HTML
+
+
+@app.post("/tracker/login", include_in_schema=False)
+async def login_submit(request: Request):
+    form = await request.form()
+    username = form.get("username", "")
+    password = form.get("password", "")
+
+    if (
+        AUTH_USER
+        and AUTH_PASS
+        and secrets.compare_digest(username.encode(), AUTH_USER.encode())
+        and secrets.compare_digest(password.encode(), AUTH_PASS.encode())
+    ):
+        token = _sign_session(username)
+        response = JSONResponse(
+            content={"ok": True},
+            status_code=303,
+            headers={"Location": "/"},
+        )
+        response.set_cookie(
+            key=_SESSION_COOKIE,
+            value=token,
+            max_age=_SESSION_MAX_AGE,
+            httponly=True,
+            samesite="lax",
+            path="/",
+        )
+        return response
+    else:
+        return HTMLResponse(
+            status_code=303,
+            content="",
+            headers={"Location": "/tracker/login?error=1"},
+        )
+
 
 # Mount routers — all under /tracker/ prefix, all require auth
 router_prefix = "/tracker"

@@ -403,10 +403,18 @@ async def batch_write(
                 data = {k: (None if v == "" else v) for k, v in data.items()}
                 columns = ", ".join(data.keys())
                 placeholders = ", ".join(["?"] * len(data))
-                db.execute(
-                    f"INSERT INTO {table} ({columns}) VALUES ({placeholders})",
-                    list(data.values()),
-                )
+                try:
+                    db.execute(
+                        f"INSERT INTO {table} ({columns}) VALUES ({placeholders})",
+                        list(data.values()),
+                    )
+                except Exception as insert_exc:
+                    logger.error(
+                        "INSERT INTO %s failed: %s  non_null_data=%r",
+                        table, insert_exc,
+                        {k: v for k, v in data.items() if v is not None},
+                    )
+                    raise
 
                 if op.get("client_id"):
                     id_map[op["client_id"]] = record_id
@@ -447,6 +455,7 @@ async def batch_write(
                 if "updated_at" in valid_columns:
                     data["updated_at"] = now
                 sets = [f"{key} = ?" for key in data]
+                data = {k: (None if v == "" else v) for k, v in data.items()}
                 params = list(data.values()) + [record_id]
 
                 expected_updated_at = meta.get("expected_updated_at")

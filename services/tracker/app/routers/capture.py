@@ -7,8 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 import secrets as _secrets
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi import Request, APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
 
 from app.config import (
     AUTH_USER,
@@ -29,19 +28,36 @@ from app.config import PI_SSH_HOST, PI_SSH_USER
 from app.jobs.capture_alerts import evaluate_alerts, get_open_alerts, get_alert_history
 
 log = logging.getLogger(__name__)
-_security = HTTPBasic()
 
 
-def _verify_capture_auth(credentials: HTTPBasicCredentials = Depends(_security)):
-    correct_user = _secrets.compare_digest(credentials.username.encode(), AUTH_USER.encode())
-    correct_pass = _secrets.compare_digest(credentials.password.encode(), AUTH_PASS.encode())
-    if not (correct_user and correct_pass):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    return credentials.username
+def _verify_capture_auth(request: Request):
+    # Check session cookie first (set by /tracker/login)
+    cookie = request.cookies.get("tracker_session")
+    if cookie:
+        from app.main import _verify_session
+        username = _verify_session(cookie)
+        if username:
+            return username
+
+    # Check Authorization header manually (for Pi, AI service, curl)
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.startswith("Basic "):
+        try:
+            import base64
+            decoded = base64.b64decode(auth_header[6:]).decode("utf-8")
+            username, password = decoded.split(":", 1)
+            if (
+                _secrets.compare_digest(username.encode(), AUTH_USER.encode())
+                and _secrets.compare_digest(password.encode(), AUTH_PASS.encode())
+            ):
+                return username
+        except Exception:
+            pass
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Authentication required",
+    )
 router = APIRouter(tags=["capture"])
 
 # --- In-memory state ---
@@ -61,10 +77,10 @@ def normalize_status(heartbeat: dict) -> str:
     'offline' is never returned here — set by the staleness timer.
     Precedence: error > recording > idle.
     """
-    if heartbeat.get("error_detail"):
+    if heartbeat.get("error_detail") and heartbeat.get("capture_service") == "active":
         return "error"
     if heartbeat.get("capture_service") != "active":
-        return "error"
+        return "stopped"
     if heartbeat.get("segment_open"):
         return "recording"
     return "idle"
@@ -421,6 +437,16 @@ _ALLOWED_ACTIONS = {
         "description": "Restart the audio capture daemon",
         "verify_cmd": "systemctl is-active sauron-capture",
     },
+    "stop-capture": {
+        "cmd": "sudo systemctl stop sauron-capture",
+        "description": "Stop the audio capture daemon (mute)",
+        "verify_cmd": "systemctl is-active sauron-capture || true",
+    },
+    "start-capture": {
+        "cmd": "sudo systemctl start sauron-capture",
+        "description": "Start the audio capture daemon (unmute)",
+        "verify_cmd": "systemctl is-active sauron-capture",
+    },
     "diagnose": {
         "cmd": (
             "echo '=== Services ===' && "
@@ -535,7 +561,7 @@ async def execute_capture_action(
 ):
     """Execute a safe, scoped management action on the Pi.
 
-    Allowed actions: diagnose, restart-heartbeat, restart-capture.
+    Allowed actions: diagnose, restart-heartbeat, restart-capture, stop-capture, start-capture.
     Rate-limited to one execution per action per 60 seconds.
     For restart-capture: requires force=true if currently recording.
     """
@@ -547,13 +573,13 @@ async def execute_capture_action(
 
     action_def = _ALLOWED_ACTIONS[action_name]
 
-    # Safety: block restart-capture while recording unless force=true
-    if action_name == "restart-capture":
+    # Safety: block restart/stop while recording unless force=true
+    if action_name in ("restart-capture", "stop-capture"):
         current_state = _last_status.get("state") if _last_status else None
         if current_state == "recording" and not force:
             raise HTTPException(
                 status_code=409,
-                detail="Capture is currently recording. Pass force=true to restart anyway (may lose in-progress segment).",
+                detail="Capture is currently recording. Pass force=true to stop anyway (may lose in-progress segment).",
             )
 
     # Check cooldown

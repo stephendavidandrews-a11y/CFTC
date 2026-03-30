@@ -19,7 +19,7 @@ export default function WorkTab({ matterId, activeTab }) {
   const { openDrawer } = useDrawer();
 
   const { data: tasksData, refetch: refetchTasks } = useLazyTab(
-    "Tasks", activeTab, () => listTasks({ matter_id: matterId }), [matterId]
+    "Work", activeTab, () => listTasks({ matter_id: matterId }), [matterId]
   );
   const tasks = tasksData?.items || tasksData || [];
 

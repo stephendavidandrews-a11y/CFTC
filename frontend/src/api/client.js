@@ -54,13 +54,18 @@ export async function fetchJSON(url, options = {}) {
 
     try {
       const response = await fetch(`${BASE}${url}`, {
-        headers: { "Content-Type": "application/json", "X-Write-Source": "human", "X-Request-ID": generateRequestId(), ...customHeaders },
+        headers: { "Content-Type": "application/json", "X-Write-Source": "manual", "X-Request-ID": generateRequestId(), ...customHeaders },
         signal: controller.signal,
         ...restOptions,
       });
       clearTimeout(timeoutId);
 
       if (!response.ok) {
+        // Redirect to login on auth failure (session expired or missing)
+        if (response.status === 401 && !url.includes('/tracker/login')) {
+          window.location.href = '/tracker/login';
+          return new Promise(() => {}); // never resolves — page is navigating away
+        }
         if (RETRYABLE_STATUSES.has(response.status) && attempt < MAX_RETRIES) {
           await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
           continue;

@@ -118,13 +118,47 @@ export default function MatterDetailPage() {
 
   useEffect(() => {
     if (!id) return;
-    getMatterTags(id).then((res) => setTags(Array.isArray(res) ? res : (res?.items || res || []))).catch(() => {});
-    listTags("matter").then((res) => setAllTags(res?.items || res || [])).catch(() => {});
-  }, [id]);
+    let cancelled = false;
+    getMatterTags(id)
+      .then((res) => {
+        if (!cancelled) setTags(Array.isArray(res) ? res : (res?.items || res || []));
+      })
+      .catch((err) => {
+        console.error(err);
+        if (!cancelled) {
+          setTags([]);
+          toast.error(err.message || "Failed to load matter tags");
+        }
+      });
+    listTags("matter")
+      .then((res) => {
+        if (!cancelled) setAllTags(res?.items || res || []);
+      })
+      .catch((err) => {
+        console.error(err);
+        if (!cancelled) {
+          setAllTags([]);
+          toast.error(err.message || "Failed to load tag catalog");
+        }
+      });
+    return () => { cancelled = true; };
+  }, [id, toast]);
 
   useEffect(() => {
-    getEnums().then((data) => setLoadedEnums(data || {})).catch(() => {});
-  }, []);
+    let cancelled = false;
+    getEnums()
+      .then((data) => {
+        if (!cancelled) setLoadedEnums(data || {});
+      })
+      .catch((err) => {
+        console.error(err);
+        if (!cancelled) {
+          setLoadedEnums({});
+          toast.error(err.message || "Failed to load enum lookups");
+        }
+      });
+    return () => { cancelled = true; };
+  }, [toast]);
 
   const handleAddTag = useCallback(async () => {
     if (!selectedTagId) return;
@@ -394,23 +428,23 @@ export default function MatterDetailPage() {
                   {ext.cftc_letter_number && <div><span style={{ color: "#888" }}>CFTC Letter Number</span> <span style={valStyle}>{ext.cftc_letter_number}</span></div>}
                   {ext.workflow_status && <div><span style={{ color: "#888" }}>Workflow Status</span> <span style={valStyle}>{ext.workflow_status}</span></div>}
                   {ext.published_in_fr != null && <div><Badge bg={ext.published_in_fr ? "rgba(129,199,132,0.15)" : "rgba(136,136,136,0.15)"} text={ext.published_in_fr ? "#81c784" : "#888"} label={ext.published_in_fr ? "Published in FR" : "Not in FR"} /></div>}
-                  {(ext.requestor_name || ext.requestor_org) && <div><span style={{ color: "#888" }}>Requestor</span> <span style={valStyle}>{[ext.requestor_name, ext.requestor_org].filter(Boolean).join(", ")}</span></div>}
+                  {(ext.requestor_name || ext.requestor_organization_id) && <div><span style={{ color: "#888" }}>Requestor</span> <span style={valStyle}>{[ext.requestor_name, ext.requestor_organization_id].filter(Boolean).join(", ")}</span></div>}
                   {ext.requestor_counsel && <div><span style={{ color: "#888" }}>Requestor Counsel</span> <span style={valStyle}>{ext.requestor_counsel}</span></div>}
                   {ext.request_date && <div><span style={{ color: "#888" }}>Request Date</span> <span style={valStyle}>{formatDate(ext.request_date)}</span></div>}
-                  {ext.issuing_office && <div><span style={{ color: "#888" }}>Issuing Office</span> <span style={valStyle}>{ext.issuing_office}</span></div>}
-                  {ext.signatory && <div><span style={{ color: "#888" }}>Signatory</span> <span style={valStyle}>{ext.signatory}</span></div>}
-                  {ext.staff_contact && <div><span style={{ color: "#888" }}>Staff Contact</span> <span style={valStyle}>{ext.staff_contact}</span></div>}
+                  {ext.issuing_office_id && <div><span style={{ color: "#888" }}>Issuing Office</span> <span style={valStyle}>{ext.issuing_office_id}</span></div>}
+                  {ext.signatory_person_id && <div><span style={{ color: "#888" }}>Signatory</span> <span style={valStyle}>{ext.signatory_person_id}</span></div>}
+                  {ext.staff_contact_person_id && <div><span style={{ color: "#888" }}>Staff Contact</span> <span style={valStyle}>{ext.staff_contact_person_id}</span></div>}
                   {ext.legal_question && <div style={{ gridColumn: "1 / -1" }}><span style={{ color: "#888" }}>Legal Question</span> <span style={{ ...valStyle, whiteSpace: "pre-wrap" }}>{ext.legal_question}</span></div>}
                   {ext.cea_provisions && <div><span style={{ color: "#888" }}>CEA Provisions</span> <span style={valStyle}>{ext.cea_provisions}</span></div>}
                   {ext.cfr_provisions && <div><span style={{ color: "#888" }}>CFR Provisions</span> <span style={valStyle}>{ext.cfr_provisions}</span></div>}
                   {ext.conditions_summary && <div style={{ gridColumn: "1 / -1" }}><span style={{ color: "#888" }}>Conditions Summary</span> <span style={{ ...valStyle, whiteSpace: "pre-wrap" }}>{ext.conditions_summary}</span></div>}
-                  {ext.amends_matter && <div><span style={{ color: "#888" }}>Amends Matter</span> <span style={valStyle}><a href={`/matters/${ext.amends_matter}`} style={{ color: theme.accent.blue }}>{ext.amends_matter}</a></span></div>}
+                  {ext.amends_matter_id && <div><span style={{ color: "#888" }}>Amends Matter</span> <span style={valStyle}><a href={`/matters/${ext.amends_matter_id}`} style={{ color: theme.accent.blue }}>{ext.amends_matter_id}</a></span></div>}
                   {ext.prior_letter_number && <div><span style={{ color: "#888" }}>Prior Letter Number</span> <span style={valStyle}>{ext.prior_letter_number}</span></div>}
                   {ext.issuance_date && <div><span style={{ color: "#888" }}>Issuance Date</span> <span style={valStyle}>{formatDate(ext.issuance_date)}</span></div>}
                   {ext.expiration_date && <div><span style={{ color: "#888" }}>Expiration Date</span> <span style={valStyle}>{formatDate(ext.expiration_date)}</span></div>}
                 </>)}
                 {matter.matter_type === "enforcement" && (<>
-                  {ext.requesting_division && <div><span style={{ color: "#888" }}>Requesting Division</span> <span style={valStyle}>{ext.requesting_division}</span></div>}
+                  {ext.requesting_division_id && <div><span style={{ color: "#888" }}>Requesting Division</span> <span style={valStyle}>{ext.requesting_division_id}</span></div>}
                   {ext.enforcement_reference && <div><span style={{ color: "#888" }}>Enforcement Reference</span> <span style={valStyle}>{ext.enforcement_reference}</span></div>}
                   {ext.workflow_status && <div><span style={{ color: "#888" }}>Workflow Status</span> <span style={valStyle}>{ext.workflow_status}</span></div>}
                   {ext.legal_issue_type && <div><span style={{ color: "#888" }}>Legal Issue Type</span> <span style={valStyle}>{ext.legal_issue_type}</span></div>}
@@ -419,7 +453,7 @@ export default function MatterDetailPage() {
                   {ext.court_or_forum && <div><span style={{ color: "#888" }}>Court/Forum</span> <span style={valStyle}>{ext.court_or_forum}</span></div>}
                   {ext.deadline_source && <div><span style={{ color: "#888" }}>Deadline Source</span> <span style={valStyle}>{ext.deadline_source}</span></div>}
                   {ext.privilege_flags && <div><span style={{ color: "#888" }}>Privilege Flags</span> <span style={valStyle}>{ext.privilege_flags}</span></div>}
-                  {ext.confidential && <div><Badge bg="rgba(239,83,80,0.15)" text="#ef5350" label="Confidential" /></div>}
+                  {!!ext.is_confidential && <div><Badge bg="rgba(239,83,80,0.15)" text="#ef5350" label="Confidential" /></div>}
                 </>)}
               </div>
             </div>

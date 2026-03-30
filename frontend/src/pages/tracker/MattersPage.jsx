@@ -32,7 +32,7 @@ function timeAgo(d) {
   return `${Math.floor(diffDays / 7)} weeks ago`;
 }
 
-// Saved view presets — client-side filters on the loaded data
+// Saved view presets - client-side filters on the loaded data
 const isOpen = (m) => m.status !== "closed";
 const isActive = (m) => isOpen(m) && m.status !== "paused";
 
@@ -41,7 +41,7 @@ const SAVED_VIEWS = [
   { label: "Critical This Week", filter: (m) => isActive(m) && m.priority === "critical this week" },
   { label: "Has Pending Decisions", filter: (m) => isActive(m) && m.pending_decisions > 0 },
   { label: "Needs My Attention", filter: (m) => isActive(m) && (m.next_step_owner_name === "You" || m.owner_name === "You") },
-  { label: "High Sensitivity", filter: (m) => isActive(m) && ["leadership_sensitive", "enforcement_sensitive", "congressional_sensitive"].includes(m.sensitivity) },
+  { label: "High Sensitivity", filter: (m) => isActive(m) && ["leadership-sensitive", "enforcement-sensitive", "congressional-sensitive"].includes(m.sensitivity) },
   { label: "Stale Matters", filter: (m) => {
     if (!isOpen(m)) return false;
     if (!m.updated_at) return true;
@@ -51,6 +51,7 @@ const SAVED_VIEWS = [
   { label: "Paused", filter: (m) => isOpen(m) && m.status === "paused" },
   { label: "Blocked", filter: (m) => isActive(m) && m.blocker },
   { label: "Comment Period Open", filter: (m) => isActive(m) && m.comment_period_status === "open" },
+  { label: "FR Pipeline", filter: (m) => isActive(m) && m.source === "fr_pipeline" },
 ];
 
 
@@ -103,9 +104,9 @@ export default function MattersPage() {
     });
   }, [rawMatters, activeView]);
 
-  const statusOpts = ["active", "paused", "closed"];
+  const statusOpts = enums?.matter_status || ["active", "paused", "closed"];
   const priorityOpts = enums?.priority || [];
-  const typeOpts = ["rulemaking", "guidance", "enforcement", "congressional", "briefing", "administrative", "inquiry", "other"];
+  const typeOpts = enums?.matter_type || ["rulemaking", "guidance", "enforcement", "congressional", "policy", "other"];
 
   const columns = [
     {
@@ -113,7 +114,15 @@ export default function MattersPage() {
       render: (val, row) => (
         <div style={{ minWidth: 200 }}>
           <div style={{ color: theme.accent.blueLight, fontWeight: 500 }}>{val}</div>
-          {row.matter_number && <div style={{ fontSize: 10, color: theme.text.dim, marginTop: 2 }}>{row.matter_number}</div>}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
+            {row.matter_number && <span style={{ fontSize: 10, color: theme.text.dim }}>{row.matter_number}</span>}
+            {row.rin && <span style={{ fontSize: 10, color: theme.accent.purple, fontFamily: theme.font.mono }}>{row.rin}</span>}
+          </div>
+          {row.description && (
+            <div style={{ fontSize: 11, color: theme.text.faint, marginTop: 2, maxWidth: 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {row.description.split("\n")[0].slice(0, 120)}
+            </div>
+          )}
         </div>
       ),
     },
@@ -135,12 +144,12 @@ export default function MattersPage() {
             <Badge bg={s.bg} text={s.text} label={s.label || val || "\u2014"} />
             {row.comment_period_status === "open" && (
               <div style={{ fontSize: 10, color: "#ffb74d", marginTop: 3 }}>
-                Comments close {formatShortDate(row.comment_period_closes)}
+                Comments close {formatShortDate(row.current_comment_period_closes)}
               </div>
             )}
-            {row.comment_period_status === "closed" && row.comment_period_closes && (
+            {row.comment_period_status === "closed" && row.current_comment_period_closes && (
               <div style={{ fontSize: 10, color: theme.text.faint, marginTop: 3 }}>
-                Comments closed {formatShortDate(row.comment_period_closes)}
+                Comments closed {formatShortDate(row.current_comment_period_closes)}
               </div>
             )}
           </div>
@@ -150,7 +159,7 @@ export default function MattersPage() {
     {
       key: "deadline", label: "Next Deadline", width: 100,
       render: (val, row) => {
-        const candidates = [row.work_deadline, row.external_deadline, row.comment_period_closes].filter(Boolean);
+        const candidates = [row.work_deadline, row.external_deadline, row.current_comment_period_closes].filter(Boolean);
         const d = candidates.length ? candidates.reduce((a, b) => (a < b ? a : b)) : null;
         if (!d) return <span style={{ color: theme.text.faint }}>{"\u2014"}</span>;
         const isOverdue = new Date(d) < new Date();
@@ -236,9 +245,9 @@ export default function MattersPage() {
               borderRadius: 16,
               fontSize: 12,
               cursor: "pointer",
-              background: i === activeView ? "#1e3a5f" : theme.bg.input,
-              color: i === activeView ? theme.accent.blueLight : theme.text.muted,
-              border: `1px solid ${i === activeView ? theme.accent.blue : theme.border.default}`,
+              background: i === activeView ? (view.label === "FR Pipeline" ? "rgba(167,139,250,0.15)" : "#1e3a5f") : theme.bg.input,
+              color: i === activeView ? (view.label === "FR Pipeline" ? theme.accent.purple : theme.accent.blueLight) : theme.text.muted,
+              border: `1px solid ${i === activeView ? (view.label === "FR Pipeline" ? theme.accent.purple : theme.accent.blue) : theme.border.default}`,
               fontWeight: i === activeView ? 600 : 400,
               transition: "all 0.15s",
               whiteSpace: "nowrap",
