@@ -249,6 +249,7 @@ async def session_cookie_middleware(request: Request, call_next):
             max_age=_SESSION_MAX_AGE,
             httponly=True,
             samesite="lax",
+            secure=True,
             path="/",
         )
     return response
@@ -319,6 +320,7 @@ async def login_submit(request: Request):
             max_age=_SESSION_MAX_AGE,
             httponly=True,
             samesite="lax",
+            secure=True,
             path="/",
         )
         return response

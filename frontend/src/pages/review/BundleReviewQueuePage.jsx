@@ -23,7 +23,7 @@ function formatDuration(seconds) {
 
 function formatRelativeTime(dateStr) {
   if (!dateStr) return "\u2014";
-  const d = new Date(dateStr);
+  const d = new Date(dateStr + "Z");
   const now = new Date();
   const diffMs = now - d;
   const diffMin = Math.floor(diffMs / 60000);

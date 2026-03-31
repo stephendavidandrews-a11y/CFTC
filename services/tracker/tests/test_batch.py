@@ -129,6 +129,44 @@ def test_batch_hard_delete_junction(client, auth_headers, db):
     assert row is None
 
 
+def test_batch_delete_directive_documents(client, auth_headers, db):
+    """Delete-only junction tables remain reachable through batch validation."""
+    directive_id = make_id()
+    document_id = make_id()
+    link_id = make_id()
+
+    db.execute(
+        "INSERT INTO policy_directives (id, source_document, source_document_type, directive_label, implementation_status, created_at, updated_at) "
+        "VALUES (?, 'memo', 'briefing_paper', 'Directive', 'not_started', datetime('now'), datetime('now'))",
+        (directive_id,),
+    )
+    db.execute(
+        "INSERT INTO documents (id, title, document_type, status, created_at, updated_at) "
+        "VALUES (?, 'Directive memo', 'briefing_paper', 'drafting', datetime('now'), datetime('now'))",
+        (document_id,),
+    )
+    db.execute(
+        "INSERT INTO directive_documents (id, directive_id, document_id, relationship_type, created_at) "
+        "VALUES (?, ?, ?, 'references', datetime('now'))",
+        (link_id, directive_id, document_id),
+    )
+    db.commit()
+
+    resp = _batch(
+        client,
+        auth_headers,
+        [
+            {"op": "delete", "table": "directive_documents", "record_id": link_id},
+        ],
+    )
+    assert resp.status_code == 200
+    row = db.execute(
+        "SELECT * FROM directive_documents WHERE id = ?", (link_id,)
+    ).fetchone()
+    assert row is None
+
+
+
 def test_batch_soft_delete(client, auth_headers, db):
     """Batch delete on 'organizations' sets is_active=0 (soft delete)."""
     org = seed_organization(db)

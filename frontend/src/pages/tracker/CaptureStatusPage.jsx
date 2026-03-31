@@ -8,10 +8,12 @@ import { titleStyle, subtitleStyle, cardStyle } from "../../styles/pageStyles";
 import useCaptureStatus from "../../hooks/useCaptureStatus";
 import useApi from "../../hooks/useApi";
 import { getCaptureTimeline, executeCaptureAction, getCaptureActionLog, getCaptureAlerts } from "../../api/tracker";
+import { useToastContext } from "../../contexts/ToastContext";
 
 const STATE_COLORS = {
   recording: { bg: "#052e16", text: "#22c55e", label: "Recording" },
   idle:      { bg: "#172554", text: "#3b82f6", label: "Idle" },
+  stopped:   { bg: "#1c1917", text: "#a8a29e", label: "Stopped" },
   offline:   { bg: "#1c1917", text: "#78716c", label: "Offline" },
   error:     { bg: "#450a0a", text: "#ef4444", label: "Error" },
 };
@@ -172,6 +174,7 @@ function Legend() {
 export default function CaptureStatusPage() {
   useEffect(() => { document.title = "Capture Status | Command Center"; }, []);
 
+  const toast = useToastContext();
   const { status, thresholds, connectionState, connected } = useCaptureStatus();
   const { data: timeline, loading: timelineLoading } = useApi(
     () => getCaptureTimeline(24), [], { refetchOnFocus: true }
@@ -196,16 +199,27 @@ export default function CaptureStatusPage() {
     setLogLoading(true);
     getCaptureActionLog(10).then(data => {
       setActionLog(data.actions || []);
-    }).catch(() => {}).finally(() => setLogLoading(false));
-    getCaptureAlerts().then(data => setAlerts(data.alerts || [])).catch(() => {});
-  }, []);
+    }).catch((err) => {
+      console.error(err);
+      setActionLog([]);
+      toast.error(err.message || "Failed to load capture action log");
+    }).finally(() => setLogLoading(false));
+    getCaptureAlerts().then(data => setAlerts(data.alerts || [])).catch((err) => {
+      console.error(err);
+      setAlerts([]);
+      toast.error(err.message || "Failed to load capture alerts");
+    });
+  }, [toast]);
 
   // Refresh alerts when WS broadcasts alert changes
   useEffect(() => {
     if (status && (status.type === "alert_opened" || status.type === "alert_resolved")) {
-      getCaptureAlerts().then(data => setAlerts(data.alerts || [])).catch(() => {});
+      getCaptureAlerts().then(data => setAlerts(data.alerts || [])).catch((err) => {
+        console.error(err);
+        toast.error(err.message || "Failed to refresh capture alerts");
+      });
     }
-  }, [status]);
+  }, [status, toast]);
 
   const runAction = async (action, force) => {
     setActionPending(action);
@@ -214,7 +228,10 @@ export default function CaptureStatusPage() {
       const result = await executeCaptureAction(action, force);
       setActionResult(result);
       // Refresh log
-      getCaptureActionLog(10).then(data => setActionLog(data.actions || [])).catch(() => {});
+      getCaptureActionLog(10).then(data => setActionLog(data.actions || [])).catch((err) => {
+        console.error(err);
+        toast.error(err.message || "Failed to refresh capture action log");
+      });
     } catch (err) {
       const detail = err.detail || err.message || "Request failed";
       setActionResult({ action, status: "error", error: detail, httpStatus: err.status });
@@ -308,7 +325,7 @@ export default function CaptureStatusPage() {
         }}>
           <MetricCell label="WiFi" value={status?.wifi_rssi != null ? status.wifi_rssi : null} unit="dBm"
             color={status?.wifi_rssi > -60 ? theme.accent.green : status?.wifi_rssi > -70 ? theme.accent.yellow : theme.accent.red} />
-          <MetricCell label="CPU Temp" value={status?.cpu_temp_c != null ? status.cpu_temp_c.toFixed(0) : null} unit="\u00b0C"
+          <MetricCell label="CPU Temp" value={status?.cpu_temp_c != null ? status.cpu_temp_c.toFixed(0) : null} unit="°C"
             color={status?.cpu_temp_c > 70 ? theme.accent.red : status?.cpu_temp_c > 55 ? theme.accent.yellow : theme.text.secondary} />
           <MetricCell label="Disk" value={status?.disk_used_pct != null ? status.disk_used_pct.toFixed(0) : null} unit="%"
             color={status?.disk_used_pct > 85 ? theme.accent.red : status?.disk_used_pct > 70 ? theme.accent.yellow : theme.text.secondary} />
@@ -367,6 +384,43 @@ export default function CaptureStatusPage() {
       {/* == Management Actions == */}
       <div style={{ ...cardStyle, marginBottom: 20 }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: theme.text.secondary, marginBottom: 12 }}>Management Actions</div>
+
+        {/* Capture toggle */}
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16, padding: "12px 16px", borderRadius: 8, background: (state === "recording" || state === "idle") ? "rgba(34,197,94,0.06)" : "rgba(120,113,108,0.08)", border: "1px solid " + ((state === "recording" || state === "idle") ? "rgba(34,197,94,0.15)" : "rgba(120,113,108,0.2)") }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: theme.text.secondary }}>
+              {state === "recording" || state === "idle" ? "Capture Active" : "Capture Stopped"}
+            </div>
+            <div style={{ fontSize: 11, color: theme.text.faint, marginTop: 2 }}>
+              {state === "recording" || state === "idle" ? "ReSpeaker mic is live. Audio is being monitored and recorded." : "ReSpeaker mic is off. No audio is being recorded."}
+            </div>
+          </div>
+          <button
+            disabled={!!actionPending}
+            onClick={() => {
+              const action = (state === "recording" || state === "idle") ? "stop-capture" : "start-capture";
+              if (state === "recording") {
+                if (!window.confirm("Capture is currently recording. Stop anyway? (may lose in-progress segment)")) return;
+                runAction(action, true);
+              } else {
+                runAction(action, false);
+              }
+            }}
+            style={{
+              padding: "10px 24px", borderRadius: 8, fontSize: 13, fontWeight: 700,
+              background: (state === "recording" || state === "idle") ? "#dc2626" : theme.accent.green,
+              color: "#fff",
+              border: "none",
+              cursor: actionPending ? "not-allowed" : "pointer",
+              opacity: actionPending ? 0.6 : 1,
+              transition: "all 0.2s",
+              minWidth: 100,
+            }}
+          >
+            {actionPending === "start-capture" || actionPending === "stop-capture" ? "Working..." : (state === "recording" || state === "idle") ? "Stop" : "Start"}
+          </button>
+        </div>
+
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
           {[
             { key: "diagnose", label: "Diagnose", desc: "Gather Pi diagnostics" },

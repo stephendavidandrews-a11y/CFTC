@@ -44,6 +44,8 @@ async def create_tag(body: CreateTag, db=Depends(get_db)):
 async def delete_tag(tag_id: str, db=Depends(get_db)):
     """Delete a tag and all its matter associations."""
     db.execute("DELETE FROM matter_tags WHERE tag_id = ?", (tag_id,))
-    db.execute("DELETE FROM tags WHERE id = ?", (tag_id,))
+    cursor = db.execute("DELETE FROM tags WHERE id = ?", (tag_id,))
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Tag not found")
     db.commit()
     return {"deleted": True}

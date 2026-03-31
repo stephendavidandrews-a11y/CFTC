@@ -9,6 +9,20 @@ from fastapi import HTTPException
 from app.bundle_review.models import BUNDLE_TERMINAL, ITEM_TERMINAL
 
 
+def _require_any(item_type: str, data: dict, field_names: tuple[str, ...]) -> None:
+    """Require that at least one alias field is present for the given item."""
+    if any(data.get(name) for name in field_names):
+        return
+    raise HTTPException(
+        400,
+        detail={
+            "error_type": "validation_failure",
+            "message": f"{item_type} requires one of: {', '.join(field_names)}",
+        },
+    )
+
+
+
 def validate_proposed_data(item_type: str, data: dict):
     """Validate item_type-specific required fields in proposed_data.
 
@@ -16,8 +30,6 @@ def validate_proposed_data(item_type: str, data: dict):
     """
     required = {}
     if item_type == "task":
-        required = {"title": str}
-    elif item_type == "follow_up":
         required = {"title": str}
     elif item_type == "matter_update":
         required = {"summary": str}
@@ -51,15 +63,19 @@ def validate_proposed_data(item_type: str, data: dict):
     elif item_type in ("new_organization",):
         required = {"name": str}
     elif item_type == "task_update":
-        required = {"task_id": str}
+        _require_any(item_type, data, ("existing_task_id", "task_id"))
+        return
     elif item_type == "decision_update":
-        required = {"decision_id": str}
+        _require_any(item_type, data, ("existing_decision_id", "decision_id"))
+        return
     elif item_type == "context_note":
-        required = {"content": str}
+        _require_any(item_type, data, ("body", "content"))
+        return
     elif item_type == "person_detail_update":
         required = {"person_id": str}
     elif item_type == "org_detail_update":
-        required = {"organization_id": str}
+        _require_any(item_type, data, ("existing_org_id", "organization_id"))
+        return
     elif item_type == "directive_update":
         required = {"directive_id": str}
 

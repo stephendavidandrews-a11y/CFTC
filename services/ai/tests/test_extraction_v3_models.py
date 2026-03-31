@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from app.pipeline.stages.extraction_v3_models import (
     CommunicationUnderstandingOutput,
+    ProposedMatterData,
     RoutingResolutionPackage,
     V3Bundle,
     V3ExtractionOutput,
@@ -186,6 +187,12 @@ def test_new_matter_bundle_requires_bundle_level_proposed_matter():
                 )
             ],
         )
+
+
+
+def test_proposed_matter_defaults_to_active_status():
+    proposed = ProposedMatterData(title="New matter", matter_type="rulemaking")
+    assert proposed.status == "active"
 
 
 def test_pass2_accepts_contract_aligned_output():

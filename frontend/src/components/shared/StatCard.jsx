@@ -2,7 +2,7 @@ import React from "react";
 import Pulse from "./Pulse";
 import theme from "../../styles/theme";
 
-export default function StatCard({ value, label, accent, pulse }) {
+export default function StatCard({ value, label, accent, pulse, subtitle }) {
   return (
     <div style={{
       background: theme.bg.card,
@@ -16,6 +16,7 @@ export default function StatCard({ value, label, accent, pulse }) {
         {pulse && <Pulse color={accent || theme.accent.blue} />}
       </div>
       <div style={{ fontSize: 12, color: theme.text.dim, marginTop: 4, fontWeight: 500 }}>{label}</div>
+      {subtitle && <div style={{ fontSize: 10, color: theme.text.faint, marginTop: 2 }}>{subtitle}</div>}
     </div>
   );
 }

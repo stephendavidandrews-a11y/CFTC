@@ -224,6 +224,10 @@ async def get_speaker_review_detail(communication_id: str, db=Depends(get_db)):
         # Voiceprint candidates for this speaker
         vp = vp_results.get(label, {})
         candidates = vp.get("candidates", [])
+        # Inject match_log_id into each candidate so the frontend can pass it back
+        vp_log_id = vp.get("match_log_id")
+        for c in candidates:
+            c["match_log_id"] = vp_log_id
         if candidates:
             matched_count += 1
 
@@ -972,7 +976,7 @@ async def edit_transcript_segment(
     communication_id: str, transcript_id: str, request: Request, db=Depends(get_db)
 ):
     """Save human-corrected text for a transcript segment."""
-    _check_review_state(db, communication_id, VALID_STATES, "speaker review")
+    _check_review_state(db, communication_id)
     body = await request.json()
     reviewed_text = body.get("reviewed_text", "").strip()
     if not reviewed_text:
@@ -1052,7 +1056,7 @@ async def find_similar_corrections(
     communication_id: str, request: Request, db=Depends(get_db)
 ):
     """Find other segments with similar text that could receive the same correction."""
-    _check_review_state(db, communication_id, VALID_STATES, "speaker review")
+    _check_review_state(db, communication_id)
     body = await request.json()
     correction_id = body.get("correction_id")
 
@@ -1120,7 +1124,7 @@ async def apply_corrections(
     communication_id: str, request: Request, db=Depends(get_db)
 ):
     """Bulk-apply reviewed_text corrections to selected segments."""
-    _check_review_state(db, communication_id, VALID_STATES, "speaker review")
+    _check_review_state(db, communication_id)
     body = await request.json()
     corrections = body.get("corrections", [])
     correction_id = body.get("correction_id")  # original correction for logging

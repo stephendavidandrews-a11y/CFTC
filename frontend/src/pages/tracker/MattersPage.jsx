@@ -209,15 +209,15 @@ export default function MattersPage() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
         <div style={titleStyle}>Matters</div>
         <div style={{ display: "flex", gap: 8 }}>
-          <select style={inputStyle} value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setActiveView(0); }}>
+          <select style={inputStyle} value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setActiveView(null); }}>
             <option value="">All Statuses</option>
             {statusOpts.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
           </select>
-          <select style={inputStyle} value={priorityFilter} onChange={(e) => { setPriorityFilter(e.target.value); setActiveView(0); }}>
+          <select style={inputStyle} value={priorityFilter} onChange={(e) => { setPriorityFilter(e.target.value); setActiveView(null); }}>
             <option value="">All Priorities</option>
             {priorityOpts.map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
-          <select style={inputStyle} value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setActiveView(0); }}>
+          <select style={inputStyle} value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setActiveView(null); }}>
             <option value="">All Types</option>
             {typeOpts.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>

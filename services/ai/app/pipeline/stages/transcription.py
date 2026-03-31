@@ -130,6 +130,10 @@ async def transcribe_via_native_worker(
     # The host equivalent path depends on the Docker volume mapping.
     # For now, we send the file content directly via multipart upload.
     try:
+        from app.config import INTAKE_USER, INTAKE_PASS
+
+        _auth = (INTAKE_USER, INTAKE_PASS) if INTAKE_USER and INTAKE_PASS else None
+
         async with httpx.AsyncClient(timeout=NATIVE_WORKER_TIMEOUT) as client:
             # Try the transcription-only endpoint first
             with open(audio_path, "rb") as f:
@@ -137,6 +141,7 @@ async def transcribe_via_native_worker(
                     f"{NATIVE_WORKER_BASE}/intake/api/transcribe",
                     files={"audio": (audio_path.name, f, "audio/wav")},
                     data={"communication_id": communication_id},
+                    auth=_auth,
                 )
 
             if response.status_code == 404:
@@ -397,7 +402,14 @@ async def run_transcription_stage(
     """Full transcription stage: call worker, store results.
 
     This is the entry point called by the orchestrator.
+    Uses a fresh DB connection for the segment INSERT to avoid
+    contention with the orchestrator's long-lived SAVEPOINT.
     """
     result = await transcribe_via_native_worker(audio_path, communication_id)
-    store_transcript(db, communication_id, result)
+
+    # Use a fresh connection to avoid the orchestrator's stale SAVEPOINT lock
+    from app.db import managed_connection
+    with managed_connection() as fresh_db:
+        store_transcript(fresh_db, communication_id, result)
+
     return result

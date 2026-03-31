@@ -723,26 +723,30 @@ async def delete_communication(communication_id: str, db=Depends(get_db)):
     # review_bundle_items must go before review_bundles (FK dependency)
     # speaker_voice_profiles uses source_communication_id, not communication_id
     child_tables = [
-        # Deepest children first
+        # FK-safe order: deepest children first
+        # ── Level 3: tables that reference review_bundle_items ──
+        ("tracker_writebacks", "communication_id = ?"),       # FK → review_bundle_items, review_bundles
+        ("review_action_log", "communication_id = ?"),        # FK → review_bundle_items, review_bundles
+        # ── Level 2: tables that reference review_bundles or transcripts ──
         ("review_bundle_items", "bundle_id IN (SELECT id FROM review_bundles WHERE communication_id = ?)"),
-        # Direct children (order doesn't matter among these)
+        # ── Level 1: tables referenced by level 2+ ──
+        ("review_bundles", "communication_id = ?"),
+        ("voiceprint_match_log", "communication_id = ?"),     # FK → voice_samples
+        ("communication_artifacts", "communication_id = ?"),  # FK → communication_messages
+        ("communication_entities", "communication_id = ?"),   # FK → transcripts
+        ("transcript_corrections", "communication_id = ?"),
         ("transcripts", "communication_id = ?"),
         ("voice_samples", "communication_id = ?"),
-        ("voiceprint_match_log", "communication_id = ?"),
         ("speaker_voice_profiles", "source_communication_id = ?"),
-        ("review_action_log", "communication_id = ?"),
-        ("review_bundles", "communication_id = ?"),
+        # ── Level 0: direct children of communications only ──
         ("commit_batches", "communication_id = ?"),
-        ("tracker_writebacks", "communication_id = ?"),
-        ("communication_entities", "communication_id = ?"),
         ("communication_participants", "communication_id = ?"),
         ("communication_matter_associations", "communication_id = ?"),
         ("communication_directive_associations", "communication_id = ?"),
         ("communication_error_log", "communication_id = ?"),
+        ("communication_messages", "communication_id = ?"),
         ("audio_files", "communication_id = ?"),
         ("ai_extractions", "communication_id = ?"),
-        ("communication_messages", "communication_id = ?"),
-        ("communication_artifacts", "communication_id = ?"),
         ("llm_usage", "communication_id = ?"),
     ]
     for table, where_clause in child_tables:

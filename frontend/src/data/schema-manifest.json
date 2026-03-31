@@ -1,14 +1,14 @@
 {
-  "generated_at": "2026-03-24T16:37:00.001068+00:00",
+  "generated_at": "2026-03-30T01:03:34.449346+00:00",
   "services": {
     "tracker": {
-      "tables": 38,
+      "tables": 50,
       "port": 8004,
       "db": "tracker.db",
       "tech": "FastAPI + SQLite (WAL)"
     },
     "ai": {
-      "tables": 25,
+      "tables": 27,
       "port": 8006,
       "db": "ai.db",
       "tech": "FastAPI + SQLite (WAL)"
@@ -164,7 +164,9 @@
         {
           "name": "last_name",
           "type": "TEXT",
-          "tags": [],
+          "tags": [
+            "IDX"
+          ],
           "not_null": false
         },
         {
@@ -186,7 +188,9 @@
         {
           "name": "email",
           "type": "TEXT",
-          "tags": [],
+          "tags": [
+            "IDX"
+          ],
           "not_null": false
         },
         {
@@ -217,7 +221,8 @@
           "name": "relationship_category",
           "type": "TEXT",
           "tags": [
-            "ENUM"
+            "ENUM",
+            "IDX"
           ],
           "not_null": false
         },
@@ -283,7 +288,8 @@
           "name": "is_active",
           "type": "INTEGER",
           "tags": [
-            "BOOL"
+            "BOOL",
+            "IDX"
           ],
           "not_null": false,
           "note": "DEFAULT 1",
@@ -376,26 +382,6 @@
           "name": "description",
           "type": "TEXT",
           "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "problem_statement",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "why_it_matters",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "status",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
           "not_null": true,
           "note": "NOT NULL"
         },
@@ -412,89 +398,11 @@
           "name": "sensitivity",
           "type": "TEXT",
           "tags": [
-            "IDX"
-          ],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "risk_level",
-          "type": "TEXT",
-          "tags": [
-            "ENUM"
-          ],
-          "not_null": false
-        },
-        {
-          "name": "boss_involvement_level",
-          "type": "TEXT",
-          "tags": [
-            "ENUM"
-          ],
-          "not_null": true,
-          "note": "NOT NULL"
-        },
-        {
-          "name": "assigned_to_person_id",
-          "type": "TEXT",
-          "tags": [
             "FK",
             "IDX"
           ],
-          "not_null": false,
-          "note": "REFERENCES people.id"
-        },
-        {
-          "name": "supervisor_person_id",
-          "type": "TEXT",
-          "tags": [
-            "FK"
-          ],
-          "not_null": false,
-          "note": "REFERENCES people.id"
-        },
-        {
-          "name": "requesting_organization_id",
-          "type": "TEXT",
-          "tags": [
-            "FK"
-          ],
-          "not_null": false,
-          "note": "REFERENCES organizations.id"
-        },
-        {
-          "name": "client_organization_id",
-          "type": "TEXT",
-          "tags": [
-            "FK",
-            "IDX"
-          ],
-          "not_null": false,
-          "note": "REFERENCES organizations.id"
-        },
-        {
-          "name": "reviewing_organization_id",
-          "type": "TEXT",
-          "tags": [
-            "FK"
-          ],
-          "not_null": false,
-          "note": "REFERENCES organizations.id"
-        },
-        {
-          "name": "lead_external_org_id",
-          "type": "TEXT",
-          "tags": [
-            "FK"
-          ],
-          "not_null": false,
-          "note": "REFERENCES organizations.id"
-        },
-        {
-          "name": "opened_date",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES people.id"
         },
         {
           "name": "work_deadline",
@@ -502,59 +410,8 @@
           "tags": [
             "IDX"
           ],
-          "not_null": false
-        },
-        {
-          "name": "decision_deadline",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": false
-        },
-        {
-          "name": "external_deadline",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": false
-        },
-        {
-          "name": "revisit_date",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": false
-        },
-        {
-          "name": "next_step",
-          "type": "TEXT",
-          "tags": [],
           "not_null": true,
           "note": "NOT NULL"
-        },
-        {
-          "name": "next_step_assigned_to_person_id",
-          "type": "TEXT",
-          "tags": [
-            "FK"
-          ],
-          "not_null": false,
-          "note": "REFERENCES people.id"
-        },
-        {
-          "name": "pending_decision",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "outcome_summary",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
         },
         {
           "name": "last_material_update_at",
@@ -587,68 +444,7 @@
             "FK"
           ],
           "not_null": false,
-          "note": "REFERENCES people.id"
-        },
-        {
-          "name": "rin",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": false
-        },
-        {
-          "name": "regulatory_stage",
-          "type": "TEXT",
-          "tags": [
-            "ENUM",
-            "IDX"
-          ],
-          "not_null": false
-        },
-        {
-          "name": "federal_register_citation",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "unified_agenda_priority",
-          "type": "TEXT",
-          "tags": [
-            "ENUM"
-          ],
-          "not_null": false
-        },
-        {
-          "name": "cfr_citation",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "docket_number",
-          "type": "TEXT",
-          "tags": [
-            "IDX"
-          ],
-          "not_null": false
-        },
-        {
-          "name": "fr_doc_number",
-          "type": "TEXT",
-          "tags": [],
-          "not_null": false
-        },
-        {
-          "name": "source",
-          "type": "TEXT",
-          "tags": [
-            "ENUM",
-            "IDX"
-          ],
-          "not_null": false,
-          "note": "DEFAULT 'manual'",
+          "note": "DEFAULT 'manual'; REFERENCES people.id",
           "default": "'manual'"
         },
         {
@@ -701,6 +497,14 @@
           "not_null": false,
           "note": "DEFAULT datetime('now')",
           "default": "datetime('now')"
+        },
+        {
+          "name": "blocker",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
         }
       ]
     },
@@ -1372,7 +1176,8 @@
           "name": "decision_assigned_to_person_id",
           "type": "TEXT",
           "tags": [
-            "FK"
+            "FK",
+            "IDX"
           ],
           "not_null": false,
           "note": "REFERENCES people.id"
@@ -1380,7 +1185,9 @@
         {
           "name": "decision_due_date",
           "type": "TEXT",
-          "tags": [],
+          "tags": [
+            "IDX"
+          ],
           "not_null": false
         },
         {
@@ -3599,6 +3406,149 @@
       ]
     },
     {
+      "name": "directive_research_notes",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "directive_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES policy_directives.id"
+        },
+        {
+          "name": "fr_citation",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "rule_title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "cfr_parts",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "statutory_authority",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "action_category",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "composite_score",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "relationship_basis",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "analysis_summary",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "regulation_text_excerpt",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "needs_reg_reading",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "reg_reading_done",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "reg_reading_notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "promote_to_matter",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "matter_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES matters.id"
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
       "name": "directive_matters",
       "service": "tracker",
       "fields": [
@@ -4459,6 +4409,1042 @@
       ]
     },
     {
+      "name": "directive_documents",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "directive_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES policy_directives.id"
+        },
+        {
+          "name": "document_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES documents.id"
+        },
+        {
+          "name": "relationship_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 'references'",
+          "default": "'references'"
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "matter_rulemaking",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "matter_id",
+          "type": "TEXT",
+          "tags": [
+            "PK",
+            "FK"
+          ],
+          "not_null": true,
+          "note": "REFERENCES matters.id; UUID"
+        },
+        {
+          "name": "rin",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "regulatory_stage",
+          "type": "TEXT",
+          "tags": [
+            "ENUM",
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "workflow_status",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "current_comment_period_closes",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "federal_register_citation",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "unified_agenda_priority",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "cfr_citation",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "docket_number",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "fr_doc_number",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "interagency_role",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "is_petition",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "petition_disposition",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "review_trigger",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "matter_guidance",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "matter_id",
+          "type": "TEXT",
+          "tags": [
+            "PK",
+            "FK"
+          ],
+          "not_null": true,
+          "note": "REFERENCES matters.id; UUID"
+        },
+        {
+          "name": "instrument_type",
+          "type": "TEXT",
+          "tags": [
+            "ENUM",
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "published_in_fr",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "cftc_letter_number",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "request_date",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "requestor_name",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "requestor_organization_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES organizations.id"
+        },
+        {
+          "name": "requestor_counsel",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "issuing_office_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES organizations.id"
+        },
+        {
+          "name": "signatory_person_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES people.id"
+        },
+        {
+          "name": "staff_contact_person_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES people.id"
+        },
+        {
+          "name": "cea_provisions",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "cfr_provisions",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "legal_question",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "conditions_summary",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "amends_matter_id",
+          "type": "TEXT",
+          "tags": [
+            "FK"
+          ],
+          "not_null": false,
+          "note": "REFERENCES matters.id"
+        },
+        {
+          "name": "prior_letter_number",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "workflow_status",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "issuance_date",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "expiration_date",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "matter_enforcement",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "matter_id",
+          "type": "TEXT",
+          "tags": [
+            "PK",
+            "FK"
+          ],
+          "not_null": true,
+          "note": "REFERENCES matters.id; UUID"
+        },
+        {
+          "name": "requesting_division_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "REFERENCES organizations.id"
+        },
+        {
+          "name": "enforcement_reference",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "legal_issue_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "support_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "litigation_stage",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "court_or_forum",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "deadline_source",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "workflow_status",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "privilege_flags",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "is_confidential",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 1",
+          "default": "1"
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "matter_regulatory_ids",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "matter_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES matters.id"
+        },
+        {
+          "name": "id_type",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "id_value",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "relationship",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 'primary'",
+          "default": "'primary'"
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "matter_number_seq",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "prefix",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "DEFAULT 'MAT'; UUID",
+          "default": "'MAT'"
+        },
+        {
+          "name": "year",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true
+        },
+        {
+          "name": "next_val",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 1",
+          "default": "1"
+        }
+      ]
+    },
+    {
+      "name": "staleness_config",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "matter_type",
+          "type": "TEXT",
+          "tags": [
+            "ENUM"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "workflow_status",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "stale_days",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "critical_stale_days",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "capture_status",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "session_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "seq",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "reported_at",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "received_at",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "recording_state",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "segment_open",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "silence_seconds",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "segment_started_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "segment_duration_seconds",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "last_speech_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "last_segment_close_reason",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "error_detail",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "audio_level_db",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "audio_level_peak_db",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "wifi_rssi",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "wifi_ssid",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "cpu_temp_c",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "disk_used_pct",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "memory_used_pct",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "uptime_seconds",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "capture_service",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "last_rsync_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "raw_payload",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "capture_status_daily",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "date",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL; UNIQUE"
+        },
+        {
+          "name": "recording_minutes",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "idle_minutes",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "offline_minutes",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "error_minutes",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "segment_count",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "avg_segment_duration_s",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "avg_wifi_rssi",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "min_wifi_rssi",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "avg_cpu_temp_c",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "max_cpu_temp_c",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "max_disk_used_pct",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "rsync_count",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 0",
+          "default": "0"
+        }
+      ]
+    },
+    {
+      "name": "capture_actions",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "action",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "requested_by",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "requested_at",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "completed_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 'pending'",
+          "default": "'pending'"
+        },
+        {
+          "name": "result_summary",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "result_detail",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "pi_host",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "duration_ms",
+          "type": "INTEGER",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "capture_alerts",
+      "service": "tracker",
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "AUTOINCREMENT"
+        },
+        {
+          "name": "alert_type",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "severity",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL; DEFAULT 'warning'",
+          "default": "'warning'"
+        },
+        {
+          "name": "message",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "detail",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "opened_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "resolved_at",
+          "type": "TEXT",
+          "tags": [
+            "IDX"
+          ],
+          "not_null": false
+        },
+        {
+          "name": "resolved_reason",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "last_evaluated_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        }
+      ]
+    },
+    {
       "name": "communications",
       "service": "ai",
       "fields": [
@@ -4596,6 +5582,12 @@
           "not_null": false,
           "note": "DEFAULT datetime('now')",
           "default": "datetime('now')"
+        },
+        {
+          "name": "intelligence_flags_json",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
         }
       ]
     },
@@ -4870,6 +5862,12 @@
           "not_null": false
         },
         {
+          "name": "reviewed_text",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
           "name": "enriched_text",
           "type": "TEXT",
           "tags": [],
@@ -4898,6 +5896,12 @@
           "not_null": false,
           "note": "DEFAULT datetime('now')",
           "default": "datetime('now')"
+        },
+        {
+          "name": "segment_metadata",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
         }
       ]
     },
@@ -6970,6 +7974,188 @@
       ]
     },
     {
+      "name": "communication_matter_associations",
+      "service": "ai",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "communication_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES communications.id"
+        },
+        {
+          "name": "matter_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "matter_title",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "confidence",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 0.0",
+          "default": "0.0"
+        },
+        {
+          "name": "relevant_segments",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "reasoning",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "confirmed",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "confirmed_by",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "confirmed_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
+      "name": "communication_directive_associations",
+      "service": "ai",
+      "fields": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "tags": [
+            "PK"
+          ],
+          "not_null": true,
+          "note": "UUID"
+        },
+        {
+          "name": "communication_id",
+          "type": "TEXT",
+          "tags": [
+            "FK",
+            "IDX"
+          ],
+          "not_null": true,
+          "note": "NOT NULL; REFERENCES communications.id"
+        },
+        {
+          "name": "directive_id",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": true,
+          "note": "NOT NULL"
+        },
+        {
+          "name": "directive_label",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "confidence",
+          "type": "REAL",
+          "tags": [],
+          "not_null": false,
+          "note": "DEFAULT 0.0",
+          "default": "0.0"
+        },
+        {
+          "name": "relevant_segments",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "reasoning",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "confirmed",
+          "type": "INTEGER",
+          "tags": [
+            "BOOL",
+            "IDX"
+          ],
+          "not_null": false,
+          "note": "DEFAULT 0",
+          "default": "0"
+        },
+        {
+          "name": "confirmed_by",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "confirmed_at",
+          "type": "TEXT",
+          "tags": [],
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "tags": [
+            "TS"
+          ],
+          "not_null": false,
+          "note": "DEFAULT datetime('now')",
+          "default": "datetime('now')"
+        }
+      ]
+    },
+    {
       "name": "conversations",
       "service": "intake",
       "fields": [
@@ -7892,49 +9078,7 @@
     },
     {
       "from": "matters",
-      "fromField": "assigned_to_person_id",
-      "to": "people",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "matters",
-      "fromField": "supervisor_person_id",
-      "to": "people",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "matters",
-      "fromField": "requesting_organization_id",
-      "to": "organizations",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "matters",
-      "fromField": "client_organization_id",
-      "to": "organizations",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "matters",
-      "fromField": "reviewing_organization_id",
-      "to": "organizations",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "matters",
-      "fromField": "lead_external_org_id",
-      "to": "organizations",
-      "toField": "id",
-      "label": "FK"
-    },
-    {
-      "from": "matters",
-      "fromField": "next_step_assigned_to_person_id",
+      "fromField": "sensitivity",
       "to": "people",
       "toField": "id",
       "label": "FK"
@@ -8283,6 +9427,20 @@
       "label": "FK"
     },
     {
+      "from": "directive_research_notes",
+      "fromField": "directive_id",
+      "to": "policy_directives",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "directive_research_notes",
+      "fromField": "matter_id",
+      "to": "matters",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
       "from": "directive_matters",
       "fromField": "directive_id",
       "to": "policy_directives",
@@ -8340,6 +9498,90 @@
     },
     {
       "from": "directive_matters",
+      "fromField": "matter_id",
+      "to": "matters",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "directive_documents",
+      "fromField": "directive_id",
+      "to": "policy_directives",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "directive_documents",
+      "fromField": "document_id",
+      "to": "documents",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matter_rulemaking",
+      "fromField": "matter_id",
+      "to": "matters",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matter_guidance",
+      "fromField": "matter_id",
+      "to": "matters",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matter_guidance",
+      "fromField": "requestor_organization_id",
+      "to": "organizations",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matter_guidance",
+      "fromField": "issuing_office_id",
+      "to": "organizations",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matter_guidance",
+      "fromField": "signatory_person_id",
+      "to": "people",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matter_guidance",
+      "fromField": "staff_contact_person_id",
+      "to": "people",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matter_guidance",
+      "fromField": "amends_matter_id",
+      "to": "matters",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matter_enforcement",
+      "fromField": "matter_id",
+      "to": "matters",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matter_enforcement",
+      "fromField": "requesting_division_id",
+      "to": "organizations",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "matter_regulatory_ids",
       "fromField": "matter_id",
       "to": "matters",
       "toField": "id",
@@ -8535,6 +9777,20 @@
       "label": "FK"
     },
     {
+      "from": "communication_matter_associations",
+      "fromField": "communication_id",
+      "to": "communications",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
+      "from": "communication_directive_associations",
+      "fromField": "communication_id",
+      "to": "communications",
+      "toField": "id",
+      "label": "FK"
+    },
+    {
       "from": "audio_files",
       "fromField": "conversation_id",
       "to": "conversations",
@@ -8594,36 +9850,18 @@
   "enums": {
     "matter_type": [
       "rulemaking",
-      "interpretive guidance",
-      "no-action letter",
-      "exemptive letter",
-      "staff advisory",
-      "other letter",
-      "interagency coordination",
-      "enforcement support",
-      "congressional response",
-      "speech / testimony / briefing prep",
-      "litigation-sensitive issue",
-      "personnel / management",
-      "administrative / ethics / process",
-      "industry inquiry",
-      "international matter",
-      "regulatory review",
-      "prospective policy",
+      "guidance",
+      "enforcement",
+      "congressional",
+      "policy",
+      "briefing",
+      "administrative",
+      "inquiry",
       "other"
     ],
     "matter_status": [
-      "new intake",
-      "framing issue",
-      "research in progress",
-      "draft in progress",
-      "internal review",
-      "client review",
-      "leadership review",
-      "external coordination",
-      "awaiting decision",
-      "awaiting comments",
-      "parked / monitoring",
+      "active",
+      "paused",
       "closed"
     ],
     "matter_priority": [
@@ -8639,19 +9877,6 @@
       "deliberative / predecisional",
       "enforcement-sensitive",
       "congressional-sensitive"
-    ],
-    "risk_level": [
-      "low",
-      "medium",
-      "high",
-      "critical"
-    ],
-    "boss_involvement_level": [
-      "no boss involvement needed",
-      "keep boss informed",
-      "boss review required",
-      "boss decision required",
-      "boss will present / speak"
     ],
     "regulatory_stage": [
       "concept",
@@ -8759,6 +9984,7 @@
       "briefing_paper",
       "correspondence",
       "report",
+      "no_action_letter",
       "other"
     ],
     "document_status": [
@@ -8991,6 +10217,7 @@
       "interagency_agreement",
       "chairman_directive",
       "testimony_commitment",
+      "chairman_speech",
       "other"
     ],
     "directive_priority_tier": [
@@ -9034,7 +10261,117 @@
     "directive_matter_relationship_type": [
       "implements",
       "partially_addresses",
-      "related_to"
+      "related_to",
+      "supersedes"
+    ],
+    "directive_document_relationship_type": [
+      "references",
+      "implements",
+      "supersedes",
+      "withdraws",
+      "amends"
+    ],
+    "rulemaking_workflow_status": [
+      "concept",
+      "drafting",
+      "cba_development",
+      "internal_review",
+      "client_review",
+      "chairman_review",
+      "commission_review",
+      "ofr_submission",
+      "comment_analysis",
+      "final_drafting",
+      "published",
+      "effective"
+    ],
+    "guidance_workflow_status": [
+      "request_received",
+      "framing",
+      "drafting",
+      "internal_review",
+      "division_review",
+      "front_office_review",
+      "issued",
+      "amended",
+      "withdrawn"
+    ],
+    "enforcement_workflow_status": [
+      "intake",
+      "analysis",
+      "drafting",
+      "review",
+      "delivered",
+      "ongoing_support"
+    ],
+    "instrument_type": [
+      "no_action",
+      "interpretive",
+      "exemptive_letter",
+      "exemptive_order",
+      "staff_advisory",
+      "other_letter"
+    ],
+    "enforcement_legal_issue_type": [
+      "statutory_interpretation",
+      "regulatory_interpretation",
+      "jurisdictional",
+      "penalty_authority",
+      "settlement_terms",
+      "litigation_support",
+      "amicus",
+      "other"
+    ],
+    "enforcement_support_type": [
+      "legal_analysis",
+      "draft_review",
+      "expert_consultation",
+      "testimony_support",
+      "brief_drafting",
+      "other"
+    ],
+    "enforcement_litigation_stage": [
+      "investigation",
+      "pre_complaint",
+      "litigation",
+      "settlement",
+      "post_judgment",
+      "appeal"
+    ],
+    "interagency_role": [
+      "lead",
+      "co_lead",
+      "commenter",
+      "observer",
+      "parallel_rule"
+    ],
+    "petition_disposition": [
+      "granted",
+      "denied",
+      "deferred",
+      "pending"
+    ],
+    "review_trigger": [
+      "executive_order",
+      "court_decision",
+      "internal_initiative",
+      "congressional_request",
+      "sunset_provision"
+    ],
+    "regulatory_id_type": [
+      "fr_citation",
+      "rin",
+      "cfr_part",
+      "docket_number",
+      "stage1_doc_id",
+      "letter_number"
+    ],
+    "regulatory_id_relationship": [
+      "primary",
+      "related",
+      "under_review",
+      "amends",
+      "supersedes"
     ]
   }
 }

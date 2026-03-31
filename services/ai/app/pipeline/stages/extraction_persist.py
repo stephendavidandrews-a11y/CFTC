@@ -121,6 +121,36 @@ def _build_source_locator(db, item, communication_id: str) -> dict:
     }
 
 
+
+def persist_extraction_with_retry(db, communication_id, extraction, processed,
+                                   system_prompt, user_prompt, full_context_json,
+                                   raw_output, attempt_number, model_used,
+                                   prompt_version, usage_data,
+                                   escalation_reason=None, success=True,
+                                   max_retries=5, base_wait=2):
+    """Retry-wrapper for _persist_extraction to handle transient DB locks without re-running the API call."""
+    import time as _time
+    for attempt in range(1, max_retries + 1):
+        try:
+            return _persist_extraction(
+                db, communication_id, extraction, processed,
+                system_prompt, user_prompt, full_context_json,
+                raw_output, attempt_number, model_used,
+                prompt_version, usage_data,
+                escalation_reason=escalation_reason, success=success,
+            )
+        except Exception as e:
+            if "locked" in str(e) and attempt < max_retries:
+                wait = base_wait * attempt
+                logger.warning(
+                    "[%s] DB locked during persist (attempt %d/%d, retrying in %ds)",
+                    communication_id[:8], attempt, max_retries, wait,
+                )
+                _time.sleep(wait)
+                continue
+            raise
+
+
 def _persist_extraction(
     db,
     communication_id: str,

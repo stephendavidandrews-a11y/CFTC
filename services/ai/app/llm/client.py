@@ -149,14 +149,23 @@ def compute_cost(model: str, input_tokens: int, output_tokens: int) -> float:
 def check_budget(db) -> tuple[float, float, bool]:
     """Check today's spend against budget.
 
+    Uses a dedicated short-lived connection to avoid holding a shared
+    lock on the caller's connection during the long LLM API call.
+
     Returns: (today_spend, daily_budget, is_over_budget)
     """
-    spend_row = db.execute("""
-        SELECT COALESCE(SUM(cost_usd), 0.0) as today_spend
-        FROM llm_usage
-        WHERE created_at >= date('now')
-    """).fetchone()
-    today_spend = spend_row["today_spend"] if spend_row else 0.0
+    from app.db import get_connection as _get_conn
+
+    conn = _get_conn()
+    try:
+        spend_row = conn.execute("""
+            SELECT COALESCE(SUM(cost_usd), 0.0) as today_spend
+            FROM llm_usage
+            WHERE created_at >= date('now')
+        """).fetchone()
+        today_spend = spend_row["today_spend"] if spend_row else 0.0
+    finally:
+        conn.close()
 
     policy = load_policy()
     model_config = policy.get("model_config", {})
@@ -189,15 +198,22 @@ def record_usage(
     output_tokens: int,
     cost_usd: float,
 ):
-    """Record LLM usage to the llm_usage table."""
-    db.execute(
-        """
-        INSERT INTO llm_usage (communication_id, stage, model, input_tokens, output_tokens, cost_usd)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """,
-        (communication_id, stage, model, input_tokens, output_tokens, cost_usd),
-    )
-    # db.commit()  # Removed: orchestrator savepoint handles commit
+    """Record LLM usage in a separate connection to avoid holding the orchestrator's write lock."""
+    from app.db import get_connection
+    usage_db = get_connection()
+    try:
+        usage_db.execute(
+            """
+            INSERT INTO llm_usage (communication_id, stage, model, input_tokens, output_tokens, cost_usd)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """,
+            (communication_id, stage, model, input_tokens, output_tokens, cost_usd),
+        )
+        usage_db.commit()
+    except Exception as e:
+        logger.warning("Failed to record LLM usage: %s", e)
+    finally:
+        usage_db.close()
 
 
 async def _call_with_retry(func, *args, **kwargs):

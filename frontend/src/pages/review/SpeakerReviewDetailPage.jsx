@@ -8,7 +8,6 @@ import {
   linkSpeaker,
   createProvisionalPerson,
   skipSpeaker,
-  rejectVoiceprintMatch,
   completeSpeakerReview,
   editTranscriptSegment,
   findSimilarCorrections,
@@ -575,7 +574,7 @@ function SpeakerCard({ speaker, color, communicationId, onUpdate, audioRef, segm
                     </div>
                   </div>
                   <button
-                    onClick={() => handleConfirmVoiceprint(c, null)}
+                    onClick={() => handleConfirmVoiceprint(c, c.match_log_id)}
                     style={{
                       padding: "4px 10px", borderRadius: 4, fontSize: 11, fontWeight: 600,
                       background: "rgba(74,222,128,0.15)", color: "#4ade80",

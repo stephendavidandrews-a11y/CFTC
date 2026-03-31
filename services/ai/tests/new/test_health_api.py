@@ -1,11 +1,11 @@
-"""Tests for the /ai/api/health endpoint.
+"""Tests for the /ai/api/health and /ai/api/costs endpoints.
 
 Covers:
-1. Basic health response shape and version
+1. Basic public health response shape
 2. Empty queue counts (fresh DB)
 3. Queue counts with seeded communications
-4. Spend / budget tracking from llm_usage
-5. Budget-paused flag when spend exceeds budget
+4. Protected cost tracking from llm_usage
+5. Budget handling on the costs endpoint
 """
 
 import uuid
@@ -25,7 +25,8 @@ def test_health_returns_ok(client):
     assert "version" in data
     assert "timestamp" in data
     assert "queue" in data
-    assert "spend" in data
+    assert "spend" not in data
+    assert "disk" not in data
 
 
 # ── 2. Empty DB: queue is empty dict, spend is zero ──
@@ -34,8 +35,7 @@ def test_health_returns_ok(client):
 def test_health_empty_db(client):
     data = client.get(f"{PREFIX}/health").json()
     assert data["queue"] == {}
-    assert data["spend"]["today_usd"] == 0.0
-    assert data["spend"]["paused"] is False
+    assert "spend" not in data
 
 
 # ── 3. Queue counts reflect communication statuses ──
@@ -60,7 +60,7 @@ def test_health_queue_counts(client, db):
 # ── 4. Spend tracking from llm_usage ──
 
 
-def test_health_spend_tracking(client, db):
+def test_costs_spend_tracking(client, db):
     comm_id = str(uuid.uuid4())
     db.execute(
         "INSERT INTO communications (id, source_type, processing_status) VALUES (?, 'audio', 'complete')",
@@ -77,18 +77,18 @@ def test_health_spend_tracking(client, db):
     )
     db.commit()
 
-    data = client.get(f"{PREFIX}/health").json()
-    assert data["spend"]["today_usd"] == 1.75
-    assert data["spend"]["budget_remaining_usd"] == round(
-        data["spend"]["daily_budget_usd"] - 1.75, 4
+    data = client.get(f"{PREFIX}/costs").json()
+    assert data["today_usd"] == 1.75
+    assert data["daily_budget_usd"] >= 1.75
+    assert data["daily_budget_usd"] - data["today_usd"] == round(
+        data["daily_budget_usd"] - 1.75, 4
     )
-    assert data["spend"]["paused"] is False
 
 
 # ── 5. Budget-paused when spend meets or exceeds daily budget ──
 
 
-def test_health_budget_paused(client, db):
+def test_costs_budget_threshold(client, db):
     comm_id = str(uuid.uuid4())
     db.execute(
         "INSERT INTO communications (id, source_type, processing_status) VALUES (?, 'audio', 'complete')",
@@ -101,7 +101,6 @@ def test_health_budget_paused(client, db):
     )
     db.commit()
 
-    data = client.get(f"{PREFIX}/health").json()
-    assert data["spend"]["today_usd"] == 15.0
-    assert data["spend"]["paused"] is True
-    assert data["spend"]["budget_remaining_usd"] < 0
+    data = client.get(f"{PREFIX}/costs").json()
+    assert data["today_usd"] == 15.0
+    assert data["daily_budget_usd"] < data["today_usd"]

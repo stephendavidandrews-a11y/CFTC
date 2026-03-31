@@ -4,9 +4,9 @@ import theme from "../../styles/theme";
 import { useToastContext } from "../../contexts/ToastContext";
 import useApi from "../../hooks/useApi";
 import { getParticipantReviewDetail, confirmParticipant, completeParticipantReview, getEmailMessages } from "../../api/ai";
-import { listPeople } from "../../api/tracker";
 import Badge from "../../components/shared/Badge";
 import EmptyState from "../../components/shared/EmptyState";
+import PersonOrgResolver from "../../components/shared/PersonOrgResolver";
 
 const cardStyle = { background: theme.bg.card, borderRadius: 10, border: `1px solid ${theme.border.default}`, padding: "16px 20px", marginBottom: 12 };
 const btnPrimary = { background: "#1e40af", color: "#fff", border: "none", padding: "6px 16px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontWeight: 600 };
@@ -18,16 +18,16 @@ export default function ParticipantReviewDetailPage() {
   const navigate = useNavigate();
   const { data, loading, error, refetch } = useApi(() => getParticipantReviewDetail(id), [id]);
   const { data: messages } = useApi(() => getEmailMessages(id), [id]);
-  const { data: peopleData } = useApi(() => listPeople({ limit: 500 }), []);
   const [completing, setCompleting] = useState(false);
+  const [resolvingId, setResolvingId] = useState(null);
 
-  const people = peopleData?.items || peopleData || [];
   const participants = data?.participants || [];
   const communication = data?.communication || data || {};
 
   const handleConfirm = async (participantId, personId) => {
     try {
       await confirmParticipant(id, { participant_id: participantId, tracker_person_id: personId });
+      setResolvingId(null);
       refetch();
     } catch (e) {
       toast.error("Failed to confirm participant: " + (e.message || e));
@@ -63,6 +63,15 @@ export default function ParticipantReviewDetailPage() {
         Confirm participant identities before extraction proceeds.
       </p>
 
+      {/* Sensitivity flags */}
+      {communication.sensitivity_flags && communication.sensitivity_flags.length > 0 && (
+        <div style={{ marginBottom: 16, display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {communication.sensitivity_flags.map((flag, i) => (
+            <Badge key={i} bg="#7f1d1d" text="#fca5a5" label={flag} />
+          ))}
+        </div>
+      )}
+
       <h2 style={{ fontSize: 15, fontWeight: 600, color: theme.text.secondary, marginBottom: 12 }}>
         Participants ({participants.length})
       </h2>
@@ -81,6 +90,7 @@ export default function ParticipantReviewDetailPage() {
               {p.proposed_title && <div style={{ color: theme.text.muted, fontSize: 12 }}>{p.proposed_title}</div>}
               {p.proposed_org && <div style={{ color: theme.text.faint, fontSize: 12 }}>{p.proposed_org}</div>}
               {p.participant_email && <div style={{ color: theme.text.faint, fontSize: 12 }}>{p.participant_email}</div>}
+              {p.header_role && <div style={{ color: theme.text.faint, fontSize: 11, fontStyle: "italic" }}>Role: {p.header_role}</div>}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {p.confirmed ? (
@@ -90,20 +100,31 @@ export default function ParticipantReviewDetailPage() {
               ) : (
                 <Badge bg="#1f2937" text="#9ca3af" label="Unconfirmed" />
               )}
-              {!p.confirmed && (
-                <select
-                  style={{ background: theme.bg.input, color: theme.text.primary, border: `1px solid ${theme.border.default}`, borderRadius: 6, padding: "4px 8px", fontSize: 12 }}
-                  value={p.tracker_person_id || ""}
-                  onChange={(e) => { if (e.target.value) handleConfirm(p.id, e.target.value); }}
+              {!p.confirmed && resolvingId !== p.id && (
+                <button
+                  style={{ ...btnPrimary, fontSize: 12, padding: "4px 12px" }}
+                  onClick={() => setResolvingId(p.id)}
                 >
-                  <option value="">Link to person...</option>
-                  {people.map(person => (
-                    <option key={person.id} value={person.id}>{person.full_name}{person.title ? ` (${person.title})` : ""}</option>
-                  ))}
-                </select>
+                  Link Person
+                </button>
               )}
             </div>
           </div>
+          {!p.confirmed && resolvingId === p.id && (
+            <div style={{ marginTop: 12, borderTop: `1px solid ${theme.border.default}`, paddingTop: 12 }}>
+              <PersonOrgResolver
+                entityType="person"
+                onLink={(personId) => handleConfirm(p.id, personId)}
+                onCreateNew={(newPerson) => {
+                  // PersonOrgResolver returns a new person object after creation
+                  if (newPerson?.id) handleConfirm(p.id, newPerson.id);
+                }}
+                onSkip={() => setResolvingId(null)}
+                showSkip={true}
+                initialSearch={p.proposed_name || p.participant_email || ""}
+              />
+            </div>
+          )}
         </div>
       ))}
 

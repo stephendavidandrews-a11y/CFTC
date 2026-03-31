@@ -15,7 +15,7 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
-from watchdog.events import FileSystemEventHandler, FileCreatedEvent
+from watchdog.events import FileSystemEventHandler, FileCreatedEvent, FileMovedEvent
 from watchdog.observers import Observer
 
 from app.pipeline.stages.preprocessing import ACCEPTED_FORMATS
@@ -46,6 +46,23 @@ class _AudioFileHandler(FileSystemEventHandler):
 
         logger.info("New audio file detected: %s", path.name)
         # Queue for processing after debounce
+        self._schedule_ingest(path)
+
+    def on_moved(self, event: FileMovedEvent):
+        """Handle file renames — rsync writes to .temp then renames on completion."""
+        if event.is_directory:
+            return
+        path = Path(event.dest_path)
+        if path.suffix.lower() not in ACCEPTED_FORMATS:
+            return
+        # Only care about moves FROM hidden temp to final name
+        src_name = Path(event.src_path).name
+        if not src_name.startswith("."):
+            return
+        if path.name.startswith(".") or path.name.startswith("~"):
+            return
+
+        logger.info("Rsync rename detected: %s → %s", src_name, path.name)
         self._schedule_ingest(path)
 
     def _schedule_ingest(self, path: Path):
@@ -129,18 +146,32 @@ class _AudioFileHandler(FileSystemEventHandler):
                 "Watcher: created communication %s from %s", comm_id[:8], path.name
             )
 
-            # Start pipeline in a new event loop (watcher runs in a thread)
+            # Schedule pipeline on main event loop (watcher runs in a thread,
+            # but pipeline uses semaphores bound to the main loop)
             from app.pipeline.orchestrator import process_communication
 
-            try:
-                loop = asyncio.new_event_loop()
-                loop.run_until_complete(process_communication(comm_id))
-            except Exception as e:
-                logger.error(
-                    "Pipeline failed for watcher-ingested %s: %s", comm_id[:8], e
+            main_loop = AudioInboxWatcher._main_loop
+            if main_loop and main_loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(
+                    process_communication(comm_id), main_loop
                 )
-            finally:
-                loop.close()
+                try:
+                    future.result(timeout=600)  # 10 min max per communication
+                except Exception as e:
+                    logger.error(
+                        "Pipeline failed for watcher-ingested %s: %s", comm_id[:8], e
+                    )
+            else:
+                # Fallback: new event loop (may fail with shared semaphores)
+                try:
+                    loop = asyncio.new_event_loop()
+                    loop.run_until_complete(process_communication(comm_id))
+                except Exception as e:
+                    logger.error(
+                        "Pipeline failed for watcher-ingested %s: %s", comm_id[:8], e
+                    )
+                finally:
+                    loop.close()
 
         except Exception:
             db.rollback()
@@ -186,6 +217,9 @@ def _quarantine_file(path: Path, reason: str):
 class AudioInboxWatcher:
     """Watches the audio inbox directory for new files."""
 
+    # Reference to main asyncio event loop, set by start()
+    _main_loop = None
+
     def __init__(self, watch_dir: Path):
         self.watch_dir = watch_dir
         self.observer = Observer()
@@ -194,6 +228,12 @@ class AudioInboxWatcher:
     def start(self):
         """Start watching. Creates subdirectories if needed."""
         self.watch_dir.mkdir(parents=True, exist_ok=True)
+
+        # Capture the main event loop so handler threads can schedule on it
+        try:
+            AudioInboxWatcher._main_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            AudioInboxWatcher._main_loop = None
 
         # Watch recursively (for pi/, plaud/, phone/ subdirs)
         self.observer.schedule(self.handler, str(self.watch_dir), recursive=True)

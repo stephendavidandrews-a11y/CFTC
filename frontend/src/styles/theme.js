@@ -54,7 +54,7 @@ const theme = {
     paused: { bg: "#422006", text: "#fbbf24", label: "Paused" },
     withdrawn: { bg: "#1f2937", text: "#9ca3af", label: "Withdrawn" },
     archived: { bg: "#1f2937", text: "#6b7280", label: "Archived" },
-    // Tracker matter statuses
+    // Legacy matter statuses retained as fallbacks until older tracker rows are normalized
     "draft in progress": { bg: "#1e3a5f", text: "#60a5fa", label: "Draft in Progress" },
     "internal review": { bg: "#172554", text: "#60a5fa", label: "Internal Review" },
     "awaiting comments": { bg: "#422006", text: "#fbbf24", label: "Awaiting Comments" },

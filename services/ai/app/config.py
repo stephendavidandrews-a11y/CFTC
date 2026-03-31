@@ -37,6 +37,10 @@ TRACKER_PASS = os.environ.get("TRACKER_PASS", "")
 # Optional Basic auth for AI service endpoints
 AI_AUTH_USER = os.environ.get("AI_AUTH_USER", "")
 AI_AUTH_PASS = os.environ.get("AI_AUTH_PASS", "")
+
+# Intake service credentials (for native transcription worker)
+INTAKE_USER = os.environ.get("INTAKE_USER", "")
+INTAKE_PASS = os.environ.get("INTAKE_PASS", "")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 
 PORT = int(os.environ.get("AI_PORT", "8006"))

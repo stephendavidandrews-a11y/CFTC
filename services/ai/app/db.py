@@ -17,11 +17,12 @@ def get_connection(db_path: Path = None) -> sqlite3.Connection:
     """Open a SQLite connection with WAL mode and FK enforcement."""
     path = db_path or AI_DB_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(path), check_same_thread=False)
+    conn = sqlite3.connect(str(path), timeout=60, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA busy_timeout=30000")
+    conn.execute("PRAGMA busy_timeout=60000")
     conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA wal_autocheckpoint=0")  # Disable auto-checkpoint; manual checkpoint during idle
     return conn
 
 
@@ -46,3 +47,14 @@ def get_db():
         yield conn
     finally:
         conn.close()
+
+def checkpoint_wal(db_path: Path = None):
+    """Run a WAL checkpoint during idle periods. Safe to call anytime."""
+    path = db_path or AI_DB_PATH
+    try:
+        conn = sqlite3.connect(str(path), check_same_thread=False)
+        conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
+        conn.close()
+    except Exception as e:
+        logger.warning("WAL checkpoint failed: %s", e)
+

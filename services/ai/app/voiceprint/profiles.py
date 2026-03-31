@@ -3,6 +3,7 @@ Voice profile management — CRUD, quality-gated promotion, running average upda
 
 Design:
   - One aggregate embedding per person (for fast O(n) matching)
+  - Dynamic embedding dimension (detected from blob size)
   - Individual confirmed samples preserved in voice_samples for audit/rebuild
   - Profile update uses 70/30 old/new running average (prevents single-sample corruption)
   - Quality gate: minimum 5 seconds of speech before promoting to profile
@@ -17,9 +18,7 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-EMBEDDING_DIM = 192
 FLOAT32_SIZE = 4
-EXPECTED_BLOB_SIZE = EMBEDDING_DIM * FLOAT32_SIZE
 
 # Minimum speech duration (seconds) before a sample can update a profile
 MIN_SPEECH_SECONDS = 5.0
@@ -35,13 +34,14 @@ BLEND_NEW = 0.3
 
 
 def _unpack(blob: bytes) -> Optional[list[float]]:
-    if not blob or len(blob) != EXPECTED_BLOB_SIZE:
+    if not blob or len(blob) < FLOAT32_SIZE or len(blob) % FLOAT32_SIZE != 0:
         return None
-    return list(struct.unpack(f"<{EMBEDDING_DIM}f", blob))
+    dim = len(blob) // FLOAT32_SIZE
+    return list(struct.unpack(f"<{dim}f", blob))
 
 
 def _pack(vec: list[float]) -> bytes:
-    return struct.pack(f"<{EMBEDDING_DIM}f", *vec)
+    return struct.pack(f"<{len(vec)}f", *vec)
 
 
 def _l2_normalize(vec: list[float]) -> list[float]:
@@ -245,7 +245,7 @@ def promote_sample_to_profile(
                 profile_id,
                 tracker_person_id,
                 _pack(normalized),
-                EMBEDDING_DIM,
+                len(normalized),
                 quality,
                 speech_seconds,
                 communication_id,

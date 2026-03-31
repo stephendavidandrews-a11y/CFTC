@@ -217,23 +217,23 @@ class TestAcceptEditedItem:
 class TestValidateProposedData:
     """All item types have required field validation."""
 
-    def test_task_update_requires_task_id(self):
+    def test_task_update_requires_existing_task_id_alias(self):
         with pytest.raises(Exception):
-            validate_proposed_data("task_update", {"title": "no task_id"})
+            validate_proposed_data("task_update", {"title": "no task id"})
 
-    def test_decision_update_requires_decision_id(self):
+    def test_decision_update_requires_existing_decision_id_alias(self):
         with pytest.raises(Exception):
-            validate_proposed_data("decision_update", {"title": "no decision_id"})
+            validate_proposed_data("decision_update", {"title": "no decision id"})
 
-    def test_context_note_requires_content(self):
+    def test_context_note_requires_body_or_content(self):
         with pytest.raises(Exception):
-            validate_proposed_data("context_note", {"title": "no content"})
+            validate_proposed_data("context_note", {"title": "no body"})
 
     def test_person_detail_update_requires_person_id(self):
         with pytest.raises(Exception):
             validate_proposed_data("person_detail_update", {"full_name": "test"})
 
-    def test_org_detail_update_requires_organization_id(self):
+    def test_org_detail_update_requires_existing_org_id_alias(self):
         with pytest.raises(Exception):
             validate_proposed_data("org_detail_update", {"name": "test"})
 
@@ -241,11 +241,29 @@ class TestValidateProposedData:
         with pytest.raises(Exception):
             validate_proposed_data("directive_update", {"status": "active"})
 
-    def test_task_update_passes_with_task_id(self):
+    def test_task_update_passes_with_existing_task_id(self):
+        validate_proposed_data("task_update", {"existing_task_id": "abc-123"})
+
+    def test_task_update_allows_legacy_task_id(self):
         validate_proposed_data("task_update", {"task_id": "abc-123"})
 
-    def test_context_note_passes_with_content(self):
+    def test_decision_update_passes_with_existing_decision_id(self):
+        validate_proposed_data("decision_update", {"existing_decision_id": "dec-123"})
+
+    def test_decision_update_allows_legacy_decision_id(self):
+        validate_proposed_data("decision_update", {"decision_id": "dec-123"})
+
+    def test_context_note_passes_with_body(self):
+        validate_proposed_data("context_note", {"body": "some note text"})
+
+    def test_context_note_allows_legacy_content(self):
         validate_proposed_data("context_note", {"content": "some note text"})
+
+    def test_org_detail_update_passes_with_existing_org_id(self):
+        validate_proposed_data("org_detail_update", {"existing_org_id": "org-123"})
+
+    def test_org_detail_update_allows_legacy_organization_id(self):
+        validate_proposed_data("org_detail_update", {"organization_id": "org-123"})
 
 
 # ============================================================

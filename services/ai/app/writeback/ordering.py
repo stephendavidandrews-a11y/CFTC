@@ -14,12 +14,15 @@ ITEM_TYPE_ORDER = {
     "stakeholder_addition": 3,
     "document": 4,
     "task": 5,
-    "follow_up": 6,
+    "task_update": 6,
     "matter_update": 7,
     "decision": 8,
-    "status_change": 9,
-    "context_note": 10,
-    "person_detail_update": 11,
+    "decision_update": 9,
+    "status_change": 10,
+    "context_note": 11,
+    "person_detail_update": 12,
+    "org_detail_update": 13,
+    "directive_update": 14,
 }
 
 

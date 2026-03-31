@@ -388,23 +388,20 @@ async def process_communication(communication_id: str, db_factory=None):
                     prev_stage = status
 
                 try:
-                    # Savepoint: all stage writes can be rolled back on failure
-                    savepoint_name = "stage_%s" % status.replace("-", "_")
-                    db.execute("SAVEPOINT %s" % savepoint_name)
-
                     # Run the stage handler
+                    # Note: stages manage their own commits internally.
+                    # No savepoint wrapper — savepoints hold read snapshots across long
+                    # API calls, causing SQLITE_BUSY_SNAPSHOT when other connections
+                    # write to the WAL during the call.
                     next_status = await run_stage(
                         db, communication_id, status, source_type
                     )
 
-                    # Release savepoint (merge stage writes into main transaction)
-                    # Note: stages may call db.commit() internally (e.g. LLM usage tracking),
-                    # which releases all savepoints. This is safe — data is already persisted.
+                    # Ensure any uncommitted stage writes are persisted
                     try:
-                        db.execute("RELEASE SAVEPOINT %s" % savepoint_name)
+                        db.commit()
                     except Exception:
-                        # Savepoint already released by an internal commit — data is safe
-                        db.commit()  # Ensure any uncommitted stage writes are persisted
+                        pass  # Stage already committed
 
                     # CAS transition
                     if not cas_transition(db, communication_id, status, next_status):
@@ -426,22 +423,10 @@ async def process_communication(communication_id: str, db_factory=None):
                     )
 
                 except Exception as e:
-                    # Roll back partial stage writes before handling the error
-                    try:
-                        db.execute("ROLLBACK TO SAVEPOINT %s" % savepoint_name)
-                        db.execute("RELEASE SAVEPOINT %s" % savepoint_name)
-                        logger.debug(
-                            "Rolled back savepoint %s for %s",
-                            savepoint_name,
-                            communication_id[:8],
-                        )
-                    except Exception as rb_err:
-                        # Savepoint gone (stage committed) — data already persisted, nothing to roll back
-                        logger.debug(
-                            "Savepoint %s already released for %s (stage committed internally)",
-                            savepoint_name,
-                            communication_id[:8],
-                        )
+                    # Stage failed — stages manage their own commits, so partial
+                    # writes may already be persisted. The error handler below
+                    # decides whether to retry or transition to error state.
+                    pass
 
                     # Budget exhaustion → paused_budget (not error)
                     from app.llm.client import BudgetExceededError, LLMError
@@ -555,6 +540,19 @@ async def process_communication(communication_id: str, db_factory=None):
                             },
                         )
                         break
+
+                    # SQLite contention → retry with backoff (database is locked)
+                    import sqlite3 as _sqlite3
+                    if isinstance(e, _sqlite3.OperationalError) and "locked" in str(e):
+                        stage_retries += 1
+                        if stage_retries <= 5:
+                            wait = min(5 * stage_retries, 30)
+                            logger.warning(
+                                "DB locked for %s at %s (attempt %d/5, retrying in %ds)",
+                                communication_id[:8], status, stage_retries, wait,
+                            )
+                            await asyncio.sleep(wait)
+                            continue  # Re-enter the while loop at the same stage
 
                     # Non-recoverable error
                     logger.error(
@@ -1005,4 +1003,30 @@ async def _handle_committing(db, communication_id: str) -> str:
         result.total_records,
         result.bundles_skipped,
     )
+
+    # Post-commit: generate meeting intelligence (non-fatal)
+    try:
+        from app.pipeline.stages.meeting_intelligence import generate_meeting_intelligence
+
+        intel_result = await generate_meeting_intelligence(db, communication_id)
+        if intel_result:
+            await publish_event(
+                "stage_progress",
+                {
+                    "communication_id": communication_id,
+                    "stage": "meeting_intelligence",
+                    "message": "Meeting intelligence generated",
+                },
+            )
+            logger.info(
+                "[%s] Meeting intelligence generated successfully",
+                communication_id[:8],
+            )
+    except Exception as e:
+        logger.warning(
+            "[%s] Meeting intelligence generation failed (non-fatal): %s",
+            communication_id[:8],
+            e,
+        )
+
     return "complete"  # next state

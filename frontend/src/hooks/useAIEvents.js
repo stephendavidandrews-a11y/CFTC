@@ -11,10 +11,11 @@ import { useState, useEffect, useRef, useCallback } from "react";
 const SSE_URL = "/ai/api/events/stream";
 const RECONNECT_BASE = 5000;    // 5 seconds initial
 const RECONNECT_MAX  = 60000;   // 60 seconds cap
+const DEFAULT_EVENT_TYPES = [];  // module-level constant to avoid reconnect loops
 
 // Connection states: "connecting" | "connected" | "disconnected" | "error"
 
-export default function useAIEvents(eventTypes = []) {
+export default function useAIEvents(eventTypes = DEFAULT_EVENT_TYPES) {
   const [connectionState, setConnectionState] = useState("disconnected");
   const [lastEvent, setLastEvent] = useState(null);
   const listenersRef = useRef({});

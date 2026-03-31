@@ -13,6 +13,10 @@ export function getAIHealth() {
   return fetchJSON("/ai/api/health");
 }
 
+export function getAICosts() {
+  return fetchJSON("/ai/api/costs");
+}
+
 // ── Config / Policy ─────────────────────────────────────────────────────────
 export function getAIConfig() {
   return fetchJSON("/ai/api/config");

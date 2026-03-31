@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import theme from "../../styles/theme";
 import useApi from "../../hooks/useApi";
 import {
@@ -13,6 +13,7 @@ import EmptyState from "../../components/shared/EmptyState";
 import { formatDate, formatDateTime } from "../../utils/dateUtils";
 import UploadAudioModal from "../../components/shared/UploadAudioModal";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
+import useAIEvents from "../../hooks/useAIEvents";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -133,6 +134,12 @@ const columns = [
 
 export default function CommunicationsArchivePage() {
   const toast = useToastContext();
+  const { lastEvent } = useAIEvents();
+
+  // Auto-refresh when pipeline events arrive
+  useEffect(() => {
+    if (lastEvent) refetch();
+  }, [lastEvent]);
   const [statusFilter, setStatusFilter] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [detailItem, setDetailItem] = useState(null);

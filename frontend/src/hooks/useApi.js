@@ -29,6 +29,7 @@ export default function useApi(fetchFn, deps = [], { refetchOnFocus = false } = 
         if (thisRequest === requestId.current) {
           setError(err);
         }
+        throw err;
       })
       .finally(() => {
         if (thisRequest === requestId.current) {
@@ -39,13 +40,13 @@ export default function useApi(fetchFn, deps = [], { refetchOnFocus = false } = 
   // eslint-disable-next-line
   }, deps);
 
-  useEffect(() => { refetch(); }, [refetch]);
+  useEffect(() => { refetch().catch(() => {}); }, [refetch]);
 
   useEffect(() => {
     if (!refetchOnFocus) return;
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible" && hasFetched.current) {
-        refetch();
+        refetch().catch(() => {});
       }
     };
     document.addEventListener("visibilitychange", onVisibilityChange);

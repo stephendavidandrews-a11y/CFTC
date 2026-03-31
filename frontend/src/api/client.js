@@ -62,7 +62,7 @@ export async function fetchJSON(url, options = {}) {
 
       if (!response.ok) {
         // Redirect to login on auth failure (session expired or missing)
-        if (response.status === 401 && !url.includes('/tracker/login')) {
+        if (response.status === 401 && url.startsWith("/tracker/") && !url.includes("/tracker/login")) {
           window.location.href = '/tracker/login';
           return new Promise(() => {}); // never resolves — page is navigating away
         }

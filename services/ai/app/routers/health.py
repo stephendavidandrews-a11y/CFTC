@@ -1,7 +1,6 @@
 """Health and operational status endpoints."""
 
 import logging
-import shutil
 from datetime import datetime
 from fastapi import APIRouter, Depends
 from app.db import get_db
@@ -18,8 +17,7 @@ AI_SERVICE_VERSION = "0.5.0"
 
 @public_router.get("/health")
 async def health(db=Depends(get_db)):
-    """Service health and queue stats."""
-    # Count communications by status for queue overview
+    """Public liveness/readiness endpoint with queue visibility only."""
     status_counts = {}
     rows = db.execute("""
         SELECT processing_status, COUNT(*) as cnt
@@ -29,25 +27,7 @@ async def health(db=Depends(get_db)):
     for r in rows:
         status_counts[r["processing_status"]] = r["cnt"]
 
-    # Today's LLM spend
-    spend_row = db.execute("""
-        SELECT COALESCE(SUM(cost_usd), 0.0) as today_spend
-        FROM llm_usage
-        WHERE created_at >= date('now')
-    """).fetchone()
-    today_spend = spend_row["today_spend"] if spend_row else 0.0
-
-    policy = load_policy()
-    daily_budget = policy.get("model_config", {}).get("daily_budget_usd", 10.0)
-
-    # Disk space
-    try:
-        usage = shutil.disk_usage("/")
-        disk_free_mb = usage.free // (1024 * 1024)
-    except Exception:
-        disk_free_mb = -1
-
-    from app.main import _disk_low, _ready
+    from app.main import _ready
 
     return {
         "status": "ok" if _ready else "starting",
@@ -56,16 +36,6 @@ async def health(db=Depends(get_db)):
         "version": AI_SERVICE_VERSION,
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "queue": status_counts,
-        "spend": {
-            "today_usd": round(today_spend, 4),
-            "daily_budget_usd": daily_budget,
-            "budget_remaining_usd": round(daily_budget - today_spend, 4),
-            "paused": today_spend >= daily_budget,
-        },
-        "disk": {
-            "free_mb": disk_free_mb,
-            "low": _disk_low,
-        },
     }
 
 

@@ -6,7 +6,7 @@ Conservative, human-in-the-loop design:
   - Returns ranked candidates with confidence labels
   - Logs every match attempt for auditability
 
-Embedding format: 192-dim float32 from pyannote speaker-diarization-3.1
+Embedding format: float32 from pyannote speaker-diarization-3.1 (dimension auto-detected)
 Similarity metric: cosine similarity (standard for speaker embeddings)
 """
 
@@ -29,9 +29,7 @@ MEDIUM_CONFIDENCE_CEIL = 0.80  # [0.70, 0.80) = medium confidence
 # Maximum candidates to return per speaker
 MAX_CANDIDATES = 3
 
-EMBEDDING_DIM = 192
 FLOAT32_SIZE = 4
-EXPECTED_BLOB_SIZE = EMBEDDING_DIM * FLOAT32_SIZE  # 768 bytes
 
 
 # ---------------------------------------------------------------------------
@@ -41,9 +39,10 @@ EXPECTED_BLOB_SIZE = EMBEDDING_DIM * FLOAT32_SIZE  # 768 bytes
 
 def _unpack_embedding(blob: bytes) -> Optional[list[float]]:
     """Unpack a BLOB into a list of float32 values. Returns None if invalid."""
-    if not blob or len(blob) != EXPECTED_BLOB_SIZE:
+    if not blob or len(blob) < FLOAT32_SIZE or len(blob) % FLOAT32_SIZE != 0:
         return None
-    return list(struct.unpack(f"<{EMBEDDING_DIM}f", blob))
+    dim = len(blob) // FLOAT32_SIZE
+    return list(struct.unpack(f"<{dim}f", blob))
 
 
 def _cosine_similarity(a: list[float], b: list[float]) -> float:

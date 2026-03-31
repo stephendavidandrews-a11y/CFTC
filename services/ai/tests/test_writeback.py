@@ -471,6 +471,15 @@ def test_2_02_ordering_preserves_sort_within_tier():
     assert [i["sort_order"] for i in ordered] == [1, 2, 3]
 
 
+
+def test_2_03_ordering_tracks_current_contract_item_types():
+    from app.writeback.ordering import ITEM_TYPE_ORDER
+
+    assert "follow_up" not in ITEM_TYPE_ORDER
+    for item_type in ("task_update", "decision_update", "org_detail_update", "directive_update"):
+        assert item_type in ITEM_TYPE_ORDER
+
+
 # =====================================================================
 # 3. FULL COMMIT — mock tracker, verify end-to-end
 # =====================================================================

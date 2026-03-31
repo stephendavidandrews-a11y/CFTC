@@ -13,7 +13,7 @@ import {
   updateAIConfigSection,
   getConfigAudit,
   getConfigStats,
-  getAIHealth,
+  getAICosts,
 } from "../../api/ai";
 import { useToastContext } from "../../contexts/ToastContext";
 
@@ -442,7 +442,7 @@ function AISettingsPageInner() {
 
   // Supplementary data
   const [stats, setStats] = useState({});
-  const [health, setHealth] = useState(null);
+  const [costs, setCosts] = useState(null);
   const [audit, setAudit] = useState([]);
 
   // Section UI state
@@ -465,10 +465,10 @@ function AISettingsPageInner() {
     try {
       setLoading(true);
       setLoadError(null);
-      const [configRes, statsRes, healthRes, auditRes] = await Promise.allSettled([
+      const [configRes, statsRes, costsRes, auditRes] = await Promise.allSettled([
         getAIConfig(),
         getConfigStats(),
-        getAIHealth(),
+        getAICosts(),
         getConfigAudit(),
       ]);
 
@@ -501,7 +501,7 @@ function AISettingsPageInner() {
       }
 
       if (statsRes.status === "fulfilled") setStats(statsRes.value || {});
-      if (healthRes.status === "fulfilled") setHealth(healthRes.value || null);
+      if (costsRes.status === "fulfilled") setCosts(costsRes.value || null);
       if (auditRes.status === "fulfilled") setAudit(auditRes.value || []);
     } catch (err) {
       setLoadError(err.message || "Failed to load configuration");
@@ -1507,7 +1507,7 @@ function AISettingsPageInner() {
             />
           </FieldRow>
           <FieldRow label="Today's Spend">
-            {health ? (
+            {costs ? (
               <div
                 style={{
                   display: "flex",
@@ -1519,8 +1519,8 @@ function AISettingsPageInner() {
                 <span
                   style={{
                     color:
-                      health.spend?.today_usd >=
-                      (health.spend?.daily_budget_usd || 10) *
+                      (costs?.today_usd ?? 0) >=
+                      (costs?.daily_budget_usd || 10) *
                         (modelConfig?.budget_warning_threshold ?? 0.8)
                         ? theme.accent.yellow
                         : theme.accent.green,
@@ -1529,12 +1529,12 @@ function AISettingsPageInner() {
                     fontWeight: 600,
                   }}
                 >
-                  ${(health.spend?.today_usd ?? 0).toFixed(2)}
+                  ${(costs?.today_usd ?? 0).toFixed(2)}
                 </span>
                 <span style={{ color: theme.text.dim, fontSize: 13 }}>
-                  / ${(health.spend?.daily_budget_usd ?? 10).toFixed(2)}
+                  / ${(costs?.daily_budget_usd ?? 10).toFixed(2)}
                 </span>
-                {health.spend?.paused && (
+                {(costs?.today_usd ?? 0) >= (costs?.daily_budget_usd ?? 10) && (
                   <span
                     style={{
                       color: theme.accent.red,

@@ -18,7 +18,7 @@ import shutil
 
 
 from app.config import CORS_ORIGINS, AI_UPLOAD_DIR, AI_AUDIO_WATCH_DIR, load_policy
-from app.db import get_connection
+from app.db import get_connection, checkpoint_wal
 from app.schema import init_schema
 
 # Readiness flags: _ready is True after successful startup
@@ -64,6 +64,8 @@ _AUTOMATED_STATES = {
     "speakers_confirmed",
     "participants_confirmed",
     "associations_confirmed",
+    "reviewed",
+    "pending",
 }
 
 # Review-in-progress states that can be reset to their awaiting counterpart
@@ -192,6 +194,8 @@ async def _stuck_recovery_loop():
     while True:
         try:
             await asyncio.sleep(STUCK_SCAN_INTERVAL)
+            # Periodic WAL checkpoint during idle to prevent WAL growth
+            checkpoint_wal()
             actions = run_stuck_recovery()
             if actions:
                 from app.routers.events import publish_event

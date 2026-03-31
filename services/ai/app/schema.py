@@ -180,7 +180,7 @@ TABLES = [
         id TEXT PRIMARY KEY,
         tracker_person_id TEXT NOT NULL,
         embedding BLOB NOT NULL,
-        embedding_dimension INTEGER DEFAULT 192,
+        embedding_dimension INTEGER DEFAULT 0,
         quality_score REAL DEFAULT 0.0,
         sample_count INTEGER DEFAULT 1,
         total_speech_seconds REAL DEFAULT 0.0,
@@ -502,6 +502,22 @@ TABLES = [
         created_at TEXT DEFAULT (datetime('now'))
     )""",
     ),
+    # ---- Table: transcript_corrections ----
+    (
+        "transcript_corrections",
+        """CREATE TABLE IF NOT EXISTS transcript_corrections (
+        id TEXT PRIMARY KEY,
+        communication_id TEXT NOT NULL REFERENCES communications(id),
+        transcript_id TEXT NOT NULL,
+        original_text TEXT NOT NULL,
+        corrected_text TEXT NOT NULL,
+        correction_type TEXT DEFAULT 'manual',
+        pattern_from TEXT,
+        pattern_to TEXT,
+        applied_count INTEGER DEFAULT 1,
+        created_at TEXT DEFAULT (datetime('now'))
+    )""",
+    ),
 ]
 
 # ---------------------------------------------------------------------------
@@ -549,6 +565,8 @@ INDEXES = [
     # -- voiceprint_match_log --
     "CREATE INDEX IF NOT EXISTS idx_vp_match_comm ON voiceprint_match_log(communication_id);",
     "CREATE INDEX IF NOT EXISTS idx_vp_match_outcome ON voiceprint_match_log(outcome);",
+    # -- transcript_corrections --
+    "CREATE INDEX IF NOT EXISTS idx_transcript_corrections_comm ON transcript_corrections(communication_id);",
     # -- ai_extractions --
     "CREATE INDEX IF NOT EXISTS idx_extraction_comm ON ai_extractions(communication_id);",
     # -- review_bundles --

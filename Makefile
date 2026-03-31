@@ -1,4 +1,4 @@
-.PHONY: test test-tracker test-ai test-intake lint format check
+.PHONY: test test-tracker test-ai test-intake test-e2e lint format check
 
 TRACKER_VENV = services/tracker/.venv/bin
 AI_VENV = services/ai/.venv/bin
@@ -13,7 +13,10 @@ test-ai:
 test-intake:
 	cd services/intake && $(CURDIR)/$(INTAKE_VENV)/python -m pytest tests/ -v
 
-test: test-tracker test-ai test-intake
+test: test-tracker test-ai test-intake test-e2e
+
+test-e2e:  ## Run e2e health & contract tests against live services
+	python3 tests/test_e2e_health.py -v
 
 lint:
 	$(TRACKER_VENV)/ruff check services/tracker/

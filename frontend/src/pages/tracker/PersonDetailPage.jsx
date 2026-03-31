@@ -146,10 +146,26 @@ export default function PersonDetailPage() {
   useEffect(() => {
     if (!person?.id) return;
     let cancelled = false;
-    getPersonProfile(person.id).then(d => { if (!cancelled) setProfile(d); }).catch(() => {});
-    getContextNotesByEntity("person", person.id).then(d => { if (!cancelled) setContextNotes(d?.items || []); }).catch(() => {});
+    getPersonProfile(person.id)
+      .then((d) => { if (!cancelled) setProfile(d); })
+      .catch((err) => {
+        console.error(err);
+        if (!cancelled) {
+          setProfile(null);
+          toast.error(err.message || "Failed to load person profile");
+        }
+      });
+    getContextNotesByEntity("person", person.id)
+      .then((d) => { if (!cancelled) setContextNotes(d?.items || []); })
+      .catch((err) => {
+        console.error(err);
+        if (!cancelled) {
+          setContextNotes([]);
+          toast.error(err.message || "Failed to load context notes");
+        }
+      });
     return () => { cancelled = true; };
-  }, [person]);
+  }, [person, toast]);
 
   const handleDelete = async () => {
     setDeleting(true);

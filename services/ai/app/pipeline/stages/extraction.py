@@ -67,6 +67,7 @@ from app.pipeline.stages.extraction_postprocess import (  # noqa: F401
 from app.pipeline.stages.extraction_persist import (  # noqa: F401
     _build_source_locator,
     _persist_extraction,
+    persist_extraction_with_retry,
     _clear_bundles_for_communication,
     _persist_failed_extraction,
 )
@@ -444,7 +445,7 @@ async def run_extraction_stage(db, communication_id: str) -> dict:
     # ── Step 3: Persist Sonnet result (always, for audit trail) ──
     sonnet_extraction_id = None
     if sonnet_result.success:
-        sonnet_extraction_id = _persist_extraction(
+        sonnet_extraction_id = persist_extraction_with_retry(
             db=db,
             communication_id=communication_id,
             extraction=sonnet_result.parsed_output,
@@ -500,7 +501,7 @@ async def run_extraction_stage(db, communication_id: str) -> dict:
                 if sonnet_result.success
                 else (MAX_SONNET_ATTEMPTS + 1)
             )
-            final_extraction_id = _persist_extraction(
+            final_extraction_id = persist_extraction_with_retry(
                 db=db,
                 communication_id=communication_id,
                 extraction=opus_result.parsed_output,

@@ -605,6 +605,66 @@ def test_2_06_add_reviewer_item():
     assert locator["type"] == "reviewer"
 
 
+@pytest.mark.parametrize(
+    ("item_type", "proposed_data"),
+    [
+        (
+            "task_update",
+            {
+                "existing_task_id": "task-123",
+                "existing_task_title": "Existing task",
+                "changes": {"status": "in progress"},
+                "change_summary": "Advance the task status",
+            },
+        ),
+        (
+            "decision_update",
+            {
+                "existing_decision_id": "decision-123",
+                "existing_decision_title": "Existing decision",
+                "changes": {"status": "made"},
+                "change_summary": "Record the final decision",
+            },
+        ),
+        (
+            "context_note",
+            {
+                "title": "Operating context",
+                "category": "process_note",
+                "body": "Leadership wants a same-day readout.",
+                "posture": "factual",
+            },
+        ),
+        (
+            "org_detail_update",
+            {
+                "existing_org_id": "org-123",
+                "existing_org_name": "SEC",
+                "changes": {"jurisdiction": "Securities oversight"},
+                "change_summary": "Clarify the org jurisdiction",
+            },
+        ),
+    ],
+)
+def test_2_06a_add_reviewer_item_current_contract_shapes(item_type, proposed_data):
+    r = client.post(
+        f"{PREFIX}/{COMM_ID}/add-item",
+        json={
+            "bundle_id": BUNDLE_IDS[0],
+            "item_type": item_type,
+            "proposed_data": proposed_data,
+        },
+    )
+    assert r.status_code == 200, r.text
+
+    row = _shared_db.execute(
+        "SELECT item_type, proposed_data FROM review_bundle_items WHERE id = ?",
+        (r.json()["item_id"],),
+    ).fetchone()
+    assert row["item_type"] == item_type
+    assert json.loads(row["proposed_data"]) == proposed_data
+
+
 def test_2_07_add_invalid_type_fails():
     r = client.post(
         f"{PREFIX}/{COMM_ID}/add-item",

@@ -9,7 +9,7 @@
     "new_matter_threshold": "medium",
     "match_confidence_minimum": 0.7,
     "multi_matter_enabled": true,
-    "max_new_matters_per_communication": 5,
+    "max_new_matters_per_communication": 10,
     "standalone_items_enabled": true
   },
   "extraction_policy": {

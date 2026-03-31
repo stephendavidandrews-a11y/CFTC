@@ -16,8 +16,9 @@ export default function useReviewCounts(enabled = true) {
       const q = data.queue || {};
       setCounts({
         speakers: (q.awaiting_speaker_review || 0) + (q.speaker_review_in_progress || 0),
-        participants: (q.awaiting_participant_review || 0) + (q.participant_review_in_progress || 0)
-                    + (q.awaiting_association_review || 0) + (q.association_review_in_progress || 0),
+        participants: (q.awaiting_participant_review || 0) + (q.participant_review_in_progress || 0),
+        entities: (q.awaiting_association_review || 0) + (q.association_review_in_progress || 0)
+                + (q.awaiting_entity_review || 0) + (q.entity_review_in_progress || 0),
         bundles: (q.awaiting_bundle_review || 0) + (q.bundle_review_in_progress || 0),
         commit: q.reviewed || 0,
       });
