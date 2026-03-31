@@ -54,3 +54,6 @@ services/ai/data/
 services/ai/uploads/
 *_extraction_output.json
 "services/ai/NOT SET"
+
+# Audio inbox — raw captures from Pi and Plaud
+services/ai/audio-inbox/
