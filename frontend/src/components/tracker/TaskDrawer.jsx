@@ -8,7 +8,9 @@ import {
   listPeople,
   listOrganizations,
   listMatters,
+  listTasks,
   getTask,
+  getSystemConfig,
 } from "../../api/tracker";
 import { validate } from "../../utils/validation";
 
@@ -24,6 +26,7 @@ const INPUT_STYLE = {
 };
 const LABEL_STYLE = { display: "block", fontSize: 12, fontWeight: 600, color: "#94a3b8", marginBottom: 4 };
 const CANCEL_BTN = { background: "transparent", color: "#64748b", padding: "8px 20px", borderRadius: 8, fontSize: 13, border: "1px solid #1f2937", cursor: "pointer" };
+const FOLLOWUP_BTN = { padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, background: "#065f46", color: "#34d399", border: "1px solid #047857", cursor: "pointer" };
 
 const EMPTY = {
   title: "",
@@ -53,6 +56,8 @@ export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved })
   const [people, setPeople] = React.useState([]);
   const [orgs, setOrgs] = React.useState([]);
   const [matters, setMatters] = React.useState([]);
+  const [allTasks, setAllTasks] = React.useState([]);
+  const [ownerId, setOwnerId] = React.useState(null);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState(null);
   const [fieldErrors, setFieldErrors] = React.useState({});
@@ -69,11 +74,15 @@ export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved })
       listPeople({ limit: 100 }).catch(() => ({ items: [] })),
       listOrganizations({ limit: 100 }).catch(() => ({ items: [] })),
       listMatters({ limit: 200 }).catch(() => ({ items: [] })),
-    ]).then(([status, mode, type, priority, deadlineType, ppl, orgList, matterList]) => {
+      listTasks({ exclude_done: true, limit: 500 }).catch(() => ({ items: [] })),
+      getSystemConfig().catch(() => ({})),
+    ]).then(([status, mode, type, priority, deadlineType, ppl, orgList, matterList, taskList, cfg]) => {
       setEnums({ status, task_mode: mode, task_type: type, priority, deadline_type: deadlineType });
       setPeople(ppl.items || ppl || []);
       setOrgs(orgList.items || orgList || []);
       setMatters(matterList.items || matterList || []);
+      setAllTasks(taskList.items || taskList || []);
+      setOwnerId(cfg.owner_person_id || null);
     });
   }, [isOpen]);
 
@@ -140,40 +149,80 @@ export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved })
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
-  const handleSave = async () => {
+  const doSave = async () => {
     setError(null);
     setFieldErrors({});
+    const payload = { ...form };
+    Object.keys(payload).forEach((k) => { if (payload[k] === "") payload[k] = null; });
+    if (!task?.id) { Object.keys(payload).forEach((k) => { if (payload[k] === null || payload[k] === undefined) delete payload[k]; }); }
+
+    const v = validate("task", payload);
+    if (!v.valid) { setFieldErrors(v.errors); setError(Object.values(v.errors).join(", ")); return null; }
+
+    if (task?.id) {
+      await updateTask(task.id, payload, etag);
+      return task.id;
+    } else {
+      const created = await createTask(payload);
+      return created?.id || created?.task?.id || true;
+    }
+  };
+
+  const handleSave = async () => {
     setSaving(true);
     try {
-      const payload = { ...form };
-      Object.keys(payload).forEach((k) => { if (payload[k] === "") payload[k] = null; });
-      if (!task?.id) { Object.keys(payload).forEach((k) => { if (payload[k] === null || payload[k] === undefined) delete payload[k]; }); }
-
-      const v = validate("task", payload);
-      if (!v.valid) { setFieldErrors(v.errors); setError(Object.values(v.errors).join(", ")); setSaving(false); return; }
-
-      if (task?.id) {
-        await updateTask(task.id, payload, etag);
-      } else {
-        await createTask(payload);
-      }
+      const result = await doSave();
+      if (result === null) { setSaving(false); return; }
       if (onSaved) onSaved();
       onClose();
     } catch (err) {
-      if (err.status === 409 && !err.fieldErrors) {
-        setError("This record was modified by someone else. Please close, reopen to load the latest version, and review before saving again.");
-        setSaving(false);
-        return;
-      }
-      if (err.fieldErrors && Object.keys(err.fieldErrors).length) {
-        setFieldErrors(err.fieldErrors);
-        setError(Object.entries(err.fieldErrors).map(([k, v]) => `${k}: ${v}`).join("; "));
-      } else {
-        setFieldErrors({});
-        setError(err.message);
-      }
+      handleError(err);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveWithFollowUp = async () => {
+    setSaving(true);
+    try {
+      const createdId = await doSave();
+      if (createdId === null) { setSaving(false); return; }
+
+      // Auto-create follow-up task for the owner
+      const followUp = {
+        title: "Follow up: " + (form.title || "Untitled task"),
+        task_mode: "follow_up",
+        assigned_to_person_id: ownerId,
+        delegated_by_person_id: ownerId,
+        priority: form.priority || "normal",
+        status: "not started",
+      };
+      if (form.matter_id) followUp.matter_id = form.matter_id;
+      if (form.due_date) followUp.due_date = form.due_date;
+      if (form.due_date) followUp.next_follow_up_date = form.due_date;
+      if (typeof createdId === "string") followUp.tracks_task_id = createdId;
+
+      await createTask(followUp);
+      if (onSaved) onSaved();
+      onClose();
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleError = (err) => {
+    if (err.status === 409 && !err.fieldErrors) {
+      setError("This record was modified by someone else. Please close, reopen to load the latest version, and review before saving again.");
+      return;
+    }
+    if (err.fieldErrors && Object.keys(err.fieldErrors).length) {
+      setFieldErrors(err.fieldErrors);
+      setError(Object.entries(err.fieldErrors).map(([k, v]) => k + ": " + v).join("; "));
+    } else {
+      setFieldErrors({});
+      setError(err.message);
     }
   };
 
@@ -198,9 +247,34 @@ export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved })
     </div>
   );
 
-  const personOpts = people.map((p) => ({ value: p.id, label: p.full_name || (`${p.first_name || ""} ${p.last_name || ""}`.trim()) || `Person #${p.id}` }));
-  const orgOpts = orgs.map((o) => ({ value: o.id, label: o.name || `Org #${o.id}` }));
-  const matterOpts = matters.map((m) => ({ value: m.id, label: m.title || `Matter #${m.id}` }));
+  const personOpts = people.map((p) => ({ value: p.id, label: p.full_name || ((p.first_name || "") + " " + (p.last_name || "")).trim() || ("Person #" + p.id) }));
+  const orgOpts = orgs.map((o) => ({ value: o.id, label: o.name || ("Org #" + o.id) }));
+  const matterOpts = matters.map((m) => ({ value: m.id, label: m.title || ("Matter #" + m.id) }));
+
+  // Build task options for "Tracks Task" dropdown
+  // If a matter is selected, show tasks from that matter first, then others
+  const taskOpts = React.useMemo(() => {
+    const currentId = task?.id;
+    const filtered = allTasks.filter((t) => t.id !== currentId);
+    if (form.matter_id) {
+      const sameMatter = filtered.filter((t) => t.matter_id === form.matter_id);
+      const otherTasks = filtered.filter((t) => t.matter_id !== form.matter_id);
+      return [
+        ...sameMatter.map((t) => ({ value: t.id, label: t.title || ("Task #" + t.id) })),
+        ...(otherTasks.length > 0 ? [{ value: "__divider__", label: "\u2500\u2500 Other matters \u2500\u2500", disabled: true }] : []),
+        ...otherTasks.map((t) => ({ value: t.id, label: (t.matter_title ? "[" + t.matter_title.slice(0, 20) + "] " : "") + (t.title || "Task #" + t.id) })),
+      ];
+    }
+    return filtered.map((t) => ({
+      value: t.id,
+      label: (t.matter_title ? "[" + t.matter_title.slice(0, 20) + "] " : "[Quick] ") + (t.title || "Task #" + t.id),
+    }));
+  }, [allTasks, form.matter_id, task]);
+
+  // Show follow-up button when creating a new task assigned to someone other than owner
+  const isNewTask = !task?.id;
+  const assignedToOther = form.assigned_to_person_id && form.assigned_to_person_id !== ownerId;
+  const showFollowUpBtn = isNewTask && assignedToOther && ownerId;
 
   return (
     <DrawerShell isOpen={isOpen} onClose={onClose} title={task ? "Edit Task" : "New Task"}>
@@ -241,7 +315,14 @@ export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved })
       {/* Tracks / Tracked-by relationship */}
       <div style={{ marginBottom: 14 }}>
         <label style={LABEL_STYLE}>Tracks Task (action this follows up on)</label>
-        <input style={INPUT_STYLE} type="text" value={form.tracks_task_id} onChange={set("tracks_task_id")} placeholder="Task ID of tracked action" />
+        <select style={INPUT_STYLE} value={form.tracks_task_id} onChange={set("tracks_task_id")}>
+          <option value="">--</option>
+          {taskOpts.map((t) =>
+            t.disabled
+              ? <option key={t.value} value="" disabled>{t.label}</option>
+              : <option key={t.value} value={t.value}>{t.label}</option>
+          )}
+        </select>
       </div>
       {task?.tracks_task_title && (
         <div style={{ marginBottom: 14, fontSize: 12, color: "#94a3b8" }}>
@@ -261,8 +342,13 @@ export default function TaskDrawer({ isOpen, onClose, task, matterId, onSaved })
 
       {error && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 10 }}>{error}</div>}
 
-      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", paddingTop: 16, borderTop: "1px solid #1f2937", marginTop: 10 }}>
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", paddingTop: 16, borderTop: "1px solid #1f2937", marginTop: 10, flexWrap: "wrap" }}>
         <button style={CANCEL_BTN} onClick={onClose}>Cancel</button>
+        {showFollowUpBtn && (
+          <button style={{ ...FOLLOWUP_BTN, opacity: saving ? 0.6 : 1 }} onClick={handleSaveWithFollowUp} disabled={saving}>
+            {saving ? "Creating..." : "Create + Follow-up for me"}
+          </button>
+        )}
         <button style={{ ...btnPrimary, opacity: saving ? 0.6 : 1 }} onClick={handleSave} disabled={saving}>
           {saving ? "Saving..." : (task ? "Save Changes" : "Create Task")}
         </button>
