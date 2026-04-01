@@ -23,12 +23,12 @@ const btnPrimary = {
 
 const sectionTitle = { fontSize: 14, fontWeight: 700, color: theme.text.secondary, marginBottom: 14 };
 
-export default function StakeholdersTab({ matterId, matter, refetch, toast, allPeople, allOrgs }) {
+export default function StakeholdersTab({ matterId, matter, refetch, toast, allPeople, allOrgs, enums }) {
   const [showStakeholderAdd, setShowStakeholderAdd] = useState(false);
-  const [stakeholderForm, setStakeholderForm] = useState({ person_id: "", matter_role: "", engagement_level: "", notes: "" });
+  const [stakeholderForm, setStakeholderForm] = useState({ person_id: "", matter_role: "FYI only", engagement_level: "", notes: "" });
 
   const [showOrgAdd, setShowOrgAdd] = useState(false);
-  const [orgForm, setOrgForm] = useState({ organization_id: "", organization_role: "", notes: "" });
+  const [orgForm, setOrgForm] = useState({ organization_id: "", organization_role: "FYI", notes: "" });
 
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: "", message: "", onConfirm: null, danger: false });
 
@@ -37,12 +37,16 @@ export default function StakeholdersTab({ matterId, matter, refetch, toast, allP
   const peopleList = allPeople?.items || allPeople || [];
   const orgsList = allOrgs?.items || allOrgs || [];
 
+  const matterRoles = enums?.matter_role || [];
+  const engagementLevels = enums?.engagement_level || [];
+  const orgRoles = enums?.organization_role || [];
+
   const handleAddStakeholder = useCallback(async () => {
     if (!stakeholderForm.person_id) return;
     try {
       const cleanStakeholder = Object.fromEntries(Object.entries(stakeholderForm).filter(([_, v]) => v !== ""));
       await addMatterPerson(matterId, cleanStakeholder);
-      setStakeholderForm({ person_id: "", matter_role: "", engagement_level: "", notes: "" });
+      setStakeholderForm({ person_id: "", matter_role: "FYI only", engagement_level: "", notes: "" });
       setShowStakeholderAdd(false);
       refetch();
     } catch (e) { console.error(e); toast.error(e.message || "Operation failed"); }
@@ -68,7 +72,7 @@ export default function StakeholdersTab({ matterId, matter, refetch, toast, allP
     try {
       const cleanOrg = Object.fromEntries(Object.entries(orgForm).filter(([_, v]) => v !== ""));
       await addMatterOrg(matterId, cleanOrg);
-      setOrgForm({ organization_id: "", organization_role: "", notes: "" });
+      setOrgForm({ organization_id: "", organization_role: "FYI", notes: "" });
       setShowOrgAdd(false);
       refetch();
     } catch (e) { console.error(e); toast.error(e.message || "Operation failed"); }
@@ -101,7 +105,7 @@ export default function StakeholdersTab({ matterId, matter, refetch, toast, allP
         </div>
         {showStakeholderAdd && (
           <div style={{
-            display: "flex", gap: 8, alignItems: "center", marginBottom: 14,
+            display: "flex", gap: 8, alignItems: "center", marginBottom: 14, flexWrap: "wrap",
             background: theme.bg.input, padding: 12, borderRadius: 8, border: `1px solid ${theme.border.default}`,
           }}>
             <select style={{ ...inputStyle, width: 200 }}
@@ -109,18 +113,21 @@ export default function StakeholdersTab({ matterId, matter, refetch, toast, allP
               onChange={(e) => setStakeholderForm((p) => ({ ...p, person_id: e.target.value }))}
             >
               <option value="">Select person...</option>
-              {peopleList.map((p) => <option key={p.id} value={p.id}>{p.full_name || `${p.first_name} ${p.last_name}`}</option>)}
+              {peopleList.map((p) => <option key={p.id} value={p.id}>{p.full_name || (p.first_name + " " + p.last_name)}</option>)}
             </select>
-            <input style={{ ...inputStyle, width: 140 }}
-              placeholder="Role..."
+            <select style={{ ...inputStyle, width: 160 }}
               value={stakeholderForm.matter_role}
               onChange={(e) => setStakeholderForm((p) => ({ ...p, matter_role: e.target.value }))}
-            />
-            <input style={{ ...inputStyle, width: 140 }}
-              placeholder="Engagement..."
+            >
+              {matterRoles.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+            <select style={{ ...inputStyle, width: 140 }}
               value={stakeholderForm.engagement_level}
               onChange={(e) => setStakeholderForm((p) => ({ ...p, engagement_level: e.target.value }))}
-            />
+            >
+              <option value="">Engagement...</option>
+              {engagementLevels.map((lvl) => <option key={lvl} value={lvl}>{lvl}</option>)}
+            </select>
             <input style={{ ...inputStyle, width: 180 }}
               placeholder="Notes..."
               value={stakeholderForm.notes}
@@ -134,7 +141,7 @@ export default function StakeholdersTab({ matterId, matter, refetch, toast, allP
         ) : (
           <DataTable
             columns={[
-              { key: "name", label: "Name", render: (v, row) => row.full_name || row.name || `${row.first_name || ""} ${row.last_name || ""}`.trim() || "\u2014" },
+              { key: "name", label: "Name", render: (v, row) => row.full_name || row.name || ((row.first_name || "") + " " + (row.last_name || "")).trim() || "\u2014" },
               { key: "matter_role", label: "Role", width: 130 },
               { key: "engagement_level", label: "Engagement", width: 120 },
               { key: "org_name", label: "Organization", width: 160 },
@@ -170,7 +177,7 @@ export default function StakeholdersTab({ matterId, matter, refetch, toast, allP
         </div>
         {showOrgAdd && (
           <div style={{
-            display: "flex", gap: 8, alignItems: "center", marginBottom: 14,
+            display: "flex", gap: 8, alignItems: "center", marginBottom: 14, flexWrap: "wrap",
             background: theme.bg.input, padding: 12, borderRadius: 8, border: `1px solid ${theme.border.default}`,
           }}>
             <select style={{ ...inputStyle, width: 220 }}
@@ -180,11 +187,12 @@ export default function StakeholdersTab({ matterId, matter, refetch, toast, allP
               <option value="">Select organization...</option>
               {orgsList.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
             </select>
-            <input style={{ ...inputStyle, width: 160 }}
-              placeholder="Role..."
+            <select style={{ ...inputStyle, width: 160 }}
               value={orgForm.organization_role}
               onChange={(e) => setOrgForm((p) => ({ ...p, organization_role: e.target.value }))}
-            />
+            >
+              {orgRoles.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
             <input style={{ ...inputStyle, width: 180 }}
               placeholder="Notes..."
               value={orgForm.notes}

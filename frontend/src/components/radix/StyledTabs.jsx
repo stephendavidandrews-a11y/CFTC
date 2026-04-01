@@ -8,7 +8,7 @@ const tabActiveCSS = `
     color: ${theme.accent.blue} !important;
     border-bottom-color: ${theme.accent.blue} !important;
   }
-  [data-radix-tabs-content][data-state="inactive"] {
+  [role="tabpanel"][data-state="inactive"] {
     display: none;
   }
   [data-radix-tabs-trigger]:hover {

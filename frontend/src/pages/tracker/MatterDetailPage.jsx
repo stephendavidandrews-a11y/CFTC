@@ -620,7 +620,7 @@ export default function MatterDetailPage() {
       <div style={cardStyle}>
         <Tabs.Content value="Activity" forceMount><ActivityTab matterId={id} matter={matter} refetch={refetch} toast={toast} enums={enums} /></Tabs.Content>
         <Tabs.Content value="Work" forceMount><WorkTab matterId={id} activeTab={activeTab} /></Tabs.Content>
-        <Tabs.Content value="Stakeholders" forceMount><StakeholdersTab matterId={id} matter={matter} refetch={refetch} toast={toast} allPeople={allPeople} allOrgs={allOrgs} /></Tabs.Content>
+        <Tabs.Content value="Stakeholders" forceMount><StakeholdersTab matterId={id} matter={matter} refetch={refetch} toast={toast} allPeople={allPeople} allOrgs={allOrgs} enums={enums} /></Tabs.Content>
         <Tabs.Content value="Intelligence" forceMount><IntelligenceTab matterId={id} activeTab={activeTab} /></Tabs.Content>
         <Tabs.Content value="Dependencies" forceMount><DependenciesTab matterId={id} matter={matter} refetch={refetch} toast={toast} allMatters={allMatters} enums={enums} /></Tabs.Content>
         <Tabs.Content value="Rulemaking" forceMount><RulemakingTab matterId={id} /></Tabs.Content>
