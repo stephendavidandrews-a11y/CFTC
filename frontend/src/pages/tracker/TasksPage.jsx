@@ -152,6 +152,22 @@ function isActive(t) {
   );
 }
 
+function getMonday(d) {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + diff);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function isCompletedThisWeek(t) {
+  if (t.status !== "done" || !t.completed_at) return false;
+  const completed = new Date(t.completed_at);
+  const monday = getMonday(new Date());
+  return completed >= monday;
+}
+
 function daysWaiting(t) {
   if (!t.created_at) return "\u2014";
   const created = safeDate(t.created_at);
@@ -194,6 +210,10 @@ const SAVED_VIEWS = [
   {
     label: "Quick Tasks",
     filter: (t) => !t.matter_id && isActive(t),
+  },
+  {
+    label: "Completed",
+    filter: (t) => t.status === "done",
   },
 ];
 
@@ -321,7 +341,6 @@ export default function TasksPage() {
         search,
         status: statusFilter,
         mode: modeFilter,
-        exclude_done: true,
         sort_by: "due_date",
         sort_dir: "asc",
         limit: 500,
@@ -355,6 +374,22 @@ export default function TasksPage() {
       } catch (err) {
         console.error(`Task ${action} failed:`, err);
         toast.error(`Failed to ${action} task: ${err.message || err}`);
+      } finally {
+        setActionBusy((prev) => ({ ...prev, [id]: false }));
+      }
+    },
+    [refetch]
+  );
+
+  const handleComplete = useCallback(
+    async (id) => {
+      setActionBusy((prev) => ({ ...prev, [id]: true }));
+      try {
+        await updateTask(id, { status: "done" });
+        refetch();
+      } catch (err) {
+        console.error("Complete failed:", err);
+        toast.error("Failed to complete task: " + (err.message || err));
       } finally {
         setActionBusy((prev) => ({ ...prev, [id]: false }));
       }
@@ -614,10 +649,37 @@ export default function TasksPage() {
       );
     }).length;
 
+    // Append this-week completions to each section (after stats, so stats stay clean)
+    const thisWeekDone = rawTasks.filter(isCompletedThisWeek);
+    const myDone = thisWeekDone.filter((t) => {
+      if (!me) return true;
+      return t.assigned_to_person_id === me || !t.assigned_to_person_id;
+    });
+    const waitingDone = thisWeekDone.filter((t) =>
+      t.task_mode === "follow_up" && !myDone.some((mt) => mt.id === t.id)
+    );
+    const claimedDoneIds = new Set([...myDone.map((t) => t.id), ...waitingDone.map((t) => t.id)]);
+    // Add done tasks to delegated groups
+    for (const group of _delegatedGroups) {
+      const groupDone = thisWeekDone.filter(
+        (t) => !claimedDoneIds.has(t.id) && group.rows.length > 0 &&
+          t.assigned_to_person_id === group.rows[0]?.assigned_to_person_id
+      );
+      if (groupDone.length > 0) group.rows = [...group.rows, ...groupDone];
+    }
+    // Add done tasks to team groups
+    for (const group of _teamGroups) {
+      const groupDone = thisWeekDone.filter(
+        (t) => !claimedDoneIds.has(t.id) && group.rows.length > 0 &&
+          (t.assigned_to_person_id || "unassigned") === group.key
+      );
+      if (groupDone.length > 0) group.rows = [...group.rows, ...groupDone];
+    }
+
     return {
-      myTasks: _myTasks,
+      myTasks: [..._myTasks, ...myDone],
       delegatedGroups: _delegatedGroups,
-      waitingTasks: _waitingTasks,
+      waitingTasks: [..._waitingTasks, ...waitingDone],
       teamGroups: _teamGroups,
       myOverdue: _myOverdue,
       teamOverdue: _teamOverdue,
@@ -643,13 +705,29 @@ export default function TasksPage() {
   const actionsCol = {
     key: "_actions",
     label: "",
-    width: 70,
+    width: 100,
     sortable: false,
     render: (_val, row) => (
       <div
         style={{ display: "flex", gap: 2 }}
         onClick={(e) => e.stopPropagation()}
       >
+        {row.status !== "done" && (
+          <button
+            title="Complete task"
+            style={{ ...actionBtnStyle, color: "#34d399" }}
+            disabled={actionBusy[row.id]}
+            onClick={() => handleComplete(row.id)}
+            onMouseEnter={(e) =>
+              (e.target.style.background = "#34d39922")
+            }
+            onMouseLeave={(e) =>
+              (e.target.style.background = "transparent")
+            }
+          >
+            ✓
+          </button>
+        )}
         <button
           title="Defer task"
           style={{ ...actionBtnStyle, color: theme.text.muted }}
@@ -1021,6 +1099,7 @@ export default function TasksPage() {
                 data={myTasks}
                 onRowClick={(row) => openDrawer("task", row, refetch)}
                 pageSize={15}
+                rowStyle={(row) => row.status === "done" ? { opacity: 0.45, textDecoration: "line-through" } : {}}
                 emptyMessage="No action items assigned to you. Tasks created in matters will appear here when assigned."
               />
             </div>
@@ -1060,6 +1139,7 @@ export default function TasksPage() {
                     data={group.rows}
                     onRowClick={(row) => openDrawer("task", row, refetch)}
                     pageSize={10}
+                  rowStyle={(row) => row.status === "done" ? { opacity: 0.45, textDecoration: "line-through" } : {}}
                     emptyMessage="No assigned tasks right now."
                   />
                 </div>
@@ -1082,6 +1162,7 @@ export default function TasksPage() {
                 data={waitingTasks}
                 onRowClick={(row) => openDrawer("task", row, refetch)}
                 pageSize={10}
+                rowStyle={(row) => row.status === "done" ? { opacity: 0.45, textDecoration: "line-through" } : {}}
                 emptyMessage="Nothing pending."
               />
             </div>
@@ -1125,6 +1206,7 @@ export default function TasksPage() {
                     columns={delegatedColumns}
                     onRowClick={(row) => openDrawer("task", row, refetch)}
                     compact
+                  rowStyle={(row) => row.status === "done" ? { opacity: 0.45, textDecoration: "line-through" } : {}}
                   />
                 </div>
               ))}
@@ -1167,6 +1249,7 @@ export default function TasksPage() {
               data={filteredTasks || []}
               onRowClick={(row) => openDrawer("task", row, refetch)}
               pageSize={25}
+              rowStyle={(row) => row.status === "done" ? { opacity: 0.45, textDecoration: "line-through" } : {}}
               emptyMessage="No tasks found."
             />
           )}

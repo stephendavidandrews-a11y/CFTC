@@ -31,6 +31,30 @@ from app.db import get_db
 from app.pipeline.orchestrator import cas_transition
 from app.routers.events import publish_event
 from app.voiceprint.matcher import match_all_speakers
+
+def _lookup_person_names(tracker_person_ids: list[str]) -> dict[str, str]:
+    """Look up full_name for tracker person IDs from the tracker DB."""
+    import sqlite3
+    import os
+    tracker_db = os.environ.get(
+        "TRACKER_DB_PATH",
+        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))),
+                     "services", "tracker", "data", "tracker.db"),
+    )
+    if not os.path.exists(tracker_db):
+        return {}
+    try:
+        conn = sqlite3.connect(f"file:{tracker_db}?mode=ro", uri=True)
+        conn.row_factory = sqlite3.Row
+        placeholders = ",".join("?" for _ in tracker_person_ids)
+        rows = conn.execute(
+            f"SELECT id, full_name FROM people WHERE id IN ({placeholders})",
+            tracker_person_ids,
+        ).fetchall()
+        conn.close()
+        return {r["id"]: r["full_name"] for r in rows if r["full_name"]}
+    except Exception:
+        return {}
 from app.voiceprint.profiles import promote_sample_to_profile
 
 logger = logging.getLogger(__name__)
@@ -193,6 +217,19 @@ async def get_speaker_review_detail(communication_id: str, db=Depends(get_db)):
 
     # Run voiceprint matching (on-demand, always uses latest profile library)
     vp_results = match_all_speakers(db, communication_id)
+
+    # Enrich voiceprint candidates with person names from tracker
+    all_candidate_ids = set()
+    for vp in vp_results.values():
+        for c in vp.get("candidates", []):
+            if c.get("tracker_person_id"):
+                all_candidate_ids.add(c["tracker_person_id"])
+    person_names = _lookup_person_names(list(all_candidate_ids)) if all_candidate_ids else {}
+    for vp in vp_results.values():
+        for c in vp.get("candidates", []):
+            pid = c.get("tracker_person_id")
+            if pid and pid in person_names:
+                c["person_name"] = person_names[pid]
 
     # Build speaker info with computed fields
     speakers = []
