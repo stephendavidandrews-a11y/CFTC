@@ -411,7 +411,15 @@ export default function TasksPage() {
         return assignedToMe;
       })
       .sort((a, b) => {
-        // Overdue first, then by due date
+        // Group by matter first, then overdue first, then by due date
+        const aMatter = (a.matter_title || "").toLowerCase();
+        const bMatter = (b.matter_title || "").toLowerCase();
+        // Quick tasks (no matter) sort last
+        const aHas = a.matter_id ? 0 : 1;
+        const bHas = b.matter_id ? 0 : 1;
+        if (aHas !== bHas) return aHas - bHas;
+        if (aMatter !== bMatter) return aMatter.localeCompare(bMatter);
+        // Within same matter: overdue first, then by due date
         const aOver = isDueOverdue(a.due_date) ? 0 : 1;
         const bOver = isDueOverdue(b.due_date) ? 0 : 1;
         if (aOver !== bOver) return aOver - bOver;
