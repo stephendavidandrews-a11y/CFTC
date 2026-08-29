@@ -33,6 +33,7 @@ const SECTIONS = [
   { path: "/context-notes", label: "Context Notes", icon: "\u2261" },
   { path: "/intelligence/daily", label: "Daily Brief", icon: "◉" },
   { path: "/intelligence/weekly", label: "Weekly Brief", icon: "\u25EB" },
+  { path: "/intelligence/osint", label: "OSINT Feed", icon: "\u25CE" },
   { path: "/settings/ai", label: "AI Configuration", icon: "\u2699" },
 
   { separator: true, label: "Developer" },

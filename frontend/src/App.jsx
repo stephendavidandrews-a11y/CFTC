@@ -46,6 +46,7 @@ import AISettingsPage from "./pages/settings/AISettingsPage";
 // -- Intelligence --
 import DailyBriefPage from "./pages/intelligence/DailyBriefPage";
 import WeeklyBriefPage from "./pages/intelligence/WeeklyBriefPage";
+import OsintFeedPage from "./pages/intelligence/OsintFeedPage";
 import DirectivesPage from "./pages/tracker/DirectivesPage";
 import DirectiveDetailPage from "./pages/tracker/DirectiveDetailPage";
 import TodayPage from "./pages/tracker/TodayPage";
@@ -100,6 +101,7 @@ export default function App() {
           <Route path="/intelligence/daily" element={<DailyBriefPage />} />
           <Route path="/intelligence/weekly" element={<WeeklyBriefPage />} />
           <Route path="/intelligence/briefs" element={<DailyBriefPage />} />
+          <Route path="/intelligence/osint" element={<OsintFeedPage />} />
 
           {/* -- AI Settings (Phase 8) -- */}
           <Route path="/settings/ai" element={<AISettingsPage />} />

@@ -439,4 +439,66 @@ export function mergeSpeakers(communicationId, targetLabel, sourceLabels) {
   });
 }
 
+// ── OSINT Feed ──────────────────────────────────────────────────────────────
+
+export function listOsintItems(params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  return fetchJSON(`/ai/api/osint/items${qs ? "?" + qs : ""}`);
+}
+
+export function getOsintTopics() {
+  return fetchJSON("/ai/api/osint/topics");
+}
+
+export function setOsintItemRead(id, isRead) {
+  return fetchJSON(`/ai/api/osint/items/${id}/read`, {
+    method: "POST",
+    body: JSON.stringify({ is_read: isRead }),
+  });
+}
+
+export function setOsintItemStarred(id, isStarred) {
+  return fetchJSON(`/ai/api/osint/items/${id}/star`, {
+    method: "POST",
+    body: JSON.stringify({ is_starred: isStarred }),
+  });
+}
+
+export function markAllOsintRead(params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  return fetchJSON(`/ai/api/osint/items/mark-all-read${qs ? "?" + qs : ""}`, {
+    method: "POST",
+  });
+}
+
+export function listOsintSources() {
+  return fetchJSON("/ai/api/osint/sources");
+}
+
+export function createOsintSource(data) {
+  return fetchJSON("/ai/api/osint/sources", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateOsintSource(id, data) {
+  return fetchJSON(`/ai/api/osint/sources/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export function deleteOsintSource(id) {
+  return fetchJSON(`/ai/api/osint/sources/${id}`, { method: "DELETE" });
+}
+
+export function refreshOsint(sourceId = null) {
+  const qs = sourceId ? `?source_id=${encodeURIComponent(sourceId)}` : "";
+  return fetchJSON(`/ai/api/osint/refresh${qs}`, {
+    method: "POST",
+    timeout: 300000,
+  });
+}
+
 export { ApiError };

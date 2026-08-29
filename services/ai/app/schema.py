@@ -518,6 +518,45 @@ TABLES = [
         created_at TEXT DEFAULT (datetime('now'))
     )""",
     ),
+    # ---- Table: osint_sources ----
+    (
+        "osint_sources",
+        """CREATE TABLE IF NOT EXISTS osint_sources (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        url TEXT NOT NULL UNIQUE,
+        category TEXT NOT NULL DEFAULT 'news',
+        default_topics TEXT,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        etag TEXT,
+        last_modified TEXT,
+        last_fetched_at TEXT,
+        last_status TEXT,
+        last_error TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+    )""",
+    ),
+    # ---- Table: osint_items ----
+    (
+        "osint_items",
+        """CREATE TABLE IF NOT EXISTS osint_items (
+        id TEXT PRIMARY KEY,
+        source_id TEXT NOT NULL REFERENCES osint_sources(id) ON DELETE CASCADE,
+        guid TEXT NOT NULL,
+        title TEXT NOT NULL,
+        url TEXT,
+        summary TEXT,
+        author TEXT,
+        published_at TEXT,
+        fetched_at TEXT DEFAULT (datetime('now')),
+        topics TEXT,
+        relevance INTEGER NOT NULL DEFAULT 0,
+        is_read INTEGER NOT NULL DEFAULT 0,
+        is_starred INTEGER NOT NULL DEFAULT 0,
+        UNIQUE(source_id, guid)
+    )""",
+    ),
 ]
 
 # ---------------------------------------------------------------------------
@@ -619,6 +658,12 @@ INDEXES = [
     # -- communication_directive_associations --
     "CREATE INDEX IF NOT EXISTS idx_directive_assoc_comm ON communication_directive_associations(communication_id);",
     "CREATE INDEX IF NOT EXISTS idx_directive_assoc_confirmed ON communication_directive_associations(communication_id, confirmed);",
+    # -- osint_sources --
+    "CREATE INDEX IF NOT EXISTS idx_osint_sources_enabled ON osint_sources(enabled);",
+    # -- osint_items --
+    "CREATE INDEX IF NOT EXISTS idx_osint_items_source ON osint_items(source_id);",
+    "CREATE INDEX IF NOT EXISTS idx_osint_items_published ON osint_items(published_at);",
+    "CREATE INDEX IF NOT EXISTS idx_osint_items_fetched ON osint_items(fetched_at);",
 ]
 
 

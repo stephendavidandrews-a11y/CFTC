@@ -48,6 +48,10 @@ HOST = os.environ.get("AI_HOST", "0.0.0.0")
 
 LOCAL_TIMEZONE = os.environ.get("LOCAL_TIMEZONE", "America/New_York")
 
+# OSINT feed refresh loop
+OSINT_ENABLED = os.environ.get("OSINT_ENABLED", "1") not in ("0", "false", "no")
+OSINT_REFRESH_MINUTES = int(os.environ.get("OSINT_REFRESH_MINUTES", "45"))
+
 APP_ENV = os.environ.get("APP_ENV", "development")
 if APP_ENV == "production" and not ANTHROPIC_API_KEY:
     print("FATAL: ANTHROPIC_API_KEY env var required in production", file=sys.stderr)

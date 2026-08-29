@@ -38,6 +38,7 @@ from app.routers import (
     intelligence,
     meeting_intelligence,
     telemetry,
+    osint,
 )
 
 logging.basicConfig(
@@ -508,6 +509,54 @@ async def _brief_scheduler_loop():
     except asyncio.CancelledError:
         logger.info("Brief scheduler stopped.")
 
+
+# ── OSINT feed refresh ───────────────────────────────────────────────────────
+
+async def _osint_refresh_loop():
+    """Periodically fetch OSINT sources (China / Taiwan / semis / AI feeds).
+
+    Interval is OSINT_REFRESH_MINUTES (default 45); set OSINT_ENABLED=0
+    to disable the loop entirely. Fetching is synchronous httpx work, so
+    it runs in a thread to keep the event loop free.
+    """
+    from app.config import OSINT_ENABLED, OSINT_REFRESH_MINUTES
+
+    if not OSINT_ENABLED:
+        logger.info("OSINT refresh loop disabled (OSINT_ENABLED=0)")
+        return
+
+    logger.info("OSINT refresh loop started (interval=%dm)", OSINT_REFRESH_MINUTES)
+
+    def _do_refresh():
+        from app.osint.fetcher import purge_old_items, refresh_sources
+
+        conn = get_connection()
+        try:
+            summary = refresh_sources(conn)
+            purge_old_items(conn)
+            return summary
+        finally:
+            conn.close()
+
+    try:
+        # Short initial delay so startup isn't slowed by network fetches
+        await asyncio.sleep(60)
+        while True:
+            try:
+                summary = await asyncio.to_thread(_do_refresh)
+                logger.info(
+                    "OSINT refresh: %d sources, %d new items, %d errors",
+                    summary["sources_checked"],
+                    summary["new_items"],
+                    summary["errors"],
+                )
+            except Exception as e:
+                logger.error("OSINT refresh loop error: %s", e)
+            await asyncio.sleep(OSINT_REFRESH_MINUTES * 60)
+    except asyncio.CancelledError:
+        logger.info("OSINT refresh loop stopped.")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize database, config, and file watcher on startup."""
@@ -578,6 +627,13 @@ async def lifespan(app: FastAPI):
                 logger.info(
                     "Crash recovery: cleaned %d temp files from _incoming/", cleaned
                 )
+
+        # Seed curated OSINT sources (idempotent, never overwrites edits)
+        from app.osint.sources import seed_default_sources
+
+        seeded = seed_default_sources(conn)
+        if seeded:
+            logger.info("OSINT: seeded %d default sources", seeded)
     finally:
         conn.close()
 
@@ -641,6 +697,7 @@ async def lifespan(app: FastAPI):
     tracker_probe_task = asyncio.create_task(_tracker_health_probe_loop())
     disk_task = asyncio.create_task(_disk_monitor_loop())
     brief_task = asyncio.create_task(_brief_scheduler_loop())
+    osint_task = asyncio.create_task(_osint_refresh_loop())
 
     # Mark service as ready
     global _ready, _startup_error
@@ -652,7 +709,7 @@ async def lifespan(app: FastAPI):
     _ready = False
 
     # Shutdown — cancel all background tasks
-    for task in [stuck_task, api_probe_task, tracker_probe_task, disk_task, brief_task]:
+    for task in [stuck_task, api_probe_task, tracker_probe_task, disk_task, brief_task, osint_task]:
         task.cancel()
         try:
             await task
@@ -800,3 +857,4 @@ app.include_router(
     meeting_intelligence.router, prefix=api_prefix, dependencies=_ai_auth_dep
 )
 app.include_router(telemetry.router, prefix=api_prefix, dependencies=_ai_auth_dep)
+app.include_router(osint.router, prefix=api_prefix, dependencies=_ai_auth_dep)
