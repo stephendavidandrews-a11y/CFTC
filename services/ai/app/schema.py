@@ -518,6 +518,109 @@ TABLES = [
         created_at TEXT DEFAULT (datetime('now'))
     )""",
     ),
+    # ---- Contact enrichment: enrichment_jobs ----
+    (
+        "enrichment_jobs",
+        """CREATE TABLE IF NOT EXISTS enrichment_jobs (
+        id TEXT PRIMARY KEY,
+        source_type TEXT NOT NULL,
+        original_filename TEXT NOT NULL,
+        stored_path TEXT NOT NULL,
+        file_sha256 TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'uploaded',
+        column_mapping TEXT,
+        enrich_profile INTEGER DEFAULT 0,
+        row_count INTEGER,
+        rows_processed INTEGER DEFAULT 0,
+        rows_found INTEGER DEFAULT 0,
+        rows_not_found INTEGER DEFAULT 0,
+        rows_skipped_cache INTEGER DEFAULT 0,
+        credits_estimated INTEGER,
+        credits_spent INTEGER DEFAULT 0,
+        credit_cap INTEGER,
+        egress_acknowledged_at TEXT,
+        error_message TEXT,
+        created_by TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+    )""",
+    ),
+    # ---- Contact enrichment: enrichment_rows ----
+    (
+        "enrichment_rows",
+        """CREATE TABLE IF NOT EXISTS enrichment_rows (
+        id TEXT PRIMARY KEY,
+        job_id TEXT NOT NULL REFERENCES enrichment_jobs(id),
+        row_number INTEGER NOT NULL,
+        raw_row TEXT NOT NULL,
+        first_name TEXT,
+        last_name TEXT,
+        full_name TEXT,
+        org_name_raw TEXT,
+        domain TEXT,
+        title_raw TEXT,
+        email_raw TEXT,
+        matched_person_id TEXT,
+        match_method TEXT,
+        match_confidence REAL,
+        match_ambiguous INTEGER DEFAULT 0,
+        resolved_organization_id TEXT,
+        org_resolution_method TEXT,
+        hunter_status TEXT DEFAULT 'pending',
+        hunter_email TEXT,
+        hunter_score INTEGER,
+        hunter_verification TEXT,
+        hunter_position TEXT,
+        hunter_linkedin_url TEXT,
+        hunter_twitter TEXT,
+        hunter_seniority TEXT,
+        hunter_department TEXT,
+        hunter_sources_count INTEGER,
+        hunter_raw TEXT,
+        from_cache INTEGER DEFAULT 0,
+        credits_used INTEGER DEFAULT 0,
+        error_detail TEXT,
+        review_status TEXT NOT NULL DEFAULT 'pending',
+        proposed_data TEXT,
+        edited_data TEXT,
+        write_action TEXT,
+        reviewed_by TEXT,
+        reviewed_at TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+    )""",
+    ),
+    # ---- Contact enrichment: enrichment_cache ----
+    (
+        "enrichment_cache",
+        """CREATE TABLE IF NOT EXISTS enrichment_cache (
+        id TEXT PRIMARY KEY,
+        lookup_key TEXT NOT NULL UNIQUE,
+        endpoint TEXT NOT NULL,
+        response_json TEXT NOT NULL,
+        hit_count INTEGER DEFAULT 0,
+        fetched_at TEXT DEFAULT (datetime('now')),
+        expires_at TEXT
+    )""",
+    ),
+    # ---- Contact enrichment: enrichment_writebacks ----
+    (
+        "enrichment_writebacks",
+        """CREATE TABLE IF NOT EXISTS enrichment_writebacks (
+        id TEXT PRIMARY KEY,
+        job_id TEXT NOT NULL REFERENCES enrichment_jobs(id),
+        row_id TEXT NOT NULL REFERENCES enrichment_rows(id),
+        target_table TEXT NOT NULL,
+        target_record_id TEXT NOT NULL,
+        write_type TEXT NOT NULL,
+        written_data TEXT NOT NULL,
+        previous_data TEXT,
+        auto_committed INTEGER DEFAULT 0,
+        reversed INTEGER DEFAULT 0,
+        reversed_at TEXT,
+        written_at TEXT DEFAULT (datetime('now'))
+    )""",
+    ),
 ]
 
 # ---------------------------------------------------------------------------
@@ -619,6 +722,21 @@ INDEXES = [
     # -- communication_directive_associations --
     "CREATE INDEX IF NOT EXISTS idx_directive_assoc_comm ON communication_directive_associations(communication_id);",
     "CREATE INDEX IF NOT EXISTS idx_directive_assoc_confirmed ON communication_directive_associations(communication_id, confirmed);",
+    # -- contact enrichment --
+    "CREATE INDEX IF NOT EXISTS idx_enrich_jobs_status ON enrichment_jobs(status);",
+    "CREATE INDEX IF NOT EXISTS idx_enrich_jobs_created ON enrichment_jobs(created_at);",
+    "CREATE INDEX IF NOT EXISTS idx_enrich_jobs_sha ON enrichment_jobs(file_sha256);",
+    "CREATE INDEX IF NOT EXISTS idx_enrich_rows_job ON enrichment_rows(job_id);",
+    "CREATE INDEX IF NOT EXISTS idx_enrich_rows_review ON enrichment_rows(job_id, review_status);",
+    "CREATE INDEX IF NOT EXISTS idx_enrich_rows_hunter ON enrichment_rows(job_id, hunter_status);",
+    "CREATE INDEX IF NOT EXISTS idx_enrich_rows_order ON enrichment_rows(job_id, row_number);",
+    "CREATE INDEX IF NOT EXISTS idx_enrich_rows_person ON enrichment_rows(matched_person_id);",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_enrich_cache_key ON enrichment_cache(lookup_key);",
+    "CREATE INDEX IF NOT EXISTS idx_enrich_cache_expires ON enrichment_cache(expires_at);",
+    "CREATE INDEX IF NOT EXISTS idx_enrich_wb_job ON enrichment_writebacks(job_id);",
+    "CREATE INDEX IF NOT EXISTS idx_enrich_wb_row ON enrichment_writebacks(row_id);",
+    "CREATE INDEX IF NOT EXISTS idx_enrich_wb_target ON enrichment_writebacks(target_table, target_record_id);",
+    "CREATE INDEX IF NOT EXISTS idx_enrich_wb_reversed ON enrichment_writebacks(reversed);",
 ]
 
 

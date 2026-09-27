@@ -65,6 +65,10 @@ class CreatePerson(EnumValidatedModel):
     source: str = "manual"
     source_id: Optional[str] = None
     external_refs: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    email_verification_status: Optional[str] = None
+    email_verified_at: Optional[str] = None
+    email_confidence: Optional[int] = None
 
     def model_post_init(self, __context):
         if self.include_in_team is not None:
@@ -100,6 +104,10 @@ class UpdatePerson(EnumValidatedModel):
     source: Optional[str] = None
     source_id: Optional[str] = None
     external_refs: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    email_verification_status: Optional[str] = None
+    email_verified_at: Optional[str] = None
+    email_confidence: Optional[int] = None
 
 
 # Organizations
@@ -117,6 +125,7 @@ class CreateOrganization(EnumValidatedModel):
     parent_organization_id: Optional[str] = None
     jurisdiction: Optional[str] = None
     notes: Optional[str] = None
+    primary_domain: Optional[str] = None
     is_active: int = 1
     source: str = "manual"
     source_id: Optional[str] = None
@@ -135,6 +144,7 @@ class UpdateOrganization(EnumValidatedModel):
     parent_organization_id: Optional[str] = None
     jurisdiction: Optional[str] = None
     notes: Optional[str] = None
+    primary_domain: Optional[str] = None
     is_active: Optional[int] = None
     source: Optional[str] = None
     source_id: Optional[str] = None

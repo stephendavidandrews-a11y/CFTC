@@ -38,6 +38,7 @@ from app.routers import (
     intelligence,
     meeting_intelligence,
     telemetry,
+    contact_enrichment,
 )
 
 logging.basicConfig(
@@ -800,3 +801,6 @@ app.include_router(
     meeting_intelligence.router, prefix=api_prefix, dependencies=_ai_auth_dep
 )
 app.include_router(telemetry.router, prefix=api_prefix, dependencies=_ai_auth_dep)
+app.include_router(
+    contact_enrichment.router, prefix=api_prefix, dependencies=_ai_auth_dep
+)

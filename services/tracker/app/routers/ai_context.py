@@ -513,7 +513,8 @@ def _get_active_organizations(db):
         dict(row)
         for row in db.execute("""
         SELECT o.id, o.name, o.short_name, o.organization_type,
-               o.parent_organization_id, po.name as parent_name
+               o.parent_organization_id, po.name as parent_name,
+               o.primary_domain
         FROM organizations o
         LEFT JOIN organizations po ON o.parent_organization_id = po.id
         WHERE o.is_active = 1

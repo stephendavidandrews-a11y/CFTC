@@ -210,9 +210,9 @@ async def create_organization(
     db.execute(
         """
         INSERT INTO organizations (id, name, short_name, organization_type,
-            parent_organization_id, jurisdiction, notes, is_active,
+            parent_organization_id, jurisdiction, notes, primary_domain, is_active,
             source, source_id, external_refs, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """,
         (
             oid,
@@ -222,6 +222,7 @@ async def create_organization(
             body.parent_organization_id,
             body.jurisdiction,
             body.notes,
+            body.primary_domain,
             body.is_active,
             source_val,
             body.source_id,

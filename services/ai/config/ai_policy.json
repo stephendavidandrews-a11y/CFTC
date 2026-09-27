@@ -35,6 +35,22 @@
     "flag_congressional_sensitive": true,
     "flag_deliberative": true
   },
+  "enrichment_policy": {
+    "enabled": true,
+    "auto_accept_score": 90,
+    "reject_below_score": 50,
+    "allow_risky_emails": false,
+    "enrich_profile_default": false,
+    "max_concurrency": 5,
+    "requests_per_second": 8,
+    "max_rows_per_job": 5000,
+    "default_credit_cap": 500,
+    "cache_ttl_days": 90,
+    "fuzzy_name_threshold": 0.85,
+    "allow_domain_search_fallback": false,
+    "propose_org_domain_writeback": true,
+    "require_egress_acknowledgement": true
+  },
   "trust_config": {
     "task": {
       "mode": "review_required",
