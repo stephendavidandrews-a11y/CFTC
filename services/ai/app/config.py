@@ -43,6 +43,16 @@ INTAKE_USER = os.environ.get("INTAKE_USER", "")
 INTAKE_PASS = os.environ.get("INTAKE_PASS", "")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 
+# Hunter.io contact enrichment. Absent key disables the feature at the router,
+# rather than failing at spend time. Never logged — see enrichment/hunter_client.
+HUNTER_API_KEY = os.environ.get("HUNTER_API_KEY", "")
+
+# Contact sheets are kilobytes, not the 200MB an audio upload gets.
+ENRICHMENT_UPLOAD_DIR = AI_UPLOAD_DIR / "enrichment"
+MAX_ENRICHMENT_UPLOAD_BYTES = int(
+    os.environ.get("MAX_ENRICHMENT_UPLOAD_BYTES", str(16 * 1024 * 1024))
+)
+
 PORT = int(os.environ.get("AI_PORT", "8006"))
 HOST = os.environ.get("AI_HOST", "0.0.0.0")
 
@@ -190,6 +200,22 @@ def _default_policy() -> dict:
             "flag_enforcement_sensitive": True,
             "flag_congressional_sensitive": True,
             "flag_deliberative": True,
+        },
+        "enrichment_policy": {
+            "enabled": True,
+            "auto_accept_score": 90,
+            "reject_below_score": 50,
+            "allow_risky_emails": False,
+            "enrich_profile_default": False,
+            "max_concurrency": 5,
+            "requests_per_second": 8,
+            "max_rows_per_job": 5000,
+            "default_credit_cap": 500,
+            "cache_ttl_days": 90,
+            "fuzzy_name_threshold": 0.85,
+            "allow_domain_search_fallback": False,
+            "propose_org_domain_writeback": True,
+            "require_egress_acknowledgement": True,
         },
         "trust_config": {
             action: {"mode": "review_required", "auto_commit_threshold": None}

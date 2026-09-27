@@ -39,3 +39,14 @@ export const cardStyle = {
   border: `1px solid ${theme.border.default}`,
   padding: 24,
 };
+
+export const btnSecondary = {
+  padding: "8px 18px",
+  borderRadius: 6,
+  fontSize: 13,
+  fontWeight: 600,
+  background: "transparent",
+  color: theme.text.muted,
+  border: `1px solid ${theme.border.default}`,
+  cursor: "pointer",
+};

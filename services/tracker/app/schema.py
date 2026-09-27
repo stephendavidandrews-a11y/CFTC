@@ -1211,6 +1211,20 @@ MIGRATIONS = [
             "CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_task_id)",
         ],
     ),
+    # Version 12: contact enrichment fields (Hunter.io) on people + org domain
+    (
+        12,
+        "people_enrichment_fields",
+        [
+            "ALTER TABLE people ADD COLUMN linkedin_url TEXT",
+            "ALTER TABLE people ADD COLUMN email_verification_status TEXT",
+            "ALTER TABLE people ADD COLUMN email_verified_at TEXT",
+            "ALTER TABLE people ADD COLUMN email_confidence INTEGER",
+            "ALTER TABLE organizations ADD COLUMN primary_domain TEXT",
+            "CREATE INDEX IF NOT EXISTS idx_people_email_verified ON people(email_verification_status)",
+            "CREATE INDEX IF NOT EXISTS idx_orgs_primary_domain ON organizations(primary_domain) WHERE primary_domain IS NOT NULL",
+        ],
+    ),
 ]
 
 

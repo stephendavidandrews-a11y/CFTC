@@ -239,8 +239,10 @@ async def create_person(
             last_interaction_date, next_interaction_needed_date, next_interaction_type,
             next_interaction_purpose, manager_person_id, include_in_team_workload,
             relationship_assigned_to_person_id, is_active,
-            source, source_id, external_refs, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            source, source_id, external_refs,
+            linkedin_url, email_verification_status, email_verified_at, email_confidence,
+            created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """,
         (
             pid,
@@ -266,6 +268,10 @@ async def create_person(
             source_val,
             body.source_id,
             body.external_refs,
+            body.linkedin_url,
+            body.email_verification_status,
+            body.email_verified_at,
+            body.email_confidence,
             now,
             now,
         ),

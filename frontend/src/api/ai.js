@@ -439,4 +439,112 @@ export function mergeSpeakers(communicationId, targetLabel, sourceLabels) {
   });
 }
 
+// ── Contact Enrichment (Hunter.io) ──────────────────────────────────────────
+
+export function getEnrichmentStatus() {
+  return fetchJSON("/ai/api/enrichment/status");
+}
+
+export function getHunterAccount() {
+  return fetchJSON("/ai/api/enrichment/account");
+}
+
+export function listEnrichmentJobs(params = {}) {
+  const qs = new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== "")
+  ).toString();
+  return fetchJSON(`/ai/api/enrichment/jobs${qs ? `?${qs}` : ""}`);
+}
+
+export function getEnrichmentJob(jobId) {
+  return fetchJSON(`/ai/api/enrichment/jobs/${jobId}`);
+}
+
+export function uploadContactSheet(file, { sourceType, enrichProfile } = {}) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const qs = new URLSearchParams();
+  if (sourceType) qs.set("source_type", sourceType);
+  if (enrichProfile !== undefined && enrichProfile !== null) {
+    qs.set("enrich_profile", String(enrichProfile));
+  }
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return uploadFile(`/ai/api/enrichment/jobs${suffix}`, formData);
+}
+
+export function getEnrichmentPreview(jobId, limit = 10) {
+  return fetchJSON(`/ai/api/enrichment/jobs/${jobId}/preview?limit=${limit}`);
+}
+
+export function confirmEnrichmentMapping(jobId, mapping) {
+  return fetchJSON(`/ai/api/enrichment/jobs/${jobId}/mapping`, {
+    method: "PUT",
+    body: JSON.stringify({ mapping }),
+  });
+}
+
+export function getEnrichmentPreflight(jobId) {
+  return fetchJSON(`/ai/api/enrichment/jobs/${jobId}/preflight`);
+}
+
+export function startEnrichmentJob(jobId, { acknowledgeEgress, creditCap } = {}) {
+  return fetchJSON(`/ai/api/enrichment/jobs/${jobId}/start`, {
+    method: "POST",
+    body: JSON.stringify({
+      acknowledge_egress: !!acknowledgeEgress,
+      credit_cap: creditCap,
+    }),
+  });
+}
+
+export function resumeEnrichmentJob(jobId, creditCap) {
+  return fetchJSON(`/ai/api/enrichment/jobs/${jobId}/resume`, {
+    method: "POST",
+    body: JSON.stringify(creditCap === undefined ? {} : { credit_cap: creditCap }),
+  });
+}
+
+export function pauseEnrichmentJob(jobId) {
+  return fetchJSON(`/ai/api/enrichment/jobs/${jobId}/pause`, { method: "POST" });
+}
+
+export function cancelEnrichmentJob(jobId) {
+  return fetchJSON(`/ai/api/enrichment/jobs/${jobId}/cancel`, { method: "POST" });
+}
+
+export function listEnrichmentRows(jobId, params = {}) {
+  const qs = new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== "")
+  ).toString();
+  return fetchJSON(`/ai/api/enrichment/jobs/${jobId}/rows${qs ? `?${qs}` : ""}`);
+}
+
+export function updateEnrichmentRow(rowId, payload) {
+  return fetchJSON(`/ai/api/enrichment/rows/${rowId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function bulkAcceptEnrichment(jobId, actor) {
+  return fetchJSON(`/ai/api/enrichment/jobs/${jobId}/bulk-accept`, {
+    method: "POST",
+    body: JSON.stringify({ actor }),
+  });
+}
+
+export function commitEnrichmentJob(jobId) {
+  return fetchJSON(`/ai/api/enrichment/jobs/${jobId}/commit`, { method: "POST" });
+}
+
+export function undoEnrichmentJob(jobId) {
+  return fetchJSON(`/ai/api/enrichment/jobs/${jobId}/undo`, { method: "POST" });
+}
+
+/** Download URL for the filled sheet. Used as an href, not fetched. */
+export function enrichmentExportUrl(jobId, fmt) {
+  return `/ai/api/enrichment/jobs/${jobId}/export${fmt ? `?fmt=${fmt}` : ""}`;
+}
+
+
 export { ApiError };
