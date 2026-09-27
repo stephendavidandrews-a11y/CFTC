@@ -14,6 +14,7 @@ const SECTIONS = [
   { path: "/tasks", label: "Tasks", icon: "\u2611" },
   { path: "/people", label: "People", icon: "\u22A1" },
   { path: "/organizations", label: "Organizations", icon: "\u229E" },
+  { path: "/enrichment", label: "Contact Enrichment", icon: "\u2295", indent: true },
   { path: "/meetings", label: "Meetings", icon: "\u229E" },
   { path: "/decisions", label: "Decisions", icon: "\u2696" },
   { path: "/documents", label: "Documents", icon: "\u25DA" },

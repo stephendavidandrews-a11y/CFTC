@@ -51,6 +51,10 @@ import DirectiveDetailPage from "./pages/tracker/DirectiveDetailPage";
 import TodayPage from "./pages/tracker/TodayPage";
 import CaptureStatusPage from "./pages/tracker/CaptureStatusPage";
 
+// -- Contact Enrichment --
+import ContactEnrichmentPage from "./pages/enrichment/ContactEnrichmentPage";
+import EnrichmentReviewPage from "./pages/enrichment/EnrichmentReviewPage";
+
 
 
 export default function App() {
@@ -83,6 +87,10 @@ export default function App() {
           <Route path="/documents/:id" element={<DocumentDetailPage />} />
           <Route path="/context-notes" element={<ContextNotesPage />} />
           <Route path="/context-notes/:id" element={<ContextNoteDetailPage />} />
+
+          {/* -- Contact Enrichment (Hunter.io) -- */}
+          <Route path="/enrichment" element={<ContactEnrichmentPage />} />
+          <Route path="/enrichment/:id" element={<EnrichmentReviewPage />} />
 
           {/* -- AI Review (Phase 3 + Phase 6) -- */}
           <Route path="/review/speakers" element={<SpeakerReviewQueuePage />} />
